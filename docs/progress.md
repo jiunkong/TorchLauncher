@@ -22,6 +22,8 @@
 - 네 세션의 2차 구현과 검토 수정을 모두 머지했다. `pnpm check`가 447개 테스트 성공,
   opt-in 실제 설치 테스트 1개 기본 skip, 전체 타입·린트·두 앱 빌드 성공으로 끝났다.
   Drive 실파일 버전 교체와 Windows 안전 저장·실계정 로그인은 미검증으로 남긴다.
+- 사용자가 Drive 공개 테스트 링크를 제공했다. #2에 `test/dl-01-live-drive` 브랜치로
+  첫 버전의 익명 Range 검증을 배정한다. 파일 교체는 첫 검증 후 별도 요청하며 아직 하지 않는다.
 - [세션별 작업 지시문과 수정 범위](work-distribution.md)를 따른다. FMT-01 계약을 우선 통합하고
   후속 writer·reader·Studio 작업을 연결한다. 독립적인 첫 작업 네 개는 병렬 착수할 수 있다.
 
@@ -113,6 +115,7 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 | DL-01 | #2 — `launcher develop #2` | `feat/dl-01-download-sources` | `.agents/worktrees/agent-2` | `packages/core/src/download/google-drive/`, `packages/core/src/download/source/`, `third-party/gdown/`, 해당 인계 문서 |
 | GAME-04 | #3 — `launcher develop #3` | `feat/game-04-runtime` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, `packages/core/src/download/full/`, 해당 인계 문서 |
 | AUTH-02 | #4 — `launcher develop #4` | `feat/auth-02-host-adapters` | `.agents/worktrees/agent-4` | `apps/launcher/src/main/auth/`, `scripts/auth-smoke.mjs`, `packages/core/package.json`의 auth export만, 해당 인계 문서 |
+| DL-01 live | #2 — `launcher develop #2` | `test/dl-01-live-drive` | `.agents/worktrees/agent-2` | 기존 DL-01 소스·테스트·fixture 범위, `docs/handoffs/DL-01-live.md` |
 
 ### 실행 세션
 
