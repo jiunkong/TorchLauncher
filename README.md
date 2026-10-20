@@ -3,8 +3,10 @@
 서버 전용 Minecraft 런처와 운영자용 **TorchLauncher Studio**를 만드는 프로젝트입니다.
 Windows·macOS·Linux, Fabric·NeoForge를 지원하는 것을 목표로 합니다.
 
-현재는 두 Electron 앱의 초기 화면, 공통 패키지, 개발·검증·패키징 기반이 있습니다.
-로그인, 게임 설치·접속, 모드 동기화, Studio의 배포 기능은 아직 구현하지 않았습니다.
+두 Electron 앱의 초기 화면과 개발·검증·패키징 기반, 배포 규격 계약,
+HTTPS Range 전송, Microsoft 인증 코어, Minecraft 설치·실행 인자 조립 코어가 있습니다.
+코어는 아직 앱에 연결하지 않았습니다. 실제 계정 로그인·게임 실행·로더 설치,
+모드 동기화와 Studio의 배포 기능은 후속 작업입니다.
 
 ## 개발 환경
 
