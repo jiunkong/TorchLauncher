@@ -7,8 +7,9 @@
 - 기준: `58fe23ea2c7d13e52d63a9e6f69220c04df359c2`.
 - 구현 커밋: `33e36bbac8e1bbcd26b77ec7f5d89708c560b468` —
   `feat(core): stream atomic single-file deployment writes`.
-- 최종 커밋: 이 문서를 포함하는 커밋. 자기 참조를 피하고자 해시는 최종 응답과 #0 완료
-  메시지에 별도로 제공한다. 통합과 완료 판정은 #0 소유이며 `main`에 직접 반영하지 않았다.
+- 최종 test-only 수정 커밋: 인계 문서를 포함하는 커밋. 자기 참조를 피하고자 해시는 최종
+  응답과 #0 완료 메시지에 별도로 제공한다. 통합과 완료 판정은 #0 소유이며 `main`에 직접
+  반영하지 않았다.
 
 ## 변경 범위와 API
 
@@ -122,6 +123,11 @@ Linux x64 / WSL2, Node.js `24.21.0`, pnpm `10.34.7`.
 - 실제 최대 4 GiB 파일/64 GiB 컨테이너 생성이나 메모리 benchmark는 수행하지 않았다.
   oversized sparse stat 거부·인덱스 한도·multi-chunk 동작을 테스트했다. 실제 Windows/macOS
   파일 시스템 alias·권한·rename·symlink 정책은 별도 OS 검증이 필요하다.
+- Windows 계정의 symlink privilege 차이 때문에 symlink를 생성하는 테스트만
+  `EPERM`/`EACCES`/`ENOTSUP`/`ENOSYS` 응답에서 capability skip한다. 그 외 오류는 실패한다.
+  hard link, directory input, output/input alias 검사는 별도 테스트라 skip 대상이 아니다.
+  이 worktree의 Linux/WSL run은 symlink 생성이 가능해 46개 모두 통과했다. Windows에서
+  해당 symlink 거부 검증이 실행되었다는 뜻은 아니다.
 - unsigned v1의 신뢰 경계는 그대로다. 서명/anti-rollback, 제품 reader, HTTP/Drive,
   Studio 파일 선택/UI/worker 연결, SYNC 적용·혼합 설정 정책은 구현하지 않았다.
 - public export는 후속 공유 파일 배정 대상이다. 내부 상대 경로로만 검증했으며 새로운
@@ -130,3 +136,16 @@ Linux x64 / WSL2, Node.js `24.21.0`, pnpm `10.34.7`.
   통과했다. 실제 게임 실행·서버 접속이나 Drive 업데이트를 검증한 결과로 취급하지 않는다.
 
 #0에게 API와 검증/제한을 먼저 전달했다. 후속 작업은 자동 착수하지 않는다.
+
+## Windows temp/symlink 검토 반영
+
+기준 commit `525ddf2dd3f6ca3d77d22c816b7b422fc49ebeae` 뒤에 test 전용 보완을 했다.
+테스트 scratch root를 `realpath(tmpdir())` 아래 만들어 host temp alias를 고정한다.
+symlink source file, parent directory, source root, external target, output 사례를 분리했다.
+링크 생성 자체가 해당 권한 제한 목록으로 실패하는 테스트만 Vitest capability skip 한다.
+hardlink/directory/output input alias 사례는 개별 non-symlink 테스트에 남겨 두었다.
+
+수정 후 검증: `pnpm exec vitest run packages/core/src/deployment/writer/writer.test.ts`
+46개 통과(현재 Linux host에서 skip 0); `pnpm --filter @torchlauncher/core typecheck`
+통과; `pnpm exec biome check .` 전체 파일 59개 통과. 이 test-only 변경에는 추가 full
+`pnpm check`/app build를 반복하지 않았다.

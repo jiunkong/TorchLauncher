@@ -6,6 +6,7 @@ import {
   open,
   readdir,
   readFile,
+  realpath,
   rename,
   rm,
   symlink,
@@ -15,7 +16,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInflateRaw, gunzipSync } from 'node:zlib';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, type TestContext } from 'vitest';
 import type { DeploymentIndex } from '../contracts/index.js';
 import { DEPLOYMENT_LIMITS } from '../contracts/index.js';
 import {
@@ -27,6 +28,28 @@ import {
 } from './index.js';
 
 const roots: string[] = [];
+const symlinkPermissionCodes = new Set(['EPERM', 'EACCES', 'ENOTSUP', 'ENOSYS']);
+
+async function createSymlinkOrSkip(
+  context: TestContext,
+  target: string,
+  path: string,
+  type?: 'dir' | 'file' | 'junction',
+): Promise<void> {
+  try {
+    await symlink(target, path, type);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      symlinkPermissionCodes.has(String(error.code))
+    ) {
+      context.skip(`Symlink creation is unavailable on this host: ${String(error.code)}`);
+    }
+    throw error;
+  }
+}
+
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
@@ -38,7 +61,7 @@ const plainInput: DeploymentInputFile = {
 };
 
 async function setup() {
-  const root = await mkdtemp(join(tmpdir(), 'torch-writer-test-'));
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'torch-writer-test-'));
   roots.push(root);
   const sourceRoot = join(root, 'source');
   await mkdir(join(sourceRoot, 'config'), { recursive: true });
@@ -251,40 +274,77 @@ describe('deployment writer path and size rejection', () => {
     ).rejects.toMatchObject({ code: 'invalid-path' });
   });
 
-  it('rejects symlink files and symlink parent directories even when pointing inside the source root', async () => {
-    const { sourceRoot, options, root } = await setup();
-    await symlink(join(sourceRoot, plainInput.sourcePath), join(sourceRoot, 'mods/link.txt'));
-    await symlink(join(sourceRoot, 'config'), join(sourceRoot, 'alias'), 'dir');
-    for (const sourcePath of ['mods/link.txt', 'alias/options.txt']) {
-      await expect(
-        writeDeployment({ ...options, files: [{ ...plainInput, sourcePath }] }),
-      ).rejects.toMatchObject({ code: 'unsafe-path' });
-    }
+  it('rejects a symlink file', async (context) => {
+    const { sourceRoot, options } = await setup();
+    await createSymlinkOrSkip(
+      context,
+      join(sourceRoot, plainInput.sourcePath),
+      join(sourceRoot, 'mods/link.txt'),
+    );
+    await expect(
+      writeDeployment({ ...options, files: [{ ...plainInput, sourcePath: 'mods/link.txt' }] }),
+    ).rejects.toMatchObject({ code: 'unsafe-path' });
+  });
+
+  it('rejects a symlink parent directory even when it points inside the source root', async (context) => {
+    const { sourceRoot, options } = await setup();
+    await createSymlinkOrSkip(
+      context,
+      join(sourceRoot, 'config'),
+      join(sourceRoot, 'alias'),
+      'dir',
+    );
+    await expect(
+      writeDeployment({ ...options, files: [{ ...plainInput, sourcePath: 'alias/options.txt' }] }),
+    ).rejects.toMatchObject({ code: 'unsafe-path' });
+  });
+
+  it('rejects a symlink source root', async (context) => {
+    const { sourceRoot, root, options } = await setup();
     const rootLink = join(root, 'root-link');
-    await symlink(sourceRoot, rootLink, 'dir');
+    await createSymlinkOrSkip(context, sourceRoot, rootLink, 'dir');
     await expect(writeDeployment({ ...options, sourceRoot: rootLink })).rejects.toMatchObject({
       code: 'unsafe-path',
     });
   });
 
-  it('rejects an external symlink and hard-linked or directory inputs', async () => {
+  it('rejects an external symlink target', async (context) => {
     const { sourceRoot, root, options } = await setup();
     const external = join(root, 'private.txt');
     await writeFile(external, 'must not export');
-    await symlink(external, join(sourceRoot, 'external'));
-    await link(external, join(sourceRoot, 'hardlink'));
-    for (const sourcePath of ['external', 'hardlink', 'config']) {
-      await expect(
-        writeDeployment({ ...options, files: [{ ...plainInput, sourcePath }] }),
-      ).rejects.toMatchObject({ code: 'unsafe-path' });
-    }
+    await createSymlinkOrSkip(context, external, join(sourceRoot, 'external'));
+    await expect(
+      writeDeployment({ ...options, files: [{ ...plainInput, sourcePath: 'external' }] }),
+    ).rejects.toMatchObject({ code: 'unsafe-path' });
   });
 
-  it('rejects a symlink output and never exports over an input file', async () => {
-    const { options, outputPath, sourceRoot, settings } = await setup();
+  it('rejects a multiply-linked input', async () => {
+    const { sourceRoot, root, options } = await setup();
+    const external = join(root, 'private.txt');
+    await writeFile(external, 'must not export');
+    await link(external, join(sourceRoot, 'hardlink'));
+    await expect(
+      writeDeployment({ ...options, files: [{ ...plainInput, sourcePath: 'hardlink' }] }),
+    ).rejects.toMatchObject({ code: 'unsafe-path' });
+  });
+
+  it('rejects a directory input', async () => {
+    const { options } = await setup();
+    await expect(
+      writeDeployment({ ...options, files: [{ ...plainInput, sourcePath: 'config' }] }),
+    ).rejects.toMatchObject({ code: 'unsafe-path' });
+  });
+
+  it('rejects a symlink output', async (context) => {
+    const { options, outputPath, sourceRoot } = await setup();
     const source = join(sourceRoot, plainInput.sourcePath);
-    await symlink(source, outputPath);
+    await createSymlinkOrSkip(context, source, outputPath);
     await expect(writeDeployment(options)).rejects.toMatchObject({ code: 'unsafe-path' });
+  });
+
+  it('never exports over an input file', async () => {
+    const { options, sourceRoot, settings } = await setup();
+    const source = join(sourceRoot, plainInput.sourcePath);
     await expect(writeDeployment({ ...options, outputPath: source })).rejects.toMatchObject({
       code: 'unsafe-path',
     });
