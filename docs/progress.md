@@ -19,6 +19,9 @@
   MOD-01·MOD-02는 취소했다. 서버 직접 접속은 유지한다.
 - 2차 작업 시작 승인에 따라 #1 FMT-02, #2 DL-01, #3 GAME-04, #4 AUTH-02를 배정했다.
   범위와 완료 기준은 [2차 작업 배정](work-distribution.md#2차-작업-배정--2026-10-21)을 따른다.
+- 네 세션의 2차 구현과 검토 수정을 모두 머지했다. `pnpm check`가 447개 테스트 성공,
+  opt-in 실제 설치 테스트 1개 기본 skip, 전체 타입·린트·두 앱 빌드 성공으로 끝났다.
+  Drive 실파일 버전 교체와 Windows 안전 저장·실계정 로그인은 미검증으로 남긴다.
 - [세션별 작업 지시문과 수정 범위](work-distribution.md)를 따른다. FMT-01 계약을 우선 통합하고
   후속 writer·reader·Studio 작업을 연결한다. 독립적인 첫 작업 네 개는 병렬 착수할 수 있다.
 
@@ -68,15 +71,15 @@
 | BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
 | BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
 | FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 완료 |
-| DL-01 | 일반 HTTPS·Drive 공개 링크 공통 처리, gdown Drive 로직 TypeScript 이식·MIT 고지·원본 커밋, Range·버전 교체 검증 | DL-02 | 진행 |
+| DL-01 | 일반 HTTPS·Drive 공개 링크 공통 처리, gdown Drive 로직 TypeScript 이식·MIT 고지·원본 커밋, Range·버전 교체 검증 | DL-02 | 검토 |
 | DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 완료 |
 | AUTH-01 | Microsoft 로그인·소유권 확인·갱신·로그아웃 코어와 저장·브라우저 계약, 모의 검증 | BASE-02 | 완료 |
-| AUTH-02 | 자체 앱 등록·API 접근 확인, 브라우저・OS 안전 저장 어댑터, 실제 로그인·재시작·갱신·로그아웃 검증 | AUTH-01 | 진행 |
-| FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 검토 |
+| AUTH-02 | 자체 앱 등록·API 접근 확인, 브라우저・OS 안전 저장 어댑터, 실제 로그인·재시작·갱신·로그아웃 검증 | AUTH-01 | 검토 |
+| FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 완료 |
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 준비 |
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 대기 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
-| GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 진행 |
+| GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-02 | 대기 |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-02 | 대기 |
@@ -183,15 +186,23 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 | 2026-10-21 | DL-02 | `f2cdeeb` (최종 `f8a8090`) | 길이 상한·identity 인코딩·수동 HTTPS 리다이렉트·동시 버전 검사 수정 후 통합. Drive 흐름은 미검증. |
 | 2026-10-21 | GAME-01 | `4e468ff` (최종 `51ab101`) | OS별 메타데이터 선택·안전한 설치·실행 인자와 호스트별 테스트 수정 통합. 실제 설치·프로세스·로그는 GAME-04, 크래시 복구는 GAME-05. |
 | 2026-10-21 | 1차 통합 검증 | `4e468ff` | Linux x64/WSL, Node 24·pnpm 10.34.7. `pnpm check` 성공: Biome·전체 TypeScript·285개 테스트·두 앱 빌드. `node scripts/smoke.mjs`로 두 앱의 실제 화면·IPC·Node 비노출·격리·샌드박스 확인. 새 코어는 앱 미연결 상태이므로 이 smoke는 실제 로그인·게임 실행 증거가 아니다. Windows/macOS 네이티브 검증은 남아 있다. |
+| 2026-10-21 | DL-01 코어 | `f7da09b` (최종 `4551783`) | 일반 HTTPS·공개 Drive 공통 소스, generation reset·인덱스 재조회 계약, gdown MIT·원본 커밋 확인 후 통합. 실제 Drive 파일·버전 교체는 사용자 테스트 파일 준비 후 검증하므로 전체 작업은 검토 상태다. |
+| 2026-10-21 | GAME-04 | `eb57f9c` (최종 `cce120c`) | 전체 HTTPS 어댑터·공유 서버 lease·프로세스·제한된 마스킹 로그 통합. worker의 실제 Linux x64 1.21.1 설치: payload 1,024,456,840 bytes/4,087 resources, Java 21.0.7 exit 0. 캐시 재설치: 862,331 bytes/5 resources. 영수증은 fixture로 추적하며 실제 게임 접속·타 OS 실행 증거는 아니다. |
+| 2026-10-21 | FMT-02 | `ad4d574` (최종 `003d214`) | 기존 v1 계약을 재사용하는 스트리밍 writer, 임시 파일·최종 rename, 입력 변경·취소 검사 통합. Windows symlink 권한별 테스트 분리 수정 포함. Linux focused 46개 성공, Win/mac 실제 생성은 미검증. |
+| 2026-10-21 | AUTH-02 구현 | `d84e35b` (최종 `5729b0e`) | loopback 브라우저·Electron 안전 저장·독립 auth smoke 도구, auth export 통합. Windows 테스트 호환성 수정 포함. Linux 실제 basic backend 거부 확인; Windows 저장과 자체 앱 실계정 cycle은 미검증이므로 전체 작업은 검토 상태다. |
+| 2026-10-21 | 2차 통합 검사 | `d84e35b` | Linux x64/WSL의 `pnpm check` 성공: Biome·전체 TypeScript·447개 테스트·두 앱 빌드. `node scripts/smoke.mjs`로 두 앱의 화면·IPC·Node 비노출·격리·샌드박스 확인. opt-in 실설치 테스트 1개는 기본 skip이며 worker의 실제 설치·Java 실행 증거는 GAME-04 영수증으로 별도 보존했다. 이 smoke는 실제 인증·게임 접속 증거가 아니다. |
 
 사용자의 Drive `usercontent` Range 요청 성공은 사전 수동 확인으로만 기록한다.
 저장소에서 구현한 다운로드 기능이나 전체 Drive 업데이트 흐름의 검증 완료로 계산하지 않는다.
 
 ## 차단·미결정 사항
 
-- FMT-02 인계 `525ddf2`를 검토했다. v1 계약·스트리밍·게시 전 실패 보존을 확인했으며,
-  Windows symlink 권한이 없는 환경에서 관련 테스트만 명시적으로 건너뛰도록 수정 요청했다.
-  작업 브랜치의 326개 테스트·빌드 성공은 통합 검증이나 Windows 실제 검증을 뜻하지 않는다.
+- FMT-02 인계와 검토 수정 `003d214`를 통합했다. v1 계약·스트리밍·게시 전 실패 보존을 확인했다.
+  Windows symlink 권한이 없으면 해당 테스트만 명시적으로 건너뛰며 다른 파일 보호 검증은 유지한다.
+  작업 브랜치의 검사 성공은 Windows 실제 검증을 뜻하지 않는다.
+- AUTH-02는 WSL의 `basic_text` backend를 안전하게 거부했다. Windows 테스트는 가능하지만
+  자체 Microsoft 앱 등록이 아직 준비되지 않았으며 사용자에게 절차를 안내했다. 실계정 cycle은 미검증이다.
+  검토 수정 `5729b0e`로 기본 테스트의 host platform·Unix 권한 검사·symlink capability를 분리했다.
 
 2026-10-21 범위 변경: 연결 해제 시 게임 자동 종료와 보조 모드는 제외했다.
 연결 해제 후 게임 기본 화면·종료 동작을 유지하며 MOD-01·MOD-02 완료를 릴리스 조건으로 요구하지 않는다.
