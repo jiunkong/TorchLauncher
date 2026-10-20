@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import { type Downloader, JAVA_MANIFEST_URL, VERSION_MANIFEST_URL } from '../installer';
 import type { Download, Platform } from '../metadata';
 
-export function fixture(platform: Platform = { os: 'linux', arch: 'x64', version: '6.1' }) {
+export function fixture(
+  platform: Platform = { os: 'linux', arch: 'x64', version: '6.1' },
+  includeRuntimeLinks = false,
+) {
   const responses = new Map<string, Uint8Array>();
   let sequence = 0;
   function bytes(value: unknown): Uint8Array {
@@ -41,7 +44,9 @@ export function fixture(platform: Platform = { os: 'linux', arch: 'x64', version
       [javaPath]: { type: 'file', executable: true, downloads: { raw: java } },
       legal: { type: 'directory' },
       'legal/LICENSE': { type: 'file', executable: false, downloads: { raw: legal } },
-      ...(platform.os === 'windows' ? {} : { 'legal/COPY': { type: 'link', target: 'LICENSE' } }),
+      ...(!includeRuntimeLinks || platform.os === 'windows'
+        ? {}
+        : { 'legal/COPY': { type: 'link', target: 'LICENSE' } }),
     },
   };
   const runtime = resource(runtimeData);

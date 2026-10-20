@@ -4,6 +4,7 @@ import {
   readdir,
   readFile,
   readlink,
+  realpath,
   rename,
   rm,
   stat,
@@ -11,8 +12,8 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { join, sep } from 'node:path';
+import { afterEach, describe, expect, it, type TestContext, vi } from 'vitest';
 import realVersion from './fixtures/1.21.1.json';
 import { fixture } from './fixtures/installation';
 import { installMinecraft, VERSION_MANIFEST_URL } from './installer';
@@ -24,9 +25,29 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 const roots: string[] = [];
 async function root() {
-  const path = await mkdtemp(join(tmpdir(), 'torch-game-01-'));
+  const path = await mkdtemp(join(await realpath(tmpdir()), 'torch-game-01-'));
   roots.push(path);
   return path;
+}
+// Some Windows accounts/filesystems cannot create symlinks. Skip only symlink-dependent
+// cases for explicit capability failures, keeping ordinary installation tests runnable.
+async function symlinkOrSkip(
+  context: TestContext,
+  target: string,
+  path: string,
+  type: 'file' | 'dir',
+) {
+  try {
+    await symlink(target, path, type);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code && ['EPERM', 'EACCES', 'ENOTSUP', 'ENOSYS'].includes(code)) {
+      context.skip(
+        `Host cannot create ${type} symlinks (${code}); symlink containment requires a capable host`,
+      );
+    }
+    throw error;
+  }
 }
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -50,7 +71,8 @@ describe('Minecraft installation', () => {
       onProgress: progress,
     });
     expect(await readFile(installed.javaPath, 'utf8')).toBe('java-executable');
-    expect((await stat(installed.javaPath)).mode & 0o111).toBeTruthy();
+    if (process.platform !== 'win32')
+      expect((await stat(installed.javaPath)).mode & 0o111).toBeTruthy();
     expect(await readFile(join(path, 'versions/1.21.1/1.21.1.jar'), 'utf8')).toBe('client-jar');
     expect(installed.classpath.some((file) => file.endsWith('windows.jar'))).toBe(
       platform.os === 'windows',
@@ -58,12 +80,20 @@ describe('Minecraft installation', () => {
     expect(data.requests.filter((url) => url === data.asset.url)).toHaveLength(1);
     expect(progress.mock.calls.at(-1)?.[0].completed).toBe(progress.mock.calls.at(-1)?.[0].total);
     expect(await readdir(path)).not.toContain('.torchlauncher-install-lock');
-    if (platform.os !== 'windows')
-      expect(
-        await readlink(
-          join(path, 'runtime/java-runtime-delta', runtimePlatform(platform), 'legal/COPY'),
-        ),
-      ).toBe('LICENSE');
+  });
+  it('installs safe relative Java license links when the host permits symlinks', async (context) => {
+    const path = await root();
+    const probeTarget = join(path, 'probe-target');
+    const probeLink = join(path, 'probe-link');
+    await writeFile(probeTarget, 'probe');
+    await symlinkOrSkip(context, probeTarget, probeLink, 'file');
+    const data = fixture(undefined, true);
+    await installMinecraft({ root: path, platform: data.platform, download: data.downloader });
+    expect(
+      await readlink(
+        join(path, 'runtime/java-runtime-delta', runtimePlatform(data.platform), 'legal/COPY'),
+      ),
+    ).toBe('LICENSE');
   });
   it('reuses valid content and repairs corrupt files without changing personal data', async () => {
     const data = fixture();
@@ -112,21 +142,21 @@ describe('Minecraft installation', () => {
     await expect(readFile(join(path, 'versions/1.21.1/1.21.1.jar'))).rejects.toThrow();
     expect(await readdir(path)).not.toContain('.torchlauncher-install-lock');
   });
-  it('rejects symlinked parents and preserves files outside the root', async () => {
+  it('rejects symlinked parents and preserves files outside the root', async (context) => {
     const data = fixture();
     const path = await root();
     const outside = await root();
-    await symlink(outside, join(path, 'libraries'), 'dir');
+    await symlinkOrSkip(context, outside, join(path, 'libraries'), 'dir');
     await expect(
       installMinecraft({ root: path, platform: data.platform, download: data.downloader }),
     ).rejects.toThrow('Unsafe installation directory');
     expect(await readdir(outside)).toEqual([]);
   });
-  it('rejects a symlinked root', async () => {
+  it('rejects a symlinked root', async (context) => {
     const data = fixture();
     const parent = await root();
     const outside = await root();
-    await symlink(outside, join(parent, 'server'), 'dir');
+    await symlinkOrSkip(context, outside, join(parent, 'server'), 'dir');
     await expect(
       installMinecraft({
         root: join(parent, 'server'),
@@ -222,7 +252,7 @@ describe('Minecraft installation', () => {
     await writeFile(join(path, 'versions/1.21.1/1.21.1.jar'), 'old-client');
     const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     vi.mocked(rename).mockImplementation(async (from, to) => {
-      if (String(to).endsWith('common.jar') || String(from).includes('/backups/'))
+      if (String(to).endsWith('common.jar') || String(from).includes(`${sep}backups${sep}`))
         throw new Error('Injected disk failure');
       return actual.rename(from, to);
     });
