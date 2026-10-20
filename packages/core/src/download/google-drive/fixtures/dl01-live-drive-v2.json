@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-20T19:22:02.833Z",
+  "sourceType": "public-google-drive",
+  "v1TotalLength": 78641842,
+  "v1RangeSha256": {
+    "first": "7517fe15a11410f6ba7c9d4cfdc95f79b5eb1cdaf23eb7cd010cb0a6e741e496",
+    "middle": "c4262d39ec22a1b74acb882290680e5188cf26faed0071abeb60138b3ed08bf4",
+    "last": "80d6f73f31c71740579284c02d1890807789f78f57709d0a3b071c04ece893d5"
+  },
+  "pinnedSourceOutcome": "change-detected",
+  "pinnedSourceError": "change-detected",
+  "v2TotalLength": 78641731,
+  "v2ProbeSha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
+  "v2SampleRanges": [
+    {
+      "name": "first",
+      "start": 0,
+      "end": 65535,
+      "sha256": "7517fe15a11410f6ba7c9d4cfdc95f79b5eb1cdaf23eb7cd010cb0a6e741e496"
+    },
+    {
+      "name": "middle",
+      "start": 39288097,
+      "end": 39353632,
+      "sha256": "8e32f758e945d2e76705532ead1a6aeb2ca07f95cdd1e79e090fa35ca157220c"
+    },
+    {
+      "name": "last",
+      "start": 78576195,
+      "end": 78641730,
+      "sha256": "1bc9b4f392de601bed154582e788ab5040a3cfd61de3a0e2ec4351fe09156d7b"
+    }
+  ],
+  "repeatedV2MiddleSha256": "8e32f758e945d2e76705532ead1a6aeb2ca07f95cdd1e79e090fa35ca157220c",
+  "changedFromV1": true,
+  "sourceGenerationAfterReset": 2
+}
