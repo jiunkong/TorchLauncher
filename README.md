@@ -57,7 +57,7 @@ WSL에서는 Linux용 Node.js와 pnpm을 사용하세요. Windows 경로의 pnpm
 apps/admin/       @torchlauncher/studio
 apps/launcher/    @torchlauncher/launcher
 packages/core/   @torchlauncher/core
-mods/            향후 Fabric·NeoForge 보조 모드
+mods/            보조 모드 계획 철회 안내
 scripts/         Electron 실행 검증
 docs/            설계·구현 순서
 ```
