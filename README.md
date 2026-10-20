@@ -6,7 +6,7 @@ Windows·macOS·Linux, Fabric·NeoForge를 지원하는 것을 목표로 합니�
 두 Electron 앱의 초기 화면과 개발·검증·패키징 기반, 배포 파일 생성기,
 일반 HTTPS·공개 Drive 다운로드 소스, Microsoft 인증 코어와 브라우저·암호화 저장 어댑터,
 Minecraft 설치·프로세스·로그 관리가 있습니다.
-Linux에서 실제 1.21.1 설치와 Java 실행을 확인했습니다. Drive 실제 버전 교체와
+Linux에서 실제 1.21.1 설치·Java 실행과 공개 Drive 파일의 부분 다운로드·같은 링크의 버전 교체를 확인했습니다.
 실계정 로그인·게임 접속·로더 설치, 제품 UI 연결·모드 동기화·Studio 배포 흐름은 후속 검증·구현입니다.
 
 ## 개발 환경
