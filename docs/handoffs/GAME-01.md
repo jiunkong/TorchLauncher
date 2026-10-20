@@ -3,7 +3,8 @@
 - Session: `launcher develop #3` (TorchLauncher worker #3).
 - Branch/worktree: `feat/game-01-installer`, `.agents/worktrees/agent-3`.
 - Baseline: `866e194f95487af9353348a72ee03fd0ecbd5987`.
-- Final implementation commit: `cb35d25598b1a3b0c3102159317bd838e6dbb0db`.
+- Implementation commit: `cb35d25598b1a3b0c3102159317bd838e6dbb0db`.
+- Host-portability review commit: `31f0404e0d12af1485b71b14a4720316b4f2771d`.
 - This handoff is committed separately after the implementation; its final branch-tip
   hash is reported in the session's final reply to avoid a self-referential hash.
 - Scope: `packages/core/src/minecraft/**`, `docs/handoffs/GAME-01.md` only.
@@ -99,10 +100,14 @@ Passed:
 
 - `pnpm check`: Biome, all workspace TypeScript checks, **48 tests across 3 files**,
   and both Electron app builds.
-- Final targeted validation: `pnpm exec vitest run packages/core/src/minecraft`:
+- Initial targeted validation: `pnpm exec vitest run packages/core/src/minecraft`:
   **36 tests across 2 files**; `pnpm --filter @torchlauncher/core typecheck`.
 - `pnpm exec biome check --write packages/core/src/minecraft`: clean after formatting.
 - `git diff --check` and staged whitespace checks.
+- After #0's host-portability review: `pnpm test` passed **49 tests across 3 files**
+  (37 Minecraft cases, no skips on this Linux host), `pnpm lint` and
+  `pnpm --filter @torchlauncher/core typecheck` passed. Changes were confined to
+  tests/fixtures and this handoff; application builds were not repeated.
 
 Behavioral coverage includes five simulated platform selections, hashes/lengths,
 asset deduplication, cache reuse/corruption repair, personal-file preservation,
@@ -132,6 +137,20 @@ Primary metadata sources:
 - No Windows/macOS native filesystem/process run, Electron smoke, or portable package
   verification was performed. The cross-platform tests simulate metadata selection
   on Linux, including Java paths, rather than executing binaries for those targets.
+  Fixture roots resolve `realpath(tmpdir())` so a host's conventional temporary-path
+  symlink is excluded from the caller-supplied root. Strict production containment
+  remains unchanged. Unix execute-mode assertions run only on non-Windows hosts.
+  Ordinary install fixtures require no symlinks; the three symlink-dependent cases
+  skip with an explicit host-capability reason for EPERM/EACCES/ENOTSUP/ENOSYS.
+  Other symlink errors remain failures. A skipped symlink case is not containment
+  validation for that host; rerun on a host/account capable of creating the links.
+- Process spawning, stdout/stderr capture, log rotation/export/redaction of process
+  output, exit/error mapping and game-running locks are deferred to caller/launcher
+  integration. This task returns a spawn-ready command and redacted diagnostic argv;
+  it does not implement a process manager or a log-capture adapter.
+- Stale-lock detection and automatic crash recovery remain deferred. Only manual
+  recovery from the preserved lock/journal/backups is documented above; injected
+  commit/rollback failures were tested, not actual process-kill or power-loss recovery.
 - Only the modern Java 21 metadata family is accepted; 1.21.1 is the fixture-backed
   target. Legacy assets/native extraction, version inheritance, loaders and helper
   mods are explicitly excluded. Other modern versions have not been validated.
