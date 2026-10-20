@@ -202,6 +202,7 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 | 2026-10-21 | AUTH-02 구현 | `d84e35b` (최종 `5729b0e`) | loopback 브라우저·Electron 안전 저장·독립 auth smoke 도구, auth export 통합. Windows 테스트 호환성 수정 포함. Linux 실제 basic backend 거부 확인; Windows 저장과 자체 앱 실계정 cycle은 미검증이므로 전체 작업은 검토 상태다. |
 | 2026-10-21 | 2차 통합 검사 | `d84e35b` | Linux x64/WSL의 `pnpm check` 성공: Biome·전체 TypeScript·447개 테스트·두 앱 빌드. `node scripts/smoke.mjs`로 두 앱의 화면·IPC·Node 비노출·격리·샌드박스 확인. opt-in 실설치 테스트 1개는 기본 skip이며 worker의 실제 설치·Java 실행 증거는 GAME-04 영수증으로 별도 보존했다. 이 smoke는 실제 인증·게임 접속 증거가 아니다. |
 | 2026-10-21 | DL-01 실환경 완료 | `26ac54c` (최종 `c763a63`) | 실제 공개 Drive 파일의 206·처음/중간/끝·반복 구간 검증. 유지한 v1 소스가 새 버전을 감지했고 reset 후 같은 공유 링크에서 v2 수신 확인. 크기는 78,641,842 → 78,641,731 bytes. 안전한 v1/v2 영수증과 opt-in harness 통합. 통합 후 다운로드 29개 테스트 성공·live 2개 기본 skip, core TypeScript·scoped Biome 성공. 전체 파일 비교와 배포 reader/SYNC 흐름의 검증은 아니다. |
+| 2026-10-21 | AUTH-02 진단 보완 | `e2ccc79` (최종 `8020eaf`) | Minecraft 단계 403의 정확한 알려진 앱 등록 거부 메시지만 기존 error code로 구분. 다른 403·유사 문구·다른 단계·HTML·크기 초과 응답은 일반 오류 유지, 본문 미노출. `pnpm check` 성공: 457개 테스트·live 3개 기본 skip·전체 TypeScript·Biome·두 앱 빌드. 실계정 재시도 결과는 아직 대기다. |
 
 사용자의 Drive `usercontent` Range 요청 성공은 사전 수동 확인으로만 기록한다.
 저장소에서 구현한 다운로드 기능이나 전체 Drive 업데이트 흐름의 검증 완료로 계산하지 않는다.
@@ -221,6 +222,11 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - AUTH-02 403 원인 조사를 시작했다. 현재 Prism의 Minecraft endpoint/body와 일치함을 확인했다.
   #4에 `fix/auth-02-minecraft-rejection`의 좁은 서버 오류 분류·테스트를 배정했다.
   explicit invalid-app-registration만 기존 code로 구분하고 일반 403을 같은 원인으로 단정하지 않는다.
+- 진단 보완 `8020eaf`를 `e2ccc79`로 통합했다. 인증 테스트 148개·core TypeScript·scoped Biome 성공.
+  사용자는 테스트 계정의 Minecraft 소유권을 확인했다. 이는 사용자 보고이며 실제 entitlement 조회는 아직 도달하지 못했다.
+  기존 실패 응답 원문은 보존하지 않았으므로 이전 403의 세부 원인을 소급 확정하지 않는다.
+  다음 증거는 같은 자체 앱·계정으로 기존 Windows smoke를 재실행한 정제된 error code다.
+  통합 후 두 Electron 앱의 화면·IPC·격리·샌드박스 smoke도 통과했다. 실제 로그인 재실행을 대신하는 검사는 아니다.
 
 2026-10-21 범위 변경: 연결 해제 시 게임 자동 종료와 보조 모드는 제외했다.
 연결 해제 후 게임 기본 화면·종료 동작을 유지하며 MOD-01·MOD-02 완료를 릴리스 조건으로 요구하지 않는다.
