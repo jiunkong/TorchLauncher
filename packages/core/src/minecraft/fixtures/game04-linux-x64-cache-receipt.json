@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-20T18:32:35.833Z",
+  "node": "v24.21.0",
+  "host": "linux/x64",
+  "minecraft": "1.21.1",
+  "receivedBytes": 862331,
+  "completedRequests": 5,
+  "installedBytes": 1024083372,
+  "installedFiles": 4085,
+  "installationMs": 8390,
+  "javaExit": {
+    "reason": "exited",
+    "code": 0,
+    "signal": null,
+    "logs": {
+      "entries": [
+        {
+          "stream": "stderr",
+          "text": "openjdk version \"21.0.7\" 2025-04-15 LTS"
+        },
+        {
+          "stream": "stderr",
+          "text": "OpenJDK Runtime Environment Microsoft-11369942 (build 21.0.7+6-LTS)"
+        },
+        {
+          "stream": "stderr",
+          "text": "OpenJDK 64-Bit Server VM Microsoft-11369942 (build 21.0.7+6-LTS, mixed mode)"
+        }
+      ],
+      "bytes": 182,
+      "droppedEntries": 0,
+      "discardedLines": 0
+    }
+  },
+  "authenticatedGameLaunch": false
+}

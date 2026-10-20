@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { chmod, copyFile, lstat, mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix, resolve, sep } from 'node:path';
+import { secureDirectory, stat } from './filesystem';
+import { acquireServerDataLock } from './lock';
 import {
   allows,
   type Download,
@@ -229,25 +231,6 @@ async function createPlan(options: InstallOptions): Promise<Plan> {
     ],
   };
 }
-async function stat(path: string) {
-  try {
-    return await lstat(path);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw error;
-  }
-}
-/** Reject symlinks in the root and all existing ancestors, including caller-supplied roots. */
-async function secureDirectory(path: string): Promise<void> {
-  const absolute = resolve(path);
-  const parent = dirname(absolute);
-  if (parent !== absolute) await secureDirectory(parent);
-  const info = await stat(absolute);
-  if (info) {
-    if (!info.isDirectory() || info.isSymbolicLink())
-      throw new Error(`Unsafe installation directory: ${absolute}`);
-  } else await mkdir(absolute);
-}
 async function cached(path: string, source: Download): Promise<boolean> {
   const info = await stat(path);
   if (!info) return false;
@@ -270,8 +253,14 @@ async function destination(root: string, path: string): Promise<string> {
 /** All downloads finish before publication; commit failures roll back replacements. One writer per root. */
 export async function installMinecraft(options: InstallOptions): Promise<Installation> {
   aborted(options.signal);
-  const root = resolve(options.root);
-  await secureDirectory(root);
+  const lease = await acquireServerDataLock(options.root, 'install');
+  try {
+    return await installLocked(options, lease.root);
+  } finally {
+    await lease.release();
+  }
+}
+async function installLocked(options: InstallOptions, root: string): Promise<Installation> {
   const lock = join(root, '.torchlauncher-install-lock');
   // A leftover lock after a killed process requires caller recovery; never steal an active lock.
   await mkdir(lock);
