@@ -7,6 +7,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  realpath,
   rm,
   stat,
   symlink,
@@ -29,7 +30,7 @@ afterEach(async () => {
 });
 
 async function setup() {
-  const root = await mkdtemp(join(tmpdir(), 'torch-auth-storage-test-'));
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'torch-auth-storage-test-'));
   directories.push(root);
   const directory = join(root, 'accounts');
   const encryptionKey = randomBytes(32);
@@ -53,10 +54,25 @@ async function setup() {
       );
     }),
   };
-  const storage = new EncryptedMicrosoftTokenStorage({ directory, safeStorage, platform: 'linux' });
+  // Exercise real host filesystem policy by default. Backend selection is injected separately.
+  const storage = new EncryptedMicrosoftTokenStorage({ directory, safeStorage });
   const path = (account = key) =>
     join(directory, `${createHash('sha256').update(account).digest('hex')}.bin`);
   return { root, directory, safeStorage, storage, path };
+}
+
+function withBackendPlatform(ctx: Awaited<ReturnType<typeof setup>>, platform: NodeJS.Platform) {
+  return new EncryptedMicrosoftTokenStorage({
+    directory: ctx.directory,
+    safeStorage: ctx.safeStorage,
+    platform,
+  });
+}
+
+function skipUnsupportedSymlink(error: unknown, skip: () => void) {
+  const code = (error as NodeJS.ErrnoException).code;
+  if (['EPERM', 'EACCES', 'ENOTSUP', 'ENOSYS'].includes(code ?? '')) skip();
+  throw error;
 }
 
 describe('OS encrypted token storage', () => {
@@ -68,12 +84,13 @@ describe('OS encrypted token storage', () => {
     const encrypted = await readFile(ctx.path());
     expect(encrypted.includes(Buffer.from(value.refreshToken))).toBe(false);
     expect(encrypted.includes(Buffer.from(key))).toBe(false);
-    expect((await stat(ctx.directory)).mode & 0o777).toBe(0o700);
-    expect((await stat(ctx.path())).mode & 0o777).toBe(0o600);
+    if (process.platform !== 'win32') {
+      expect((await stat(ctx.directory)).mode & 0o777).toBe(0o700);
+      expect((await stat(ctx.path())).mode & 0o777).toBe(0o600);
+    }
     const restarted = new EncryptedMicrosoftTokenStorage({
       directory: ctx.directory,
       safeStorage: ctx.safeStorage,
-      platform: 'linux',
     });
     expect(await restarted.read(key)).toEqual(value);
     await restarted.clear(key);
@@ -90,12 +107,8 @@ describe('OS encrypted token storage', () => {
     async (backend) => {
       const ctx = await setup();
       ctx.safeStorage.getSelectedStorageBackend.mockReturnValue(backend);
-      await expect(ctx.storage.write(key, value)).rejects.toMatchObject({
-        code: 'secure_storage_unavailable',
-      });
-      await expect(ctx.storage.read(key)).rejects.toMatchObject({
-        code: 'secure_storage_unavailable',
-      });
+      const linuxBackend = withBackendPlatform(ctx, 'linux');
+      expect(() => linuxBackend.assertSecureBackend()).toThrow('secure_storage_unavailable');
       expect(ctx.safeStorage.encryptString).not.toHaveBeenCalled();
       await expect(stat(ctx.directory)).rejects.toMatchObject({ code: 'ENOENT' });
     },
@@ -106,8 +119,7 @@ describe('OS encrypted token storage', () => {
     async (backend) => {
       const ctx = await setup();
       ctx.safeStorage.getSelectedStorageBackend.mockReturnValue(backend);
-      await ctx.storage.write(key, value);
-      expect(await ctx.storage.read(key)).toEqual(value);
+      expect(() => withBackendPlatform(ctx, 'linux').assertSecureBackend()).not.toThrow();
     },
   );
 
@@ -118,13 +130,8 @@ describe('OS encrypted token storage', () => {
       ctx.safeStorage.getSelectedStorageBackend.mockImplementation(() => {
         throw new Error();
       });
-      const storage = new EncryptedMicrosoftTokenStorage({
-        directory: ctx.directory,
-        safeStorage: ctx.safeStorage,
-        platform,
-      });
-      await storage.write(key, value);
-      expect(await storage.read(key)).toEqual(value);
+      const storage = withBackendPlatform(ctx, platform);
+      expect(() => storage.assertSecureBackend()).not.toThrow();
       expect(ctx.safeStorage.getSelectedStorageBackend).not.toHaveBeenCalled();
     },
   );
@@ -138,7 +145,9 @@ describe('OS encrypted token storage', () => {
     ctx.safeStorage.getSelectedStorageBackend.mockImplementationOnce(() => {
       throw new Error('private OS failure');
     });
-    expect(() => ctx.storage.assertSecureBackend()).toThrow('secure_storage_unavailable');
+    expect(() => withBackendPlatform(ctx, 'linux').assertSecureBackend()).toThrow(
+      'secure_storage_unavailable',
+    );
   });
 
   it('preserves the old token and removes temporary ciphertext if encryption becomes unavailable before rename', async () => {
@@ -234,39 +243,56 @@ describe('OS encrypted token storage', () => {
     expect(String(error)).not.toContain('private');
   });
 
-  it('rejects a symlinked account directory', async () => {
+  it('rejects a symlinked account directory', async ({ skip }) => {
     const ctx = await setup();
     const outside = join(ctx.root, 'outside');
     await mkdir(outside, { mode: 0o700 });
-    await symlink(outside, ctx.directory);
+    try {
+      await symlink(await realpath(outside), ctx.directory);
+    } catch (error) {
+      skipUnsupportedSymlink(error, skip);
+    }
     await expect(ctx.storage.write(key, value)).rejects.toMatchObject({ code: 'storage_failed' });
     expect(await readdir(outside)).toEqual([]);
   });
 
-  it.each(['symlink', 'hardlink'])(
-    'rejects a %s credential file before read/write/clear',
-    async (type) => {
+  async function rejectsLinkedCredentialFile(type: 'symlink' | 'hardlink', skip: () => void) {
+    const ctx = await setup();
+    await mkdir(ctx.directory, { mode: 0o700 });
+    const outside = join(ctx.root, 'outside');
+    await writeFile(outside, 'outside-data', { mode: 0o600 });
+    if (type === 'symlink') {
+      try {
+        await symlink(await realpath(outside), ctx.path());
+      } catch (error) {
+        skipUnsupportedSymlink(error, skip);
+      }
+    } else await link(outside, ctx.path());
+    await expect(ctx.storage.read(key)).rejects.toMatchObject({ code: 'storage_failed' });
+    await expect(ctx.storage.write(key, value)).rejects.toMatchObject({ code: 'storage_failed' });
+    await expect(ctx.storage.clear(key)).rejects.toMatchObject({ code: 'storage_failed' });
+    expect(await readFile(outside, 'utf8')).toBe('outside-data');
+  }
+
+  it('rejects a symlink credential file when the OS permits symlink creation', async ({ skip }) => {
+    await rejectsLinkedCredentialFile('symlink', skip);
+  });
+
+  it('rejects a hardlink credential file', async () => {
+    await rejectsLinkedCredentialFile('hardlink', () => {});
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'rejects permissive directories/files instead of silently accepting them',
+    async () => {
       const ctx = await setup();
-      await mkdir(ctx.directory, { mode: 0o700 });
-      const outside = join(ctx.root, 'outside');
-      await writeFile(outside, 'outside-data', { mode: 0o600 });
-      if (type === 'symlink') await symlink(outside, ctx.path());
-      else await link(outside, ctx.path());
+      await ctx.storage.write(key, value);
+      await chmod(ctx.path(), 0o644);
       await expect(ctx.storage.read(key)).rejects.toMatchObject({ code: 'storage_failed' });
+      await chmod(ctx.directory, 0o755);
       await expect(ctx.storage.write(key, value)).rejects.toMatchObject({ code: 'storage_failed' });
-      await expect(ctx.storage.clear(key)).rejects.toMatchObject({ code: 'storage_failed' });
-      expect(await readFile(outside, 'utf8')).toBe('outside-data');
     },
   );
-
-  it('rejects permissive directories/files instead of silently accepting them', async () => {
-    const ctx = await setup();
-    await ctx.storage.write(key, value);
-    await chmod(ctx.path(), 0o644);
-    await expect(ctx.storage.read(key)).rejects.toMatchObject({ code: 'storage_failed' });
-    await chmod(ctx.directory, 0o755);
-    await expect(ctx.storage.write(key, value)).rejects.toMatchObject({ code: 'storage_failed' });
-  });
 
   it('requires a trusted absolute directory', () => {
     expect(
