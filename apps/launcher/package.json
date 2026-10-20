@@ -1,0 +1,22 @@
+{
+  "name": "@torchlauncher/launcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TorchLauncher desktop application",
+  "author": "TorchLauncher contributors",
+  "main": "./out/main/index.cjs",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
+    "package": "pnpm build && electron-builder --config electron-builder.config.cjs",
+    "package:dir": "pnpm build && electron-builder --config electron-builder.config.cjs --dir"
+  },
+  "devDependencies": {
+    "@torchlauncher/core": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+
+ignoredBuiltDependencies:
+  - electron-winstaller
+
+strictPeerDependencies: true
