@@ -11,6 +11,8 @@ const oauthBase = 'https://login.microsoftonline.com/consumers/oauth2/v2.0';
 const scopes = 'XboxLive.signin offline_access';
 const minecraftBase = 'https://api.minecraftservices.com';
 const maxResponseBytes = 256 * 1024;
+const invalidAppRegistrationMessage =
+  /^invalid app registration(?:, see https:\/\/aka\.ms\/appreginfo for more information)?\.?$/i;
 
 function object(value: unknown, stage: AuthStage): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -379,6 +381,15 @@ export class MicrosoftAuthenticator {
       if (
         stage === 'oauth' &&
         ['invalid_client', 'unauthorized_client'].includes(String(body.error))
+      ) {
+        throw new AuthenticationError('app_registration_rejected', stage, response.status);
+      }
+      if (
+        stage === 'minecraft' &&
+        response.status === 403 &&
+        typeof body.errorMessage === 'string' &&
+        (body.error === undefined || body.error === 'ForbiddenOperationException') &&
+        invalidAppRegistrationMessage.test(body.errorMessage.trim())
       ) {
         throw new AuthenticationError('app_registration_rejected', stage, response.status);
       }

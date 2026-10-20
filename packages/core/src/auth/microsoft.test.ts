@@ -300,17 +300,82 @@ describe('Microsoft authentication', () => {
     expect(ctx.fetch).toHaveBeenCalledTimes(3);
   });
 
-  it.each([3, 4, 5])(
-    'preserves HTTP 403 at Minecraft stage %i without falsely claiming app approval',
-    async (index) => {
+  it.each([
+    'Invalid app registration',
+    'Invalid app registration.',
+    'Invalid app registration, see https://aka.ms/AppRegInfo for more information',
+    'Invalid app registration, see https://aka.ms/AppRegInfo for more information.',
+    '  invalid app registration.  ',
+  ])('identifies an explicit Minecraft app registration rejection: %s', async (errorMessage) => {
+    const ctx = setup();
+    ctx.queue[3] = json(
+      {
+        error: 'ForbiddenOperationException',
+        errorMessage,
+        access_token: 'must-not-escape',
+      },
+      403,
+    );
+    const error = await ctx.auth.login().catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      code: 'app_registration_rejected',
+      stage: 'minecraft',
+      status: 403,
+    });
+    expect(String(error)).not.toContain(errorMessage.trim());
+    expect(JSON.stringify(error)).not.toContain('must-not-escape');
+    expect(ctx.fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it('classifies an exact Minecraft rejection message when the response omits an error kind', async () => {
+    const ctx = setup();
+    ctx.queue[3] = json({ errorMessage: 'Invalid app registration' }, 403);
+    await expect(ctx.auth.login()).rejects.toMatchObject({
+      code: 'app_registration_rejected',
+      stage: 'minecraft',
+      status: 403,
+    });
+  });
+
+  it.each([
+    [
+      3,
+      403,
+      { error: 'ForbiddenOperationException', errorMessage: 'Not an Invalid app registration.' },
+    ],
+    [
+      3,
+      403,
+      {
+        error: 'ForbiddenOperationException',
+        errorMessage: 'Invalid app registration because policy denied it',
+      },
+    ],
+    [3, 403, { error: 'OtherError', errorMessage: 'Invalid app registration' }],
+    [3, 401, { error: 'ForbiddenOperationException', errorMessage: 'Invalid app registration' }],
+    [4, 403, { error: 'ForbiddenOperationException', errorMessage: 'Invalid app registration' }],
+    [5, 403, { error: 'ForbiddenOperationException', errorMessage: 'Invalid app registration' }],
+  ])(
+    'keeps unrelated Minecraft-service failures generic at response %i / status %i',
+    async (index, status, body) => {
       const ctx = setup();
-      ctx.queue[index] = json(
-        { error: 'ForbiddenOperationException', errorMessage: 'Invalid app registration' },
-        403,
-      );
-      await expect(ctx.auth.login()).rejects.toMatchObject({ code: 'http_failed', status: 403 });
+      ctx.queue[index] = json(body, status);
+      await expect(ctx.auth.login()).rejects.toMatchObject({ code: 'http_failed', status });
     },
   );
+
+  it('keeps a non-JSON Minecraft 403 generic', async () => {
+    const ctx = setup();
+    ctx.queue[3] = new Response('<html>Invalid app registration</html>', {
+      status: 403,
+      headers: { 'Content-Type': 'text/html' },
+    });
+    await expect(ctx.auth.login()).rejects.toMatchObject({
+      code: 'http_failed',
+      stage: 'minecraft',
+      status: 403,
+    });
+  });
 
   it.each([
     [0, { token_type: 'Bearer', access_token: 'x', refresh_token: 'y', expires_in: 0 }],
