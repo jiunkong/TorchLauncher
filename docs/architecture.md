@@ -217,6 +217,9 @@ Drive에서는 기존 파일을 삭제하고 새 파일을 만드는 대신 **�
 - 혼합 설정 파일의 항목별 적용과 리소스팩 활성화·순서 관리.
 - 사용자 모드와 필수 모드의 파일 경로·모드 ID 충돌 처리.
 - Microsoft 앱 등록과 API 접근 조건, 시스템 브라우저·OS 안전 저장 어댑터와 실제 로그인·갱신 검증. 인증 코어의 모의 응답 검증과 구분한다.
+- Microsoft 앱 등록 외 Minecraft API 접근 승인 여부도 확인한다. [인증 문서](https://minecraft.wiki/w/Microsoft_authentication)가
+  연결하는 [앱 검토 폼](https://aka.ms/mce-reviewappid)은 Microsoft Forms로 연결된다. 실제 접수 상태·승인 절차는
+  운영 시 확인하며, 사용자 계정의 게임 소유권과 앱의 API 사용 권한을 별개로 다룬다.
 - 지원 Minecraft 버전 목록과 로더별 설치·직접 접속 대응 범위.
 - OS·CPU 아키텍처별 포터블 패키지, 서명 및 런처 코어 자동 업데이트.
 

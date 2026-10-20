@@ -227,6 +227,13 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
   기존 실패 응답 원문은 보존하지 않았으므로 이전 403의 세부 원인을 소급 확정하지 않는다.
   다음 증거는 같은 자체 앱·계정으로 기존 Windows smoke를 재실행한 정제된 error code다.
   통합 후 두 Electron 앱의 화면·IPC·격리·샌드박스 smoke도 통과했다. 실제 로그인 재실행을 대신하는 검사는 아니다.
+- 사용자가 재시도했으나 `http_failed / minecraft / 403`을 다시 보고했다. 좁은 분류가
+  인식하는 명시 응답은 아직 확인되지 않았으며 정확한 원인은 미확정이다.
+- 사용자 제공 [Microsoft authentication 문서](https://minecraft.wiki/w/Microsoft_authentication)의
+  OAuth 절을 직접 읽었다. 문서는 새 Azure 앱의 별도 Minecraft API 사용 승인과 미승인 시 403을 명시하며,
+  [신청 링크](https://aka.ms/mce-reviewappid)를 제공한다. 실제 링크가 Microsoft Forms로 연결됨을 확인했다.
+  현재 접수 가능 여부·필수 입력·승인 소요 시간은 확인하지 못했다. 앱 등록과 API 접근 승인을 구분하고,
+  승인 여부 확인을 다음 단계로 우선한다. 추가 진단 harness는 제안만 받았으며 구현하지 않았다.
 
 2026-10-21 범위 변경: 연결 해제 시 게임 자동 종료와 보조 모드는 제외했다.
 연결 해제 후 게임 기본 화면·종료 동작을 유지하며 MOD-01·MOD-02 완료를 릴리스 조건으로 요구하지 않는다.
