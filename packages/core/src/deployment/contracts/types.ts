@@ -8,8 +8,8 @@ export const DEPLOYMENT_LIMITS = {
   fileLength: 4 * 1024 ** 3,
   totalOriginalLength: 128 * 1024 ** 3,
   compressionRatio: 1_000,
-  pathLength: 240,
-  pathComponentLength: 120,
+  pathLength: 240, // UTF-8 bytes, including slash separators.
+  pathComponentLength: 120, // UTF-8 bytes per component.
 } as const;
 
 export const EMPTY_FILE_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
@@ -35,6 +35,7 @@ export type DeploymentFilePolicy = 'initial-only' | 'always';
 export type DeploymentLoaderKind = 'fabric' | 'neoforge';
 
 export interface DeploymentFile {
+  /** NFC Unicode, slash-separated relative path within the portable UTF-8 byte limits. */
   readonly path: string;
   readonly sha256: string;
   /** Relative to the first payload byte, not the container start. */

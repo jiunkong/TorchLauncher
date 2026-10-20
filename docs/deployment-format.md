@@ -91,16 +91,33 @@ trailer는 허용하지 않는다. 마지막 구간 끝은 `totalLength - 64 - i
 
 ## 이식 가능한 경로와 소유권
 
-경로는 서버별 **게임 디렉터리 기준** slash-separated 상대 경로다. 1–240 ASCII 바이트,
-각 구성 요소는 1–120바이트다. 구성 요소에는 영문자·숫자·공백·`_-.+()[]`만 허용한다.
+경로는 서버별 **게임 디렉터리 기준** slash-separated 상대 경로다. 한글 등 Unicode
+파일명을 지원하며 **인덱스에 기록한 문자열 자체가 NFC**여야 한다. writer는 원본 경로를
+NFC로 변환해 기록하되, 원본의 서로 다른 이름이 같은 대상이 되면 생성 단계에서 충돌로
+거부한다. validator/reader는 non-NFC 입력을 조용히 바꾸지 않고 거부한다. 예를 들어
+`resourcepacks/서버 리소스팩.zip`, `config/한글/설정.toml`, `config/é.txt`는 유효하고
+분해된 자모나 `e` + combining acute로 표현한 동일 이름은 인덱스에서 거부한다.
+
+길이는 **UTF-8 바이트 수**로 계산한다. 전체 경로는 slash를 포함해 1–240바이트, 각
+구성 요소는 1–120바이트다. 한글 40글자는 120바이트로 허용되며 41글자 구성 요소는
+거부된다. 구성 요소에는 Unicode 문자·결합 문자·숫자·구두점·기호(범주 L/M/N/P/S)와
+ASCII 공백을 허용한다. Windows 금지 문자 `< > : " \\ | ? *`와 `%`는 추가로 거부한다.
 구성 요소의 앞/뒤 공백, 뒤의 점, `.`·`..`, 절대 경로, drive/UNC 경로, backslash,
-빈 구성 요소, 제어 문자, 콜론/NTFS stream, percent encoding은 거부한다. v1은 OS 간
-Unicode 정규화·대소문자 차이로 인한 alias를 피하기 위해 비 ASCII 경로를 거부한다.
+빈 구성 요소, 제어/서식 문자(예: bidi override·zero-width joiner), 고립 surrogate,
+private-use/미할당 문자, ASCII 공백 이외의 구분 공백도 거부한다.
 
 Windows 예약 이름 `CON`, `PRN`, `AUX`, `NUL`, `COM0`–`COM9`, `LPT0`–`LPT9`,
 `CONIN$`, `CONOUT$`는 확장자와 대소문자에 관계없이 각 구성 요소에서 거부한다.
+Windows device alias인 `COM¹`/`COM²`/`COM³`, `LPT¹`/`LPT²`/`LPT³`와
+확장자 앞 공백이 있는 예약 이름(`NUL .txt`)도 거부한다.
+위 첨자 숫자 예약 이름은 [Microsoft 파일명 규칙](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file)을 따른다.
 `.torchlauncher`로 시작하는 최상위 구성 요소는 런처 내부용으로 예약한다.
-대소문자를 무시한 중복 경로와 파일/하위 경로 충돌(`config`와 `config/a`)도 거부한다.
+충돌 키는 locale에 의존하지 않는 JavaScript 연산
+`path.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC')`로 만든다.
+이 보수적인 키로 중복 경로와 파일/하위 경로 충돌(`config`와 `config/a`)을 양방향으로
+거부한다. `É`/`é`, `straße`/`STRASSE`, Greek sigma의 두 소문자, case 변환 후 다시
+NFC가 필요한 이름도 충돌로 처리한다. 이 키는 원본 경로나 저장 파일명을 바꾸지 않으며
+모든 OS의 실제 파일 시스템 비교 규칙을 그대로 재현한다는 의미도 아니다.
 
 파싱 성공은 디스크 쓰기 권한을 뜻하지 않는다. 적용자는 실제 루트 containment와 기존
 심볼릭 링크/reparse point를 검사하고, Java·Minecraft 설치 파일 및 런처/자격 증명 저장소와

@@ -298,7 +298,6 @@ describe('portable path validation', () => {
     'config/a\u0000b',
     'config/a\nb',
     'config/ 한글.txt',
-    'config/é.txt',
     'config/ file',
     'config/file ',
     'config/file.',
@@ -312,10 +311,26 @@ describe('portable path validation', () => {
     'config/LPT0.txt',
     'config/CONIN$',
     'config/CONOUT$.txt',
+    'config/COM¹.txt',
+    'config/LPT².txt',
+    'config/COM³.txt',
+    'config/a\u0085b',
+    'config/a\u202eb',
+    'config/a\u200db',
+    'config/a\u00a0b',
+    'config/a\ud800b',
+    'config/file?.txt',
+    'config/file*.txt',
+    'config/file|name',
+    'config/file<name',
+    'config/file>name',
+    'config/file"name',
     '.torchlauncher/state.json',
     '.TorchLauncher-cache/file',
     'a'.repeat(121),
     `${'a'.repeat(120)}/${'b'.repeat(120)}`,
+    '가'.repeat(41),
+    `${'가'.repeat(40)}/${'나'.repeat(40)}`,
   ])('rejects an unsafe path: %j', (path) => {
     const { index, header } = withFiles([{ ...emptyFile, path }]);
     expectInvalid(() => validateDeploymentIndex(index, header, context), 'invalid-path');
@@ -325,6 +340,8 @@ describe('portable path validation', () => {
     const paths = [
       'mods/Example Mod [1.21.1]+(client).jar',
       `${'a'.repeat(120)}/${'b'.repeat(119)}`,
+      '가'.repeat(40),
+      `${'가'.repeat(40)}/${'나'.repeat(39)}ab`,
     ];
     for (const path of paths) {
       const { index, header } = withFiles([{ ...emptyFile, path }]);
@@ -333,10 +350,57 @@ describe('portable path validation', () => {
   });
 
   it.each([
+    'resourcepacks/서버 리소스팩.zip',
+    'config/서버/기본 설정.toml',
+    'config/é.txt',
+    'config/ǰ.txt',
+    'resourcepacks/🔥 팩.zip',
+  ])('accepts portable NFC Unicode names without rewriting: %s', (path) => {
+    const { index, header } = withFiles([{ ...emptyFile, path }]);
+    expect(validateDeploymentIndex(index, header, context)).toBe(index);
+    expect(index.files[0]?.path).toBe(path);
+  });
+
+  it.each(['config/é.txt', 'config/한글.txt', 'config/각/설정.toml'])(
+    'rejects non-NFC names and normalization aliases instead of rewriting: %s',
+    (path) => {
+      const decomposed = path.normalize('NFD');
+      expect(decomposed).not.toBe(path);
+      const single = withFiles([{ ...emptyFile, path: decomposed }]);
+      expectInvalid(
+        () => validateDeploymentIndex(single.index, single.header, context),
+        'invalid-path',
+      );
+      for (const paths of [
+        [path, decomposed],
+        [decomposed, path],
+      ]) {
+        const { index, header } = withFiles(paths.map((path) => ({ ...emptyFile, path })));
+        expectInvalid(() => validateDeploymentIndex(index, header, context), 'invalid-path');
+      }
+    },
+  );
+
+  it('rejects a decomposed directory alias of a file prefix', () => {
+    const { index, header } = withFiles([
+      { ...emptyFile, path: 'config/각' },
+      { ...emptyFile, path: 'config/각/설정.toml'.normalize('NFD') },
+    ]);
+    expectInvalid(() => validateDeploymentIndex(index, header, context), 'invalid-path');
+  });
+
+  it.each([
     ['mods/a.jar', 'mods/a.jar'],
     ['mods/A.jar', 'MODS/a.JAR'],
     ['config', 'config/a.toml'],
     ['config/a.toml', 'CONFIG'],
+    ['config/É.txt', 'CONFIG/é.TXT'],
+    ['config/straße.txt', 'config/STRASSE.txt'],
+    ['config/σ.txt', 'config/ς.txt'],
+    ['config/ﬀ.txt', 'config/FF.txt'],
+    ['config/ǰ.txt', 'config/J\u030c.txt'.normalize('NFC')],
+    ['config/한글É', 'CONFIG/한글é/설정.toml'],
+    ['config/한글é/설정.toml', 'CONFIG/한글É'],
   ])('rejects duplicate or file/directory aliases: %j', (first, second) => {
     const { index, header } = withFiles([
       { ...emptyFile, path: first },
@@ -347,7 +411,9 @@ describe('portable path validation', () => {
 
   it('does not confuse a shared directory or a filename prefix with a conflict', () => {
     const { index, header } = withFiles(
-      ['config/a', 'CONFIG/b', 'config-a'].map((path) => ({ ...emptyFile, path })),
+      ['config/a', 'CONFIG/b', 'config-a', '설정/기본값', '설정/서버값', '설정-서버값'].map(
+        (path) => ({ ...emptyFile, path }),
+      ),
     );
     expect(validateDeploymentIndex(index, header, context)).toBe(index);
   });

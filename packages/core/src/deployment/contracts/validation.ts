@@ -97,11 +97,20 @@ function versionToken(value: unknown, field: string): void {
   }
 }
 
-function path(value: unknown, field: string): string {
+const utf8 = new TextEncoder();
+
+/** Conservative, locale-independent alias key; NFC also follows case expansion. */
+function pathCollisionKey(value: string): string {
+  return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
+}
+
+function path(value: unknown, field: string): void {
   if (
     typeof value !== 'string' ||
     value.length < 1 ||
-    value.length > DEPLOYMENT_LIMITS.pathLength
+    value.length > DEPLOYMENT_LIMITS.pathLength ||
+    utf8.encode(value).byteLength > DEPLOYMENT_LIMITS.pathLength ||
+    value.normalize('NFC') !== value
   ) {
     fail('invalid-path', field);
   }
@@ -110,18 +119,18 @@ function path(value: unknown, field: string): string {
     const stem = component.split('.')[0]?.trimEnd().toUpperCase();
     if (
       component.length < 1 ||
-      component.length > DEPLOYMENT_LIMITS.pathComponentLength ||
-      /[^A-Za-z0-9 _.+()[\]-]/u.test(component) ||
+      utf8.encode(component).byteLength > DEPLOYMENT_LIMITS.pathComponentLength ||
+      /[^\p{L}\p{M}\p{N}\p{P}\p{S} ]/u.test(component) ||
+      /[<>:"\\|?*%]/u.test(component) ||
       component.trim() !== component ||
       component.endsWith('.') ||
-      /^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9]|CONIN\$|CONOUT\$)$/u.test(stem ?? '')
+      /^(CON|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³]|CONIN\$|CONOUT\$)$/u.test(stem ?? '')
     ) {
       fail('invalid-path', field);
     }
   }
-  const normalized = value.toLowerCase();
+  const normalized = pathCollisionKey(value);
   if (normalized.startsWith('.torchlauncher')) fail('invalid-path', field);
-  return normalized;
 }
 
 function file(value: unknown, field: string): DeploymentFile {
@@ -217,7 +226,7 @@ export function validateDeploymentIndex(
   for (const [position, candidate] of entry.files.entries()) {
     const field = `index.files[${position}]`;
     const current = file(candidate, field);
-    const normalized = current.path.toLowerCase();
+    const normalized = pathCollisionKey(current.path);
     if (filePaths.has(normalized) || directories.has(normalized))
       fail('path-conflict', `${field}.path`);
     const components = normalized.split('/');
