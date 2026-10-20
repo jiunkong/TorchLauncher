@@ -12,7 +12,7 @@
 - 전체 총괄은 사용자 지정 `#0` 에이전트인 **`launcher develop #0`**이다. #0은 제품 기능을
   구현하지 않고 배정·문서·검토·Git 통합·통합 검증을 맡는다.
 - 첫 작업은 #1 FMT-01, #2 DL-02, #3 GAME-01, #4 AUTH-01로 배정했다.
-  아직 구현 세션을 생성하거나 착수 확인을 한 것은 아니므로 상태는 준비이다.
+  네 세션을 생성·실행했으며 첫 작업은 진행 상태이다. #2는 Luna, 나머지는 총괄 모델 상속으로 실행했다.
 - [세션별 작업 지시문과 수정 범위](work-distribution.md)를 따른다. FMT-01 계약을 우선 통합하고
   후속 writer·reader·Studio 작업을 연결한다. 독립적인 첫 작업 네 개는 병렬 착수할 수 있다.
 
@@ -60,14 +60,14 @@
 | BASE-02 | Git·main·기준 커밋과 네 구현 브랜치·worktree 준비 | BASE-01 | 완료 |
 | BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
 | BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
-| FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 준비 |
+| FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 진행 |
 | DL-01 | gdown 공개 링크 로직 TypeScript 이식, 원본 커밋·MIT 고지, Drive 버전 교체 검증 | DL-02 | 대기 |
-| DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 준비 |
-| AUTH-01 | Microsoft 앱 등록·로그인·소유권 확인·세션 저장·갱신·로그아웃 검증 | BASE-02 | 준비 |
+| DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 진행 |
+| AUTH-01 | Microsoft 앱 등록·로그인·소유권 확인·세션 저장·갱신·로그아웃 검증 | BASE-02 | 진행 |
 | FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 대기 |
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 대기 |
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 대기 |
-| GAME-01 | 호환 Java·Minecraft·라이브러리·자산 설치, 프로세스·로그 관리 | BASE-02 | 준비 |
+| GAME-01 | 호환 Java·Minecraft·라이브러리·자산 설치, 프로세스·로그 관리 | BASE-02 | 진행 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, AUTH-01 | 대기 |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, AUTH-01 | 대기 |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 대기 |
@@ -92,10 +92,22 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 
 | 작업 ID | 담당 에이전트 | 브랜치 | Worktree 경로 | 독점 수정 범위 |
 | --- | --- | --- | --- | --- |
-| FMT-01 | #1 — `launcher develop #1` 예정 | `feat/fmt-01-contracts` | `.agents/worktrees/agent-1` | `docs/deployment-format.md`, `packages/core/src/deployment/contracts/`, 해당 인계 문서 |
-| DL-02 | #2 — `launcher develop #2` 예정 | `feat/dl-02-http-range` | `.agents/worktrees/agent-2` | `packages/core/src/download/http/`, 해당 인계 문서 |
-| GAME-01 | #3 — `launcher develop #3` 예정 | `feat/game-01-installer` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, 해당 인계 문서 |
-| AUTH-01 | #4 — `launcher develop #4` 예정 | `feat/auth-01-microsoft` | `.agents/worktrees/agent-4` | `packages/core/src/auth/`, 해당 인계 문서 |
+| FMT-01 | #1 — `launcher develop #1` | `feat/fmt-01-contracts` | `.agents/worktrees/agent-1` | `docs/deployment-format.md`, `packages/core/src/deployment/contracts/`, 해당 인계 문서 |
+| DL-02 | #2 — `launcher develop #2` | `feat/dl-02-http-range` | `.agents/worktrees/agent-2` | `packages/core/src/download/http/`, 해당 인계 문서 |
+| GAME-01 | #3 — `launcher develop #3` | `feat/game-01-installer` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, 해당 인계 문서 |
+| AUTH-01 | #4 — `launcher develop #4` | `feat/auth-01-microsoft` | `.agents/worktrees/agent-4` | `packages/core/src/auth/`, 해당 인계 문서 |
+
+### 실행 세션
+
+총괄 #0 ID: `01a15961-1386-7fd0-bd22-a71aaf70fdd4`.
+아래는 실행 요청에 사용한 모델이며, 완료·검증을 뜻하지 않는다.
+
+| 세션 | 작업 | 모델 | 세션 ID |
+| --- | --- | --- | --- |
+| #1 | FMT-01 | 현재 모델 상속 | `01a15a0a-76e2-7230-a0b2-a7a07cd83ea1` |
+| #2 | DL-02 | `gpt-6-luna` | `01a15a0a-7f50-7ee3-891a-0d01524073bd` |
+| #3 | GAME-01 | 현재 모델 상속 | `01a15a0a-9146-7ee0-9d88-1edda8809abc` |
+| #4 | AUTH-01 | 현재 모델 상속 | `01a15a0a-9a6b-7e33-9c57-2541b698de36` |
 
 작업 경계는 다음처럼 나누는 것을 기본으로 한다. 아직 생성하지 않은 경로는 배정 시 확정한다.
 
