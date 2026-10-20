@@ -8,6 +8,8 @@ TorchLauncher is a server-specific Minecraft launcher built with Electron, TypeS
 
 The user-designated **#0 agent** (currently `launcher develop #0`) is the project coordinator. Other sessions act as implementation workers unless the user changes their role.
 
+#0 manages planning, documentation, review, Git integration, and integrated validation; product implementation belongs to other sessions. Read `docs/work-distribution.md` for assignments. Shared-file implementation must be assigned to one worker rather than implemented by #0.
+
 - Only #0 updates `docs/progress.md`, assigns tasks and exclusive file scopes, and records integration results.
 - Only #0 integrates work into `main` or another designated integration branch, including merges, cherry-picks, integration conflict resolution, and completion decisions.
 - Workers use separate branches/worktrees, commit their assigned changes, and report their session name, task ID, commit, and validation in a PR or `docs/handoffs/<task-ID>.md`. They do not edit the tracker or integrate their own work into the integration branch.
@@ -49,7 +51,7 @@ Use Vitest for unit tests and Playwright for Electron smoke checks. No coverage 
 
 ## Commit & Pull Request Guidelines
 
-No Git history is available. Start with imperative, scoped messages such as `feat(core): validate range responses`. Describe behavior, validation, and limitations in pull requests. Link relevant issues and include screenshots for UI changes.
+Use imperative, scoped messages such as `feat(core): validate range responses`, following the initial workspace commit. Describe behavior, validation, and limitations in pull requests. Link relevant issues and include screenshots for UI changes.
 
 ## Configuration & Data Safety
 

@@ -8,18 +8,19 @@
 ## 현재 상태와 다음 작업
 
 - 프로젝트 기반 구축과 Linux 검증은 완료했다. 게임·인증·동기화·Studio 제품 기능은 미구현이다.
-- Git 저장소를 초기화했고 기본 브랜치는 `main`이다. 아직 커밋은 없으며, 에이전트별
-  브랜치·worktree를 만들기 전에 기반 코드의 기준 커밋이 필요하다.
-- 전체 총괄은 사용자 지정 `#0` 에이전트인 **`launcher develop #0`**이다. 개별 구현 작업의
-  담당 에이전트와 브랜치는 아직 배정하지 않았다.
-- 다음 순서: `BASE-02` → `FMT-01` 계약 확정. Git 기반 마련 후 `DL-01`, `DL-02`, `AUTH-01`은
-  서로 다른 파일 범위에서 병렬 착수할 수 있다. 구현이 끝난 작업도 통합 검증 전에는 완료 처리하지 않는다.
+- Git 기준 커밋 `4d5b4ab`과 `main`, 네 작업 브랜치·worktree를 준비했다.
+- 전체 총괄은 사용자 지정 `#0` 에이전트인 **`launcher develop #0`**이다. #0은 제품 기능을
+  구현하지 않고 배정·문서·검토·Git 통합·통합 검증을 맡는다.
+- 첫 작업은 #1 FMT-01, #2 DL-02, #3 GAME-01, #4 AUTH-01로 배정했다.
+  아직 구현 세션을 생성하거나 착수 확인을 한 것은 아니므로 상태는 준비이다.
+- [세션별 작업 지시문과 수정 범위](work-distribution.md)를 따른다. FMT-01 계약을 우선 통합하고
+  후속 writer·reader·Studio 작업을 연결한다. 독립적인 첫 작업 네 개는 병렬 착수할 수 있다.
 
 ## 총괄과 에이전트 역할
 
 | 역할 | 담당 | 책임 |
 | --- | --- | --- |
-| 전체 총괄 | `#0` — 현재 `launcher develop #0` | 작업 분배·범위 조정, 이 진행 문서 갱신, 통합 검토·Git 머지·통합 충돌 해결·검증·완료 판정 |
+| 전체 총괄 | `#0` — 현재 `launcher develop #0` | 제품 구현 제외. 작업 분배·범위 조정, 이 진행 문서 갱신, 통합 검토·Git 머지·통합 충돌 해결·검증·완료 판정 |
 | 구현 에이전트 | 그 외 작업 세션 | 배정된 브랜치·worktree에서 구현·테스트·커밋 후 총괄에게 인계 |
 
 - **이 진행 문서 수정과 `main` 또는 별도 지정한 통합 브랜치로의 반영은 `#0`만 수행한다.**
@@ -56,17 +57,17 @@
 | ID | 구현·검증할 내용 | 선행 작업 | 상태 |
 | --- | --- | --- | --- |
 | BASE-01 | 모노레포, 독립 앱, IPC 격리, 검사·빌드·포터블 패키징 기반 | — | 완료 |
-| BASE-02 | Git·main 초기화 완료; 기준 커밋 확정과 worktree 운영 준비 남음 | BASE-01 | 준비 |
-| BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 대기 |
-| BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 대기 |
-| FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 대기 |
-| DL-01 | gdown 공개 링크 로직 TypeScript 이식, 원본 커밋·MIT 고지, Drive 버전 교체 검증 | BASE-02 | 대기 |
-| DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 대기 |
-| AUTH-01 | Microsoft 앱 등록·로그인·소유권 확인·세션 저장·갱신·로그아웃 검증 | BASE-02 | 대기 |
+| BASE-02 | Git·main·기준 커밋과 네 구현 브랜치·worktree 준비 | BASE-01 | 완료 |
+| BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
+| BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
+| FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 준비 |
+| DL-01 | gdown 공개 링크 로직 TypeScript 이식, 원본 커밋·MIT 고지, Drive 버전 교체 검증 | DL-02 | 대기 |
+| DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 준비 |
+| AUTH-01 | Microsoft 앱 등록·로그인·소유권 확인·세션 저장·갱신·로그아웃 검증 | BASE-02 | 준비 |
 | FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 대기 |
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 대기 |
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 대기 |
-| GAME-01 | 호환 Java·Minecraft·라이브러리·자산 설치, 프로세스·로그 관리 | BASE-02 | 대기 |
+| GAME-01 | 호환 Java·Minecraft·라이브러리·자산 설치, 프로세스·로그 관리 | BASE-02 | 준비 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, AUTH-01 | 대기 |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, AUTH-01 | 대기 |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 대기 |
@@ -74,7 +75,7 @@
 | USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 대기 |
 | MOD-01 | NeoForge 보조 모드: 직접 나가기 시 정상 종료, 강퇴·오류 구분 | GAME-02 | 대기 |
 | MOD-02 | Fabric 보조 모드: 직접 나가기 시 정상 종료, 강퇴·오류 구분 | GAME-03 | 대기 |
-| UI-01 | 서버 온라인·응답 실패·접속 인원·지연시간 조회와 표시 | BASE-02 | 대기 |
+| UI-01 | 서버 온라인·응답 실패·접속 인원·지연시간 조회와 표시 | BASE-02 | 준비 |
 | UI-02 | 사용자 런처에 인증·동기화·접속·설정·추가 모드·오류·로그 기능 연결 | AUTH-01, SYNC-01, GAME-02, GAME-03, USER-01, USER-02, USER-03, UI-01 | 대기 |
 | STUDIO-01 | 서버 프로젝트 저장, 버전·로더·주소·이미지·기본 설정 구성 | FMT-01 | 대기 |
 | STUDIO-02 | 배포 파일 선택·생성, 공개 URL 등록·부분 다운로드 검사, 업데이트 흐름 | STUDIO-01, FMT-02, DL-01, DL-02 | 대기 |
@@ -91,7 +92,10 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 
 | 작업 ID | 담당 에이전트 | 브랜치 | Worktree 경로 | 독점 수정 범위 |
 | --- | --- | --- | --- | --- |
-| — | 미배정 | — | — | — |
+| FMT-01 | #1 — `launcher develop #1` 예정 | `feat/fmt-01-contracts` | `.agents/worktrees/agent-1` | `docs/deployment-format.md`, `packages/core/src/deployment/contracts/`, 해당 인계 문서 |
+| DL-02 | #2 — `launcher develop #2` 예정 | `feat/dl-02-http-range` | `.agents/worktrees/agent-2` | `packages/core/src/download/http/`, 해당 인계 문서 |
+| GAME-01 | #3 — `launcher develop #3` 예정 | `feat/game-01-installer` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, 해당 인계 문서 |
+| AUTH-01 | #4 — `launcher develop #4` 예정 | `feat/auth-01-microsoft` | `.agents/worktrees/agent-4` | `packages/core/src/auth/`, 해당 인계 문서 |
 
 작업 경계는 다음처럼 나누는 것을 기본으로 한다. 아직 생성하지 않은 경로는 배정 시 확정한다.
 
@@ -111,6 +115,7 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
   소유권을 다시 나누거나 작업 순서를 직렬화한다. 디렉터리 이름만 다르다고 독립 작업으로 가정하지 않는다.
 - 루트 설정, `pnpm-lock.yaml`, 패키지 manifest·공개 export, 공용 IPC 계약, CI,
   `AGENTS.md`, 아키텍처 문서는 통합 담당자가 조정한다. 의존성·계약 변경은 요청으로 전달한다.
+- 공유 파일의 제품 코드 수정은 #0이 구현 세션 하나에 배정한다. #0이 대신 구현하지 않는다.
 - 작업 도중 범위를 넓혀야 하면 먼저 배정표를 갱신하고 다른 작업과의 충돌을 확인한다.
 
 ## 인계와 머지 절차
@@ -144,6 +149,7 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 | --- | --- | --- | --- |
 | 2026-10-21 | BASE-01 | Git 초기화 전 | Linux x64 / WSL2, Node.js 24. frozen-lockfile 설치, `pnpm check`와 단위 테스트 12개 통과. 실제 두 앱의 화면·IPC·Node.js 비노출·격리·샌드박스 확인. 두 Linux 포터블 생성·내용 검사·패키징된 실행 파일 검증 완료. Windows·macOS 미검증. |
 | 2026-10-21 | BASE-02 일부 | 아직 없음 | `git init -b main` 완료. `git status --short --branch`로 main과 커밋 없음 상태 확인. 기준 커밋·작업별 worktree는 아직 생성하지 않음. |
+| 2026-10-21 | BASE-02 완료 | `4d5b4ab` 기반 | 기반 코드 커밋과 네 독립 구현 브랜치·worktree 생성. 배정 문서를 반영한 최신 main으로 착수 기준을 맞춘다. 세션 실행·구현은 미착수. |
 
 사용자의 Drive `usercontent` Range 요청 성공은 사전 수동 확인으로만 기록한다.
 저장소에서 구현한 다운로드 기능이나 전체 Drive 업데이트 흐름의 검증 완료로 계산하지 않는다.
