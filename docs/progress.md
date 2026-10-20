@@ -218,6 +218,9 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
   앱 API 접근 허용 문제인지 요청 방식 문제인지는 아직 확정하지 않는다. Windows 저장 cycle의
   개별 결과와 재시작 후 갱신·로그아웃 증거는 #4 인계에 보완하며 AUTH-02 전체 완료로 처리하지 않는다.
   검토 수정 `5729b0e`로 기본 테스트의 host platform·Unix 권한 검사·symlink capability를 분리했다.
+- AUTH-02 403 원인 조사를 시작했다. 현재 Prism의 Minecraft endpoint/body와 일치함을 확인했다.
+  #4에 `fix/auth-02-minecraft-rejection`의 좁은 서버 오류 분류·테스트를 배정했다.
+  explicit invalid-app-registration만 기존 code로 구분하고 일반 403을 같은 원인으로 단정하지 않는다.
 
 2026-10-21 범위 변경: 연결 해제 시 게임 자동 종료와 보조 모드는 제외했다.
 연결 해제 후 게임 기본 화면·종료 동작을 유지하며 MOD-01·MOD-02 완료를 릴리스 조건으로 요구하지 않는다.

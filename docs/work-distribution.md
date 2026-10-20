@@ -237,6 +237,23 @@ BASE-03·04 및 QA-01·RELEASE 작업은 가능한 환경을 확인한 뒤 별�
 
 ## 공유 파일 변경과 검토 규칙
 
+### AUTH-02 Minecraft 403 진단 보완
+
+사용자 승인으로 #4가 최신 main의 `fix/auth-02-minecraft-rejection` 브랜치에서 진행한다.
+조사는 Sol, 아래처럼 확정된 국소 구현·테스트는 Luna를 사용한다. 대상은
+`packages/core/src/auth/microsoft.ts`, 같은 디렉터리의 인증 테스트,
+`docs/handoffs/AUTH-02-diagnostics.md`다. 기존 error code를 재사용하고 public 계약·IPC·
+앱 설정·엔드포인트·로그인 요청 방식은 변경하지 않는다.
+
+- Minecraft 단계 HTTP 403 응답에 명시적인 알려진 `Invalid app registration` 메시지가
+  있는 경우만 기존 `app_registration_rejected` code로 분류한다.
+- 일치하는 서버 메시지의 허용 형태를 좁게 정의한다. 다른 403, 다른 단계, 잘못된/HTML 응답은
+  기존 일반 실패로 유지한다. 임의 provider 문자열·본문·토큰·URL을 진단 출력에 추가하지 않는다.
+- 명시 메시지·비일치·위장된 유사 문자열·민감 데이터 미노출을 테스트한다. 기존 취소·크기 상한을 유지한다.
+- 기존 smoke 도구는 error code를 이미 출력하므로 새 product UI나 별도 raw diagnostic 도구는 추가하지 않는다.
+- 필요한 검사 후 인계하며 #0 통합 후 사용자에게 Windows 재실행 절차를 전달한다.
+  분류 결과 전에는 앱 접근 승인 문제가 실제 원인이라고 확정하거나 승인 경로를 추정해 안내하지 않는다.
+
 ### DL-01 실환경 검증 추가 배정
 
 사용자 제공 공개 Drive 파일로 #2가 익명 다운로드·실제 Range를 검증한다.
