@@ -69,10 +69,11 @@ state를 출력하지 않는다. 전체 cycle이 성공한 경우에만 `liveAut
 도중 실패하면 암호화된 refresh token이 남을 수 있으므로 같은 ID/디렉터리로 `logout`을 실행한다.
 로그아웃은 로컬 삭제이며 브라우저 Microsoft 로그인이나 사용자 동의 철회는 별도다.
 
-사용자에게 실제 인증 참여를 직접 요청했고 #0에도 알렸다. 사용자는 **Windows 테스트는
-가능하지만 앱 등록은 아직 준비되지 않았다**고 명확히 정정했다. 비밀번호·인증 코드·토큰을
-채팅에 요청하지 않았으며 자체 앱 등록의 의미와 공식 문서, 개인 Microsoft 계정 유형 및
-desktop loopback 설정을 안내했다. 앱 등록 완료나 Minecraft 접근 승인은 아직 확인되지 않았다.
+사용자에게 실제 인증 참여를 직접 요청했고 #0에도 알렸다. 사용자는 Windows 테스트가 가능하며
+자체 앱 등록을 완료했다고 확인했다. 최초 로그인에서 `unauthorized_client`가 나타난 뒤
+소비자 계정 허용 설정을 변경했고, 포털 저장 과정에서는
+`api.requestedAccessTokenVersion` 오류를 보고했다. 이어 매니페스트의 토큰 버전을 2로 설정해
+저장했다고 확인했다. 비밀번호·인증 코드·토큰은 채팅으로 받지 않았다.
 
 앱 등록 담당자가 준비할 값:
 
@@ -100,7 +101,25 @@ node scripts/auth-smoke.mjs cycle --data-dir "$env:LOCALAPPDATA\TorchLauncherAut
 
 마지막 명령은 앱 등록 후 실행한다. 로그인은 열린 Microsoft 브라우저에서 사용자가 직접
 완료한다. 결과 공유는 정제된 JSON 성공/오류 결과만으로 충분하며 브라우저 주소나 credentials는
-공유하지 않는다. Windows/macOS OS 암호화·재시작, 실제 계정 로그인/갱신/로그아웃은 아직 미검증이다.
+공유하지 않는다.
+
+### Windows 실계정 검증 결과 (사용자 보고)
+
+아래는 사용자가 직접 보고한 결과만 기록한다. Client ID, 계정 정보, callback URL과 토큰은
+기록하지 않는다.
+
+| 단계 | 관측 결과 | 해석/한계 |
+| --- | --- | --- |
+| 앱 등록 | 사용자가 자체 앱 등록 완료 및 consumer 계정 지원 설정 변경을 확인 | 앱 설정 화면의 전체 상태나 ID는 미수집 |
+| `probe`, `storage-cycle` | 실행 결과 JSON을 이 세션에 공유하지 않음 | Windows 암호화 저장소 가용성 및 저장/재시작/삭제 성공을 증거로 기록할 수 없음 |
+| Microsoft 브라우저 로그인 | 웹페이지에서 성공 표시 후 smoke 명령은 `http_failed`, `stage: minecraft`, `status: 403` 출력 | `cycle`은 로그인 흐름에서 실패했고 refresh/재시작/로그아웃 검증까지 도달하지 않음 |
+| Xbox/XSTS | 코드 흐름상 `stage: minecraft` 응답 전에 OAuth 및 Xbox/XSTS 요청이 성공했음을 뜻함 | 별도 JSON 단계 결과가 아니므로 사용자 출력으로 직접 확인된 세부 응답은 아님 |
+| Minecraft Services | 코드의 `minecraft` 단계는 `launcher/login` 요청임 | 이 403만으로 앱 허용 목록, 계정 자격, 서비스 측 정책 중 원인을 확정할 수 없음. entitlement/profile 단계 전이므로 Minecraft 소유권은 검증되지 않음 |
+| `logout` cleanup | 실행/성공 결과가 보고되지 않음 | OAuth 토큰 교환 후 하위 Minecraft 요청 전 저장됐을 수 있으므로 동일 data directory와 client ID로 정리해야 함 |
+
+`launcher/login`의 403은 앱 등록 속성만으로 고칠 수 있다고 단정하지 않는다. Minecraft
+Services의 앱 접근 정책/승인 가능성은 조사할 후속 외부 조건이며, 현재 근거만으로 승인 원인이나
+절차를 확정하지 않는다. AUTH-02의 실계정 cycle은 아직 미완료다.
 
 ## 실행한 검증과 관찰
 
@@ -125,6 +144,6 @@ pnpm의 비대화형 purge 확인 때문에 중단됐고 위 명령으로 성공
   `encryptionAvailable: false`, `code: secure_storage_unavailable`. 자격 증명은 기록하지 않았다.
   이 환경에서 storage-cycle과 실계정 cycle 성공을 주장하지 않는다.
 
-다음 필요한 증거는 Windows에서 `probe`, `storage-cycle`, 자체 앱을 사용한 실제 `cycle` 결과다.
-그 결과가 오기 전에는 **AUTH-02 전체 완료로 처리하지 않는다**. 통합/완료 판단은 #0 소유이며
-이 작업 외 후속 작업은 시작하지 않았다.
+다음 필요한 증거는 Windows `probe`, `storage-cycle`, `logout`의 정제된 결과 및 Minecraft
+Services 단계가 통과하는 앱으로 실행한 실제 `cycle`이다. 그 결과가 오기 전에는 **AUTH-02
+전체 완료로 처리하지 않는다**. 통합/완료 판단은 #0 소유이며 이 작업 외 후속 작업은 시작하지 않았다.
