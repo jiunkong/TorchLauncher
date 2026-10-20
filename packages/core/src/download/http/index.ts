@@ -1,5 +1,6 @@
 export type {
   ByteRange,
+  HttpRangeClientOptions,
   RangeRequestOptions,
   RangeResponse,
   ResourceSnapshot,

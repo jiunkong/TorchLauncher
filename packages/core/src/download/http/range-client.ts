@@ -20,8 +20,17 @@ export interface RangeRequestOptions {
   headers?: NonNullable<Parameters<typeof fetch>[1]>['headers'];
   maxAttempts?: number;
   retryDelayMs?: number;
+  maxBytes?: number;
+  maxRedirects?: number;
   fetch?: typeof globalThis.fetch;
 }
+
+export interface HttpRangeClientOptions {
+  /** Enable plain HTTP only for local fixtures or explicit development use. */
+  allowInsecureHttp?: boolean;
+}
+
+const defaultMaxBytes = 64 * 1024 * 1024;
 
 export class RangeDownloadError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -48,13 +57,20 @@ export class RangeHttpError extends RangeDownloadError {
 /** Fetches inclusive HTTP byte ranges and pins the remote resource after the first response. */
 export class HttpRangeClient {
   private resourceSnapshot: ResourceSnapshot | undefined;
+  private resourceIdentity: { requested: string; effective: string } | undefined;
+  private readonly allowInsecureHttp: boolean;
+
+  constructor(options: HttpRangeClientOptions = {}) {
+    this.allowInsecureHttp = options.allowInsecureHttp === true;
+  }
 
   get snapshot(): ResourceSnapshot | undefined {
-    return this.resourceSnapshot;
+    return this.resourceSnapshot ? { ...this.resourceSnapshot } : undefined;
   }
 
   reset(): void {
     this.resourceSnapshot = undefined;
+    this.resourceIdentity = undefined;
   }
 
   async getRange(
@@ -65,11 +81,29 @@ export class HttpRangeClient {
     validateRange(range);
     const maxAttempts = options.maxAttempts ?? 3;
     const retryDelayMs = options.retryDelayMs ?? 150;
+    const maxBytes = options.maxBytes ?? defaultMaxBytes;
+    const maxRedirects = options.maxRedirects ?? 5;
+    const expectedLength = getRangeLength(range);
+    const resourceIdentity = getResourceIdentity(url, this.allowInsecureHttp);
     if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
       throw new RangeDownloadError('maxAttempts must be a positive integer');
     }
     if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
       throw new RangeDownloadError('retryDelayMs must be a non-negative number');
+    }
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+      throw new RangeDownloadError('maxBytes must be a positive safe integer');
+    }
+    if (!Number.isSafeInteger(maxRedirects) || maxRedirects < 0 || maxRedirects > 10) {
+      throw new RangeDownloadError('maxRedirects must be an integer from 0 through 10');
+    }
+    if (expectedLength > maxBytes) {
+      throw new RangeDownloadError(`Requested range exceeds the ${maxBytes}-byte response limit`);
+    }
+    if (this.resourceIdentity && resourceIdentity !== this.resourceIdentity.requested) {
+      throw new RemoteResourceChangedError(
+        'This client is already pinned to a different resource; reset it before reuse',
+      );
     }
 
     const fetcher = options.fetch ?? globalThis.fetch;
@@ -81,7 +115,15 @@ export class HttpRangeClient {
       }
 
       try {
-        return await this.requestRange(fetcher, url, range, options);
+        return await this.requestRange(
+          fetcher,
+          url,
+          resourceIdentity,
+          range,
+          expectedLength,
+          maxRedirects,
+          options,
+        );
       } catch (error) {
         if (isAbortError(error) || options.signal?.aborted) {
           throw abortError(options.signal?.reason ?? error);
@@ -100,10 +142,14 @@ export class HttpRangeClient {
   private async requestRange(
     fetcher: typeof globalThis.fetch,
     url: string | URL,
+    resourceIdentity: string,
     range: ByteRange,
+    expectedLength: number,
+    maxRedirects: number,
     options: RangeRequestOptions,
   ): Promise<RangeResponse> {
     const headers = new Headers(options.headers);
+    headers.set('Accept-Encoding', 'identity');
     headers.set('Range', `bytes=${range.start}-${range.end}`);
 
     const snapshot = this.resourceSnapshot;
@@ -112,19 +158,15 @@ export class HttpRangeClient {
       if (validator) headers.set('If-Range', validator);
     }
 
-    let response: Response;
-    try {
-      response = await fetcher(url, {
-        method: 'GET',
-        headers,
-        ...(options.signal ? { signal: options.signal } : {}),
-      });
-    } catch (error) {
-      if (isAbortError(error)) throw error;
-      throw new RetryableRangeTransportError('Range request could not be completed', {
-        cause: error,
-      });
-    }
+    const { response, finalUrl } = await fetchFollowingRedirects(
+      fetcher,
+      url,
+      headers,
+      maxRedirects,
+      this.allowInsecureHttp,
+      options.signal,
+    );
+    const effectiveResourceIdentity = getResourceIdentity(finalUrl, this.allowInsecureHttp);
 
     if (response.status === 200) {
       await discardBody(response);
@@ -149,6 +191,12 @@ export class HttpRangeClient {
       );
     }
 
+    const contentEncoding = response.headers.get('Content-Encoding');
+    if (contentEncoding && contentEncoding.trim().toLowerCase() !== 'identity') {
+      await discardBody(response);
+      throw new RangeProtocolError('The server returned an encoded range response');
+    }
+
     const contentRange = parseContentRange(response.headers.get('Content-Range'));
     if (!contentRange) {
       await discardBody(response);
@@ -159,13 +207,16 @@ export class HttpRangeClient {
       throw new RangeProtocolError('The returned Content-Range does not match the requested range');
     }
 
-    const expectedLength = range.end - range.start + 1;
     const contentLengthHeader = response.headers.get('Content-Length');
-    if (contentLengthHeader === null || !/^\d+$/.test(contentLengthHeader)) {
+    if (contentLengthHeader !== null && !/^\d+$/.test(contentLengthHeader)) {
       await discardBody(response);
-      throw new RangeProtocolError('The server returned a missing or invalid Content-Length');
+      throw new RangeProtocolError('The server returned an invalid Content-Length');
     }
-    if (Number(contentLengthHeader) !== expectedLength) {
+    if (
+      contentLengthHeader !== null &&
+      (!Number.isSafeInteger(Number(contentLengthHeader)) ||
+        Number(contentLengthHeader) !== expectedLength)
+    ) {
       await discardBody(response);
       throw new RangeProtocolError('Content-Length does not match the requested range');
     }
@@ -183,21 +234,40 @@ export class HttpRangeClient {
       await discardBody(response);
       throw new RemoteResourceChangedError('The remote resource changed during range transfer');
     }
-    if (!this.resourceSnapshot) this.resourceSnapshot = currentSnapshot;
-
     let bytes: Uint8Array;
     try {
-      bytes = new Uint8Array(await response.arrayBuffer());
+      bytes = await readBoundedBody(response, expectedLength, options.signal);
     } catch (error) {
+      if (error instanceof RangeProtocolError) throw error;
       throw new RetryableRangeTransportError('The range response body could not be read', {
         cause: error,
       });
     }
-    if (bytes.byteLength !== expectedLength) {
-      throw new RangeProtocolError('The received body length does not match the requested range');
+
+    const liveSnapshot = this.resourceSnapshot;
+    if (
+      this.resourceIdentity &&
+      (resourceIdentity !== this.resourceIdentity.requested ||
+        effectiveResourceIdentity !== this.resourceIdentity.effective)
+    ) {
+      throw new RemoteResourceChangedError(
+        'The concurrent request targeted a different resource than the pinned one',
+      );
+    }
+    if (liveSnapshot && !sameSnapshot(liveSnapshot, currentSnapshot)) {
+      throw new RemoteResourceChangedError(
+        'The remote resource changed during concurrent range transfer',
+      );
+    }
+    if (!liveSnapshot) {
+      this.resourceSnapshot = { ...currentSnapshot };
+      this.resourceIdentity = {
+        requested: resourceIdentity,
+        effective: effectiveResourceIdentity,
+      };
     }
 
-    return { bytes, range: { ...range }, snapshot: currentSnapshot };
+    return { bytes, range: { ...range }, snapshot: { ...currentSnapshot } };
   }
 }
 
@@ -211,6 +281,92 @@ function validateRange(range: ByteRange): void {
     throw new RangeDownloadError(
       'Byte range must use non-negative safe integers with end >= start',
     );
+  }
+  getRangeLength(range);
+}
+
+function getRangeLength(range: ByteRange): number {
+  const length = range.end - range.start + 1;
+  if (!Number.isSafeInteger(length) || length < 1) {
+    throw new RangeDownloadError('Byte range length must be a positive safe integer');
+  }
+  return length;
+}
+
+function getResourceIdentity(url: string | URL, allowInsecureHttp: boolean): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch (error) {
+    throw new RangeDownloadError('Range URL must be absolute', { cause: error });
+  }
+  validateTransportUrl(parsed, allowInsecureHttp);
+  parsed.hash = '';
+  return parsed.href;
+}
+
+async function fetchFollowingRedirects(
+  fetcher: typeof globalThis.fetch,
+  initialUrl: string | URL,
+  headers: Headers,
+  maxRedirects: number,
+  allowInsecureHttp: boolean,
+  signal?: AbortSignal,
+): Promise<{ response: Response; finalUrl: URL }> {
+  let currentUrl = new URL(initialUrl);
+  for (let redirects = 0; ; redirects += 1) {
+    let response: Response;
+    try {
+      response = await fetcher(currentUrl, {
+        method: 'GET',
+        headers,
+        redirect: 'manual',
+        ...(signal ? { signal } : {}),
+      });
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      throw new RetryableRangeTransportError('Range request could not be completed', {
+        cause: error,
+      });
+    }
+
+    if (response.status < 300 || response.status > 399) {
+      return { response, finalUrl: currentUrl };
+    }
+    const location = response.headers.get('Location');
+    await discardBody(response);
+    if (!location) throw new RangeProtocolError('Redirect response is missing Location');
+    if (redirects >= maxRedirects) {
+      throw new RangeProtocolError(`Range request exceeded the ${maxRedirects}-redirect limit`);
+    }
+
+    let nextUrl: URL;
+    try {
+      nextUrl = new URL(location, currentUrl);
+    } catch (error) {
+      throw new RangeProtocolError('The server returned an invalid redirect target', {
+        cause: error,
+      });
+    }
+    validateTransportUrl(nextUrl, allowInsecureHttp);
+    if (nextUrl.origin !== currentUrl.origin) {
+      const forwardedHeaders = new Headers();
+      for (const name of ['Accept-Encoding', 'If-Range', 'Range']) {
+        const value = headers.get(name);
+        if (value !== null) forwardedHeaders.set(name, value);
+      }
+      headers = forwardedHeaders;
+    }
+    currentUrl = nextUrl;
+  }
+}
+
+function validateTransportUrl(url: URL, allowInsecureHttp: boolean): void {
+  if (url.username || url.password) {
+    throw new RangeProtocolError('Credentials in range URLs are not allowed');
+  }
+  if (url.protocol !== 'https:' && !(allowInsecureHttp && url.protocol === 'http:')) {
+    throw new RangeProtocolError('Range sources and redirects must use HTTPS');
   }
 }
 
@@ -287,6 +443,42 @@ async function delay(milliseconds: number, signal?: AbortSignal): Promise<void> 
     }
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+async function readBoundedBody(
+  response: Response,
+  expectedLength: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new RangeProtocolError('The range response has no body');
+  const bytes = new Uint8Array(expectedLength);
+  let received = 0;
+  try {
+    while (true) {
+      if (signal?.aborted) throw abortError(signal.reason);
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value.byteLength > expectedLength - received) {
+        throw new RangeProtocolError('The response body exceeds the requested range length');
+      }
+      bytes.set(value, received);
+      received += value.byteLength;
+    }
+  } catch (error) {
+    try {
+      await reader.cancel(error);
+    } catch {
+      // Preserve the original read or protocol error.
+    }
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  if (received !== expectedLength) {
+    throw new RangeProtocolError('The received body length does not match the requested range');
+  }
+  return bytes;
 }
 
 async function discardBody(response: Response): Promise<void> {
