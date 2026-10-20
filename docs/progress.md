@@ -17,6 +17,8 @@
   원래의 제품 완료 기준을 줄이지 않고 AUTH-02·GAME-04·GAME-05로 추적한다.
 - 사용자 결정으로 연결 해제 시 게임 자동 종료와 이를 위한 보조 모드를 제외했다.
   MOD-01·MOD-02는 취소했다. 서버 직접 접속은 유지한다.
+- 2차 작업 시작 승인에 따라 #1 FMT-02, #2 DL-01, #3 GAME-04, #4 AUTH-02를 배정했다.
+  범위와 완료 기준은 [2차 작업 배정](work-distribution.md#2차-작업-배정--2026-10-21)을 따른다.
 - [세션별 작업 지시문과 수정 범위](work-distribution.md)를 따른다. FMT-01 계약을 우선 통합하고
   후속 writer·reader·Studio 작업을 연결한다. 독립적인 첫 작업 네 개는 병렬 착수할 수 있다.
 
@@ -66,15 +68,15 @@
 | BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
 | BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
 | FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 완료 |
-| DL-01 | 일반 HTTPS·Drive 공개 링크 공통 처리, gdown Drive 로직 TypeScript 이식·MIT 고지·원본 커밋, Range·버전 교체 검증 | DL-02 | 준비 |
+| DL-01 | 일반 HTTPS·Drive 공개 링크 공통 처리, gdown Drive 로직 TypeScript 이식·MIT 고지·원본 커밋, Range·버전 교체 검증 | DL-02 | 진행 |
 | DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 완료 |
 | AUTH-01 | Microsoft 로그인·소유권 확인·갱신·로그아웃 코어와 저장·브라우저 계약, 모의 검증 | BASE-02 | 완료 |
-| AUTH-02 | 자체 앱 등록·API 접근 확인, 브라우저・OS 안전 저장 어댑터, 실제 로그인·재시작·갱신·로그아웃 검증 | AUTH-01 | 준비 |
-| FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 준비 |
+| AUTH-02 | 자체 앱 등록·API 접근 확인, 브라우저・OS 안전 저장 어댑터, 실제 로그인·재시작·갱신·로그아웃 검증 | AUTH-01 | 진행 |
+| FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 진행 |
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 준비 |
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 대기 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
-| GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 준비 |
+| GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 진행 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-02 | 대기 |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-02 | 대기 |
@@ -104,18 +106,22 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 | DL-02 | #2 — `launcher develop #2` | `feat/dl-02-http-range` | `.agents/worktrees/agent-2` | `packages/core/src/download/http/`, 해당 인계 문서 |
 | GAME-01 | #3 — `launcher develop #3` | `feat/game-01-installer` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, 해당 인계 문서 |
 | AUTH-01 | #4 — `launcher develop #4` | `feat/auth-01-microsoft` | `.agents/worktrees/agent-4` | `packages/core/src/auth/`, 해당 인계 문서 |
+| FMT-02 | #1 — `launcher develop #1` | `feat/fmt-02-writer` | `.agents/worktrees/agent-1` | `packages/core/src/deployment/writer/`, 해당 인계 문서 |
+| DL-01 | #2 — `launcher develop #2` | `feat/dl-01-download-sources` | `.agents/worktrees/agent-2` | `packages/core/src/download/google-drive/`, `packages/core/src/download/source/`, `third-party/gdown/`, 해당 인계 문서 |
+| GAME-04 | #3 — `launcher develop #3` | `feat/game-04-runtime` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, `packages/core/src/download/full/`, 해당 인계 문서 |
+| AUTH-02 | #4 — `launcher develop #4` | `feat/auth-02-host-adapters` | `.agents/worktrees/agent-4` | `apps/launcher/src/main/auth/`, `scripts/auth-smoke.mjs`, `packages/core/package.json`의 auth export만, 해당 인계 문서 |
 
 ### 실행 세션
 
 총괄 #0 ID: `01a15961-1386-7fd0-bd22-a71aaf70fdd4`.
-아래는 첫 작업에 사용한 모델이다. 네 세션 모두 인계를 마쳤으며 후속 배정을 기다린다.
+아래 세션을 재사용해 2차 작업을 실행한다. #2는 Luna를 유지하고 나머지 모델도 유지한다.
 
 | 세션 | 작업 | 모델 | 세션 ID |
 | --- | --- | --- | --- |
-| #1 | FMT-01 | 현재 모델 상속 | `01a15a0a-76e2-7230-a0b2-a7a07cd83ea1` |
-| #2 | DL-02 | `gpt-6-luna` | `01a15a0a-7f50-7ee3-891a-0d01524073bd` |
-| #3 | GAME-01 | 현재 모델 상속 | `01a15a0a-9146-7ee0-9d88-1edda8809abc` |
-| #4 | AUTH-01 | 현재 모델 상속 | `01a15a0a-9a6b-7e33-9c57-2541b698de36` |
+| #1 | FMT-02 | 현재 모델 상속 | `01a15a0a-76e2-7230-a0b2-a7a07cd83ea1` |
+| #2 | DL-01 | `gpt-6-luna` | `01a15a0a-7f50-7ee3-891a-0d01524073bd` |
+| #3 | GAME-04 | 현재 모델 상속 | `01a15a0a-9146-7ee0-9d88-1edda8809abc` |
+| #4 | AUTH-02 | 현재 모델 상속 | `01a15a0a-9a6b-7e33-9c57-2541b698de36` |
 
 작업 경계는 다음처럼 나누는 것을 기본으로 한다. 아직 생성하지 않은 경로는 배정 시 확정한다.
 
