@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-20T19:08:15.465Z",
+  "sourceType": "public-google-drive",
+  "rangeWindowBytes": 65536,
+  "totalLength": 78641842,
+  "firstProbe": {
+    "status": 206,
+    "contentRange": "bytes 0-0/78641842",
+    "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2"
+  },
+  "sampleRanges": [
+    {
+      "name": "first",
+      "start": 0,
+      "end": 65535,
+      "status": 206,
+      "sha256": "7517fe15a11410f6ba7c9d4cfdc95f79b5eb1cdaf23eb7cd010cb0a6e741e496"
+    },
+    {
+      "name": "middle",
+      "start": 39288153,
+      "end": 39353688,
+      "status": 206,
+      "sha256": "c4262d39ec22a1b74acb882290680e5188cf26faed0071abeb60138b3ed08bf4"
+    },
+    {
+      "name": "last",
+      "start": 78576306,
+      "end": 78641841,
+      "status": 206,
+      "sha256": "80d6f73f31c71740579284c02d1890807789f78f57709d0a3b071c04ece893d5"
+    }
+  ],
+  "repeatedMiddleSha256": "c4262d39ec22a1b74acb882290680e5188cf26faed0071abeb60138b3ed08bf4",
+  "fullComparisonByteLimit": 16777216,
+  "fullComparison": "skipped-over-limit",
+  "fullSha256": null,
+  "generation": 0
+}
