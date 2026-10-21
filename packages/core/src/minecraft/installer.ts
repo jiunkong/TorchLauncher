@@ -1,8 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { chmod, copyFile, mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix, resolve, sep } from 'node:path';
 import { secureDirectory, stat } from './filesystem';
+import {
+  INSTALL_LOCK_DIRECTORY,
+  type InstallOperation,
+  InstallRollbackError,
+  publishInstallOperations,
+  writeInstallJournal,
+} from './install-transaction';
 import { acquireServerDataLock } from './lock';
 import {
   allows,
@@ -264,12 +271,11 @@ export async function installMinecraft(options: InstallOptions): Promise<Install
   }
 }
 async function installLocked(options: InstallOptions, root: string): Promise<Installation> {
-  const lock = join(root, '.torchlauncher-install-lock');
-  // A leftover lock after a killed process requires caller recovery; never steal an active lock.
+  const lock = join(root, INSTALL_LOCK_DIRECTORY);
+  // A leftover lock after a killed process is resolved by recoverServerEnvironment; never steal it here.
   await mkdir(lock);
   const staging = join(lock, 'staging');
   const backups = join(lock, 'backups');
-  const published: { target: string; backup?: string }[] = [];
   let retainRecovery = false;
   try {
     await mkdir(staging);
@@ -335,7 +341,7 @@ async function installLocked(options: InstallOptions, root: string): Promise<Ins
     const nativesDirectory = await destination(root, `natives/${plan.version.id}`);
     await secureDirectory(nativesDirectory);
     // Persist intent before the first rename so an interrupted process leaves recoverable paths.
-    const operations: { target: string; staged: string; backup?: string }[] = [];
+    const operations: InstallOperation[] = [];
     for (const update of updates) {
       const target = await destination(root, update.path);
       const info = await stat(target);
@@ -348,36 +354,13 @@ async function installLocked(options: InstallOptions, root: string): Promise<Ins
         ...(info ? { backup: join(backups, randomUUID()) } : {}),
       });
     }
-    await writeFile(join(lock, 'journal.json'), JSON.stringify({ version: 1, root, operations }), {
-      flag: 'wx',
-    });
+    await writeInstallJournal(lock, root, operations);
     // Cancellation stops before this commit boundary. Publication finishes or rolls back as a unit.
     aborted(options.signal);
     try {
-      for (const operation of operations) {
-        // Caller serializes all mutations; recheck parent directories at each rename boundary.
-        await secureDirectory(dirname(operation.target));
-        if (operation.backup) await rename(operation.target, operation.backup);
-        published.push(operation);
-        await rename(operation.staged, operation.target);
-      }
+      await publishInstallOperations(lock, operations);
     } catch (error) {
-      const failures: unknown[] = [];
-      for (const operation of published.reverse()) {
-        try {
-          await rm(operation.target, { recursive: true, force: true });
-          if (operation.backup) await rename(operation.backup, operation.target);
-        } catch (rollbackError) {
-          failures.push(rollbackError);
-        }
-      }
-      if (failures.length) {
-        retainRecovery = true;
-        throw new AggregateError(
-          [error, ...failures],
-          `Install rollback failed; preserve recovery files at ${lock}`,
-        );
-      }
+      if (error instanceof InstallRollbackError) retainRecovery = true;
       throw error;
     }
     return {
