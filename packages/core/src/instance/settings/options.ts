@@ -78,8 +78,12 @@ export class OptionsDocument {
   }
 }
 
-/** Minecraft default when options.txt has no resourcePacks entry. */
-export const DEFAULT_PACKS: readonly string[] = ['vanilla'];
+/**
+ * Active list assumed when options.txt has no resourcePacks entry: `[]` (wiki default; a real
+ * 1.21.1 client writes `resourcePacks:[]`, the built-in vanilla pack is implicit). Profiles own
+ * the per-version value; this export is kept for compatibility.
+ */
+export const DEFAULT_PACKS: readonly string[] = [];
 
 export function readPackList(doc: OptionsDocument): string[] | undefined {
   const raw = doc.get('resourcePacks');

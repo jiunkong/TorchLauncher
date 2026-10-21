@@ -61,7 +61,7 @@ USER-02 코어 명세. 구현: `packages/core/src/instance/settings/`. UI/IPC �
 
 ### 리소스팩
 
-`resourcePacks:["vanilla","file/foo.zip"]`(JSON 배열)를 관리한다. 키가 없으면 Minecraft 기본값 `["vanilla"]`로 간주한다.
+`resourcePacks:["vanilla","file/foo.zip"]`(JSON 배열)를 관리한다. 키가 없으면 형식 프로파일의 기본값(현재 모두 `[]`)으로 간주한다. 이전 구현은 `["vanilla"]`를 가정했으나, Minecraft Wiki의 기본값이 `[]`이고 실제 1.21.1 클라이언트 파일도 `resourcePacks:[]`이므로 변경했다(vanilla는 내장 팩으로 암묵 적용). 운영자가 `vanilla`를 명시하면 그대로 유지된다.
 
 - required 팩이 없으면 추가: 운영자 순서상 앞선 required 팩 바로 뒤, 없으면 뒤따르는 required 팩 앞, 둘 다 없으면 목록 끝(최우선).
 - required 팩들의 상대 순서가 어긋나면 기존 required 팩이 차지한 자리 안에서 운영자 순서로 되돌린다.
@@ -79,4 +79,27 @@ USER-02 코어 명세. 구현: `packages/core/src/instance/settings/`. UI/IPC �
 ## 오류 코드
 
 `aborted`, `file-changed`, `invalid-argument`, `invalid-options`, `invalid-policy`, `invalid-state`, `io-error`, `limit-exceeded`, `locked`,
-`options-owned-by-sync`, `required-pack-removed`, `required-pack-reordered`, `sync-not-initialized`, `unsafe-path`. 모두 `SettingsError.code`.
+`options-owned-by-sync`, `required-pack-removed`, `required-pack-reordered`, `sync-not-initialized`, `unsafe-path`, `unsupported-options-version`. 모두 `SettingsError.code`.
+
+## 버전별 형식 프로파일 (`profiles.ts`)
+
+`options.txt`의 `version:` 줄(데이터 버전, 1.10-pre1에서 추가)로 프로파일을 고른다. 줄이 없으면 호출자의 `minecraftVersion`, 둘 다 없으면 기존 동작(1.21.1 프로파일). 둘 다 있는데 서로 다른 프로파일이면 `unsupported-options-version`.
+`versionPolicy`(적용/읽기/팩 설정 API 공통 옵션): `verified-only`(기본) / `allow-researched` / `allow-any`. 지원 밖 버전은 기본적으로 파일을 수정하지 않고 `unsupported-options-version`으로 거부한다.
+`allow-any`는 3955보다 큰 데이터 버전만 최신 레이아웃으로 처리하며 `result.warnings`에 경고를 남긴다. 1519 미만(1.13 이전)은 항상 거부한다.
+결과의 `formatProfile`, `warnings`로 사용된 프로파일을 알 수 있다.
+
+| 프로파일 | 데이터 버전 | Minecraft | 근거 수준 |
+| --- | --- | --- | --- |
+| `java-1.21.1` | 3955 | 1.21.1 | **검증**(실제 클라이언트 파일 fixture로 테스트) |
+| `java-1.13-1.21` | 1519–3954 | 1.13, 1.14, 1.16–1.20, 1.20.5, 1.21 | **미검증(조사 기반)**: 구현만 있고 실파일 테스트 없음 |
+| (없음) | <1519, >=3956 | 1.12 이하, 1.21.2+ | 미지원: 기본 거부 |
+
+프로파일이 결정하는 것: 기본 팩 목록(`[]`), 단축키 값이 이름 형식(`key.keyboard.*`/`key.mouse.*`)이어야 하는지(숫자 키코드 거부 -> `invalid-policy`),
+`file/` 팩 ID 검증(빈 이름, `..`/빈 세그먼트, 역슬래시 거부). 정책의 `version` 키는 게임 소유라 `invalid-policy`.
+
+조사 출처:
+- https://minecraft.wiki/w/Options.txt_(Java_Edition): `version`은 마지막으로 저장한 클라이언트의 데이터 버전(1.10-pre1 추가), `resourcePacks`(13w36a)·`incompatibleResourcePacks`(1.8.8) 기본값 `[]`, 단축키 `key_key.*` = `key.keyboard.w` 등.
+- https://minecraft.wiki/w/Key_codes: LWJGL 3 전환(17w43a)으로 키코드 재설계, 17w45a부터 `key.keyboard.` 접두사(1.13). 이전은 숫자 코드.
+- https://minecraft.wiki/w/Data_version: 1.13=1519, 1.21=3953, 1.21.1=3955, 1.21.2=4080.
+
+조사로 확인하지 못해 구현하지 않은 것: 버전별 팩 ID 표기 변화(`vanilla`, `file/` 접두사 도입 시점, 모드 내장 팩 ID, 서버 리소스팩 표기), 1.12 이하 숫자 키코드·평문 팩 이름 처리, 1.21.2 이후 레이아웃 변화.

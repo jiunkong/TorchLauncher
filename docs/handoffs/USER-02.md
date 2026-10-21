@@ -52,3 +52,13 @@
 2. 호출 순서 제안: 인증 -> 설치 -> `synchronizeDeployment` -> `readSyncOwnership`(USER-01) -> `applySettingsPolicy(root,{ownership})` -> `assertSynchronizedForLaunch` -> 게임 실행. 게임 잠금 전에 호출해야 한다(잠금을 쥐고 있으면 `locked`).
 3. 운영자 도구(Studio)가 `options.txt`를 `always`로 배포하지 못하게 검증하는 지점은 이 모듈의 `assertOptionsNotSyncOwned`/`parseSettingsPolicy`를 재사용 가능(Studio 연결은 별도 작업).
 4. 추가 요청 없음(의존성·공유 파일 변경 불필요).
+
+## 후속: 실제 options.txt 호환 + 버전별 포맷 프로파일
+
+- 브랜치 `feat/user-02-versioned-options`(기준 main `cd7377b`). 최종 커밋 해시는 세션 보고에 기재. 범위: `packages/core/src/instance/settings/**`, `docs/settings-policy.md`, 이 절.
+- fixture: `settings/fixtures/options-1.21.1.txt` = 실제 1.21.1 클라이언트 파일(`/mnt/d/TorchLauncherSmoke/games/4444.../options.txt`)의 바이트 복사(CRLF, 140줄, `version:3955`). 계정·경로·토큰 값 없음(`lastServer:`는 빈 값, `soundDevice:""`) 확인, 값 제거 없음.
+- 테스트(`profiles.test.ts`): 변경 없으면 쓰지 않음, 필수/초기/팩 적용 시 대상 줄만 바뀌고 CRLF·순서·`version:` 유지, `resourcePacks:[]` 위 필수 팩 추가, 재적용 멱등, 프로파일 선택/거부.
+- 기본값 변경: 키 없을 때 기본 팩 목록 `["vanilla"]` -> `[]`. 근거: 실제 1.21.1 파일과 위키 기본값. 기존 테스트는 모두 통과(36개).
+- 구조/지원 표/출처/미구현 목록은 `docs/settings-policy.md`의 "버전별 형식 프로파일" 절 참조. 요약: 검증은 `java-1.21.1`(3955)뿐, `java-1.13-1.21`은 미검증(조사 기반)이며 `versionPolicy: 'allow-researched'` 선택 시에만 사용.
+- 새 오류 코드 `unsupported-options-version`. 새 옵션 `minecraftVersion`, `versionPolicy`(apply/getResourcePacks/setUserResourcePacks), 결과 필드 `formatProfile`, `warnings`(`ApplySettingsResult.warnings`는 필수 필드 추가).
+- 제약: 기본 `verified-only`라서 1.21.1(3955) 외 데이터 버전 파일은 호출자가 정책을 고르지 않으면 거부된다(1.21 등 연동 시 #0이 정책 결정). 파일에 `version:`이 없고 `minecraftVersion`도 없으면 기존처럼 1.21.1 프로파일로 처리.
