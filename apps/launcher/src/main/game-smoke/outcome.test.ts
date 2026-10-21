@@ -1,5 +1,5 @@
 import { AuthenticationError } from '@torchlauncher/core/auth';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { type GameExit, GameStartError } from '../../../../../packages/core/src/minecraft/process';
 import { safeFailure, safeGameExit } from './outcome';
 
@@ -39,4 +39,23 @@ it('reports only known typed code/stage/status and suppresses raw causes and fie
   const output = JSON.stringify(safeFailure(forged, secret, false));
   expect(output).not.toContain(secret);
   expect(output).not.toContain('99999');
+});
+
+describe('fatal log classification', () => {
+  it('reports a fixed code for module resolution failures without log text', () => {
+    const logs = {
+      entries: [
+        {
+          stream: 'stderr' as const,
+          text: 'Exception in thread "main" java.lang.module.ResolutionException: Modules a and b export package x',
+        },
+      ],
+      bytes: 1,
+      droppedEntries: 0,
+      discardedLines: 0,
+    };
+    const result = safeGameExit({ reason: 'exited', code: 1, signal: null, logs }, false);
+    expect(result).toMatchObject({ ok: false, exitCode: 1, code: 'module_resolution_failed' });
+    expect(JSON.stringify(result)).not.toContain('Modules a');
+  });
 });

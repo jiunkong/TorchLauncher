@@ -152,7 +152,11 @@ async function main() {
     const electronPath = (await import('electron')).default;
     const env = {
       ...process.env,
-      TORCH_GAME_SMOKE_CONFIG: JSON.stringify({ ...config, cancelFile: join(temporary, 'cancel') }),
+      TORCH_GAME_SMOKE_CONFIG: JSON.stringify({
+        ...config,
+        cancelFile: join(temporary, 'cancel'),
+        resultFile: join(temporary, 'result'),
+      }),
       DEBUG: '',
     };
     delete env.ELECTRON_RUN_AS_NODE;
@@ -177,11 +181,15 @@ async function main() {
     process.on('SIGINT', interrupt);
     process.on('SIGTERM', interrupt);
     try {
-      const code = await new Promise((resolveExit, reject) => {
+      const hostCode = await new Promise((resolveExit, reject) => {
         child.once('error', () => reject(new Error('Electron could not start.')));
         child.once('close', resolveExit);
       });
-      const line = output
+      let fileOutput = '';
+      try {
+        fileOutput = await readFile(join(temporary, 'result'), 'utf8');
+      } catch {}
+      const line = `${fileOutput}\n${output}`
         .split(/\r?\n/)
         .findLast((line) => line.startsWith('TORCH_GAME_SMOKE_RESULT '));
       if (!line) {
@@ -197,6 +205,7 @@ async function main() {
             ok: false,
             phase: 'electron-runtime',
             code,
+            hostExitCode: typeof hostCode === 'number' ? hostCode : null,
             authenticatedConnection: false,
           }),
         );
@@ -205,7 +214,7 @@ async function main() {
       }
       const result = JSON.parse(line.slice('TORCH_GAME_SMOKE_RESULT '.length));
       console.log(JSON.stringify(result));
-      if (code !== 0 || !result.ok) process.exitCode = 1;
+      if (hostCode !== 0 || !result.ok) process.exitCode = 1;
     } finally {
       process.removeListener('SIGINT', interrupt);
       process.removeListener('SIGTERM', interrupt);

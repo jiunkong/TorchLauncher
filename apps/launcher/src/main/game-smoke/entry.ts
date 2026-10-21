@@ -1,3 +1,4 @@
+import { writeFileSync, writeSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app } from 'electron';
@@ -22,6 +23,7 @@ interface Config {
   server?: string;
   durationSeconds: number;
   cancelFile: string;
+  resultFile?: string;
 }
 const config = JSON.parse(process.env.TORCH_GAME_SMOKE_CONFIG ?? '{}') as Config;
 delete process.env.TORCH_GAME_SMOKE_CONFIG;
@@ -122,17 +124,25 @@ async function main() {
     clearTimeout(timer);
   }
 }
+/** Synchronous and durable: a piped console.log can be lost when app.exit follows (observed on Windows). */
+function publish(result: unknown) {
+  const line = `TORCH_GAME_SMOKE_RESULT ${JSON.stringify(result)}`;
+  try {
+    if (config.resultFile) writeFileSync(config.resultFile, line, { flag: 'wx', mode: 0o600 });
+  } catch {}
+  try {
+    writeSync(1, `${line}\n`);
+  } catch {}
+}
 void main().then(
   (result) => {
-    console.log(`TORCH_GAME_SMOKE_RESULT ${JSON.stringify(result)}`);
+    publish(result);
     stopPolling();
     completed = true;
     app.exit(result.ok ? 0 : 1);
   },
   (error: unknown) => {
-    console.log(
-      `TORCH_GAME_SMOKE_RESULT ${JSON.stringify(safeFailure(error, phase, controller.signal.aborted))}`,
-    );
+    publish(safeFailure(error, phase, controller.signal.aborted));
     stopPolling();
     completed = true;
     app.exit(1);
