@@ -6,6 +6,7 @@ import type { Installation } from '../minecraft/installer';
 import { buildLaunchCommand } from '../minecraft/launch';
 import { type Platform, parseVersion } from '../minecraft/metadata';
 import fabricProfile from './fixtures/fabric-0.16.14-profile.json';
+import fabric0195Profile from './fixtures/fabric-0.19.5-profile.json';
 import neoforgeProfile from './fixtures/neoforge-21.1.264-profile.json';
 import { type LoaderSelection, loaderInstallation, maven } from './profile';
 
@@ -105,6 +106,32 @@ describe('assembled loader JVM arguments', () => {
         'fabric-loader-0.16.14-1.21.1',
       );
       expect(result.args).toContain('net.fabricmc.loader.impl.launch.knot.KnotClient');
+    },
+  );
+  it.each(platforms)(
+    'Fabric 0.19.5 on $platform.os assembles a single-jar Knot launch for the Fabric server version',
+    ({ platform }) => {
+      const result = assembled(platform, { kind: 'fabric', version: '0.19.5' }, fabric0195Profile);
+      expect(result.args.join('\n')).not.toContain('${');
+      expect(result.ignoreList).toBeUndefined();
+      expect(result.modulePath).toEqual([]);
+      expect(result.classpath.filter((entry) => entry === result.vanillaJar)).toHaveLength(1);
+      expect(result.classpath.filter((entry) => basename(entry) === '1.21.1.jar')).toHaveLength(1);
+      expect(new Set(result.classpath).size).toBe(result.classpath.length);
+      const keys = result.installation.version.libraries.map(
+        (library) => maven(library.name).key + (library.rules ? JSON.stringify(library.rules) : ''),
+      );
+      expect(new Set(keys).size).toBe(keys.length);
+      expect(result.classpath.some((entry) => basename(entry) === 'fabric-loader-0.19.5.jar')).toBe(
+        true,
+      );
+      expect(
+        result.classpath.some((entry) => basename(entry) === 'fabric-loader-0.16.14.jar'),
+      ).toBe(false);
+      expect(result.args[result.args.indexOf('--version') + 1]).toBe('fabric-loader-0.19.5-1.21.1');
+      const main = result.args.indexOf('net.fabricmc.loader.impl.launch.knot.KnotClient');
+      expect(main).toBeGreaterThan(result.args.indexOf('-cp'));
+      expect(result.args).toContain('-DFabricMcEmu= net.minecraft.client.main.Main ');
     },
   );
   it('leaves vanilla launches on the base version name', () => {
