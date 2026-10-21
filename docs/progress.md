@@ -12,6 +12,13 @@
   실제 업로드가 필요한 검증은 #0이 테스트 산출물을 준비한 뒤 사용자에게 요청한다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
   core TypeScript·scoped Biome 성공. SYNC-01은 [범용 동기화 기준](synchronization.md)에 따라 이어서 구현한다.
+  생성한 비민감 v1 torchpack을 사용자가 Drive에 업로드했다. 실제 공개 링크에서 헤더·인덱스 읽기와
+  생성본의 정확한 일치를 확인했다(140,736 bytes, 파일 5개, payload 미수신).
+  로컬 검증 영수증은 `.cache/sync-validation/reader-v1-receipt.json`이며 공유 URL은 커밋하지 않는다.
+- SYNC-01 구현은 #2 worktree에 미커밋 상태다. worker의 scoped Biome·core TypeScript·로컬 테스트
+  30개가 성공했고, 실제 Drive v1 최초 구성은 5개 수신, 무변경 재실행은 payload 수신 0을 확인했다.
+  v2 교체 확인 대기는 시간 만료됐고 worker는 도구 사용량 제한으로 중단됐다. 제품 실패와 구분한다.
+  재개 절차·dirty 경로·로컬 산출물은 [도구 간 인계](tool-handoff.md)에 기록한다. v2 실검증·커밋·통합은 남아 있다.
 - 최신 사용자 결정: 자체 앱 ID 승인·최종 연결은 마지막 단계로 미루고, 개발 중에는 임시 공개
   Java Title ID 인증을 사용한다. AUTH-03 구현을 `a7eba73`으로 통합했다. smoke 기본은
   `public-java`이며 기존 own-app 경로는 명시적 옵션으로 유지한다. Windows 실계정 cycle은 사용자 보고로 성공했다.
@@ -21,7 +28,7 @@
   메인의 `worker-check`도 pinned 3.1.1 임시 번들 로딩·종료에 성공했다(네트워크·로그인 없음).
   구현 커밋은 `ccac0c7`, 상세 인계와 Windows 명령은 [AUTH-03](handoffs/AUTH-03.md)를 따른다.
 
-- 프로젝트 기반 구축과 Linux 검증은 완료했다. 배포 규격 계약·Range 전송·인증·Minecraft 설치 코어를 통합했다. 앱 연결·실계정 로그인·실제 게임 실행·동기화·Studio 제품 기능은 남아 있다.
+- 프로젝트 기반 구축과 Linux 검증은 완료했다. 배포 규격·Range 전송·임시 인증·Minecraft 설치 코어를 통합했다. 앱 기능 연결·실제 게임 실행·동기화·Studio 제품 기능은 남아 있다.
 - Git 기준 커밋 `4d5b4ab`과 `main`, 네 작업 브랜치·worktree를 준비했다.
 - 전체 총괄은 사용자 지정 `#0` 에이전트인 **`launcher develop #0`**이다. #0은 제품 기능을
   구현하지 않고 배정·문서·검토·Git 통합·통합 검증을 맡는다.

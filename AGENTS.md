@@ -16,6 +16,31 @@ The user-designated **#0 agent** (currently `launcher develop #0`) is the projec
 - Workers may update their own branches from the integration baseline. Shared configuration, manifests, lockfile, exports, and IPC changes must be coordinated with #0.
 - #0 reviews handoffs, integrates in dependency order, and marks tasks complete only after integrated verification.
 
+## Resuming in Another Tool
+
+These repository rules apply equally to Codex, Claude Code, and other development tools. Chat history,
+session IDs, model names, and tool-specific messaging are not required to resume the work.
+
+- Start by reading this file, `docs/progress.md`, `docs/work-distribution.md`, and the latest
+  `docs/tool-handoff.md` if present. Then read the relevant specifications and `docs/handoffs/` reports.
+- Inspect `git status --short --branch`, `git worktree list`, and recent commits in both the coordinator
+  checkout and the assigned worker checkout. Preserve uncommitted and untracked work; never reset,
+  clean, or recreate a worktree simply because the previous tool stopped.
+- Retain the user-designated coordinator/worker roles and exclusive file scopes. Resuming in a new
+  tool does not authorize merging worker work or starting overlapping implementations. If agent
+  messaging is unavailable, use repository handoff files and separate terminals/worktrees instead.
+- Before a usage limit or tool switch, record the task, role, branch/worktree, baseline/current commit,
+  dirty paths, decisions, exact validation results, running processes, pending user actions, blockers,
+  and next commands. #0 maintains `docs/tool-handoff.md`; workers update their assigned handoff.
+  Distinguish implemented, tested, integrated, and pending work. Do not rely on conversation memory.
+- Keep credentials and private URLs out of tracked handoffs. Reference ignored local artifacts or
+  environment variable names, and state when an artifact must be regenerated or requested again.
+- Treat temporary toolchains, dependencies, process IDs, and old test results as environment-specific.
+  Check prerequisites and process state before resuming; rerun only checks affected by new changes or
+  unresolved failures. Report usage/tool failures separately from product defects.
+- Apply the task-based model policy using the capabilities available in the new tool; Codex-specific
+  model names and messaging APIs are examples, not prerequisites for continuing the project.
+
 ## Project Structure & Module Organization
 
 Use these module boundaries; applications must not import each other:
