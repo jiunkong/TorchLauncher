@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { fork, spawn } from 'node:child_process';
 import { lstat, mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -8,9 +8,11 @@ import { build } from 'vite';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const usage = `Usage: node scripts/auth-smoke.mjs <mode> --data-dir <absolute-private-directory>
+  [--provider public-java|own-app]
   [--client-id <your-own-public-client-id>] [--redirect-uri http://localhost:48127/callback]
 
 Modes:
+  worker-check   Build/start the pinned-library worker; no network, login or token cache.
   probe          Check real Electron secure storage, with no login or credential write.
   reject-basic   Linux only: verify that --password-store=basic is rejected. No login.
   storage-cycle  Write synthetic data, restart/read, clear, restart/check empty. No login.
@@ -20,7 +22,8 @@ Modes:
   logout         Remove this client's saved session. Does not revoke browser consent.
   assert-empty   Verify no session remains for this client.
 
-Live modes require YOUR registered public client ID and registered loopback redirect.
+Default provider: public-java (temporary Java Title device-code/SISU flow).
+Only --provider own-app requires YOUR registered client ID and loopback redirect.
 Data must be outside this repository. Never paste credentials, codes or tokens in chat.
 If a live cycle fails, run logout using the same client ID/data directory to clean up.
 `;
@@ -31,6 +34,7 @@ function argumentsFor(argv) {
   if (
     ![
       'probe',
+      'worker-check',
       'reject-basic',
       'storage-cycle',
       'cycle',
@@ -47,7 +51,7 @@ function argumentsFor(argv) {
     const flag = args[index];
     const value = args[index + 1];
     if (
-      !['--data-dir', '--client-id', '--redirect-uri'].includes(flag) ||
+      !['--data-dir', '--client-id', '--redirect-uri', '--provider'].includes(flag) ||
       !value ||
       options.has(flag)
     ) {
@@ -58,21 +62,69 @@ function argumentsFor(argv) {
   const dataDirectory = options.get('--data-dir');
   if (!dataDirectory || !isAbsolute(dataDirectory))
     throw new Error('--data-dir must be an absolute private path outside the repository.');
-  const live = !['probe', 'reject-basic', 'storage-cycle'].includes(mode);
+  const live = !['probe', 'reject-basic', 'storage-cycle', 'worker-check'].includes(mode);
   const clientId = options.get('--client-id');
   const redirectUri = options.get('--redirect-uri');
+  const provider = options.get('--provider') ?? 'public-java';
+  if (!['public-java', 'own-app'].includes(provider))
+    throw new Error('Unknown authentication provider.');
+  if (provider === 'public-java' && (clientId || redirectUri))
+    throw new Error('Client ID/redirect options require --provider own-app.');
   if (
     live &&
+    provider === 'own-app' &&
     (!clientId || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(clientId) || !redirectUri)
   ) {
     throw new Error('Live modes require --client-id (your registered ID) and --redirect-uri.');
   }
-  return { mode, dataDirectory, clientId, redirectUri };
+  return { mode, dataDirectory, clientId, redirectUri, provider };
 }
 
 function inside(path, root) {
   const child = relative(root, path);
   return child === '' || (!child.startsWith(`..${sep}`) && child !== '..' && !isAbsolute(child));
+}
+
+async function workerCheck(entry) {
+  const env = { ...process.env, DEBUG: '' };
+  delete env.NODE_OPTIONS;
+  delete env.NODE_PATH;
+  delete env.ELECTRON_RUN_AS_NODE;
+  const worker = fork(entry, [], {
+    env,
+    execArgv: [],
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+  });
+  const closed = new Promise((resolve) => worker.once('close', resolve));
+  const timer = setTimeout(() => worker.kill('SIGKILL'), 10_000);
+  try {
+    await new Promise((resolve, reject) => {
+      worker.once('error', () => reject(new Error('Worker check failed.')));
+      worker.once('close', () => reject(new Error('Worker check failed.')));
+      worker.once('message', (message) => {
+        if (
+          message?.type === 'self-check' &&
+          message.ok === true &&
+          message.libraryVersion === '3.1.1'
+        )
+          resolve();
+        else reject(new Error('Worker check failed.'));
+      });
+      worker.send({ type: 'self-check' });
+    });
+    console.log(
+      JSON.stringify({
+        ok: true,
+        mode: 'worker-check',
+        libraryVersion: '3.1.1',
+        liveAuthentication: false,
+      }),
+    );
+  } finally {
+    worker.kill('SIGKILL');
+    await closed;
+    clearTimeout(timer);
+  }
 }
 
 async function child(entry, config, mode) {
@@ -157,12 +209,19 @@ async function main() {
       logLevel: 'silent',
       ssr: { noExternal: true, external: ['electron'] },
       build: {
-        ssr: resolve(repository, 'apps/launcher/src/main/auth/smoke-entry.ts'),
+        ssr: true,
         outDir: temp,
         emptyOutDir: false,
         rollupOptions: {
+          input: {
+            'auth-smoke': resolve(repository, 'apps/launcher/src/main/auth/smoke-entry.ts'),
+            'public-java-worker': resolve(
+              repository,
+              'apps/launcher/src/main/auth/public-java-worker.ts',
+            ),
+          },
           external: ['electron'],
-          output: { format: 'cjs', entryFileNames: 'auth-smoke.cjs' },
+          output: { format: 'cjs', entryFileNames: '[name].cjs' },
         },
       },
     });
@@ -172,11 +231,13 @@ async function main() {
         : config.mode === 'storage-cycle'
           ? ['storage-write', 'storage-read', 'storage-clear', 'storage-empty']
           : [config.mode];
-    for (const mode of steps) await child(join(temp, 'auth-smoke.cjs'), config, mode);
+    if (config.mode === 'worker-check') await workerCheck(join(temp, 'public-java-worker.cjs'));
+    else for (const mode of steps) await child(join(temp, 'auth-smoke.cjs'), config, mode);
     console.log(
       JSON.stringify({
         ok: true,
         mode: config.mode,
+        provider: config.provider,
         liveAuthentication: config.mode === 'cycle' ? 'verified' : 'not-asserted',
       }),
     );

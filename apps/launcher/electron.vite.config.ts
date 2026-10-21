@@ -1,11 +1,37 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
 export default defineConfig({
   main: {
+    plugins: [
+      {
+        name: 'auth-dependency-notices',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'prismarine-auth-NOTICE.txt',
+            source: readFileSync(
+              new URL('../../third-party/prismarine-auth/NOTICE.txt', import.meta.url),
+              'utf8',
+            ),
+          });
+        },
+      },
+    ],
     build: {
       externalizeDeps: false,
-      lib: { formats: ['cjs'], fileName: () => 'index.cjs' },
+      lib: {
+        entry: {
+          index: fileURLToPath(new URL('./src/main/index.ts', import.meta.url)),
+          'public-java-worker': fileURLToPath(
+            new URL('./src/main/auth/public-java-worker.ts', import.meta.url),
+          ),
+        },
+        formats: ['cjs'],
+        fileName: (_format, name) => `${name}.cjs`,
+      },
     },
   },
   preload: {
