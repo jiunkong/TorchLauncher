@@ -10,8 +10,9 @@ import { SERVER_LOCK_DIRECTORY } from '../lock';
 import { inspectServerEnvironment, recoverServerEnvironment } from './index';
 
 /**
- * Real process-kill scenarios (Linux only). A synthetic host runs the production lock and
- * install-transaction modules through Node type stripping and is killed with SIGKILL.
+ * Real process-kill scenarios (Linux and Windows). A synthetic host runs the production lock and
+ * install-transaction modules through Node type stripping and is force-killed (SIGKILL on Linux,
+ * TerminateProcess on Windows; the exit signal is platform dependent, so it is judged by outcome).
  */
 const SOURCE = dirname(dirname(fileURLToPath(import.meta.url)));
 const HOST = `
@@ -33,7 +34,11 @@ const lock = await load('lock.ts');
 const { systemProcessProbe } = await load('identity.ts');
 const tx = await load('install-transaction.ts');
 const say = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
-const die = () => process.kill(process.pid, 'SIGKILL');
+const die = () => {
+  process.kill(process.pid, 'SIGKILL');
+  // Only reached if the platform did not terminate us synchronously.
+  process.exit(137);
+};
 if (mode === 'game') {
   const lease = await lock.acquireServerDataLock(root, 'game');
   await lease.recordChild({ state: 'starting' });
@@ -72,11 +77,12 @@ const pids: number[] = [];
 afterEach(async () => {
   for (const pid of pids.splice(0))
     try {
-      process.kill(pid, 'SIGKILL');
+      process.kill(pid, 'SIGKILL'); // TerminateProcess on Windows
     } catch {
       // Already gone.
     }
-  for (const path of cleanup.splice(0)) await rm(path, { recursive: true, force: true });
+  for (const path of cleanup.splice(0))
+    await rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 async function tempDir(prefix: string): Promise<string> {
   const path = await mkdtemp(join(await realpath(tmpdir()), prefix));
@@ -95,7 +101,10 @@ interface Host {
   stderr: () => string;
 }
 function runHost(script: string, args: string[]): Host {
-  const child = spawn(process.execPath, [script, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [script, ...args], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
   if (child.pid) pids.push(child.pid);
   let err = '';
   child.stderr?.on('data', (chunk: Buffer) => {
@@ -168,6 +177,10 @@ async function files(root: string) {
     runtime: await readFile(join(root, 'runtime', 'java', 'bin'), 'utf8'),
   };
 }
+/** A forced kill is never a clean exit: SIGKILL on Linux, a non-zero exit code on Windows. */
+function wasKilled(exit: { code: number | null; signal: NodeJS.Signals | null }): boolean {
+  return process.platform === 'win32' ? exit.code !== 0 : exit.signal === 'SIGKILL';
+}
 const OLD = { a: 'old-a', b: null, runtime: 'old-runtime' };
 const NEW = { a: 'new-a', b: 'new-b', runtime: 'new-runtime' };
 async function killedInstall(script: string, killAfter: number): Promise<string> {
@@ -176,12 +189,13 @@ async function killedInstall(script: string, killAfter: number): Promise<string>
   const planPath = join(await tempDir('torch-kill-plan-'), 'plan.json');
   await writeFile(planPath, JSON.stringify(plan));
   const host = runHost(script, ['install', root, SOURCE, planPath]);
-  expect(await host.exited).toEqual({ code: null, signal: 'SIGKILL' });
+  const exit = await host.exited;
+  expect(wasKilled(exit), `${JSON.stringify(exit)} ${host.stderr()}`).toBe(true);
   return root;
 }
 
-describe.runIf(process.platform === 'linux')(
-  'SIGKILL recovery (Linux real processes)',
+describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
+  'forced-kill recovery (real processes, Linux and Windows)',
   { timeout: 60_000 },
   () => {
     it('keeps the lock while the game child outlives a killed host, then reclaims', async () => {
@@ -191,7 +205,7 @@ describe.runIf(process.platform === 'linux')(
       const { child } = await host.message;
       if (typeof child !== 'number') throw new Error(host.stderr());
       pids.push(child);
-      host.child.kill('SIGKILL');
+      host.child.kill('SIGKILL'); // TerminateProcess on Windows
       await host.exited;
 
       const live = await inspectServerEnvironment(root);
@@ -224,6 +238,7 @@ describe.runIf(process.platform === 'linux')(
       const root = await tempDir('torch-kill-root-');
       const sleeper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
         stdio: 'ignore',
+        windowsHide: true,
       });
       if (!sleeper.pid) throw new Error('spawn failed');
       pids.push(sleeper.pid);
@@ -294,7 +309,7 @@ describe.runIf(process.platform === 'linux')(
         const root = await killedInstall(script, 3);
         const recover = runHost(script, ['recover', root, SOURCE, String(step)]);
         const exit = await recover.exited;
-        if (exit.signal !== 'SIGKILL') {
+        if (!wasKilled(exit)) {
           // Fewer steps than `step`: the recovery finished normally.
           expect(exit.code, recover.stderr()).toBe(0);
           expect(await files(root)).toEqual(OLD);
