@@ -318,6 +318,40 @@ BASE-03·04 및 QA-01·RELEASE 작업은 가능한 환경을 확인한 뒤 별�
 
 ## 새 세션에 전달할 시작 지시문
 
+## 배포 reader → 동기화 엔진 착수 — 2026-10-21
+
+사용자 승인 범위는 FMT-03을 구현·통합한 뒤 SYNC-01을 이어서 구현하는 것이다.
+실파일 업로드가 필요한 시점에는 #0이 생성된 테스트 파일과 절차를 준비해 사용자에게 요청한다.
+다른 로더·UI·Studio 작업은 이번에 착수하지 않는다.
+
+### FMT-03 — #2
+
+- 최신 main에서 `feat/fmt-03-reader`를 준비한다. 독점 범위는
+  `packages/core/src/deployment/reader/**`, `docs/handoffs/FMT-03.md`다.
+- 모델은 명세가 확정된 reader 구현이므로 Luna, 목표 effort medium이다. 실제 effort 설정은 도구로 변경하지 못한다.
+- 기존 계약·writer·DownloadSource를 재사용한다. 64-byte 헤더 u64 안전 변환,
+  strict UTF-8/BOM/중복 JSON 키 거부, 원본 인덱스 SHA-256·서버 ID·컨테이너 길이를 검증한다.
+- 열린 reader는 검증 결과를 외부 변경으로부터 보호한다. 모든 구간에 동일 소스·generation·snapshot을 적용하고,
+  버전 변경·reset·취소 시 실패한다. 자동 reset/재시도하여 한 배포에 다른 버전을 섞지 않는다.
+- 파일별 payload는 작은 Range들로 읽어 메모리를 제한하고 caller가 지정한 새 임시 파일에 기록한다.
+  빈 파일, none, gzip 단일 member를 지원한다. gzip CRC·trailer·후속 member/데이터·출력 길이·SHA-256을 확인한다.
+  검증 전 게임 파일을 수정하지 않으며 실패한 자기 임시 파일만 정리한다. 로컬 운영 예산은 규격보다 낮게 설정 가능하다.
+- writer→reader roundtrip과 손상·과대 입력·동시 reset·취소·범위 선택·gzip 오류를 행동 테스트한다.
+  실환경 모의 검사를 실제 Drive 검증으로 기록하지 않는다. 공유 manifest/export 변경은 먼저 요청한다.
+
+### SYNC-01 — FMT-03 통합 후 #2
+
+- reader 통합 후 새 브랜치로 별도 배정한다. 모델은 파일 소유권·복구·OS 차이 때문에 Sol, 목표 medium이다.
+- 운영자 관리 목록·변경 비교·검증된 staging·적용·이전 always 파일 삭제·실패 복구를 구현한다.
+  같은 서버 데이터 잠금으로 실행/설치와 경합을 막는다. symlink/hardlink·보호 경로·다른 서버 ID를 거부한다.
+- 미등록 파일은 소유권으로 편입하지 않는다. 충돌은 보존하고 명시 오류로 반환한다.
+  initial-only는 최초 성공한 환경 구성에서만 제공하고 이후 수정·삭제·배포 누락을 보존한다.
+  같은 경로 정책 전환은 이번에 거부한다. 혼합 설정·모드 ID 관리는 USER 작업으로 남긴다.
+- 시작 시 남은 transaction을 검사하고, 실패·중단 후 복구할 수 있는 journal/backup을 둔다.
+  전체 검증 전 기존 환경은 변경하지 않는다. 관리 목록도 같은 transaction으로 반영한다.
+- 실제 사용자 파일 손실을 막는 테스트와 writer→source→reader→sync 통합 fixture를 포함한다.
+  구체적인 API·보호 경로·복구 규칙은 착수 전에 #0이 확정하고 추가 기록한다.
+
 아래에서 번호만 바꿔 각 세션에 전달한다. 각 번호의 구체적인 첫 작업과 수정 범위는 위 절을 따른다.
 
 ```text
