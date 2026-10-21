@@ -336,3 +336,13 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - UI-02 연결 순서(제안): `ensureServerDataRoot` → 설치/`synchronizeDeployment` → `readSyncOwnership` → `applySettingsPolicy(root,{ownership})` →
   `assertSynchronizedForLaunch` → 게임 실행. 삭제는 같은 main 프로세스에서 `previewServerDataDeletion` 후 `deleteServerData`(확인 토큰은 프로세스 메모리에만 존재).
   main 프로세스가 같은 서버의 설치·실행·삭제를 직렬화해야 한다. 상세는 `docs/handoffs/USER-0{1,2,3}.md`.
+
+## 2026-10-22 USER 후속 통합
+
+- USER-01 후속: 사용자 모드 등록 전 디스크 여유 공간 검사(`insufficient-space`, jar+max(64MiB,10%)) 통합. ZIP64 jar는 계속 미지원(ID 검사만 생략, 등록 허용).
+- USER-02 후속: 실제 1.21.1 `options.txt`(데이터 버전 3955, CRLF)를 fixture로 검증했고(`fixtures/.gitattributes`로 줄바꿈 보존),
+  기본 리소스팩 목록을 `["vanilla"]`에서 `[]`로 바꿨다. 버전별 포맷 프로파일을 추가했다: `java-1.21.1`(검증), `java-1.13-1.21`(조사 기반·미검증,
+  `versionPolicy: 'allow-researched'`일 때만), 그 외는 `unsupported-options-version`으로 거부. 1.21.1 외 버전 지원 시 프로파일 정책과 fixture 추가 필요.
+- 메인 `pnpm check` 성공: 655개 테스트·opt-in 7개 skip·전체 TypeScript·Biome·두 앱 빌드.
+- 조사한 Drive 동작: 공개 링크는 `Last-Modified`만 주고 ETag와 304(Not Modified)는 지원하지 않는 것으로 관찰했다(한 파일 기준). 현재 최신 확인은 Range로 헤더·인덱스만
+  읽고 해시로 판단하므로 조건부 요청은 사용하지 않는다.
