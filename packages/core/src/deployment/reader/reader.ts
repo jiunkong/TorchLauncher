@@ -522,6 +522,7 @@ async function stagePayload(
     const cursor = new StoredByteCursor(fetchChunks());
     await parseGzipHeader(cursor, file.storedLength);
     const inflater = createInflateRaw();
+    const inflaterClosed = new Error('inflater closed during write');
     const consume = (async (): Promise<{ ok: true } | { ok: false; error: unknown }> => {
       for await (const outputChunk of inflater) await writeOutput(outputChunk as Uint8Array);
       return { ok: true };
@@ -535,8 +536,16 @@ async function stagePayload(
         const chunk = await cursor.takeChunk();
         if (!chunk) break;
         const before = inflater.bytesWritten;
+        // A destroy while zlib is mid-write can leave the write callback uncalled, so also settle
+        // on 'close'; the consumer's own failure then decides the reported error.
         await new Promise<void>((resolve, reject) => {
-          inflater.write(chunk, (error) => (error ? reject(error) : resolve()));
+          const onClose = () => reject(inflaterClosed);
+          inflater.once('close', onClose);
+          inflater.write(chunk, (error) => {
+            inflater.off('close', onClose);
+            if (error) reject(error);
+            else resolve();
+          });
         });
         const consumed = inflater.bytesWritten - before;
         if (consumed < chunk.byteLength) {
@@ -552,6 +561,7 @@ async function stagePayload(
       consumeResult = await consume;
       if (!consumeResult.ok) inflater.destroy();
     }
+    if (feedError === inflaterClosed && !consumeResult.ok) feedError = undefined;
     if (feedError !== undefined) {
       if (feedError instanceof DeploymentReaderError || options.signal?.aborted) throw feedError;
       fail('invalid-gzip', feedError);
