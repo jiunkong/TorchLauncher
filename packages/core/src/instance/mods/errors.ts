@@ -5,6 +5,7 @@ export type UserModErrorCode =
   | 'invalid-path'
   | 'unsafe-path'
   | 'limit-exceeded'
+  | 'insufficient-space'
   | 'invalid-jar'
   | 'path-conflict'
   | 'mod-id-conflict'
@@ -20,7 +21,13 @@ export type UserModErrorCode =
 export class UserModError extends Error {
   constructor(
     readonly code: UserModErrorCode,
-    readonly detail?: { readonly path?: string; readonly conflictsWith?: readonly string[] },
+    readonly detail?: {
+      readonly path?: string;
+      readonly conflictsWith?: readonly string[];
+      /** `insufficient-space` only: bytes needed (jar size plus safety margin) and bytes available. */
+      readonly required?: number;
+      readonly available?: number;
+    },
     options?: ErrorOptions,
   ) {
     super(`User mod operation failed: ${code}`, options);
@@ -43,3 +50,16 @@ export const USER_MOD_LIMITS = {
   listedDepth: 8,
   operatorJarsParsed: 1_000,
 } as const;
+
+/** Free space kept beyond the jar size when registering: the larger of 64 MiB or 10% of the jar. */
+export const USER_MOD_SPACE_MARGIN = { minimumBytes: 64 * 1024 ** 2, fraction: 0.1 } as const;
+
+export function requiredSpaceBytes(jarBytes: number): number {
+  return (
+    jarBytes +
+    Math.max(
+      USER_MOD_SPACE_MARGIN.minimumBytes,
+      Math.ceil(jarBytes * USER_MOD_SPACE_MARGIN.fraction),
+    )
+  );
+}
