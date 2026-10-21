@@ -1,4 +1,5 @@
 export { recoverSynchronization, synchronizeDeployment } from './engine.js';
+export { assertSynchronizedForLaunch } from './launch-guard.js';
 export type {
   RecoveryResult,
   SyncCounts,

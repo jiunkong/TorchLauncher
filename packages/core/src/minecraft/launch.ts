@@ -110,6 +110,8 @@ export function buildLaunchCommand(
     assets_index_name: installation.version.assetIndex.id,
     natives_directory: installation.nativesDirectory,
     classpath: installation.classpath.join(installation.platform.os === 'windows' ? ';' : ':'),
+    library_directory: installation.libraryDirectory ?? join(installation.root, 'libraries'),
+    classpath_separator: installation.platform.os === 'windows' ? ';' : ':',
     launcher_name: 'TorchLauncher',
     launcher_version: options.launcherVersion,
     resolution_width: String(options.resolution?.width ?? ''),
