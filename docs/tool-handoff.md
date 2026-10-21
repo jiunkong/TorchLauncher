@@ -2,6 +2,39 @@
 
 Updated: 2026-10-21. Read `AGENTS.md` before continuing. This checkpoint is maintained by #0.
 
+## Claude continuation
+
+The user is transferring subsequent work to Claude because the Codex usage budget is low.
+Continue the #0 coordinator role under `AGENTS.md`; do not begin additional implementation or
+repeat completed checks solely because the tool changed. The last verified main checkpoint before
+this handoff update is `fc85ec2`, with no uncommitted changes. Inspect status and worktrees again.
+Implementation workers are idle; no login or live validation is running on the coordinator's behalf.
+The user's separately managed server may still be running; confirm its current state without changing it.
+
+The immediate next input is the user's Windows NeoForge gameplay test result. They have already
+received the fresh-clone command below. If it has not been run, help resume that test; do not mark
+GAME-02/03 complete until actual automatic server/world entry is confirmed. Read
+`docs/handoffs/GAME-02-03.md` before diagnosing failures or assigning a worker a narrowly scoped fix.
+
+```powershell
+git clone D:\Projects\mclauncher D:\TorchLauncherWindowsSmoke
+cd D:\TorchLauncherWindowsSmoke
+pnpm install --frozen-lockfile
+
+$sid = "44444444-4444-4444-8444-444444444444"
+node scripts/game-smoke.mjs launch `
+  --data-dir D:\TorchLauncherSmoke\auth `
+  --game-dir "D:\TorchLauncherSmoke\games\$sid" `
+  --loader neoforge --loader-version 21.1.264 `
+  --source-file D:\Projects\mclauncher\.cache\game-smoke-validation\live-url.txt `
+  --server-id $sid --server localhost:25565 `
+  --duration-seconds 900
+```
+
+Use Node 24 and pnpm 10.34.7. If the Windows clone already exists, inspect it instead of cloning over it.
+Initial downloads may take several minutes. After login and visible world entry, quit normally and
+record the user's observation plus redacted result JSON. Do not request credentials or raw auth logs.
+
 ## Role and authorized scope
 
 The current coordinator is user-designated #0. Product implementation belongs to workers; only #0
@@ -9,7 +42,7 @@ updates progress, reviews and integrates into main. Reader/sync are complete. Th
 task is GAME-02/03: 1.21.1 NeoForge installation/launch/direct connection first, then Fabric, including
 the latest-sync launch gate. Do not start Studio or product UI work. Preserve generic game content paths.
 
-Active worker: #3, `.agents/worktrees/agent-3`, `feat/game-02-03-loaders`, prepared from the main
+Assigned worker (currently idle): #3, `.agents/worktrees/agent-3`, `feat/game-02-03-loaders`, prepared from the main
 assignment commit. Read `docs/game-launch.md` and the latest assignment in `docs/work-distribution.md`.
 Scope includes loaders/minecraft, narrow read-only sync launch guard, and a separate Electron game-smoke
 runner; auth implementation and other shared files require coordination. A running user server is now
