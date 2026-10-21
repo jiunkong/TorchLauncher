@@ -9,6 +9,8 @@ import { launchDeployment } from '../../../../../packages/core/src/loaders/launc
 import type { LoaderSelection } from '../../../../../packages/core/src/loaders/profile';
 import { installMinecraft } from '../../../../../packages/core/src/minecraft/installer';
 import { createPublicJavaAuthenticator } from '../auth/public-java-electron';
+import { watchCancellation } from './control';
+import { safeFailure, safeGameExit } from './outcome';
 
 interface Config {
   mode: 'install' | 'launch';
@@ -19,6 +21,7 @@ interface Config {
   serverId?: string;
   server?: string;
   durationSeconds: number;
+  cancelFile: string;
 }
 const config = JSON.parse(process.env.TORCH_GAME_SMOKE_CONFIG ?? '{}') as Config;
 delete process.env.TORCH_GAME_SMOKE_CONFIG;
@@ -27,6 +30,7 @@ app.on('window-all-closed', () => {});
 const controller = new AbortController();
 let completed = false;
 let phase = 'starting';
+const stopPolling = watchCancellation(config.cancelFile, () => controller.abort());
 app.on('before-quit', (event) => {
   if (!completed) {
     event.preventDefault();
@@ -88,6 +92,9 @@ async function main() {
     server: config.server,
     signal: controller.signal,
     current,
+    onPhase: (next) => {
+      phase = next;
+    },
     prepare: async (reader) => {
       const selection = reader.index.game.loader;
       if (
@@ -103,20 +110,14 @@ async function main() {
     },
   });
   phase = 'game-running';
+  let durationElapsed = false;
   const timer = setTimeout(() => {
+    durationElapsed = true;
     void game.stop();
   }, config.durationSeconds * 1000);
   try {
     const result = await game.finished;
-    return {
-      ok:
-        result.reason === 'exited' || result.reason === 'stopped' || result.reason === 'cancelled',
-      mode: 'launch',
-      spawned: true,
-      exitCode: result.code,
-      exitReason: result.reason,
-      authenticatedConnection: 'not-asserted',
-    };
+    return safeGameExit(result, durationElapsed);
   } finally {
     clearTimeout(timer);
   }
@@ -124,13 +125,15 @@ async function main() {
 void main().then(
   (result) => {
     console.log(`TORCH_GAME_SMOKE_RESULT ${JSON.stringify(result)}`);
+    stopPolling();
     completed = true;
     app.exit(result.ok ? 0 : 1);
   },
-  () => {
+  (error: unknown) => {
     console.log(
-      `TORCH_GAME_SMOKE_RESULT ${JSON.stringify({ ok: false, phase, code: controller.signal.aborted ? 'cancelled' : 'operation_failed', authenticatedConnection: false })}`,
+      `TORCH_GAME_SMOKE_RESULT ${JSON.stringify(safeFailure(error, phase, controller.signal.aborted))}`,
     );
+    stopPolling();
     completed = true;
     app.exit(1);
   },

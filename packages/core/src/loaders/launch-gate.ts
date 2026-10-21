@@ -19,6 +19,16 @@ function fingerprint(reader: DeploymentReader) {
 }
 export interface LaunchDeploymentOptions {
   root: string;
+  onPhase?: (
+    phase:
+      | 'deployment'
+      | 'installation'
+      | 'authentication'
+      | 'latest-deployment'
+      | 'synchronization'
+      | 'final-guard'
+      | 'spawn',
+  ) => void;
   expectedServerId: string;
   server: string;
   signal?: AbortSignal;
@@ -31,11 +41,15 @@ export interface LaunchDeploymentOptions {
 /** Installation/authentication, a fresh mandatory sync, then final remote/local checks under game lease. */
 export async function launchDeployment(options: LaunchDeploymentOptions): Promise<RunningGame> {
   options.signal?.throwIfAborted();
+  options.onPhase?.('deployment');
   const first = await options.current(options.signal);
   if (first.index.serverId !== options.expectedServerId)
     throw new GameStartError('ESERVERIDENTITY');
+  options.onPhase?.('installation');
   const installation = await options.prepare(first);
+  options.onPhase?.('authentication');
   const auth = await options.authenticate();
+  options.onPhase?.('latest-deployment');
   const accepted = await options.current(options.signal);
   if (pair(first) !== pair(accepted)) throw new GameStartError('EDEPLOYMENTCHANGED');
   if (
@@ -46,6 +60,7 @@ export async function launchDeployment(options: LaunchDeploymentOptions): Promis
   )
     throw new GameStartError('EINSTALLIDENTITY');
   if (installation.root !== options.root) throw new GameStartError('EINSTALLIDENTITY');
+  options.onPhase?.('synchronization');
   await synchronizeDeployment({
     root: options.root,
     reader: accepted,

@@ -15,8 +15,9 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+let scriptPhase = 'configuration';
 const usage =
-  'node scripts/game-smoke.mjs install|launch --data-dir <absolute-private-directory> --game-dir <absolute-game-directory> --loader neoforge|fabric --loader-version <exact-version> [--source-file <absolute-private-url-file> --server-id <expected-uuid> --server <address:port>] [--duration-seconds 300]';
+  'node scripts/game-smoke.mjs install|launch --data-dir <absolute-private-directory> --game-dir <absolute-game-directory> --loader neoforge|fabric --loader-version <exact-version> --server-id <expected-uuid> [--source-file <absolute-private-url-file> --server <address:port>] [--duration-seconds 300]';
 const inside = (path, root) => {
   const child = relative(root, path);
   return child === '' || (!child.startsWith(`..${sep}`) && child !== '..' && !isAbsolute(child));
@@ -124,6 +125,7 @@ async function main() {
   await mkdir(harnessLock);
   const temporary = await mkdtemp(join(await realpath(tmpdir()), 'torch-game-smoke-'));
   try {
+    scriptPhase = 'bundle';
     await build({
       root: repository,
       configFile: false,
@@ -146,21 +148,34 @@ async function main() {
         },
       },
     });
+    scriptPhase = 'electron-runtime';
     const electronPath = (await import('electron')).default;
-    const env = { ...process.env, TORCH_GAME_SMOKE_CONFIG: JSON.stringify(config), DEBUG: '' };
+    const env = {
+      ...process.env,
+      TORCH_GAME_SMOKE_CONFIG: JSON.stringify({ ...config, cancelFile: join(temporary, 'cancel') }),
+      DEBUG: '',
+    };
     delete env.ELECTRON_RUN_AS_NODE;
+    delete env.NODE_OPTIONS;
+    delete env.NODE_PATH;
     const child = spawn(electronPath, [join(temporary, 'game-smoke.cjs')], {
       env,
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
+    let nativeDiagnostics = '';
+    child.stderr.on('data', (chunk) => {
+      nativeDiagnostics = (nativeDiagnostics + chunk.toString()).slice(-4096);
+    });
     child.stdout.on('data', (chunk) => {
       output = (output + chunk.toString()).slice(-16384);
     });
     // Ask Electron to cancel and reap its child; do not terminate the owner while Java is active.
-    const interrupt = () => child.kill('SIGTERM');
-    process.once('SIGINT', interrupt);
-    process.once('SIGTERM', interrupt);
+    const interrupt = () => {
+      void writeFile(join(temporary, 'cancel'), 'cancel', { flag: 'wx' }).catch(() => {});
+    };
+    process.on('SIGINT', interrupt);
+    process.on('SIGTERM', interrupt);
     try {
       const code = await new Promise((resolveExit, reject) => {
         child.once('error', () => reject(new Error('Electron could not start.')));
@@ -169,7 +184,25 @@ async function main() {
       const line = output
         .split(/\r?\n/)
         .findLast((line) => line.startsWith('TORCH_GAME_SMOKE_RESULT '));
-      if (!line) throw new Error('No safe smoke result; verify Electron/display prerequisites.');
+      if (!line) {
+        const code = /SUID sandbox|No usable sandbox/.test(nativeDiagnostics)
+          ? 'host_sandbox_unavailable'
+          : /Missing X server|cannot open display|DISPLAY/.test(nativeDiagnostics)
+            ? 'host_display_unavailable'
+            : /error while loading shared libraries/.test(nativeDiagnostics)
+              ? 'host_library_missing'
+              : 'host_no_result';
+        console.log(
+          JSON.stringify({
+            ok: false,
+            phase: 'electron-runtime',
+            code,
+            authenticatedConnection: false,
+          }),
+        );
+        process.exitCode = 1;
+        return;
+      }
       const result = JSON.parse(line.slice('TORCH_GAME_SMOKE_RESULT '.length));
       console.log(JSON.stringify(result));
       if (code !== 0 || !result.ok) process.exitCode = 1;
@@ -184,7 +217,17 @@ async function main() {
 }
 await main().catch(() => {
   console.error(
-    'Game smoke failed; check prerequisites and --help. Raw provider errors are suppressed.',
+    JSON.stringify({
+      ok: false,
+      phase: scriptPhase,
+      code:
+        scriptPhase === 'configuration'
+          ? 'invalid_configuration'
+          : scriptPhase === 'bundle'
+            ? 'bundle_failed'
+            : 'host_start_failed',
+      authenticatedConnection: false,
+    }),
   );
   process.exitCode = 1;
 });
