@@ -143,7 +143,7 @@
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 완료 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
-| GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
+| GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — UI 연결(UI-02) 대기, Windows 실검증 미실시 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 Fabric 0.19.5 실접속 성공(사용자 확인) |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 코어 완료 — UI 연결(UI-02) 대기 |
@@ -356,3 +356,15 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - macOS는 당분간 지원하지 않는다(사용자 결정). 지원 대상은 Windows x64와 Linux x64이다. BASE-04는 보류하고 RELEASE-01의 선행에서 제외했다.
   macOS 전용 코드와 검증은 만들지 않으며, 프로세스 식별 등 OS별 조회가 불가능한 환경에서는 안전하게 '불확실'로 폴백한다.
   AGENTS.md의 지원 OS 문구를 갱신했다. macOS를 다시 지원하려면 별도 승인과 BASE-04 재개가 필요하다.
+
+## 2026-10-22 GAME-05 통합
+
+- GAME-05 `50a4908`을 병합했다. 서버 잠금 owner.json v2(pid·프로세스 시작 식별자·머신 ID 해시·자식 Java 기록), 설치 transaction 분리,
+  `inspectServerEnvironment`/`recoverServerEnvironment`(stale 잠금 자동 회수는 같은 머신에서 주인·자식 모두 종료/PID 재사용이 확인된 경우만,
+  그 외는 `uncertain`이며 사용자 확인 `acceptUncertain`이 필요하고 자식 Java가 살아 있으면 거부), 설치 journal 롤백/완료 복구, 기존 동기화·사용자 모드 복구 호출.
+- 검증: 메인 `pnpm check` 성공(697개 테스트·opt-in 7개 skip·전체 TypeScript·Biome·두 앱 빌드). Linux에서 실제 SIGKILL 테스트(자식이 주인보다 오래 사는 경우,
+  PID 재사용, v1 잠금, 설치 rename 1~5 단계 중단, 복구 도중 중단 재실행)를 통과했다. 킬 테스트 스위트 타임아웃은 병렬 부하 때문에 60초로 늘렸고, 8회 연속 전체 통과.
+  1회 원인 불명 실패(재현 안 됨)는 인계에 기록됨.
+- 미검증: Windows 실제 프로세스 종료, 전원 차단 내구성(fsync), 실제 NeoForge 설치기 강제 종료. macOS는 지원하지 않으며 항상 `unknown`→`uncertain`.
+- UI-02 연결 지점: `ServerDataLockedError`/`EINSTALLRECOVERY` 수신 시 inspect→recover, `lock-uncertain`+`confirmable`이면 "아무것도 실행 중이 아님" 확인 후 `acceptUncertain: true`.
+  `minecraft/recovery`는 아직 상위 export에 연결하지 않았다.
