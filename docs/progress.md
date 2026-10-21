@@ -10,6 +10,8 @@
 - 사용자 승인으로 FMT-03 배포 reader를 #2에 배정하고, 통합 후 SYNC-01을 같은 세션에서 이어간다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환한다.
   실제 업로드가 필요한 검증은 #0이 테스트 산출물을 준비한 뒤 사용자에게 요청한다.
+- FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
+  core TypeScript·scoped Biome 성공. SYNC-01은 [범용 동기화 기준](synchronization.md)에 따라 이어서 구현한다.
 - 최신 사용자 결정: 자체 앱 ID 승인·최종 연결은 마지막 단계로 미루고, 개발 중에는 임시 공개
   Java Title ID 인증을 사용한다. AUTH-03 구현을 `a7eba73`으로 통합했다. smoke 기본은
   `public-java`이며 기존 own-app 경로는 명시적 옵션으로 유지한다. Windows 실계정 cycle은 사용자 보고로 성공했다.
@@ -99,8 +101,8 @@
 | AUTH-03 | 임시 공개 Java Title ID 인증, 암호화 캐시·취소·재시작·실계정 cycle 검증 | AUTH-01, AUTH-02 구현 | 완료 — Windows cycle 성공 보고, smoke 종료 회귀 수정·검증 |
 | AUTH-04 | 최종 자체 앱 ID API 승인·제품 연결·실계정 회귀 검증, 임시 기본 경로 교체 | AUTH-03 | 대기 |
 | FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 완료 |
-| FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 진행 |
-| SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 대기 |
+| FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 완료 |
+| SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 진행 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
@@ -139,6 +141,7 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 | DL-01 live | #2 — `launcher develop #2` | `test/dl-01-live-drive` | `.agents/worktrees/agent-2` | 기존 DL-01 소스·테스트·fixture 범위, `docs/handoffs/DL-01-live.md` |
 | AUTH-03 | #4 — `launcher develop #4` | `feat/auth-03-public-java` | `.agents/worktrees/agent-4` | auth host·smoke·런처 manifest·lockfile·필요한 main 빌드 설정·공유 결과 설명/export·인계/라이선스 (상세는 배정 문서) |
 | FMT-03 | #2 — `launcher develop #2` | `feat/fmt-03-reader` | `.agents/worktrees/agent-2` | `packages/core/src/deployment/reader/**`, `docs/handoffs/FMT-03.md` |
+| SYNC-01 | #2 — `launcher develop #2` | `feat/sync-01-engine` | `.agents/worktrees/agent-2` | `packages/core/src/instance/sync/**`, `docs/handoffs/SYNC-01.md` |
 
 ### 실행 세션
 

@@ -341,7 +341,10 @@ BASE-03·04 및 QA-01·RELEASE 작업은 가능한 환경을 확인한 뒤 별�
 
 ### SYNC-01 — FMT-03 통합 후 #2
 
-- reader 통합 후 새 브랜치로 별도 배정한다. 모델은 파일 소유권·복구·OS 차이 때문에 Sol, 목표 medium이다.
+- reader 통합 후 `feat/sync-01-engine`로 배정한다. 독점 범위는
+  `packages/core/src/instance/sync/**`, `docs/handoffs/SYNC-01.md`다.
+  상세 동작은 [synchronization.md](synchronization.md)를 따른다.
+  모델은 파일 소유권·복구·OS 차이 때문에 Sol, 목표 medium이다(실제 effort 변경은 미확인).
 - 운영자 관리 목록·변경 비교·검증된 staging·적용·이전 always 파일 삭제·실패 복구를 구현한다.
   같은 서버 데이터 잠금으로 실행/설치와 경합을 막는다. symlink/hardlink·보호 경로·다른 서버 ID를 거부한다.
 - 미등록 파일은 소유권으로 편입하지 않는다. 충돌은 보존하고 명시 오류로 반환한다.
