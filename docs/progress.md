@@ -28,6 +28,11 @@
   `ok:true, exitCode:0, completion:process_exit`로 끝났고, 사용자가 게임 실행 후 서버 월드 자동 접속을 직접 확인했다
   (결과 JSON의 `authenticatedConnection`은 `not-asserted`이므로 접속은 사용자 보고가 근거다). 서버 콘솔 로그는 미확인.
   GAME-03(Fabric)은 맞는 Fabric 배포본·서버로 실접속 확인이 남아 있다.
+- GAME-03 준비: Fabric 0.19.5 Linux 실설치 성공(5.4MB, 65 classpath), 인자 회귀 테스트 추가, `.testfabricserver/` 제외 규칙을
+  `fix/game-03-fabric-validation`(`c0b748e`)에서 통합했다. 메인 `pnpm check` 성공(551개 테스트·opt-in 6개 skip).
+  사용자가 Drive 팩을 Fabric 0.19.5용으로 교체했고 실제 링크 읽기가 일치했다(301 bytes, 서버 ID 일치). 제품에서는 서버 로더가
+  바뀌지 않으므로 게임 폴더를 로더별로 나누지 않는다. 테스트도 기존 서버 UUID 폴더를 재사용한다(로더 트리는 버전별 하위 폴더).
+  Windows Fabric 실접속 결과 대기.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,

@@ -27,11 +27,11 @@ accepts the client (both use Fabric Loader 0.19.5, MC 1.21.1, online-mode, no mo
 ## Windows commands (use a fresh empty game directory; its basename must be the server UUID)
 Optional install check:
 ```powershell
-node scripts/game-smoke.mjs install --data-dir D:\TorchLauncherSmoke\auth --game-dir D:\TorchLauncherSmoke\games-fabric\44444444-4444-4444-8444-444444444444 --server-id 44444444-4444-4444-8444-444444444444 --loader fabric --loader-version 0.19.5
+node scripts/game-smoke.mjs install --data-dir D:\TorchLauncherSmoke\auth --game-dir D:\TorchLauncherSmoke\games\44444444-4444-4444-8444-444444444444 --server-id 44444444-4444-4444-8444-444444444444 --loader fabric --loader-version 0.19.5
 ```
 Launch (needs the Fabric server running with a matching empty pack; the source URL file is local and ignored):
 ```powershell
-node scripts/game-smoke.mjs launch --data-dir D:\TorchLauncherSmoke\auth --game-dir D:\TorchLauncherSmoke\games-fabric\44444444-4444-4444-8444-444444444444 --loader fabric --loader-version 0.19.5 --source-file D:\Projects\mclauncher\.cache\game-smoke-validation\live-url.txt --server-id 44444444-4444-4444-8444-444444444444 --server localhost:25565 --duration-seconds 300
+node scripts/game-smoke.mjs launch --data-dir D:\TorchLauncherSmoke\auth --game-dir D:\TorchLauncherSmoke\games\44444444-4444-4444-8444-444444444444 --loader fabric --loader-version 0.19.5 --source-file D:\Projects\mclauncher\.cache\game-smoke-validation\live-url.txt --server-id 44444444-4444-4444-8444-444444444444 --server localhost:25565 --duration-seconds 300
 ```
 Note: the launch gate needs a deployment/source for this server ID that matches the Fabric loader; the existing NeoForge URL file
 may describe a NeoForge pack. #0 must confirm that a Fabric-matching source exists before the user runs launch.
