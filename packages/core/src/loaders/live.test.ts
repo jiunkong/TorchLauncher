@@ -8,7 +8,7 @@ import { installLoader } from './installer';
 
 it.skipIf(!process.env.TORCH_LOADER_LIVE_ROOT).each([
   { kind: 'neoforge' as const, version: '21.1.264' },
-  { kind: 'fabric' as const, version: '0.16.14' },
+  { kind: 'fabric' as const, version: process.env.TORCH_LOADER_LIVE_FABRIC ?? '0.16.14' },
 ])(
   'installs official $kind $version without authentication or game launch',
   async (selection) => {
