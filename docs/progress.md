@@ -12,6 +12,9 @@
   서버·직접 계정 테스트가 필요하면 #0이 준비된 명령과 함께 사용자에게 요청한다.
   사용자는 `.testserver/`에 1.21.1 / NeoForge 21.1.264 서버를 별도 실행했다. 포트 25565,
   online-mode=true, whitelist=false, 추가 모드 없음, 기동 완료 로그 확인. 파일과 프로세스는 변경하지 않는다.
+  #3 체크포인트 `e763686`: 실제 Linux NeoForge 21.1.264·Fabric 0.16.14 설치 성공,
+  scoped 테스트 72개·live 3개 기본 skip·전체 TypeScript 성공. 종료 처리 보완과 Electron 검증 중이며
+  main 미통합·실계정 게임 실행/접속 미검증 상태다. 자세한 재개 상태는 도구 간 인계를 따른다.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,

@@ -23,6 +23,14 @@ passed against actual Drive. Expected server ID is `44444444-4444-4444-8444-4444
 This is separate from the completed sync v1/v2 fixture. Coordinator-tool localhost TCP did not connect;
 verify the native user's localhost:25565 in the eventual Windows smoke. Do not infer the server is down.
 
+Worker implementation checkpoint `e763686` is committed, not yet integrated. Both official Linux
+loader installs passed (NeoForge 21.1.264 / Fabric 0.16.14); focused tests 72 passed with 3 live skips,
+and workspace TypeScript passed. This is not authenticated game/server evidence. Follow-up changes to
+`game-smoke` lifecycle/error reporting and tests are in progress; preserve tracked/untracked files.
+Windows Ctrl+C must use cooperative cancellation rather than killing the Electron owner before Java
+is reaped. Nonzero game exits must fail. Final Electron harness validation, review, merge, integrated
+checks and user native Windows launch are still pending; do not run the older checkpoint as final.
+
 ## Git and files
 
 - Coordinator checkout: repository root, `main`. Inspect current status/log; documentation may be dirty.
