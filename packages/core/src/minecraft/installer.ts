@@ -49,6 +49,9 @@ export interface Installation {
   nativesDirectory: string;
   assetsDirectory: string;
   loggingPath?: string;
+  /** Loader-private module/library tree; base libraries remain on the merged classpath. */
+  libraryDirectory?: string;
+  loader?: { kind: 'neoforge' | 'fabric'; version: string; minecraftVersion: string };
 }
 interface FilePlan {
   path: string;

@@ -13,3 +13,5 @@ coverage/
 .aws/
 .codex/
 .agents/
+
+.testserver/

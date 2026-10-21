@@ -183,3 +183,36 @@ describe('managed Java lifecycle', () => {
     expect(adapter.mock.calls[0]?.[1]).toEqual(['-version']);
   });
 });
+
+it('runs the final guard while holding the game lease and never spawns on rejection', async () => {
+  const installed = await installation();
+  const adapter = vi.fn(node(''));
+  await expect(
+    launchMinecraft(installed, launch, {
+      spawn: adapter,
+      preSpawn: async () => {
+        await expect(acquireServerDataLock(installed.root, 'maintenance')).rejects.toThrow(
+          'Server data is in use',
+        );
+        throw new GameStartError('EGUARDREJECTED');
+      },
+    }),
+  ).rejects.toThrow('EGUARDREJECTED');
+  expect(adapter).not.toHaveBeenCalled();
+  const lease = await acquireServerDataLock(installed.root, 'maintenance');
+  await lease.release();
+});
+it('times out a stuck read-only guard, does not spawn, and releases its lease', async () => {
+  const installed = await installation();
+  const adapter = vi.fn(node(''));
+  await expect(
+    launchMinecraft(installed, launch, {
+      spawn: adapter,
+      preSpawnTimeoutMs: 10,
+      preSpawn: async () => new Promise(() => {}),
+    }),
+  ).rejects.toThrow('EGUARDTIMEOUT');
+  expect(adapter).not.toHaveBeenCalled();
+  const lease = await acquireServerDataLock(installed.root, 'maintenance');
+  await lease.release();
+});

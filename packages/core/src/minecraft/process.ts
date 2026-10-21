@@ -13,6 +13,9 @@ export interface GameProcessOptions {
   logs?: GameLogLimits;
   /** Host/test boundary; the production default uses node:child_process.spawn. */
   spawn?: ProcessSpawner;
+  /** Trusted read-only final validation under the game lease. Must honor its deadline signal. */
+  preSpawn?: (context: { root: string; signal: AbortSignal }) => Promise<void>;
+  preSpawnTimeoutMs?: number;
 }
 export interface GameExit {
   reason: 'exited' | 'stopped' | 'cancelled' | 'process-error' | 'lock-error';
@@ -57,6 +60,27 @@ async function start(
     if (await stat(join(lease.root, '.torchlauncher-install-lock')))
       throw new GameStartError('EINSTALLRECOVERY');
     aborted(options.signal);
+    if (options.preSpawn) {
+      const timeout = options.preSpawnTimeoutMs ?? 30000;
+      if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 120000)
+        throw new GameStartError('EGUARDCONFIG');
+      const deadline = AbortSignal.timeout(timeout);
+      const signal = options.signal ? AbortSignal.any([deadline, options.signal]) : deadline;
+      let abortGuard: () => void = () => {};
+      const stopped = new Promise<never>((_resolve, reject) => {
+        abortGuard = () =>
+          reject(new GameStartError(options.signal?.aborted ? 'EGUARDCANCELLED' : 'EGUARDTIMEOUT'));
+        signal.addEventListener('abort', abortGuard, { once: true });
+        if (signal.aborted) abortGuard();
+      });
+      try {
+        await Promise.race([options.preSpawn({ root: lease.root, signal }), stopped]);
+      } finally {
+        signal.removeEventListener('abort', abortGuard);
+      }
+      signal.throwIfAborted();
+      aborted(options.signal);
+    }
     child = (options.spawn ?? nodeSpawn)(command.executable, command.args, {
       cwd: lease.root,
       shell: false,
@@ -191,4 +215,24 @@ export async function startJavaDiagnostic(
     [],
     options,
   );
+}
+
+/** Trusted official installer runner. Caller already holds the server install lease; cwd is disposable staging. */
+export async function runInstallerJava(
+  installation: Installation,
+  cwd: string,
+  args: string[],
+  signal?: AbortSignal,
+): Promise<GameExit> {
+  const executable =
+    installation.platform.os === 'windows'
+      ? installation.javaPath.replace(/javaw\.exe$/i, 'java.exe')
+      : installation.javaPath;
+  // Staging is a separate disposable root, so its process lease cannot release the caller's game-root lease.
+  const process = await start(
+    { executable, args, cwd, shell: false, redactedArgs: [] },
+    [cwd],
+    signal ? { signal } : {},
+  );
+  return process.finished;
 }

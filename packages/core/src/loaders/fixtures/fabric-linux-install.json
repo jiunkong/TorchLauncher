@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-21T10:02:39.481Z",
+  "platform": "linux/x64",
+  "selection": {
+    "kind": "fabric",
+    "version": "0.16.14"
+  },
+  "minecraft": "1.21.1",
+  "elapsedMs": 42,
+  "receivedBytes": 862331,
+  "classpathEntries": 65,
+  "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+  "authenticatedConnection": false
+}
