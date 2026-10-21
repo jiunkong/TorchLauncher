@@ -16,7 +16,11 @@ Update: the first Windows run failed with a module-resolution error (vanilla cli
 in the Windows clone after `git pull`; no Windows result for the fix exists yet. Worker #3's branch is
 `fix/game-02-03-module-conflict`, idle. Claude subagents cannot be resumed after being stopped; start a new one.
 
-The immediate next input is the user's Windows NeoForge gameplay test result. They have already
+UPDATE: both GAME-02 (NeoForge 21.1.264) and GAME-03 (Fabric 0.19.5) joined the user's server on Windows 11 (user-confirmed);
+both are complete in `docs/progress.md`. No test is pending. Next work needs a new user-approved assignment (ready: GAME-05,
+UI-01, STUDIO-01, BASE-03/04). Branch `fix/game-02-03-module-conflict` and `fix/game-03-fabric-validation` are merged and idle.
+
+Historical (superseded): the immediate next input was the user's Windows NeoForge gameplay test result. They have already
 received the fresh-clone command below. If it has not been run, help resume that test; do not mark
 GAME-02/03 complete until actual automatic server/world entry is confirmed. Read
 `docs/handoffs/GAME-02-03.md` before diagnosing failures or assigning a worker a narrowly scoped fix.

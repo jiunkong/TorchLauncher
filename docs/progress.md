@@ -33,6 +33,9 @@
   사용자가 Drive 팩을 Fabric 0.19.5용으로 교체했고 실제 링크 읽기가 일치했다(301 bytes, 서버 ID 일치). 제품에서는 서버 로더가
   바뀌지 않으므로 게임 폴더를 로더별로 나누지 않는다. 테스트도 기존 서버 UUID 폴더를 재사용한다(로더 트리는 버전별 하위 폴더).
   Windows Fabric 실접속 결과 대기.
+- GAME-03 완료: Windows 11에서 `game-smoke launch`(Fabric 0.19.5, 기존 서버 UUID 게임 폴더 재사용, localhost:25565)가
+  `ok:true, exitCode:0, completion:process_exit`로 끝났고 사용자가 서버 접속을 확인했다(결과 JSON은 `not-asserted`,
+  접속 근거는 사용자 보고). NeoForge와 같은 폴더에 로더 트리가 공존함을 실제로 확인했다. 서버 콘솔 로그는 미확인.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
@@ -142,7 +145,7 @@
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
-| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 검토 — 구현 통합·Linux 설치 성공, Fabric 대응 배포·서버 접속 대기 |
+| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 Fabric 0.19.5 실접속 성공(사용자 확인) |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 대기 |
 | USER-02 | 최초 기본값·필수 설정 구분, 혼합 설정 적용, 리소스팩 활성화·순서 | FMT-01, SYNC-01 | 대기 |
 | USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 대기 |
