@@ -13,6 +13,7 @@ const usage = `Usage: node scripts/auth-smoke.mjs <mode> --data-dir <absolute-pr
 
 Modes:
   worker-check   Build/start the pinned-library worker; no network, login or token cache.
+  window-cycle   Close a sole Electron window, then finish async cleanup/report; no login.
   probe          Check real Electron secure storage, with no login or credential write.
   reject-basic   Linux only: verify that --password-store=basic is rejected. No login.
   storage-cycle  Write synthetic data, restart/read, clear, restart/check empty. No login.
@@ -35,6 +36,7 @@ function argumentsFor(argv) {
     ![
       'probe',
       'worker-check',
+      'window-cycle',
       'reject-basic',
       'storage-cycle',
       'cycle',
@@ -62,7 +64,9 @@ function argumentsFor(argv) {
   const dataDirectory = options.get('--data-dir');
   if (!dataDirectory || !isAbsolute(dataDirectory))
     throw new Error('--data-dir must be an absolute private path outside the repository.');
-  const live = !['probe', 'reject-basic', 'storage-cycle', 'worker-check'].includes(mode);
+  const live = !['probe', 'reject-basic', 'storage-cycle', 'worker-check', 'window-cycle'].includes(
+    mode,
+  );
   const clientId = options.get('--client-id');
   const redirectUri = options.get('--redirect-uri');
   const provider = options.get('--provider') ?? 'public-java';

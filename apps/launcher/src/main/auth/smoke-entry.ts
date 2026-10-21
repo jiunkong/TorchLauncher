@@ -1,7 +1,7 @@
 // Dedicated harness entry; never imported by the product main process.
 import { join } from 'node:path';
 import { AuthenticationError, type StoredMicrosoftSession } from '@torchlauncher/core/auth';
-import { app, safeStorage } from 'electron';
+import { app, BrowserWindow, safeStorage } from 'electron';
 import { createElectronAuthenticator } from './electron';
 import { HostAuthenticationError } from './errors';
 import { EncryptedPublicJavaCache } from './public-java-cache';
@@ -22,6 +22,9 @@ const syntheticSession: StoredMicrosoftSession = {
   refreshToken: 'auth-storage-smoke-synthetic-value-not-a-credential',
 };
 const controller = new AbortController();
+// The standalone harness owns process exit: closing the device-code window must not interrupt
+// worker reaping, cache drains or the final report. report() exits after stdout is flushed.
+app.on('window-all-closed', () => {});
 process.once('SIGINT', () => controller.abort());
 process.once('SIGTERM', () => controller.abort());
 
@@ -44,6 +47,15 @@ async function run() {
     safeStorage,
   });
   const result = { mode: config.mode, platform: process.platform };
+  if (config.mode === 'window-cycle') {
+    // Exercise the async cleanup/report boundary after the sole authentication window closes.
+    const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+    window.destroy();
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    if (BrowserWindow.getAllWindows().length !== 0)
+      throw new HostAuthenticationError('invalid_configuration');
+    return { ...result, ok: true, soleWindowClosed: true, liveAuthentication: false };
+  }
   if (config.mode === 'reject-basic') {
     if (process.platform !== 'linux') throw new HostAuthenticationError('invalid_configuration');
     try {
