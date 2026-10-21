@@ -346,3 +346,7 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 메인 `pnpm check` 성공: 655개 테스트·opt-in 7개 skip·전체 TypeScript·Biome·두 앱 빌드.
 - 조사한 Drive 동작: 공개 링크는 `Last-Modified`만 주고 ETag와 304(Not Modified)는 지원하지 않는 것으로 관찰했다(한 파일 기준). 현재 최신 확인은 Range로 헤더·인덱스만
   읽고 해시로 판단하므로 조건부 요청은 사용하지 않는다.
+- USER-02 후속(3955 초과): `java-1.21.2+` 프로파일(데이터 버전 3956–5023, Minecraft 1.21.2~26.3, 조사 기반·미검증, `allow-researched` 이상에서만 사용)을 통합했다.
+  근거는 minecraft.wiki 문서에 3955 이후 `version`·`resourcePacks`·`key:value` 구조 변경 기록이 없다는 부재 증거뿐이며, 실제 3955 초과 클라이언트 파일 검증은 없다.
+  데이터 버전 숫자는 #0이 Data_version 문서로 대조했다(1.21.2=4080, 26.3=5023). 5024 이상은 기본 거부, `allow-any`만 경고와 함께 처리. 메인 `pnpm check` 성공(658개 테스트).
+  병합된 작업 브랜치를 모두 삭제했고 `main`만 남았다(워크트리는 `main` 기준 detached).
