@@ -78,6 +78,9 @@ if (extra === 'detached') child.unref();
 const probe = createSystemProcessProbe();
 const cleanup: string[] = [];
 const pids: number[] = [];
+// A dead child is reported as child-exited, or child-pid-reused when the OS (notably Windows, which
+// recycles PIDs very quickly) hands the PID to another process; the product treats both as dead.
+const CHILD_DEAD = expect.stringMatching(/^child-(exited|pid-reused)$/);
 afterEach(async () => {
   for (const pid of pids.splice(0))
     try {
@@ -234,7 +237,7 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
         const stale = await inspectServerEnvironment(root);
         expect(stale.serverLock).toMatchObject({
           state: 'stale-verified',
-          evidence: ['owner-exited', 'child-exited'],
+          evidence: ['owner-exited', CHILD_DEAD],
         });
         const report = await recoverServerEnvironment(root);
         expect(report).toMatchObject({
@@ -264,7 +267,7 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
         expect(stale.serverLock).toMatchObject({
           state: 'stale-verified',
           purpose: 'game',
-          evidence: ['owner-exited', 'child-exited'],
+          evidence: ['owner-exited', CHILD_DEAD],
         });
         const report = await recoverServerEnvironment(root);
         expect(report).toMatchObject({
@@ -305,7 +308,7 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
         const stale = await inspectServerEnvironment(root);
         expect(stale.serverLock).toMatchObject({
           state: 'stale-verified',
-          evidence: ['owner-exited', 'child-exited'],
+          evidence: ['owner-exited', CHILD_DEAD],
         });
         const report = await recoverServerEnvironment(root);
         expect(report).toMatchObject({

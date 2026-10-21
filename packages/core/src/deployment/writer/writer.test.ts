@@ -397,36 +397,39 @@ describe('deployment writer path and size rejection', () => {
 });
 
 describe('deployment writer snapshots and rollback', () => {
-  it.each(['append', 'truncate', 'same-size', 'replace'] as const)(
-    'rejects a source changed during reading: %s',
-    async (change) => {
-      const { sourceRoot, options, outputPath, root } = await setup();
-      const source = join(sourceRoot, plainInput.sourcePath);
-      await writeFile(outputPath, 'old complete deployment');
-      let changed = false;
-      await expect(
-        writeDeployment({
-          ...options,
-          onProgress: async (event) => {
-            if (event.phase !== 'reading' || changed) return;
-            changed = true;
-            if (change === 'append')
-              await writeFile(source, 'longer than the originally opened source'.repeat(3));
-            if (change === 'truncate') await truncate(source, 0);
-            if (change === 'same-size')
-              await writeFile(source, Buffer.alloc((await readFile(source)).length, 65));
-            if (change === 'replace') {
-              const replacement = join(sourceRoot, 'replacement');
-              await writeFile(replacement, 'replacement data');
-              await rename(replacement, source);
-            }
-          },
-        }),
-      ).rejects.toMatchObject({ code: 'source-changed' });
-      expect(await readFile(outputPath, 'utf8')).toBe('old complete deployment');
-      await expectNoStage(root);
-    },
-  );
+  // Windows cannot rename over a source the writer holds open (EPERM before the writer can notice),
+  // so the 'replace' case is only meaningful on POSIX; other cases still cover Windows.
+  it.each(
+    (['append', 'truncate', 'same-size', 'replace'] as const).filter(
+      (change) => !(change === 'replace' && process.platform === 'win32'),
+    ),
+  )('rejects a source changed during reading: %s', async (change) => {
+    const { sourceRoot, options, outputPath, root } = await setup();
+    const source = join(sourceRoot, plainInput.sourcePath);
+    await writeFile(outputPath, 'old complete deployment');
+    let changed = false;
+    await expect(
+      writeDeployment({
+        ...options,
+        onProgress: async (event) => {
+          if (event.phase !== 'reading' || changed) return;
+          changed = true;
+          if (change === 'append')
+            await writeFile(source, 'longer than the originally opened source'.repeat(3));
+          if (change === 'truncate') await truncate(source, 0);
+          if (change === 'same-size')
+            await writeFile(source, Buffer.alloc((await readFile(source)).length, 65));
+          if (change === 'replace') {
+            const replacement = join(sourceRoot, 'replacement');
+            await writeFile(replacement, 'replacement data');
+            await rename(replacement, source);
+          }
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'source-changed' });
+    expect(await readFile(outputPath, 'utf8')).toBe('old complete deployment');
+    await expectNoStage(root);
+  });
 
   it('rechecks already staged inputs immediately before publication', async () => {
     const { sourceRoot, options, outputPath, root } = await setup();
@@ -444,23 +447,28 @@ describe('deployment writer snapshots and rollback', () => {
     await expectNoStage(root);
   });
 
-  it('rejects directory replacement during generation', async () => {
-    const { options, sourceRoot, root } = await setup();
-    let changed = false;
-    await expect(
-      writeDeployment({
-        ...options,
-        onProgress: async () => {
-          if (changed) return;
-          changed = true;
-          await rename(join(sourceRoot, 'config'), join(sourceRoot, 'old-config'));
-          await mkdir(join(sourceRoot, 'config'));
-          await writeFile(join(sourceRoot, plainInput.sourcePath), 'replacement');
-        },
-      }),
-    ).rejects.toMatchObject({ code: 'source-changed' });
-    await expectNoStage(root);
-  });
+  // Windows cannot rename a directory containing a file the writer holds open (EPERM), so this
+  // scenario cannot occur there.
+  it.skipIf(process.platform === 'win32')(
+    'rejects directory replacement during generation',
+    async () => {
+      const { options, sourceRoot, root } = await setup();
+      let changed = false;
+      await expect(
+        writeDeployment({
+          ...options,
+          onProgress: async () => {
+            if (changed) return;
+            changed = true;
+            await rename(join(sourceRoot, 'config'), join(sourceRoot, 'old-config'));
+            await mkdir(join(sourceRoot, 'config'));
+            await writeFile(join(sourceRoot, plainInput.sourcePath), 'replacement');
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'source-changed' });
+      await expectNoStage(root);
+    },
+  );
 
   it.each(['reading', 'assembling'] as const)(
     'cancellation during %s preserves the existing output and removes staging',
