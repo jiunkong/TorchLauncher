@@ -129,7 +129,7 @@
 | --- | --- | --- | --- |
 | BASE-01 | 모노레포, 독립 앱, IPC 격리, 검사·빌드·포터블 패키징 기반 | — | 완료 |
 | BASE-02 | Git·main·기준 커밋과 네 구현 브랜치·worktree 준비 | BASE-01 | 완료 |
-| BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
+| BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 완료 — Windows 11: `pnpm check`·`pnpm smoke`·두 앱 포터블 패키징·실행 확인(미서명) |
 | BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 보류 — 사용자 결정으로 macOS는 당분간 지원하지 않음 |
 | FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 완료 |
 | DL-01 | 일반 HTTPS·Drive 공개 링크 공통 처리, gdown Drive 로직 TypeScript 이식·MIT 고지·원본 커밋, Range·버전 교체 검증 | DL-02 | 완료 |
@@ -380,3 +380,14 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 아직 검증되지 않은 것: Windows에서 자식이 호스트보다 오래 사는(`held-live`) 실프로세스 경로(Linux 실프로세스와 주입 테스트로만 확인),
   Electron 메인 프로세스에서 띄운 Java가 호스트 강제 종료 시 함께 종료되는지, 전원 차단 내구성, 심볼릭 링크 거부 로직의 Windows 실행(개발자 모드 필요).
 - `applySettingsPolicy` 한 번 호출은 Windows에서 약 1초 안팎이다. UI-02에서 진행 표시를 고려한다.
+
+## 2026-10-22 Windows 네이티브 검증 종합 (BASE-03)
+
+- Windows 11 Pro(10.0.26300), Node 24.22.0, pnpm 10.34.7, Electron 44.9.1에서 검증 워커(Claude Code)가 실행했다.
+  `pnpm check` 통과(37 파일 통과·4 skip, 686 테스트 통과·27 skip·0 실패, 수정 적용 상태), `pnpm smoke`로 두 앱의 renderer·IPC·샌드박스 확인,
+  `pnpm package:launcher`/`package:studio` 성공(TorchLauncher-0.1.0-win-x64.exe 96.1 MB, Studio 95.6 MB) 및 포터블 exe 실행·메인 창 확인. 서명은 `NotSigned`.
+- 발견·수정한 **제품 결함**: `deployment/reader`의 gzip stage 경로에서 취소 시 `inflater.write` 콜백이 유실되면 Promise가 영구 pending되어 취소가 끝나지 않는 경쟁(Windows 약 45% 재현).
+  `inflater`의 `close`에서도 write 대기를 종료하도록 우회 수정(`3f9e54b`). 근본 원인은 Node 내부 콜백 유실로 추정되며 Node 이슈 여부와 최소 재현은 미확인.
+  Linux에서는 재현되지 않았다. 수정 후 Windows 30회 반복 통과.
+- 확인된 사실: Windows에서 일반 `spawn` 자식은 호스트(Node·Electron 모두) 강제 종료 시 함께 종료되고, `detached`는 생존한다. 제품의 Java 실행은 `detached`를 쓰지 않는다.
+- 미검증/남음: 개발자 모드에서의 symlink 테스트 14개, 서명·SmartScreen(RELEASE-01), writer의 Windows 소스 교체 감지 경로(테스트 skip), `fileParallelism` 조정 필요 여부.
