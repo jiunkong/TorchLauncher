@@ -110,8 +110,30 @@ export function safeFailure(error: unknown, phase: string, cancelled: boolean) {
     authenticatedConnection: false,
   };
 }
+/** Fixed allowlist of fatal JVM/launcher error classes; matched text is never returned. */
+const fatalClasses: [string, RegExp][] = [
+  ['module_resolution_failed', /java\.lang\.module\.(?:FindException|ResolutionException)/],
+  ['class_not_found', /ClassNotFoundException|NoClassDefFoundError/],
+  ['unsupported_class_version', /UnsupportedClassVersionError/],
+  ['out_of_memory', /OutOfMemoryError/],
+  [
+    'jvm_creation_failed',
+    /Could not create the Java Virtual Machine|Error occurred during initialization of VM/,
+  ],
+];
+export function classifyFatalLog(logs: GameExit['logs']): string | undefined {
+  for (const [name, pattern] of fatalClasses)
+    if (logs.entries.some((entry) => pattern.test(entry.text))) return name;
+  return undefined;
+}
 export function safeGameExit(result: GameExit, durationElapsed: boolean) {
   const controlledStop = durationElapsed && result.reason === 'stopped';
+  const failed = !(
+    !result.errorCode &&
+    ((result.reason === 'exited' && result.code === 0) ||
+      (controlledStop && (result.code === null || result.code === 0)))
+  );
+  const fatal = failed ? classifyFatalLog(result.logs) : undefined;
   return {
     ok:
       !result.errorCode &&
@@ -121,6 +143,8 @@ export function safeGameExit(result: GameExit, durationElapsed: boolean) {
     spawned: true,
     exitCode: result.code,
     exitReason: result.reason,
+    ...(result.signal ? { exitSignal: result.signal } : {}),
+    ...(failed ? { code: fatal ?? 'game_exited_abnormally' } : {}),
     completion: controlledStop
       ? 'duration_elapsed'
       : result.reason === 'cancelled'

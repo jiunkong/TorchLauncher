@@ -139,6 +139,37 @@ export function inspectProfile(
   };
   return { data, libraries, version: parseVersion(normalized) };
 }
+const IGNORE_LIST = '-DignoreList=';
+/**
+ * NeoForge's BootstrapLauncher skips legacy classpath jars whose file names start with an
+ * `-DignoreList` entry. Its profile names the client jar `${version_name}.jar`, assuming the
+ * official layout where an inheriting profile's jar is copied to versions/<child-id>/<child-id>.jar.
+ * TorchLauncher keeps the verified vanilla jar at versions/<base-id>/<base-id>.jar, so that entry is
+ * bound to the actual jar name here. `${version_name}` itself (e.g. `--version`) stays the loader id.
+ */
+function ignoreClientJar(
+  jvm: Version['arguments']['jvm'],
+  selection: LoaderSelection,
+  clientJar: string,
+): Version['arguments']['jvm'] {
+  let matched = false;
+  const bind = (value: string) => {
+    if (!value.startsWith(IGNORE_LIST)) return value;
+    const entries = value
+      .slice(IGNORE_LIST.length)
+      .split(',')
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: Literal NeoForge profile placeholder.
+      .map((entry) => (entry === '${version_name}.jar' ? clientJar : entry));
+    if (entries.some((entry) => entry && clientJar.startsWith(entry))) matched = true;
+    return `${IGNORE_LIST}${entries.join(',')}`;
+  };
+  const result = jvm.map((arg) =>
+    typeof arg === 'string' ? bind(arg) : { ...arg, value: arg.value.map(bind) },
+  );
+  if (selection.kind === 'neoforge' && !matched)
+    throw new Error('Loader profile would load the vanilla client jar as a module');
+  return result;
+}
 export function loaderInstallation(
   base: Installation,
   selection: LoaderSelection,
@@ -156,10 +187,17 @@ export function loaderInstallation(
         library.artifact.path,
       ),
     );
-  classpath.push(join(base.root, 'versions', base.version.id, `${base.version.id}.jar`));
+  const clientJar = `${base.version.id}.jar`;
+  classpath.push(join(base.root, 'versions', base.version.id, clientJar));
   return {
     ...base,
-    version: parsed.version,
+    version: {
+      ...parsed.version,
+      arguments: {
+        ...parsed.version.arguments,
+        jvm: ignoreClientJar(parsed.version.arguments.jvm, selection, clientJar),
+      },
+    },
     classpath,
     libraryDirectory: join(tree, 'libraries'),
     loader: { ...selection, minecraftVersion: base.version.id },
