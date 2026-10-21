@@ -20,6 +20,12 @@ import { SettingsError } from './types.js';
  *   names arrived in 17w45a (1.13). Earlier files used numeric codes.
  * - https://minecraft.wiki/w/Data_version: 1.13 = 1519, 1.21 = 3953, 1.21.1 = 3955, 1.21.2 = 4080.
  *
+ * - Post-3955 research (2026-10-22; see docs/settings-policy.md): the wiki's options table lists no
+ *   change to `version`, `resourcePacks`, `incompatibleResourcePacks` or the `key:value` line
+ *   structure for any release from 1.21.2 through 26.3 (data versions 4080-5023); only keys were
+ *   added/removed. 26.3-snapshot4 changed undefined key codes from `scancode.###` to
+ *   `key.keyboard.###` (still non-numeric).
+ *
  * Not established by any source found: how pack ids (`vanilla`, `file/` prefix, built-in mod packs)
  * changed between versions. Profiles therefore only reject provably malformed entries.
  */
@@ -34,6 +40,9 @@ export interface OptionsFormatProfile {
   readonly namedKeyCodes: boolean;
   readonly minecraftVersions: readonly string[];
 }
+
+/** Data version of Minecraft 26.3, the newest release covered by the research. */
+export const LATEST_RESEARCHED_DATA_VERSION = 5023;
 
 export const OPTIONS_PROFILES: readonly OptionsFormatProfile[] = [
   {
@@ -53,6 +62,33 @@ export const OPTIONS_PROFILES: readonly OptionsFormatProfile[] = [
     defaultPacks: [],
     namedKeyCodes: true,
     minecraftVersions: ['1.13', '1.14', '1.16', '1.17', '1.18', '1.19', '1.20', '1.20.5', '1.21'],
+  },
+  {
+    // 1.21.2 (4080) .. 26.3 (5023). Same layout as 1.21.1 per the wiki option table (no documented
+    // change to the lines this module touches). Documentation-only, hence "researched". Pack id
+    // notation after 1.21.1 is undocumented. 1.21.2 starts at 3956 because no release lies between.
+    id: 'java-1.21.2+',
+    evidence: 'researched',
+    dataVersions: [3956, LATEST_RESEARCHED_DATA_VERSION],
+    defaultPacks: [],
+    namedKeyCodes: true,
+    minecraftVersions: [
+      '1.21.2',
+      '1.21.3',
+      '1.21.4',
+      '1.21.5',
+      '1.21.6',
+      '1.21.7',
+      '1.21.8',
+      '1.21.9',
+      '1.21.10',
+      '1.21.11',
+      '26.1',
+      '26.1.1',
+      '26.1.2',
+      '26.2',
+      '26.3',
+    ],
   },
 ];
 
@@ -90,9 +126,9 @@ export function selectProfile(
     found = OPTIONS_PROFILES.find((p) => dv >= p.dataVersions[0] && dv <= p.dataVersions[1]);
     if (!found) {
       if (policy !== 'allow-any') unsupported(`unsupported options.txt data version ${raw}`);
-      // Newer than every profile: assume the latest layout, but only when explicitly allowed.
-      if (dataVersion > 3955) {
-        found = FALLBACK_PROFILE;
+      // Newer than every researched release: assume the newest layout, only when explicitly allowed.
+      if (dataVersion > LATEST_RESEARCHED_DATA_VERSION) {
+        found = OPTIONS_PROFILES[OPTIONS_PROFILES.length - 1] as OptionsFormatProfile;
         warnings.push(`unknown data version ${raw}: using profile ${found.id}`);
       } else unsupported(`options.txt data version ${raw} predates the supported formats`);
     }
