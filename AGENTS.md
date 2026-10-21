@@ -2,7 +2,7 @@
 
 ## Project Status & Architecture
 
-TorchLauncher is a server-specific Minecraft launcher built with Electron, TypeScript, and React. The pnpm monorepo contains independent player and Studio apps with shared contracts. Support Windows, macOS, and Linux, with both Fabric and NeoForge; validate Minecraft 1.21.1 first. Desktop shells and shared download, deployment, synchronization, authentication, and base game-installation code are implemented. Product UI wiring, loader installation and full end-to-end validation remain pending; consult `docs/progress.md` for current evidence.
+TorchLauncher is a server-specific Minecraft launcher built with Electron, TypeScript, and React. The pnpm monorepo contains independent player and Studio apps with shared contracts. Support Windows and Linux (macOS is deferred by user decision, 2026-10-22; Linux ARM64 is not supported), with both Fabric and NeoForge; validate Minecraft 1.21.1 first. Desktop shells and shared download, deployment, synchronization, authentication, and base game-installation code are implemented. Product UI wiring, loader installation and full end-to-end validation remain pending; consult `docs/progress.md` for current evidence.
 
 ## Agent Coordination & Merge Ownership
 

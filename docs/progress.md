@@ -130,7 +130,7 @@
 | BASE-01 | 모노레포, 독립 앱, IPC 격리, 검사·빌드·포터블 패키징 기반 | — | 완료 |
 | BASE-02 | Git·main·기준 커밋과 네 구현 브랜치·worktree 준비 | BASE-01 | 완료 |
 | BASE-03 | Windows 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
-| BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 준비 |
+| BASE-04 | macOS 실제 실행·패키징·smoke test 확인 | BASE-02 | 보류 — 사용자 결정으로 macOS는 당분간 지원하지 않음 |
 | FMT-01 | 단일 배포 파일 규격·서버 식별자·공유 계약 확정, 테스트 예제 정의 | BASE-02 | 완료 |
 | DL-01 | 일반 HTTPS·Drive 공개 링크 공통 처리, gdown Drive 로직 TypeScript 이식·MIT 고지·원본 커밋, Range·버전 교체 검증 | DL-02 | 완료 |
 | DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 완료 |
@@ -157,7 +157,7 @@
 | STUDIO-02 | 배포 파일 선택·생성, 공개 URL 등록·부분 다운로드 검사, 업데이트 흐름 | STUDIO-01, FMT-02, DL-01, DL-02 | 대기 |
 | STUDIO-03 | OS별 공통 코어에 설정·이미지를 묶어 전용 포터블 런처 내보내기 | STUDIO-02, UI-02 | 대기 |
 | QA-01 | 운영자 구성 → 업로드 → 내보내기 → 신규 설치 → 접속 → 업데이트 전체 검증 | STUDIO-03, GAME-05 | 대기 |
-| RELEASE-01 | 지원 OS·CPU·게임 버전 범위와 서명·배포 정책 확정·검증 | BASE-03, BASE-04, QA-01, AUTH-04 | 대기 |
+| RELEASE-01 | 지원 OS·CPU·게임 버전 범위와 서명·배포 정책 확정·검증 | BASE-03, QA-01, AUTH-04 (BASE-04는 macOS 보류로 제외) | 대기 |
 | RELEASE-02 | 공통 런처 코어 자동 업데이트 설계·구현·호환성 검증 | QA-01 | 대기 |
 
 ## 담당 배정과 수정 범위
@@ -350,3 +350,9 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
   근거는 minecraft.wiki 문서에 3955 이후 `version`·`resourcePacks`·`key:value` 구조 변경 기록이 없다는 부재 증거뿐이며, 실제 3955 초과 클라이언트 파일 검증은 없다.
   데이터 버전 숫자는 #0이 Data_version 문서로 대조했다(1.21.2=4080, 26.3=5023). 5024 이상은 기본 거부, `allow-any`만 경고와 함께 처리. 메인 `pnpm check` 성공(658개 테스트).
   병합된 작업 브랜치를 모두 삭제했고 `main`만 남았다(워크트리는 `main` 기준 detached).
+
+## 2026-10-22 지원 OS 결정
+
+- macOS는 당분간 지원하지 않는다(사용자 결정). 지원 대상은 Windows x64와 Linux x64이다. BASE-04는 보류하고 RELEASE-01의 선행에서 제외했다.
+  macOS 전용 코드와 검증은 만들지 않으며, 프로세스 식별 등 OS별 조회가 불가능한 환경에서는 안전하게 '불확실'로 폴백한다.
+  AGENTS.md의 지원 OS 문구를 갱신했다. macOS를 다시 지원하려면 별도 승인과 BASE-04 재개가 필요하다.
