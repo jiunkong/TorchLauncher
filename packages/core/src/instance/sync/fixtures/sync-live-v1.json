@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-21T07:11:02.673Z",
+  "totalLength": 140736,
+  "indexSha256": "3d09c8b06b9d21693d2c9c206b5734f1920f75cbaa5f061ddeb09e20cc417a3e",
+  "first": {
+    "downloaded": 5,
+    "reused": 0,
+    "preserved": 0,
+    "deleted": 0,
+    "deploymentId": "22222222-2222-4222-8222-222222222222",
+    "recovery": "none"
+  },
+  "repeat": {
+    "downloaded": 0,
+    "reused": 4,
+    "preserved": 1,
+    "deleted": 0,
+    "deploymentId": "22222222-2222-4222-8222-222222222222",
+    "recovery": "none"
+  },
+  "repeatNetworkRangeCount": 0,
+  "fileHashes": [
+    {
+      "path": "custom-data/unchanged.bin",
+      "sha256": "2c6750d88b5eb3f299dd72af0393713a0f86da11a77389f283cce25b126d6a99",
+      "length": 131072
+    },
+    {
+      "path": "saves/fixture-world/data/marker.dat",
+      "sha256": "413bbe26c787ef220a100c990da4b204673f58b553c29a206a701968943ea312",
+      "length": 46
+    },
+    {
+      "path": "config/required.txt",
+      "sha256": "55cb77705ae2c589b5009eb25f7aa30538ceb62c2aaa9c8a2e7bd5beeca8e354",
+      "length": 15
+    },
+    {
+      "path": "options.txt",
+      "sha256": "64ff3ae87b74fbfa65fb43ec7a6e45980c642120b5c0afe3ed3fdd30aaa064ca",
+      "length": 56
+    },
+    {
+      "path": "custom-data/removed.bin",
+      "sha256": "d068cad11683706fa7a748bb47f065d9c342d90654762f51d9cebedd832f16b9",
+      "length": 8192
+    }
+  ]
+}
