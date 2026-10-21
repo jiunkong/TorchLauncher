@@ -18,6 +18,12 @@
   독립 Electron/auth-worker 번들 생성은 성공했으나 개발 환경의 native Electron install-only는
   harness 결과 없이 종료되어 GUI 검증은 미완료다. Windows 실제 게임 실행·월드 접속을 사용자에게 요청한다.
   테스트 명령은 [GAME-02/03 인계](handoffs/GAME-02-03.md), 현재 재개 상태는 도구 간 인계를 따른다.
+- Windows 첫 실접속 시도: 인증 후 게임 JVM이 `Modules _1._21._1 and minecraft export package ...` 모듈 해석 오류로
+  즉시 종료했고 호스트는 `host_no_result`만 출력했다. 원인은 NeoForge `-DignoreList`의 `${version_name}.jar`가
+  병합 id(`neoforge-21.1.264`)로 치환되어 바닐라 `1.21.1.jar`가 무시되지 않은 것이다. 수정 `35f5734`를 `3a86683`로
+  통합했다(ignoreList를 실제 바닐라 jar 이름에 결합, 비정상 종료의 안전한 `ok:false`·고정 분류 코드, 결과 파일 병행 기록).
+  메인 `pnpm check` 성공: 549개 테스트·opt-in 6개 skip·전체 TypeScript·Biome·두 앱 빌드. `host_no_result`의 원인
+  (종료 직전 console.log 유실)은 Linux에서 재현하지 못한 가설이다. Windows 재실행 결과 대기, GAME-02/03은 여전히 검토 상태다.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,

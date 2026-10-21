@@ -11,6 +11,11 @@ this handoff update is `fc85ec2`, with no uncommitted changes. Inspect status an
 Implementation workers are idle; no login or live validation is running on the coordinator's behalf.
 The user's separately managed server may still be running; confirm its current state without changing it.
 
+Update: the first Windows run failed with a module-resolution error (vanilla client jar not ignored); fixed in
+`35f5734`, merged by `3a86683` (see `docs/handoffs/GAME-02-03-fix.md`). The user must rerun the same launch command
+in the Windows clone after `git pull`; no Windows result for the fix exists yet. Worker #3's branch is
+`fix/game-02-03-module-conflict`, idle. Claude subagents cannot be resumed after being stopped; start a new one.
+
 The immediate next input is the user's Windows NeoForge gameplay test result. They have already
 received the fresh-clone command below. If it has not been run, help resume that test; do not mark
 GAME-02/03 complete until actual automatic server/world entry is confirmed. Read
