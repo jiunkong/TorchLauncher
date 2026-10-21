@@ -12,8 +12,16 @@ the latest-sync launch gate. Do not start Studio or product UI work. Preserve ge
 Active worker: #3, `.agents/worktrees/agent-3`, `feat/game-02-03-loaders`, prepared from the main
 assignment commit. Read `docs/game-launch.md` and the latest assignment in `docs/work-distribution.md`.
 Scope includes loaders/minecraft, narrow read-only sync launch guard, and a separate Electron game-smoke
-runner; auth implementation and other shared files require coordination. Server availability has been
-asked asynchronously; do not assume a reply or start accepting EULAs. No real game connection is verified yet.
+runner; auth implementation and other shared files require coordination. A running user server is now
+available in root `.testserver/`: Minecraft 1.21.1, NeoForge 21.1.264, port 25565, online mode enabled,
+no whitelist/extra mods. Treat its data/process as read-only. #3 additionally owns the narrow `.gitignore`
+and Biome exclusions for that local server. Do not accept EULAs. No real client connection is verified yet.
+
+The matching 305-byte empty-content test pack is in ignored `.cache/game-smoke-validation/`, with
+`manifest.json`, `reader-receipt.json` and `live-url.txt` (public URL, do not commit). Reader preflight
+passed against actual Drive. Expected server ID is `44444444-4444-4444-8444-444444444444`.
+This is separate from the completed sync v1/v2 fixture. Coordinator-tool localhost TCP did not connect;
+verify the native user's localhost:25565 in the eventual Windows smoke. Do not infer the server is down.
 
 ## Git and files
 
