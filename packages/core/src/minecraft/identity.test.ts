@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   type CommandRunner,
@@ -5,6 +6,7 @@ import {
   parseLinuxStat,
   parseWindowsMachineGuid,
   parseWindowsProcess,
+  systemProcessProbe,
   windowsProcessScript,
 } from './identity';
 
@@ -120,11 +122,54 @@ describe('createSystemProcessProbe', () => {
     expect(await probe.host()).toEqual({ machine: null });
   });
 
-  it.runIf(process.platform === 'linux')('identifies real Linux processes', async () => {
-    const probe = createSystemProcessProbe();
-    const self = await probe.process(process.pid);
-    expect(self.state).toBe('running');
-    expect(await probe.process(process.pid)).toEqual(self);
-    expect(await probe.process(0x7ffffffe)).toEqual({ state: 'absent' });
-  });
+  it.runIf(process.platform === 'linux' || process.platform === 'win32')(
+    'identifies real processes with the system probe (Linux procfs / Windows PowerShell+reg.exe)',
+    { timeout: 60_000 },
+    async () => {
+      const probe = systemProcessProbe();
+      const host = await probe.host();
+      expect(host.machine).toMatch(/^[0-9a-f]{64}$/);
+      const self = await probe.process(process.pid);
+      expect(self.state).toBe('running');
+      if (self.state === 'running')
+        expect(self.start).toMatch(
+          process.platform === 'win32' ? /^windows:\d+$/ : /^linux:[0-9a-f-]{36}:\d+$/,
+        );
+      expect(await probe.process(process.pid)).toEqual(self);
+
+      const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      try {
+        await new Promise((resolve, reject) => {
+          child.once('spawn', resolve);
+          child.once('error', reject);
+        });
+        const pid = child.pid;
+        if (!pid) throw new Error('spawn failed');
+        const first = await probe.process(pid);
+        expect(first.state).toBe('running');
+        expect(first).not.toEqual(self);
+        const exited = new Promise((resolve) => child.once('exit', resolve));
+        child.kill();
+        await exited;
+        let state = await probe.process(pid);
+        for (let i = 0; i < 100 && state.state !== 'absent'; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          state = await probe.process(pid);
+        }
+        expect(state).toEqual({ state: 'absent' });
+      } finally {
+        child.kill();
+      }
+    },
+  );
+
+  it.runIf(process.platform === 'linux' || process.platform === 'win32')(
+    'reports a never-used PID as absent',
+    async () => {
+      expect(await systemProcessProbe().process(0x7ffffffe)).toEqual({ state: 'absent' });
+    },
+  );
 });

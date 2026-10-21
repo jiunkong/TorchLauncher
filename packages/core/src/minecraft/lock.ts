@@ -222,7 +222,7 @@ function createLease(root: string, lock: string, initial: LockOwnerV2): ServerDa
         await writeFile(temporary, nextText, { flag: 'wx', mode: 0o600 });
         try {
           // Atomic replacement: readers see either the previous or the new owner record.
-          await rename(temporary, join(lock, OWNER_FILE));
+          await renameWithRetry(temporary, join(lock, OWNER_FILE));
         } catch (error) {
           await unlink(temporary).catch(() => undefined);
           throw error;
@@ -231,6 +231,40 @@ function createLease(root: string, lock: string, initial: LockOwnerV2): ServerDa
         text = nextText;
       }),
   };
+}
+
+const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY']);
+export interface RenameRetryOptions {
+  platform?: NodeJS.Platform;
+  rename?: (from: string, to: string) => Promise<void>;
+  sleep?: (ms: number) => Promise<void>;
+  attempts?: number;
+}
+/**
+ * Windows reports EPERM/EACCES/EBUSY when another process (a status reader, antivirus, the
+ * search indexer) briefly holds the file without FILE_SHARE_DELETE. Retry a few times there;
+ * other platforms and other errors (including ENOENT) propagate immediately.
+ */
+export async function renameWithRetry(
+  from: string,
+  to: string,
+  options: RenameRetryOptions = {},
+): Promise<void> {
+  const platform = options.platform ?? process.platform;
+  const move = options.rename ?? rename;
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
+  const attempts = platform === 'win32' ? (options.attempts ?? 8) : 1;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await move(from, to);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= attempts || code === undefined || !TRANSIENT_RENAME_CODES.has(code))
+        throw error;
+      await sleep(25 * attempt);
+    }
+  }
 }
 
 /** Cooperative filesystem lock: all installation, launch and future deletion callers must use it. */
@@ -280,7 +314,7 @@ export async function reclaimServerDataLock(
     aside = join(lock, `${OWNER_FILE}.reclaimed-${randomUUID()}`);
     try {
       // Only one concurrent reclaimer can move this exact file away.
-      await rename(ownerPath, aside);
+      await renameWithRetry(ownerPath, aside);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ServerDataLockedError(root);
       throw error;
