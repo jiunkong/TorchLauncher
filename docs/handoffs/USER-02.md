@@ -62,3 +62,11 @@
 - 구조/지원 표/출처/미구현 목록은 `docs/settings-policy.md`의 "버전별 형식 프로파일" 절 참조. 요약: 검증은 `java-1.21.1`(3955)뿐, `java-1.13-1.21`은 미검증(조사 기반)이며 `versionPolicy: 'allow-researched'` 선택 시에만 사용.
 - 새 오류 코드 `unsupported-options-version`. 새 옵션 `minecraftVersion`, `versionPolicy`(apply/getResourcePacks/setUserResourcePacks), 결과 필드 `formatProfile`, `warnings`(`ApplySettingsResult.warnings`는 필수 필드 추가).
 - 제약: 기본 `verified-only`라서 1.21.1(3955) 외 데이터 버전 파일은 호출자가 정책을 고르지 않으면 거부된다(1.21 등 연동 시 #0이 정책 결정). 파일에 `version:`이 없고 `minecraftVersion`도 없으면 기존처럼 1.21.1 프로파일로 처리.
+
+## 후속: 데이터 버전 3955 초과 options.txt 프로파일 (브랜치 `feat/user-02-newer-versions`, 기준 main `4320567`)
+
+- 범위: `packages/core/src/instance/settings/**`, `docs/settings-policy.md`, 이 절. 최종 커밋 해시는 세션 보고에 기재.
+- 추가: 프로파일 `java-1.21.2+`(데이터 버전 3956–5023 = 1.21.2–26.3, 근거 "미검증(조사 기반)", `allow-researched` 이상에서만 사용). `LATEST_RESEARCHED_DATA_VERSION`(5023) 초과 데이터 버전은 `allow-any`만 이 프로파일로 처리(경고). `verified-only` 기본 동작과 1.21.1(3955) 검증 프로파일은 불변. 기존 API/오류 코드 호환.
+- 조사 출처/날짜(2026-10-22)와 판단은 `docs/settings-policy.md`의 "3955 초과 조사 결과" 절 참조. 요약: Options.txt 위키 표에 1.21.2~26.3 구간의 `version`/`resourcePacks`/줄 구조 변경 기록 없음(옵션 추가·삭제만), 26.3-snapshot4에서 미정의 키 코드 표기만 변경(비숫자 유지).
+- 확신 없어 미지원: 3955 이후 팩 ID 표기 변화(위키 서술 없음), 26.3 이후 릴리스, 실파일 검증. 데이터 버전 값은 WebFetch 요약에서 가져왔으므로 구현 전 Data_version 위키와 대조 권장.
+- 테스트: `profiles.test.ts`에 조사 기반 테스트 추가(합성 `version:` 입력; 3956–5023 선택/기본 거부/옵트인, 숫자 키코드 거부, 호출자 버전 선택·불일치 거부, 5024 `allow-any`). 3955 fixture 테스트 불변. core settings vitest 39개 통과.

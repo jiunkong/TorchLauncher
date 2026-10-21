@@ -85,14 +85,16 @@ USER-02 코어 명세. 구현: `packages/core/src/instance/settings/`. UI/IPC �
 
 `options.txt`의 `version:` 줄(데이터 버전, 1.10-pre1에서 추가)로 프로파일을 고른다. 줄이 없으면 호출자의 `minecraftVersion`, 둘 다 없으면 기존 동작(1.21.1 프로파일). 둘 다 있는데 서로 다른 프로파일이면 `unsupported-options-version`.
 `versionPolicy`(적용/읽기/팩 설정 API 공통 옵션): `verified-only`(기본) / `allow-researched` / `allow-any`. 지원 밖 버전은 기본적으로 파일을 수정하지 않고 `unsupported-options-version`으로 거부한다.
-`allow-any`는 3955보다 큰 데이터 버전만 최신 레이아웃으로 처리하며 `result.warnings`에 경고를 남긴다. 1519 미만(1.13 이전)은 항상 거부한다.
+`allow-any`는 조사 범위 상한(5023, 26.3)을 넘는 데이터 버전만 최신 프로파일(`java-1.21.2+`)로 처리하며 `result.warnings`에 경고를 남긴다. 1519 미만(1.13 이전)은 항상 거부한다.
 결과의 `formatProfile`, `warnings`로 사용된 프로파일을 알 수 있다.
 
 | 프로파일 | 데이터 버전 | Minecraft | 근거 수준 |
 | --- | --- | --- | --- |
 | `java-1.21.1` | 3955 | 1.21.1 | **검증**(실제 클라이언트 파일 fixture로 테스트) |
 | `java-1.13-1.21` | 1519–3954 | 1.13, 1.14, 1.16–1.20, 1.20.5, 1.21 | **미검증(조사 기반)**: 구현만 있고 실파일 테스트 없음 |
-| (없음) | <1519, >=3956 | 1.12 이하, 1.21.2+ | 미지원: 기본 거부 |
+| `java-1.21.2+` | 3956–5023 | 1.21.2–1.21.11, 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | **미검증(조사 기반)**: 3955와 같은 레이아웃이라는 문서 근거만 있고 실파일 테스트 없음 |
+| (없음) | <1519 | 1.12 이하 | 미지원: 항상 거부 |
+| (없음) | >=5024 | 26.3 이후(조사 시점 이후 릴리스) | 기본 거부, `allow-any`만 `java-1.21.2+`로 처리(경고) |
 
 프로파일이 결정하는 것: 기본 팩 목록(`[]`), 단축키 값이 이름 형식(`key.keyboard.*`/`key.mouse.*`)이어야 하는지(숫자 키코드 거부 -> `invalid-policy`),
 `file/` 팩 ID 검증(빈 이름, `..`/빈 세그먼트, 역슬래시 거부). 정책의 `version` 키는 게임 소유라 `invalid-policy`.
@@ -103,3 +105,13 @@ USER-02 코어 명세. 구현: `packages/core/src/instance/settings/`. UI/IPC �
 - https://minecraft.wiki/w/Data_version: 1.13=1519, 1.21=3953, 1.21.1=3955, 1.21.2=4080.
 
 조사로 확인하지 못해 구현하지 않은 것: 버전별 팩 ID 표기 변화(`vanilla`, `file/` 접두사 도입 시점, 모드 내장 팩 ID, 서버 리소스팩 표기), 1.12 이하 숫자 키코드·평문 팩 이름 처리, 1.21.2 이후 레이아웃 변화.
+
+### 3955 초과 조사 결과 (2026-10-22 확인)
+
+데이터 버전(Data_version 위키, WebFetch 요약): 1.21.2=4080, 1.21.3=4082, 1.21.4=4189, 1.21.5=4325, 1.21.6=4435, 1.21.7=4438, 1.21.8=4440, 1.21.9=4554, 1.21.10=4556, 1.21.11=4671, 26.1=4786, 26.1.1=4788, 26.1.2=4790, 26.2=4903, 26.3=5023. 26.1(2026-03-24)부터 `연도.드롭.핫픽스` 표기(26.1 문서). 3955 직후 릴리스가 1.21.2(4080)이므로 프로파일 하한은 3956으로 둔다.
+- https://minecraft.wiki/w/Options.txt_(Java_Edition) (옵션 표 원문 wikitext 확인): `version`(데이터 버전 정수, 없으면 기본 설정으로 대체), `resourcePacks`(13w36a)/`incompatibleResourcePacks`(1.8.8)는 문자열 목록 기본 `[]`, 키 `key_key.*` 값은 Key codes. 1.21.2~26.3 사이 이 항목들의 변경 기록은 표에 없다. 이 구간의 변경은 옵션 추가/삭제뿐(1.21.2 `inactivityFpsLimit` 등, 1.21.5 `startedCleanly`, 1.21.6 `musicFrequency`, 1.21.9 `toggleAttack` 등, 1.21.11 `graphicsPreset`(`graphicsMode` 대체), 26.1 `exclusiveFullscreen`, 26.2 `sharePresence` 등, 26.3 `quitShortcuts` 등, `touchscreen`·`rawMouseInput` 제거). `key:value` 줄 구조, 줄바꿈, 인코딩에 대한 변경 서술은 없음.
+- https://minecraft.wiki/w/Key_codes (History 확인): 26.3-snapshot4에서 정의 없는 키 코드가 `scancode.###` -> `key.keyboard.###`로 바뀌고 SDL3 사용. 값은 여전히 비숫자 이름 형식이라 `namedKeyCodes` 검사와 충돌하지 않는다.
+- https://minecraft.wiki/w/Java_Edition_26.1: 26.1에서 월드 리소스팩(`resources.zip`)이 `resourcepacks` 하위로 이동(options.txt 영향 서술 없음).
+
+판단: 위 근거로 TorchLauncher가 쓰는 부분(`version:` 줄, `resourcePacks` 목록, 단축키 값 형식)의 레이아웃이 3955와 같다고 보아 하나의 프로파일로 구현했다. 단 근거는 "문서에 변경 기록이 없음"이라는 부재 증거이고 실제 클라이언트 파일로 확인하지 못했으므로 `allow-researched`에서만 쓰인다.
+미지원/미확인: 3955 이후의 팩 ID 표기(`vanilla`, `file/`, 모드·서버 내장 팩 ID)는 위키에 서술이 없어 확인 못함(프로파일은 기존처럼 잘못된 `file/` ID만 거부). 26.3 이후 릴리스(26.4 등)는 확인 불가라 범위에서 제외. 26.3-snapshot4 이전 `scancode.###` 값의 의미는 확인 못함.

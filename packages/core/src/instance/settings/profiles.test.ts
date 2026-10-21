@@ -96,7 +96,7 @@ describe('real Minecraft 1.21.1 options.txt (data version 3955)', () => {
 describe('format profile selection', () => {
   const pol = { ...base, required: { a: '1' } };
   it('rejects unknown or unsupported data versions without touching the file', async () => {
-    for (const v of ['4080', '1343', 'abc']) {
+    for (const v of ['1343', 'abc', '4080', '5023']) {
       const text = `version:${v}\r\nx:1\r\n`;
       const dir = await setup(pol, text);
       expect(await code(applySettingsPolicy(dir))).toBe('unsupported-options-version');
@@ -111,11 +111,71 @@ describe('format profile selection', () => {
     expect(result.formatProfile).toBe('java-1.13-1.21');
     expect(result.warnings.length).toBe(1);
   });
-  it('allow-any applies newer versions with the latest layout and a warning', async () => {
-    const dir = await setup(pol, 'version:4080\nx:1\n');
+  it('allow-any applies versions beyond the researched range with the newest layout and a warning', async () => {
+    const dir = await setup(pol, 'version:5024\nx:1\n');
+    expect(await code(applySettingsPolicy(dir, { versionPolicy: 'allow-researched' }))).toBe(
+      'unsupported-options-version',
+    );
     const result = await applySettingsPolicy(dir, { versionPolicy: 'allow-any' });
-    expect(result.warnings[0]).toContain('4080');
-    expect(await readFile(join(dir, 'options.txt'), 'utf8')).toBe('version:4080\nx:1\na:1\n');
+    expect(result.formatProfile).toBe('java-1.21.2+');
+    expect(result.warnings[0]).toContain('5024');
+    expect(await readFile(join(dir, 'options.txt'), 'utf8')).toBe('version:5024\nx:1\na:1\n');
+  });
+  // Research-based (no real files): data versions 3956-5023 = 1.21.2 .. 26.3.
+  it('researched java-1.21.2+ profile covers 3956-5023 and needs an opt-in', async () => {
+    for (const v of ['3956', '4080', '4325', '4671', '4786', '5023']) {
+      const text = `version:${v}\r\nx:1\r\n`;
+      const dir = await setup(pol, text);
+      expect(await code(applySettingsPolicy(dir))).toBe('unsupported-options-version');
+      expect(await readFile(join(dir, 'options.txt'), 'utf8')).toBe(text);
+      const r = await applySettingsPolicy(dir, { versionPolicy: 'allow-researched' });
+      expect(r.formatProfile).toBe('java-1.21.2+');
+      expect(r.warnings.length).toBe(1);
+      expect(await readFile(join(dir, 'options.txt'), 'utf8')).toBe(`${text}a:1\r\n`);
+    }
+  });
+  it('java-1.21.2+ keeps named key codes and the 3955 profile stays separate', async () => {
+    const d = await setup({ ...base, required: { 'key_key.jump': '57' } }, 'version:4080\n');
+    expect(await code(applySettingsPolicy(d, { versionPolicy: 'allow-researched' }))).toBe(
+      'invalid-policy',
+    );
+    const ok = await setup(
+      { ...base, required: { 'key_key.jump': 'key.keyboard.space' } },
+      'version:5023\n',
+    );
+    expect(
+      (await applySettingsPolicy(ok, { versionPolicy: 'allow-researched' })).formatProfile,
+    ).toBe('java-1.21.2+');
+    const v = await setup(pol, 'version:3955\nx:1\n');
+    expect((await applySettingsPolicy(v)).formatProfile).toBe('java-1.21.1');
+  });
+  it('selects java-1.21.2+ from the caller version and rejects mismatches', async () => {
+    const dir = await setup(pol, 'x:1\n');
+    expect(await code(applySettingsPolicy(dir, { minecraftVersion: '26.3' }))).toBe(
+      'unsupported-options-version',
+    );
+    const r = await applySettingsPolicy(dir, {
+      minecraftVersion: '26.3',
+      versionPolicy: 'allow-researched',
+    });
+    expect(r.formatProfile).toBe('java-1.21.2+');
+    const mism = await setup(pol, 'version:4080\nx:1\n');
+    expect(
+      await code(
+        applySettingsPolicy(mism, {
+          minecraftVersion: '1.21.1',
+          versionPolicy: 'allow-researched',
+        }),
+      ),
+    ).toBe('unsupported-options-version');
+    expect(
+      await code(
+        applySettingsPolicy(mism, {
+          minecraftVersion: '1.21.11',
+          versionPolicy: 'allow-researched',
+        }),
+      ),
+    ).toBe('none');
   });
   it('uses the caller Minecraft version only when the file has no version line', async () => {
     const dir = await setup(pol, 'x:1\n');
