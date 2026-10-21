@@ -19,7 +19,7 @@
 
 ```powershell
 git fetch origin
-git checkout test/game-05-windows
+git checkout main
 git pull
 pnpm install --frozen-lockfile
 pnpm exec vitest run packages/core/src/minecraft/identity.test.ts packages/core/src/minecraft/recovery/kill.test.ts packages/core/src/minecraft/recovery/recovery.test.ts packages/core/src/minecraft/recovery/rename-retry.test.ts --reporter=verbose
