@@ -23,13 +23,21 @@ passed against actual Drive. Expected server ID is `44444444-4444-4444-8444-4444
 This is separate from the completed sync v1/v2 fixture. Coordinator-tool localhost TCP did not connect;
 verify the native user's localhost:25565 in the eventual Windows smoke. Do not infer the server is down.
 
-Worker implementation checkpoint `e763686` is committed, not yet integrated. Both official Linux
-loader installs passed (NeoForge 21.1.264 / Fabric 0.16.14); focused tests 72 passed with 3 live skips,
-and workspace TypeScript passed. This is not authenticated game/server evidence. Follow-up changes to
-`game-smoke` lifecycle/error reporting and tests are in progress; preserve tracked/untracked files.
-Windows Ctrl+C must use cooperative cancellation rather than killing the Electron owner before Java
-is reaped. Nonzero game exits must fail. Final Electron harness validation, review, merge, integrated
-checks and user native Windows launch are still pending; do not run the older checkpoint as final.
+Implementation `e763686`, lifecycle fixes `bc6ead4`, and final handoff `2fc3c2e` were merged by `541237a`.
+Main `pnpm check` passed: 543 tests, 6 opt-in skips, all TypeScript/Biome and both app builds. Both official
+Linux installs passed (NeoForge 21.1.264 / Fabric 0.16.14). This is not authenticated game/server evidence.
+Standalone Electron/auth-worker bundle creation passed, but native Linux Electron install-only exited
+without a harness result; GUI evidence remains unverified. Windows Ctrl+C now uses cooperative control
+and Java reaping; nonzero exits/cancel fail with safe diagnostics. Native Windows launch is next.
+
+#3 is awaiting the user's test result, not running an account login. Use a fresh Windows-native clone
+outside the coordinator checkout to avoid replacing Linux node_modules. Exact commands are in
+`docs/handoffs/GAME-02-03.md`; the original ignored source-file path must remain accessible from Windows.
+Use separate external data/game roots, expected UUID `44444444-4444-4444-8444-444444444444`, NeoForge
+21.1.264 and localhost:25565. Ask the user to confirm visible automatic world entry, then quit normally
+and share only safe result JSON. Spawn/exit 0 alone does not count as a join. If a failure is reported,
+resume #3 in a new fix branch with its explicit diagnostic and preserve server/user data.
+Fabric's actual launch/join still needs a matching Fabric deployment/server after NeoForge validation.
 
 ## Git and files
 

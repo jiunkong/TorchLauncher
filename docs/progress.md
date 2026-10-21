@@ -12,9 +12,12 @@
   서버·직접 계정 테스트가 필요하면 #0이 준비된 명령과 함께 사용자에게 요청한다.
   사용자는 `.testserver/`에 1.21.1 / NeoForge 21.1.264 서버를 별도 실행했다. 포트 25565,
   online-mode=true, whitelist=false, 추가 모드 없음, 기동 완료 로그 확인. 파일과 프로세스는 변경하지 않는다.
-  #3 체크포인트 `e763686`: 실제 Linux NeoForge 21.1.264·Fabric 0.16.14 설치 성공,
-  scoped 테스트 72개·live 3개 기본 skip·전체 TypeScript 성공. 종료 처리 보완과 Electron 검증 중이며
-  main 미통합·실계정 게임 실행/접속 미검증 상태다. 자세한 재개 상태는 도구 간 인계를 따른다.
+  #3 구현 `e763686`·종료 처리 `bc6ead4`·인계 `2fc3c2e`를 `541237a`로 통합했다.
+  실제 Linux NeoForge 21.1.264·Fabric 0.16.14 설치 성공. 메인 `pnpm check` 성공:
+  543개 테스트·opt-in 6개 기본 skip·전체 TypeScript·Biome·두 앱 빌드.
+  독립 Electron/auth-worker 번들 생성은 성공했으나 개발 환경의 native Electron install-only는
+  harness 결과 없이 종료되어 GUI 검증은 미완료다. Windows 실제 게임 실행·월드 접속을 사용자에게 요청한다.
+  테스트 명령은 [GAME-02/03 인계](handoffs/GAME-02-03.md), 현재 재개 상태는 도구 간 인계를 따른다.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
@@ -123,8 +126,8 @@
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
-| GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 진행 |
-| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 진행 — NeoForge 이후 같은 담당이 검증 |
+| GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 검토 — 구현 통합·Linux 설치 성공, Windows 실접속 대기 |
+| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 검토 — 구현 통합·Linux 설치 성공, 실제 게임/대응 서버 접속 대기 |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 대기 |
 | USER-02 | 최초 기본값·필수 설정 구분, 혼합 설정 적용, 리소스팩 활성화·순서 | FMT-01, SYNC-01 | 대기 |
 | USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 대기 |
