@@ -7,18 +7,20 @@
 
 ## 현재 상태와 다음 작업
 
-- 사용자 승인으로 FMT-03 배포 reader를 #2에 배정하고, 통합 후 SYNC-01을 같은 세션에서 이어간다.
-  reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환한다.
-  실제 업로드가 필요한 검증은 #0이 테스트 산출물을 준비한 뒤 사용자에게 요청한다.
+- 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
+  reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
   core TypeScript·scoped Biome 성공. SYNC-01은 [범용 동기화 기준](synchronization.md)에 따라 이어서 구현한다.
   생성한 비민감 v1 torchpack을 사용자가 Drive에 업로드했다. 실제 공개 링크에서 헤더·인덱스 읽기와
   생성본의 정확한 일치를 확인했다(140,736 bytes, 파일 5개, payload 미수신).
   로컬 검증 영수증은 `.cache/sync-validation/reader-v1-receipt.json`이며 공유 URL은 커밋하지 않는다.
-- SYNC-01 구현은 #2 worktree에 미커밋 상태다. worker의 scoped Biome·core TypeScript·로컬 테스트
-  30개가 성공했고, 실제 Drive v1 최초 구성은 5개 수신, 무변경 재실행은 payload 수신 0을 확인했다.
-  v2 교체 확인 대기는 시간 만료됐고 worker는 도구 사용량 제한으로 중단됐다. 제품 실패와 구분한다.
-  재개 절차·dirty 경로·로컬 산출물은 [도구 간 인계](tool-handoff.md)에 기록한다. v2 실검증·커밋·통합은 남아 있다.
+- SYNC-01 구현 `88c8af3`을 `c79b95b`로, 실검증 기록 `adff59c`를 `0f3ce6c`로 통합했다.
+  v1 실제 최초 구성 5개 수신, 같은 reader 재실행은 payload 수신 0을 확인했다.
+  같은 Drive 파일의 v2 교체 후 이전 reader는 `source-changed`, reset 후 v2 인덱스 일치,
+  변경·추가 파일 2개만 HTTP 206 수신(본문 4,140 bytes), 2개 재사용·1개 개인 설정 보존·1개 삭제를 검증했다.
+  메인 `pnpm check` 성공: 518개 테스트·opt-in 4개 기본 skip·전체 TypeScript·Biome·두 앱 빌드.
+  앱 UI 연결과 GAME-05 stale-lock 복구·실제 전원 차단 내구성 검증은 이번 완료 범위가 아니다.
+  도구 제한 중단 후 재개했고 [도구 간 인계](tool-handoff.md)를 최신 상태로 갱신했다.
 - 최신 사용자 결정: 자체 앱 ID 승인·최종 연결은 마지막 단계로 미루고, 개발 중에는 임시 공개
   Java Title ID 인증을 사용한다. AUTH-03 구현을 `a7eba73`으로 통합했다. smoke 기본은
   `public-java`이며 기존 own-app 경로는 명시적 옵션으로 유지한다. Windows 실계정 cycle은 사용자 보고로 성공했다.
@@ -28,7 +30,7 @@
   메인의 `worker-check`도 pinned 3.1.1 임시 번들 로딩·종료에 성공했다(네트워크·로그인 없음).
   구현 커밋은 `ccac0c7`, 상세 인계와 Windows 명령은 [AUTH-03](handoffs/AUTH-03.md)를 따른다.
 
-- 프로젝트 기반 구축과 Linux 검증은 완료했다. 배포 규격·Range 전송·임시 인증·Minecraft 설치 코어를 통합했다. 앱 기능 연결·실제 게임 실행·동기화·Studio 제품 기능은 남아 있다.
+- 프로젝트 기반 구축과 Linux 검증은 완료했다. 배포 규격·Range 전송·임시 인증·Minecraft 설치·파일 동기화 코어를 통합했다. 앱 기능 연결·실제 게임 실행·Studio 제품 기능은 남아 있다.
 - Git 기준 커밋 `4d5b4ab`과 `main`, 네 작업 브랜치·worktree를 준비했다.
 - 전체 총괄은 사용자 지정 `#0` 에이전트인 **`launcher develop #0`**이다. #0은 제품 기능을
   구현하지 않고 배정·문서·검토·Git 통합·통합 검증을 맡는다.
@@ -109,7 +111,7 @@
 | AUTH-04 | 최종 자체 앱 ID API 승인·제품 연결·실계정 회귀 검증, 임시 기본 경로 교체 | AUTH-03 | 대기 |
 | FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 완료 |
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 완료 |
-| SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 진행 |
+| SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 완료 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
