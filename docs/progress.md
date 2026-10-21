@@ -146,9 +146,9 @@
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 Fabric 0.19.5 실접속 성공(사용자 확인) |
-| USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 준비 |
-| USER-02 | 최초 기본값·필수 설정 구분, 혼합 설정 적용, 리소스팩 활성화·순서 | FMT-01, SYNC-01 | 준비 |
-| USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 준비 |
+| USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 코어 완료 — UI 연결(UI-02) 대기 |
+| USER-02 | 최초 기본값·필수 설정 구분, 혼합 설정 적용, 리소스팩 활성화·순서 | FMT-01, SYNC-01 | 코어 완료 — UI 연결(UI-02) 대기 |
+| USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 코어 완료 — UI 연결(UI-02) 대기 |
 | MOD-01 | NeoForge 연결 해제 시 종료 보조 모드 — 사용자 결정으로 제외 | — | 취소 |
 | MOD-02 | Fabric 연결 해제 시 종료 보조 모드 — 사용자 결정으로 제외 | — | 취소 |
 | UI-01 | 서버 온라인·응답 실패·접속 인원·지연시간 조회와 표시 | BASE-02 | 준비 |
@@ -324,3 +324,15 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
   제품 수준의 자동 접속 확인은 UI-01(서버 상태)·UI-02에서 다시 설계한다.
 - 병합 완료된 작업 브랜치를 모두 삭제했고(`main`만 남음) `.agents/worktrees/agent-1~4`는 `main` 기준 detached 상태다.
   새 작업은 `main`에서 새 브랜치를 만들어 시작한다.
+
+## 2026-10-21 USER-01/02/03 코어 통합
+
+- 코어만 구현·통합했다(UI/IPC 미연결). USER-01 `4703dc1`(사용자 모드 registry·읽기 전용 sync 소유권), USER-02 `f0f34e6`
+  (settings-policy·options.txt 항목별 적용·리소스팩), USER-03 `96533f8`(서버 데이터 경로·용량·확인 토큰 기반 삭제)를 `main`에 병합했다.
+  `packages/core/src/instance/index.ts`에 네임스페이스 export(`data`·`mods`·`settings`·`sync`)를 추가했다. 패키지 공개 export는 UI-02에서 정한다.
+- 메인 `pnpm check` 성공: 644개 테스트·opt-in 7개 skip·전체 TypeScript·Biome·두 앱 빌드. Linux/WSL만 검증했다.
+- 미검증: Windows junction/reparse·macOS, 실제 프로세스 강제 종료 복구(모의 의도 기록으로만 검증), 실제 게임이 다시 쓰는 `options.txt`와의 호환,
+  USER-01 `readSyncOwnership`와 USER-02 `applySettingsPolicy`의 실제 결합 호출(별도 선언된 동일 형태 타입을 사용).
+- UI-02 연결 순서(제안): `ensureServerDataRoot` → 설치/`synchronizeDeployment` → `readSyncOwnership` → `applySettingsPolicy(root,{ownership})` →
+  `assertSynchronizedForLaunch` → 게임 실행. 삭제는 같은 main 프로세스에서 `previewServerDataDeletion` 후 `deleteServerData`(확인 토큰은 프로세스 메모리에만 존재).
+  main 프로세스가 같은 서버의 설치·실행·삭제를 직렬화해야 한다. 상세는 `docs/handoffs/USER-0{1,2,3}.md`.

@@ -8,3 +8,5 @@ export type {
   SyncResult,
 } from './types.js';
 export { SynchronizationError } from './types.js';
+export type { SyncOwnedFile, SyncOwnership } from './ownership.js';
+export { readSyncOwnership } from './ownership.js';
