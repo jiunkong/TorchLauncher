@@ -237,6 +237,44 @@ BASE-03·04 및 QA-01·RELEASE 작업은 가능한 환경을 확인한 뒤 별�
 
 ## 공유 파일 변경과 검토 규칙
 
+### AUTH-03 — 임시 공개 Java Title ID 인증
+
+사용자가 자체 앱 ID의 API 승인·연결을 최종 단계로 미루고 임시 공개 ID 사용을 승인했다.
+이는 기존의 자체 앱 ID만 사용한다는 정책에 대한 명시적 변경이다. AGENTS.md의 기존 문구보다
+이후 사용자 지시를 우선하며, 최종 배포 전 자체 앱 ID 전환·승인을 별도 추적한다.
+
+#4 단독 담당, 최신 main의 `feat/auth-03-public-java`를 사용한다. 프로토콜·수명주기·암호화
+캐시 설계는 Sol로 진행하고, 계약이 확정된 단순 수정은 작업별로 Luna 전환을 재평가한다.
+다른 세션은 병렬 착수하지 않는다. 먼저 최소 설계·라이브러리 경계·취소 방식을 #0에 알린다.
+
+독점 범위:
+
+- `apps/launcher/src/main/auth/**`, `scripts/auth-smoke.mjs`
+- `apps/launcher/package.json`, `pnpm-lock.yaml`의 필요한 의존성 변경
+- 필요한 worker 진입점 출력을 위한 `apps/launcher/electron.vite.config.ts`
+- 필요한 경우 공유 `MinecraftAuthResult` 설명·export만 `packages/core/src/auth/contracts.ts`, `index.ts`
+- `docs/handoffs/AUTH-03.md`, `third-party/prismarine-auth/**`
+
+완료 기준과 제한:
+
+- 공개 Java Title ID `00000000402b5328`에 맞는 Device Code·장치/Title/SISU 흐름을 지원한다.
+  자체 앱용 PKCE 코드의 ID 검증만 느슨하게 바꾸거나 다른 승인 앱으로 자동 우회하지 않는다.
+- 유지보수되는 MIT `prismarine-auth` 등 실제 공개 구현을 검토해 재사용한다. 버전을 고정하고
+  정확한 의존성과 라이선스를 기록한다. LGPL Java 코드를 무고지로 이식하지 않는다.
+- 개발 중 기본 경로는 임시 public-java, 기존 own-app 경로는 명시적으로 선택 가능하게 보존한다.
+  own-app의 실패 후 public-java로 숨은 fallback을 하지 않는다. renderer·제품 UI 연결은 이번 범위가 아니다.
+- 기존 실행용 인증 결과 계약에 맞춰 유효한 Minecraft 토큰·만료·Java 소유권·프로필을 확인한다.
+  정품 계정 흐름을 유지하고 오프라인 계정은 추가하지 않는다. 라이브러리 응답만 믿고 소유권 검사를 생략하지 않는다.
+- 기본 파일 캐시를 사용하지 않는다. 제공되는 cache factory로 장치 키·refresh/access 토큰 등
+  모든 캐시를 OS 암호화 저장에 연결하고 자체 앱 저장소와 분리한다. 로그아웃 후 늦은 쓰기·세션 복구를 막는다.
+- 라이브러리에 중단 가능한 transport가 없으면 별도 프로세스 등으로 취소·시간 제한과 정리를 보장한다.
+  토큰·원본 오류·임시 인증 URL은 로그/진단 JSON으로 노출하지 않는다. debug 출력도 통제한다.
+- Device Code는 로컬 사용자 안내에만 사용하고 채팅/인계/fixture에 남기지 않는다. 시스템 브라우저에서 로그인한다.
+- smoke 도구로 첫 로그인·재시작 후 갱신·로그아웃·빈 캐시 확인을 재현한다. 취소·저장 실패·늦은 쓰기·
+  redaction·소유권/프로필 부재·기존 own-app 경로 보존을 테스트한다.
+- 사용자 실계정 검증이 필요하면 #0에 준비 상태와 정확한 Windows 명령을 전달한다. 라이브 성공은 모의 테스트로 대체하지 않는다.
+- 공유 파일은 이 작업에서 #4만 수정한다. 다른 범위가 필요하면 #0에 요청하고 자동으로 넓히지 않는다.
+
 ### AUTH-02 Minecraft 403 진단 보완
 
 사용자 승인으로 #4가 최신 main의 `fix/auth-02-minecraft-rejection` 브랜치에서 진행한다.

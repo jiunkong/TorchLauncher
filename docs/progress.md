@@ -7,6 +7,9 @@
 
 ## 현재 상태와 다음 작업
 
+- 최신 사용자 결정: 자체 앱 ID 승인·최종 연결은 마지막 단계로 미루고, 개발 중에는 임시 공개
+  Java Title ID 인증을 사용한다. AUTH-03을 #4 단독으로 배정했다. 기존 own-app 경로는 유지한다.
+
 - 프로젝트 기반 구축과 Linux 검증은 완료했다. 배포 규격 계약·Range 전송·인증·Minecraft 설치 코어를 통합했다. 앱 연결·실계정 로그인·실제 게임 실행·동기화·Studio 제품 기능은 남아 있다.
 - Git 기준 커밋 `4d5b4ab`과 `main`, 네 작업 브랜치·worktree를 준비했다.
 - 전체 총괄은 사용자 지정 `#0` 에이전트인 **`launcher develop #0`**이다. #0은 제품 기능을
@@ -84,6 +87,8 @@
 | DL-02 | 일반 HTTPS Range 전송, 206·범위·길이 검사, 취소·재시도·원격 교체 감지 | BASE-02 | 완료 |
 | AUTH-01 | Microsoft 로그인·소유권 확인·갱신·로그아웃 코어와 저장·브라우저 계약, 모의 검증 | BASE-02 | 완료 |
 | AUTH-02 | 자체 앱 등록·API 접근 확인, 브라우저・OS 안전 저장 어댑터, 실제 로그인·재시작·갱신·로그아웃 검증 | AUTH-01 | 검토 |
+| AUTH-03 | 임시 공개 Java Title ID 인증, 암호화 캐시·취소·재시작·실계정 cycle 검증 | AUTH-01, AUTH-02 구현 | 진행 |
+| AUTH-04 | 최종 자체 앱 ID API 승인·제품 연결·실계정 회귀 검증, 임시 기본 경로 교체 | AUTH-03 | 대기 |
 | FMT-02 | 인덱스와 독립 압축 데이터를 포함하는 단일 배포 파일 생성 | FMT-01 | 완료 |
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 준비 |
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 대기 |
@@ -123,6 +128,7 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 | GAME-04 | #3 — `launcher develop #3` | `feat/game-04-runtime` | `.agents/worktrees/agent-3` | `packages/core/src/minecraft/`, `packages/core/src/download/full/`, 해당 인계 문서 |
 | AUTH-02 | #4 — `launcher develop #4` | `feat/auth-02-host-adapters` | `.agents/worktrees/agent-4` | `apps/launcher/src/main/auth/`, `scripts/auth-smoke.mjs`, `packages/core/package.json`의 auth export만, 해당 인계 문서 |
 | DL-01 live | #2 — `launcher develop #2` | `test/dl-01-live-drive` | `.agents/worktrees/agent-2` | 기존 DL-01 소스·테스트·fixture 범위, `docs/handoffs/DL-01-live.md` |
+| AUTH-03 | #4 — `launcher develop #4` | `feat/auth-03-public-java` | `.agents/worktrees/agent-4` | auth host·smoke·런처 manifest·lockfile·필요한 main 빌드 설정·공유 결과 설명/export·인계/라이선스 (상세는 배정 문서) |
 
 ### 실행 세션
 
@@ -137,7 +143,7 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 | #1 | FMT-02 | `gpt-6-luna` 지정 | `01a15a0a-76e2-7230-a0b2-a7a07cd83ea1` |
 | #2 | DL-01 | `gpt-6-luna` | `01a15a0a-7f50-7ee3-891a-0d01524073bd` |
 | #3 | GAME-04 | `gpt-6.1-sol` 지정 | `01a15a0a-9146-7ee0-9d88-1edda8809abc` |
-| #4 | AUTH-02 | `gpt-6.1-sol` 지정 | `01a15a0a-9a6b-7e33-9c57-2541b698de36` |
+| #4 | AUTH-03 | `gpt-6.1-sol` (프로토콜·수명주기 설계/구현) | `01a15a0a-9a6b-7e33-9c57-2541b698de36` |
 
 작업 경계는 다음처럼 나누는 것을 기본으로 한다. 아직 생성하지 않은 경로는 배정 시 확정한다.
 
