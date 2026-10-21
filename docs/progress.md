@@ -143,7 +143,7 @@
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 완료 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
-| GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — UI 연결(UI-02) 대기, Windows 실검증 미실시 |
+| GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 11 실프로세스 검증 통과, UI 연결(UI-02) 대기 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
 | GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 Fabric 0.19.5 실접속 성공(사용자 확인) |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 코어 완료 — UI 연결(UI-02) 대기 |
@@ -368,3 +368,15 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 미검증: Windows 실제 프로세스 종료, 전원 차단 내구성(fsync), 실제 NeoForge 설치기 강제 종료. macOS는 지원하지 않으며 항상 `unknown`→`uncertain`.
 - UI-02 연결 지점: `ServerDataLockedError`/`EINSTALLRECOVERY` 수신 시 inspect→recover, `lock-uncertain`+`confirmable`이면 "아무것도 실행 중이 아님" 확인 후 `acceptUncertain: true`.
   `minecraft/recovery`는 아직 상위 export에 연결하지 않았다.
+
+## 2026-10-22 GAME-05·USER Windows 검증
+
+- 사용자가 Windows 11(Node 24)에서 `vitest run packages/core/src/minecraft packages/core/src/instance`를 실행했다. 최종 결과: **Test Files 16 passed | 2 skipped,
+  Tests 234 passed | 14 skipped, 실패 0**. 14개 skip은 symlink 생성 권한이 없는 환경에서 건너뛴 테스트(개발자 모드/관리자에서 실행 가능)와 기타 의도된 skip이다.
+- 처음 실행에서 6건 실패: symlink 권한(EPERM) 5건, 호스트 종료 시 자식 프로세스 생존 가정 1건, profiles 타임아웃 1건. 진단으로 확인한 사실:
+  Windows(Node)에서는 호스트를 강제 종료하면 자식 프로세스도 함께 종료되고(`child absent`), 프로세스 시작 시각 조회는 같은 프로세스에 대해 안정적이다.
+  제품 판정 로직은 올바르며 테스트 가정과 환경 문제였다. 수정은 테스트(Windows 기대값 분리, symlink capability skip, 반복 테스트 타임아웃 30초)와
+  `lock.ts`의 Windows `renameWithRetry`뿐이다.
+- 아직 검증되지 않은 것: Windows에서 자식이 호스트보다 오래 사는(`held-live`) 실프로세스 경로(Linux 실프로세스와 주입 테스트로만 확인),
+  Electron 메인 프로세스에서 띄운 Java가 호스트 강제 종료 시 함께 종료되는지, 전원 차단 내구성, 심볼릭 링크 거부 로직의 Windows 실행(개발자 모드 필요).
+- `applySettingsPolicy` 한 번 호출은 Windows에서 약 1초 안팎이다. UI-02에서 진행 표시를 고려한다.
