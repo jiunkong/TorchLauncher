@@ -24,7 +24,7 @@ Final commit hash is in the session reply. No product code defect was found; no 
 Real Fabric game launch, authenticated join to `.testfabricserver` (Windows, user), Windows install of 0.19.5, and that the server
 accepts the client (both use Fabric Loader 0.19.5, MC 1.21.1, online-mode, no mods). The server directory was only listed, not modified.
 
-## Windows commands (use a fresh empty game directory; its basename must be the server UUID)
+## Windows commands (reuse the existing server-UUID game directory (loader trees are per-version subfolders); its basename must be the server UUID)
 Optional install check:
 ```powershell
 node scripts/game-smoke.mjs install --data-dir D:\TorchLauncherSmoke\auth --game-dir D:\TorchLauncherSmoke\games\44444444-4444-4444-8444-444444444444 --server-id 44444444-4444-4444-8444-444444444444 --loader fabric --loader-version 0.19.5
