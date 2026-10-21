@@ -409,3 +409,38 @@ progress.md를 수정하거나 main에 머지하지 마라.
 인계 문서에 최종 커밋 자체를 기록하면 자기 참조가 되므로, 최종 커밋 해시는
 커밋을 만든 뒤 세션의 최종 응답에도 별도로 알려라.
 ```
+
+## USER-01 / USER-02 / USER-03 코어 착수 — 2026-10-21
+
+사용자 승인 범위는 이 세 작업의 **코어 기능**뿐이다. renderer·IPC·앱 연결(UI-02)과 다른 작업은 착수하지 않는다.
+각 모듈은 나중에 UI/IPC가 호출할 수 있게 Electron·UI에 의존하지 않는 비동기 API, 타입이 있는 결과·오류 코드,
+`AbortSignal`·진행 콜백을 제공한다. 세 작업은 서로 독립된 디렉터리를 독점하며 공유 파일(패키지 export, 기존 sync 구현,
+lockfile, manifest)은 수정하지 않는다. 각 모듈의 `index.ts`까지만 만들고 상위 export 연결은 #0이 통합 때 한다.
+모델: USER-01·02 Sonnet medium, USER-03(삭제·데이터 손실 경계) Opus medium. 문제가 어려우면 보고 후 #0이 상향한다.
+공통 규칙: 서버 데이터 변경은 모두 `acquireServerDataLock(root, 'maintenance')` 아래에서 하며 게임 실행·설치 중에는 실패한다.
+사용자 상태는 예약 경로 `.torchlauncher-user/` 아래(USER-01 `mods.json`, USER-02 `settings.json`)에 두고 원자적으로 쓴다.
+`.torchlauncher*` 접두 경로는 sync가 이미 보호한다. 외부 입력 경로는 전부 검증하고 symlink/hardlink/경로 탈출을 거부한다.
+
+| 작업 | 브랜치 / Worktree | 독점 수정 범위 |
+| --- | --- | --- |
+| USER-01 | `feat/user-01-mods` / `agent-1` | `packages/core/src/instance/mods/**`, `packages/core/src/instance/sync/ownership.ts`·`ownership.test.ts`(읽기 전용 소유권 조회 신설), `docs/handoffs/USER-01.md` |
+| USER-02 | `feat/user-02-settings` / `agent-2` | `packages/core/src/instance/settings/**`, `docs/settings-policy.md`, `docs/handoffs/USER-02.md` |
+| USER-03 | `feat/user-03-data` / `agent-3` | `packages/core/src/instance/data/**`, `docs/handoffs/USER-03.md` |
+
+- **USER-01 정책:** 사용자 모드는 `.jar`만, 대상은 `mods/<파일명>`. 운영자 관리 경로와 같거나 내용이 다른 기존 파일이 있으면 `path-conflict`로 거부.
+  jar 안의 모드 ID(Fabric `fabric.mod.json`, NeoForge `META-INF/neoforge.mods.toml`)를 크기·개수 상한이 있는 안전한 방식으로 읽고,
+  운영자 모드나 다른 사용자 모드와 ID가 같으면 `mod-id-conflict`로 거부(ID를 못 읽으면 경고와 함께 등록은 허용).
+  `mods/`의 미등록 파일은 자동 분류·삭제하지 않고 목록으로 표시하며, 사용자가 명시적으로 편입하거나 삭제할 수 있다.
+  등록·삭제는 복구 가능한 순서(임시 복사→rename→registry 원자적 갱신, 중단 후 재시작 시 정합성 복구)로 하고 sync가 사용자 모드를 건드리지 않음을
+  기존 sync API로 통합 테스트한다. `ownership.ts`는 sync 원장을 읽기 전용으로 읽어 `{ serverId, deploymentId, initialized, files:[{path,policy,sha256,length}] }`를 반환한다.
+- **USER-02 정책:** sync 소유권 조회는 위 형태의 인터페이스를 **주입**받아 가짜 구현으로 테스트한다(USER-01의 구현과 직접 결합하지 않음).
+  운영자는 일반 `always` 파일로 `torchlauncher/settings-policy.json`(v1 스키마는 `docs/settings-policy.md`에 정의)을 배포하고,
+  코어가 이를 읽어 Minecraft `options.txt`에 항목별 규칙을 적용한다: `required`(키 값을 매번 강제, 나머지 키·순서·줄바꿈 보존),
+  `initial`(최초 구성에서 한 번만 설정하고 이후 사용자 변경 보존, 적용 기록은 `settings.json`). 리소스팩은 `options.txt`의 `resourcePacks`
+  목록으로 관리한다: 필수 팩은 항상 활성화·상대 순서 유지, 사용자가 추가한 팩과 순서는 보존, 최초 기본 목록은 initial 규칙. `options.txt` 자체는
+  동기화 `always` 대상이 아니어야 함을 문서화하고, 위반 구성(정책 파일이 `options.txt`를 `always`로 배포)은 명시 오류로 거부한다.
+  파일 전체 덮어쓰기는 하지 않는다. 손상·과대·중복 키 정책 파일은 안전하게 거부.
+- **USER-03 정책:** 서버별 데이터 루트 해석(`<userDataBase>/servers/<serverUuid>`, 서버 UUID v4 검증), 루트 소유 표식 파일, 디스크 사용량 계산
+  (symlink를 따르지 않는 상한 있는 순회, 취소 가능), 삭제 전 미리보기(대상 경로·용량·파일 수·실행 중 여부)와 실제 삭제.
+  삭제는 maintenance 잠금을 얻어 실행 중이면 거부하고, 표식이 있는 정확한 서버 루트만 삭제하며 base/다른 서버/기존 `.minecraft`/인증 데이터 디렉터리/
+  symlink·junction 대상은 절대 건드리지 않는다. 잠금 디렉터리 자체와 삭제 도중 중단 후 재시도를 처리한다.
