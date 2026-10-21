@@ -45,3 +45,36 @@ pnpm exec vitest run packages/core/src/minecraft/identity.test.ts packages/core/
 - 경로 비교는 대소문자 구분(`journal.root !== paths.root`, `staged` 집합); 저널은 같은 `resolve()` 결과로 쓰이므로 정상 흐름에서는 일치하나, 드라이브 문자 대소문자가 바뀐 경로로 재진입하면 `journal-root-mismatch`가 될 수 있다. `\\?\` 접두 경로는 미검증.
 - PowerShell 프로브는 호출당 수백 ms 소요; kill 테스트의 `waitAbsent`(최대 5초 폴링)가 느린 PC에서 부족할 수 있다.
 - `process.kill(self,'SIGKILL')`의 Windows 종료 코드는 구현 의존이라 `code != 0`로만 판정한다.
+
+## Windows 실측 후 수정 (브랜치 `test/windows-test-fixes`)
+
+사용자 Windows 11 / Node 24 실행에서 6건 실패. 분류와 조치:
+
+- **kill.test `keeps the lock while the game child outlives a killed host`**: 진단 결과 Windows에서는 호스트를
+  `kill('SIGKILL')`(TerminateProcess)로 종료하면 자식(손자) 프로세스도 함께 종료된다(job object와 유사한 동작; 종료 전 probe
+  `start=...`, 종료 후 `absent`, `process.kill(pid,0)` false). 시작 시각 조회는 같은 프로세스에 3회 동일 값으로 안정적.
+  따라서 `stale-verified` 판정이 맞고 제품 결함이 아니다. 분리 실행(`detached`)로 생존시키는 시도는 Windows 실측 없이 확신할 수 없어
+  채택하지 않았다. 조치: 기존 테스트는 Linux 전용(`runIf linux`, 기대 불변), Windows 전용 테스트
+  `reclaims a game lock when the killed host takes its child down (Windows)` 추가(`stale-verified`, evidence
+  `owner-exited`,`child-exited`, 복구 후 free). 이 Windows 테스트는 Linux에서 실행되지 않아 **Windows 재실행 필요**.
+- **symlink 권한(EPERM)**: Windows는 개발자 모드/관리자 없이 symlink를 만들 수 없다. 각 테스트 파일이 시작 시 임시 디렉터리에서
+  실제 symlink 생성을 시도(`canSymlink`)하고, 불가능하면 해당 테스트만 `it.skipIf(!canSymlink)`로 건너뛴다. 대상:
+  `recovery.test.ts`(symlinked lock entry, symlinked target ancestor), `settings.test.ts`(linked options.txt),
+  `mods.test.ts`(symlinked source, symlinked mods directory). 한 테스트에 섞여 있던 비-symlink 검증은 별도 테스트로 분리해 계속 실행된다.
+  mods.test의 `.catch(() => undefined)` 무시 패턴은 제거했다. Linux에서는 모두 실행된다.
+- **profiles.test `format profile selection`(전체 실행에서만 1회 실패, 단독 통과, 원인 미확정, 수정 안 함)**: 의심 지점일 뿐이다.
+  해당 describe의 일부 테스트가 `for` 루프로 `setup`(mkdtemp+파일 쓰기)과 `applySettingsPolicy`(잠금, fsync, rename)를 최대 6회 반복해
+  Windows에서 전체 병렬 실행(백신/디스크 부하) 시 기본 5초 vitest 타임아웃에 근접할 수 있다. 테스트 파일 단위 임시 경로는
+  `mkdtemp`라 충돌 가능성은 낮다. 실패 메시지(타임아웃인지 assertion인지)를 확인하면 판별된다.
+
+## 사용자가 다시 실행할 명령 (PowerShell)
+
+```powershell
+git fetch origin
+git checkout test/windows-test-fixes   # 또는 #0이 main에 통합한 뒤에는 git checkout main; git pull
+pnpm install --frozen-lockfile
+pnpm exec vitest run packages/core/src/minecraft packages/core/src/instance
+pnpm exec vitest run packages/core/src/minecraft/recovery/kill.test.ts --reporter=verbose
+```
+
+기대: symlink 권한이 없으면 해당 테스트는 `skipped`(실패 아님), kill 테스트는 모두 통과. profiles.test가 다시 실패하면 오류 메시지 첫 5줄을 보고.

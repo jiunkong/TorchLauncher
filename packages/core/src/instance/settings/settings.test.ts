@@ -25,6 +25,20 @@ import {
 } from './index.js';
 import { mergeRequiredPacks } from './options.js';
 
+/** Creating symlinks needs Developer Mode or elevation on Windows; such tests are skipped without it. */
+const canSymlink = await (async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'torch-symlink-probe-'));
+  try {
+    await writeFile(join(dir, 'target'), '');
+    await symlink(join(dir, 'target'), join(dir, 'link'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+})();
+
 const roots: string[] = [];
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((r) => rm(r, { recursive: true, force: true })));
@@ -230,13 +244,17 @@ describe('invalid input', () => {
     }
   });
 
-  it('rejects corrupt state and linked options.txt', async () => {
+  it('rejects corrupt state', async () => {
     const dir = await root();
     await policy(dir, { ...base, required: { a: '1' } });
     await mkdir(join(dir, '.torchlauncher-user'));
     await writeFile(join(dir, '.torchlauncher-user/settings.json'), '{"version":1,"x":1}');
     expect(await code(applySettingsPolicy(dir))).toBe('invalid-state');
-    await rm(join(dir, '.torchlauncher-user'), { recursive: true });
+  });
+
+  it.skipIf(!canSymlink)('rejects a linked options.txt (needs symlink permission)', async () => {
+    const dir = await root();
+    await policy(dir, { ...base, required: { a: '1' } });
     await writeFile(join(dir, 'real.txt'), 'a:0\n');
     await symlink(join(dir, 'real.txt'), join(dir, 'options.txt'));
     expect(await code(applySettingsPolicy(dir))).toBe('unsafe-path');

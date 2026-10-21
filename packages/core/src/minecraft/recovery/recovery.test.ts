@@ -32,6 +32,20 @@ import { startJavaDiagnostic } from '../process';
 import { inspectServerEnvironment, recoverServerEnvironment } from './index';
 import { inspectInstallTransaction, recoverInstallTransaction } from './install';
 
+/** Creating symlinks needs Developer Mode or elevation on Windows; such tests are skipped without it. */
+const canSymlink = await (async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'torch-symlink-probe-'));
+  try {
+    await writeFile(join(dir, 'target'), '');
+    await symlink(join(dir, 'target'), join(dir, 'link'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+})();
+
 const MACHINE = 'a'.repeat(64);
 const roots: string[] = [];
 afterEach(async () => {
@@ -271,18 +285,24 @@ describe('lock classification', () => {
     expect((await inspectServerEnvironment(root, { probe: fakeProbe() })).serverLock).toMatchObject(
       { state: 'uncertain', evidence: ['owner-missing'], confirmable: true },
     );
-    const other = await tempRoot();
-    const target = await tempRoot();
-    await symlink(target, join(other, SERVER_LOCK_DIRECTORY));
-    expect(
-      (await inspectServerEnvironment(other, { probe: fakeProbe() })).serverLock,
-    ).toMatchObject({ state: 'uncertain', evidence: ['lock-unsafe'], confirmable: false });
-    const report = await recoverServerEnvironment(other, {
-      probe: fakeProbe(),
-      acceptUncertain: true,
-    });
-    expect(report).toMatchObject({ status: 'blocked', issues: [{ code: 'lock-unsafe' }] });
   });
+
+  it.skipIf(!canSymlink)(
+    'reports a symlinked lock entry as unsafe (needs symlink permission)',
+    async () => {
+      const other = await tempRoot();
+      const target = await tempRoot();
+      await symlink(target, join(other, SERVER_LOCK_DIRECTORY));
+      expect(
+        (await inspectServerEnvironment(other, { probe: fakeProbe() })).serverLock,
+      ).toMatchObject({ state: 'uncertain', evidence: ['lock-unsafe'], confirmable: false });
+      const report = await recoverServerEnvironment(other, {
+        probe: fakeProbe(),
+        acceptUncertain: true,
+      });
+      expect(report).toMatchObject({ status: 'blocked', issues: [{ code: 'lock-unsafe' }] });
+    },
+  );
 });
 
 describe('recoverServerEnvironment lock handling', () => {
@@ -516,18 +536,21 @@ describe('install transaction recovery', () => {
     });
   });
 
-  it('rejects a symlinked target ancestor', async () => {
-    const root = await tempRoot();
-    const outside = await tempRoot();
-    const { lock, operations } = await installScenario(root);
-    await rm(join(root, 'libraries'), { recursive: true });
-    await symlink(outside, join(root, 'libraries'));
-    await writeInstallJournal(lock, root, operations);
-    expect(await inspectInstallTransaction(root)).toEqual({
-      state: 'invalid',
-      reason: 'unsafe-path',
-    });
-  });
+  it.skipIf(!canSymlink)(
+    'rejects a symlinked target ancestor (needs symlink permission)',
+    async () => {
+      const root = await tempRoot();
+      const outside = await tempRoot();
+      const { lock, operations } = await installScenario(root);
+      await rm(join(root, 'libraries'), { recursive: true });
+      await symlink(outside, join(root, 'libraries'));
+      await writeInstallJournal(lock, root, operations);
+      expect(await inspectInstallTransaction(root)).toEqual({
+        state: 'invalid',
+        reason: 'unsafe-path',
+      });
+    },
+  );
 });
 
 describe('environment inspection', () => {
