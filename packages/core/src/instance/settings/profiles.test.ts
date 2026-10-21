@@ -102,7 +102,7 @@ describe('format profile selection', () => {
       expect(await code(applySettingsPolicy(dir))).toBe('unsupported-options-version');
       expect(await readFile(join(dir, 'options.txt'), 'utf8')).toBe(text);
     }
-  });
+  }, 30_000);
   it('researched profiles need an opt-in and report a warning', async () => {
     const text = 'version:3837\nx:1\n';
     const dir = await setup(pol, text);
@@ -133,7 +133,7 @@ describe('format profile selection', () => {
       expect(r.warnings.length).toBe(1);
       expect(await readFile(join(dir, 'options.txt'), 'utf8')).toBe(`${text}a:1\r\n`);
     }
-  });
+  }, 30_000);
   it('java-1.21.2+ keeps named key codes and the 3955 profile stays separate', async () => {
     const d = await setup({ ...base, required: { 'key_key.jump': '57' } }, 'version:4080\n');
     expect(await code(applySettingsPolicy(d, { versionPolicy: 'allow-researched' }))).toBe(

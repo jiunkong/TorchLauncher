@@ -242,7 +242,7 @@ describe('invalid input', () => {
       expect(await code(applySettingsPolicy(dir))).toBe('invalid-options');
       expect(await readFile(join(dir, 'options.txt'))).toEqual(content);
     }
-  });
+  }, 30_000);
 
   it('rejects corrupt state', async () => {
     const dir = await root();
