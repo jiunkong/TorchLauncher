@@ -1,0 +1,146 @@
+[
+  {
+    "name": "@azure/msal-common",
+    "version": "14.16.1",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "@azure/msal-node",
+    "version": "2.16.3",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "@xboxreplay/xboxlive-auth",
+    "version": "5.1.0",
+    "license": "Apache-2.0",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "buffer-equal-constant-time",
+    "version": "1.0.1",
+    "license": "BSD-3-Clause",
+    "noticeFiles": ["LICENSE.txt"]
+  },
+  {
+    "name": "debug",
+    "version": "4.4.3",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "ecdsa-sig-formatter",
+    "version": "1.0.11",
+    "license": "Apache-2.0",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "jsonwebtoken",
+    "version": "9.0.3",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "jwa",
+    "version": "2.0.1",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "jws",
+    "version": "4.0.1",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.includes",
+    "version": "4.3.0",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.isboolean",
+    "version": "3.0.3",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.isinteger",
+    "version": "4.0.4",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.isnumber",
+    "version": "3.0.3",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.isplainobject",
+    "version": "4.0.6",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.isstring",
+    "version": "4.0.1",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "lodash.once",
+    "version": "4.1.1",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "macaddress",
+    "version": "0.5.4",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "ms",
+    "version": "2.1.3",
+    "license": "MIT",
+    "noticeFiles": ["license.md"]
+  },
+  {
+    "name": "prismarine-auth",
+    "version": "3.1.1",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "safe-buffer",
+    "version": "5.1.2",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "semver",
+    "version": "7.8.5",
+    "license": "ISC",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "smart-buffer",
+    "version": "4.2.0",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  },
+  {
+    "name": "uuid",
+    "version": "8.3.2",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE.md"]
+  },
+  {
+    "name": "uuid-1345",
+    "version": "1.0.2",
+    "license": "MIT",
+    "noticeFiles": ["LICENSE"]
+  }
+]

@@ -5,6 +5,7 @@ export interface MinecraftAuthResult {
   expiresAt: number;
   profile: { id: string; name: string };
   userType: 'msa';
+  /** Selected OAuth app ID or explicitly configured temporary public Java Title ID. */
   clientId: string;
   xuid?: string;
 }

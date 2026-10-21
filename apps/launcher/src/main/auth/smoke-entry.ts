@@ -4,6 +4,8 @@ import { AuthenticationError, type StoredMicrosoftSession } from '@torchlauncher
 import { app, safeStorage } from 'electron';
 import { createElectronAuthenticator } from './electron';
 import { HostAuthenticationError } from './errors';
+import { EncryptedPublicJavaCache } from './public-java-cache';
+import { createPublicJavaAuthenticator } from './public-java-electron';
 import { EncryptedMicrosoftTokenStorage } from './storage';
 
 interface SmokeConfig {
@@ -11,6 +13,7 @@ interface SmokeConfig {
   dataDirectory: string;
   clientId?: string;
   redirectUri?: string;
+  provider?: 'public-java' | 'own-app';
 }
 
 const syntheticKey = 'torchlauncher.microsoft.00000000-0000-4000-8000-000000000002';
@@ -100,7 +103,35 @@ async function run() {
     } else throw new HostAuthenticationError('invalid_configuration');
     return { ...result, ok: true, liveAuthentication: false };
   }
-  if (!config.clientId || !config.redirectUri)
+  if (config.provider === 'public-java') {
+    const cacheDirectory = join(config.dataDirectory, 'public-java');
+    if (config.mode === 'assert-empty') {
+      const store = new EncryptedPublicJavaCache({ directory: cacheDirectory, safeStorage });
+      if ((await store.read()) !== null) throw new HostAuthenticationError('storage_failed');
+      return { ...result, provider: config.provider, ok: true };
+    }
+    const auth = await createPublicJavaAuthenticator({ cacheDirectory });
+    if (config.mode === 'logout') {
+      await auth.logout();
+      return { ...result, provider: config.provider, ok: true };
+    }
+    const account =
+      config.mode === 'login'
+        ? await auth.login(controller.signal)
+        : config.mode === 'refresh'
+          ? await auth.refresh(controller.signal)
+          : undefined;
+    if (!account || account.expiresAt <= Date.now())
+      throw new HostAuthenticationError('invalid_configuration');
+    return {
+      ...result,
+      provider: config.provider,
+      ok: true,
+      gameEntitlementVerified: true,
+      profileVerified: true,
+    };
+  }
+  if (config.provider !== 'own-app' || !config.clientId || !config.redirectUri)
     throw new HostAuthenticationError('invalid_configuration');
   // Logout can remove ciphertext even if an OS keyring has become unavailable.
   if (config.mode === 'logout') {
