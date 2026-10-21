@@ -3,6 +3,10 @@
 이 문서는 이번 코어 구현의 동작 기준이다. UI·사용자 모드 등록·혼합 설정 편집은 별도 작업이다.
 입력은 신뢰된 서버 ID, 서버별 게임 루트, 검증된 deployment reader다.
 
+사용자 요구에 따라 모드·리소스팩·설정 확장자나 고정 디렉터리 allowlist로 대상을 제한하지 않는다.
+운영자는 서버 게임 폴더 안의 임의 상대 경로·파일 형식을 선택하고 파일별 적용 정책을 지정한다.
+단축키·음량 등 자주 쓰는 설정의 전용 편집은 Studio/USER-02 편의 기능이며 범용 파일 동기화와 분리한다.
+
 ## 소유권과 비교
 
 - 내부 상태와 transaction은 예약 경로 `.torchlauncher-sync/` 아래에 둔다.
@@ -25,8 +29,9 @@
 - 서버 ID와 모든 인덱스/상태/journal 경로를 검증한다. 루트와 부모/대상 symlink, 일반 파일이 아닌 대상,
   하드링크 파일을 거부한다. 파일명 충돌 규칙은 deployment 계약과 동일하게 적용한다.
 - Java·Minecraft 설치 및 런처 데이터는 배포 대상이 아니다. 최소한 최상위 `runtime`, `versions`,
-  `libraries`, `assets`, `natives`, `logs`, `crash-reports`, `saves`, `screenshots`, `quickPlay`,
-  `accounts`, `public-java`와 `.torchlauncher`로 시작하는 경로를 보수적인 충돌 키로 보호한다.
+  `libraries`, `assets`, `natives`, `accounts`, `public-java`와 `.torchlauncher`로 시작하는 경로를
+  보수적인 충돌 키로 보호한다. 이는 설치 엔진/인증/런처 내부 소유권 경계이며 콘텐츠 경로 allowlist가 아니다.
+  `saves`·임의 모드 데이터·사용자 정의 디렉터리도 일반 파일과 같은 소유권·충돌 규칙으로 다룬다.
   인덱스뿐 아니라 과거 상태와 복구 journal에도 같은 보호 규칙을 적용한다.
 - 목적은 원격 입력·기존 위험 경로·협력 프로세스 경합 방어다. 로컬 공격자가 파일 시스템을 동시에
   교체하는 적대적 TOCTOU나 모든 OS의 reparse point 방어를 완전 보장한다고 주장하지 않는다.
