@@ -332,6 +332,8 @@ BASE-03·04 및 QA-01·RELEASE 작업은 가능한 환경을 확인한 뒤 별�
   `launch-guard.test.ts`, `index.ts`의 해당 export 추가. 기존 sync engine/state/safety는 읽기만 한다.
 - `apps/launcher/src/main/game-smoke/**`, `scripts/game-smoke.mjs`, `docs/handoffs/GAME-02-03.md`.
 - 공용 package manifest/export·lockfile·앱 빌드 설정·인증 구현은 변경 전에 #0에 요청한다.
+- 사용자 테스트 서버 보호를 위한 `.gitignore`의 `.testserver/`와 `biome.json`의 해당 제외 규칙은
+  #3 단독으로 추가하도록 범위를 확장했다. `.testserver/` 자체는 읽기만 하며 구성·프로세스를 변경하지 않는다.
 
 루트/인증 테스트와 별도로 실행 가능한 게임 smoke를 준비한다. 접속 직전 최신 배포 확인과
 always 파일 검증이 실패하면 spawn을 금지하며 캐시 우회 옵션은 제공하지 않는다.

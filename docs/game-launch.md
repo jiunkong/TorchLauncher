@@ -10,7 +10,8 @@ The worker owns both loaders and shared launch changes so file scopes do not ove
 ## Loader installation
 
 - Operator-selected exact loader versions are authoritative; do not silently choose latest or replace
-  the requested Minecraft/loader combination. The current safe test pack declares NeoForge 21.1.200.
+  the requested Minecraft/loader combination. The running user test server is 1.21.1 / NeoForge 21.1.264;
+  use a new matching game test pack rather than the old 21.1.200 synchronization fixture.
 - NeoForge: inspect the official Maven installer/profile and supported client CLI. Prefer running its
   official installation processors with managed Java in a dedicated staging root, not reimplementing
   the processor pipeline. Bound execution, capture sanitized logs, stop/reap on cancellation, and
@@ -74,6 +75,12 @@ before a long user wait and update the portable handoff if a tool limit interrup
 The user offered to supply a test server or run direct tests when needed. #0 coordinates requests.
 Do not assume an existing server, accept an EULA on the user's behalf, or claim a connection from
 installation-only checks. Prepare concrete server requirements and exact commands first.
+
+The user has now started the server independently in repository-local `.testserver/`. Its port is
+25565, online mode is enabled, whitelist is disabled, and no extra mods are installed. Startup completion
+is visible in the server log. This directory is read-only user data: never stop it, change its configuration,
+or publish its logs/world/account files. Exclude it from Git and Biome. A coordinator-tool localhost TCP
+probe did not connect; this does not establish server failure. Native client connectivity must be verified.
 
 ## Upstream references
 
