@@ -34,7 +34,7 @@ All take `{ root, serverId, signal?, onProgress? }` plus the fields below. Mutat
 | `recoverUserMods` | none | `{ outcome: 'none'|'registered'|'removed'|'discarded', temporaryRemoved }` |
 | `readSyncOwnership(root, serverId)` (`sync/ownership.ts`) | none | `{ serverId, deploymentId, initialized, files:[{path, policy, sha256, length}] } | null` |
 
-`ModListEntry`: `{ path, source: 'operator'|'user'|'unregistered', state: 'ok'|'missing'|'modified'|'unsafe', length?, sha256?, modIds, conflicts: [{kind:'path'|'mod-id', modId?, with}] }`. Notes: operator and user entries can both appear for the same path (path conflict, both flagged); `modified` means the registered file's content changed; unregistered files are never classified, hashed or parsed. Warnings are `mod-id-unavailable`, `metadata-unreadable`, `zip64-unsupported`, `unsupported-compression`.
+`ModListEntry`: `{ path, source: 'operator'|'user'|'unregistered', state: 'ok'|'missing'|'modified'|'unsafe', length?, sha256?, modIds, conflicts: [{kind:'path'|'mod-id', modId?, with}] }`. Notes: operator and user entries can both appear for the same path (path conflict, both flagged); `modified` means the registered file's content changed; unregistered files are never classified, hashed or parsed. Warnings are `space-check-unavailable` (registration only), `mod-id-unavailable`, `metadata-unreadable`, `zip64-unsupported`, `unsupported-compression`.
 
 `onProgress` phases: `recovering`, `copying` (`bytes`/`total`), `verifying`, `registering`, `removing`. Aborting is honoured until the intent is written; after that the operation completes or is repaired by recovery. Abort errors propagate as the platform `AbortError`.
 
@@ -48,6 +48,7 @@ All take `{ root, serverId, signal?, onProgress? }` plus the fields below. Mutat
 | `invalid-path` | not a portable `mods/...` path (traversal, absolute, reserved, bad characters) |
 | `unsafe-path` | symlink/junction, hard link, or non-regular file in the way |
 | `limit-exceeded` | any limit below, including oversized/compressed-bomb jar metadata |
+| `insufficient-space` | free space on the server-data volume (`statfs` bavail*bsize) is below `requiredSpaceBytes(jarSize)`; `detail.required` / `detail.available` in bytes; checked before any temporary file is created |
 | `invalid-jar` | not a readable ZIP, or structurally inconsistent (duplicate metadata entries, wrong sizes) |
 | `path-conflict` | operator-owned path, or an existing file with different content / case-colliding name |
 | `mod-id-conflict` | mod ID equals an operator or another user mod (`detail.conflictsWith`) |
@@ -92,3 +93,10 @@ Run in the worktree with the host Node and the shared toolchain:
 
 - Export from `packages/core/src/instance/mods/index.ts` and `sync/ownership.ts` (`readSyncOwnership`, `SyncOwnership`, `SyncOwnedFile`) via the instance/core index when integrating; USER-02 may use the `SyncOwnership` shape.
 - UI/IPC callers should surface `recoveryRequired` and call `recoverUserMods` (or just run any mutation, which repairs first).
+
+## Follow-up: free-space check before registration
+
+- `registerUserMod` probes the server data root with `fs.promises.statfs` before creating the temporary copy. Required = jar size + max(64 MiB, 10% of jar size) (`USER_MOD_SPACE_MARGIN`, `requiredSpaceBytes()`, exported). Shortfall fails with `insufficient-space` (`detail.required`/`detail.available`) and creates no file.
+- If `statfs` throws or returns invalid values, registration proceeds and `warnings` contains `space-check-unavailable`.
+- `RegisterUserModOptions.statfs` is an optional injectable probe (tests). `adoptUnregistered` does not copy, so it has no check.
+- Invalid/oversized sources skip the probe and keep their existing errors.

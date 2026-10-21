@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import { open, readdir, rename, unlink } from 'node:fs/promises';
+import { open, readdir, rename, statfs, unlink } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { acquireServerDataLock, ServerDataLockedError } from '../../minecraft/lock.js';
 import { readSyncOwnership, type SyncOwnership } from '../sync/ownership.js';
@@ -15,7 +15,12 @@ import {
 } from '../sync/safety.js';
 import { validatePathSet } from '../sync/state.js';
 import { SynchronizationError } from '../sync/types.js';
-import { USER_MOD_LIMITS as L, UserModError, type UserModErrorCode } from './errors.js';
+import {
+  USER_MOD_LIMITS as L,
+  requiredSpaceBytes,
+  UserModError,
+  type UserModErrorCode,
+} from './errors.js';
 import { type JarInfo, type JarWarningCode, readJarInfo } from './jar.js';
 import {
   clearIntent,
@@ -50,6 +55,11 @@ export interface UserModOptions {
 export interface RegisterUserModOptions extends UserModOptions {
   /** External .jar file chosen by the user. It is copied, never moved or linked. */
   readonly sourcePath: string;
+  /** Free-space probe (defaults to `fs.promises.statfs`); injectable for tests. */
+  readonly statfs?: (path: string) => Promise<{
+    readonly bavail: number | bigint;
+    readonly bsize: number | bigint;
+  }>;
 }
 export interface UserModPathOptions extends UserModOptions {
   /** Server-relative portable path such as `mods/example.jar`. */
@@ -64,7 +74,7 @@ export interface RemoveUnregisteredOptions extends UserModPathOptions {
   readonly expectedSha256?: string;
 }
 
-export type UserModWarning = JarWarningCode;
+export type UserModWarning = JarWarningCode | 'space-check-unavailable';
 export interface UserModRegistration {
   readonly mod: UserModRecord;
   readonly warnings: readonly UserModWarning[];
@@ -291,6 +301,24 @@ async function copyJar(
   }
 }
 
+/** Fails with `insufficient-space` before anything is written; probe failures only warn. */
+async function checkSpace(options: RegisterUserModOptions): Promise<UserModWarning[]> {
+  const source = await maybeStat(resolve(options.sourcePath));
+  // Invalid or oversized sources are reported by copyJar.
+  if (!source?.isFile() || source.isSymbolicLink() || source.size > BigInt(L.jarBytes)) return [];
+  let available: number;
+  try {
+    const stats = await (options.statfs ?? statfs)(options.root);
+    available = Number(BigInt(stats.bavail) * BigInt(stats.bsize));
+    if (!Number.isFinite(available) || available < 0) throw new Error('bad statfs');
+  } catch {
+    return ['space-check-unavailable'];
+  }
+  const required = requiredSpaceBytes(Number(source.size));
+  if (available < required) throw new UserModError('insufficient-space', { required, available });
+  return [];
+}
+
 /** Copies an external jar to mods/<name> and records it as user-owned. */
 export function registerUserMod(options: RegisterUserModOptions): Promise<UserModRegistration> {
   return locked(options, async () => {
@@ -307,6 +335,7 @@ export function registerUserMod(options: RegisterUserModOptions): Promise<UserMo
     if (find(registry.mods, path)) throw new UserModError('already-registered', { path });
     if (registry.mods.length >= L.registeredMods) throw new UserModError('limit-exceeded');
 
+    const spaceWarnings = await checkSpace(options);
     const temporary = await newTemporaryFile(root);
     try {
       const digest = await copyJar(options, temporary);
@@ -335,7 +364,7 @@ export function registerUserMod(options: RegisterUserModOptions): Promise<UserMo
       }
       await writeRegistry(root, { ...registry, mods: [...registry.mods, mod] });
       await clearIntent(root);
-      return { mod, warnings: info.warnings, copied: !existing };
+      return { mod, warnings: [...info.warnings, ...spaceWarnings], copied: !existing };
     } finally {
       await unlink(temporary).catch(() => undefined);
     }

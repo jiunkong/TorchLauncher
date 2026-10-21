@@ -19,6 +19,7 @@ import {
   registerUserMod,
   removeUnregistered,
   removeUserMod,
+  requiredSpaceBytes,
   UserModError,
 } from './index.js';
 import { clearIntent, userPaths, writeIntent } from './registry.js';
@@ -75,6 +76,36 @@ describe('register / remove / list', () => {
     await expect(removeUserMod({ ...base, path: 'mods/usermod.jar' })).rejects.toMatchObject({
       code: 'not-registered',
     });
+  });
+
+  it('checks free space before copying and reports required/available bytes', async () => {
+    const { root, base, jar } = await setup();
+    const bytes = fabricJar('space');
+    const sourcePath = await jar('space.jar', bytes);
+    const required = requiredSpaceBytes(bytes.length);
+    expect(required).toBe(bytes.length + 64 * 1024 ** 2);
+    const probe = (available: number) => async () => ({ bavail: available, bsize: 1 });
+    await expect(
+      registerUserMod({ ...base, sourcePath, statfs: probe(required - 1) }),
+    ).rejects.toMatchObject({
+      code: 'insufficient-space',
+      detail: { required, available: required - 1 },
+    });
+    expect(await readdir(join(root, 'mods')).catch(() => [])).toEqual([]);
+    const ok = await registerUserMod({ ...base, sourcePath, statfs: probe(required) });
+    expect(ok.warnings).not.toContain('space-check-unavailable');
+  });
+
+  it('warns instead of failing when free space cannot be determined', async () => {
+    const { base, jar } = await setup();
+    const result = await registerUserMod({
+      ...base,
+      sourcePath: await jar('nospace.jar', fabricJar('nospace')),
+      statfs: async () => {
+        throw new Error('ENOSYS');
+      },
+    });
+    expect(result.warnings).toEqual(['space-check-unavailable']);
   });
 
   it('allows registration with a warning when the id cannot be read', async () => {

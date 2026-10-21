@@ -1,4 +1,10 @@
-export { USER_MOD_LIMITS, UserModError, type UserModErrorCode } from './errors.js';
+export {
+  requiredSpaceBytes,
+  USER_MOD_LIMITS,
+  USER_MOD_SPACE_MARGIN,
+  UserModError,
+  type UserModErrorCode,
+} from './errors.js';
 export type { JarInfo, JarWarningCode } from './jar.js';
 export { readJarInfo } from './jar.js';
 export type { UserModRecord, UserModRegistry } from './registry.js';
