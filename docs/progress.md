@@ -23,7 +23,11 @@
   병합 id(`neoforge-21.1.264`)로 치환되어 바닐라 `1.21.1.jar`가 무시되지 않은 것이다. 수정 `35f5734`를 `3a86683`로
   통합했다(ignoreList를 실제 바닐라 jar 이름에 결합, 비정상 종료의 안전한 `ok:false`·고정 분류 코드, 결과 파일 병행 기록).
   메인 `pnpm check` 성공: 549개 테스트·opt-in 6개 skip·전체 TypeScript·Biome·두 앱 빌드. `host_no_result`의 원인
-  (종료 직전 console.log 유실)은 Linux에서 재현하지 못한 가설이다. Windows 재실행 결과 대기, GAME-02/03은 여전히 검토 상태다.
+  (종료 직전 console.log 유실)은 Linux에서 재현하지 못한 가설이다. Windows 재실행은 성공했다(아래).
+- GAME-02 완료: 수정 반영 후 Windows 11에서 `game-smoke launch`(NeoForge 21.1.264, localhost:25565)가
+  `ok:true, exitCode:0, completion:process_exit`로 끝났고, 사용자가 게임 실행 후 서버 월드 자동 접속을 직접 확인했다
+  (결과 JSON의 `authenticatedConnection`은 `not-asserted`이므로 접속은 사용자 보고가 근거다). 서버 콘솔 로그는 미확인.
+  GAME-03(Fabric)은 맞는 Fabric 배포본·서버로 실접속 확인이 남아 있다.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
@@ -132,8 +136,8 @@
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
-| GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 검토 — 구현 통합·Linux 설치 성공, Windows 실접속 대기 |
-| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 검토 — 구현 통합·Linux 설치 성공, 실제 게임/대응 서버 접속 대기 |
+| GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
+| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 검토 — 구현 통합·Linux 설치 성공, Fabric 대응 배포·서버 접속 대기 |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 대기 |
 | USER-02 | 최초 기본값·필수 설정 구분, 혼합 설정 적용, 리소스팩 활성화·순서 | FMT-01, SYNC-01 | 대기 |
 | USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 대기 |
