@@ -198,41 +198,78 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
   'forced-kill recovery (real processes, Linux and Windows)',
   { timeout: 60_000 },
   () => {
-    it('keeps the lock while the game child outlives a killed host, then reclaims', async () => {
-      const script = await hostScript();
-      const root = await tempDir('torch-kill-root-');
-      const host = runHost(script, ['game', root, SOURCE]);
-      const { child } = await host.message;
-      if (typeof child !== 'number') throw new Error(host.stderr());
-      pids.push(child);
-      host.child.kill('SIGKILL'); // TerminateProcess on Windows
-      await host.exited;
+    // Linux only: the game child is reparented and survives a SIGKILLed host. On Windows a
+    // force-killed host takes its child down with it (observed on Windows 11 / Node 24: the
+    // child probe is `absent` right after the host exits), so the lock is correctly stale-verified;
+    // that behaviour is asserted by the Windows-specific test below.
+    it.runIf(process.platform === 'linux')(
+      'keeps the lock while the game child outlives a killed host, then reclaims',
+      async () => {
+        const script = await hostScript();
+        const root = await tempDir('torch-kill-root-');
+        const host = runHost(script, ['game', root, SOURCE]);
+        const { child } = await host.message;
+        if (typeof child !== 'number') throw new Error(host.stderr());
+        pids.push(child);
+        host.child.kill('SIGKILL'); // TerminateProcess on Windows
+        await host.exited;
 
-      const live = await inspectServerEnvironment(root);
-      expect(live.serverLock).toMatchObject({
-        state: 'held-live',
-        purpose: 'game',
-        evidence: ['owner-exited', 'child-alive'],
-        childAlive: true,
-      });
-      const refused = await recoverServerEnvironment(root, { acceptUncertain: true });
-      expect(refused.status).toBe('blocked');
-      expect(await readdir(root)).toContain(SERVER_LOCK_DIRECTORY);
+        const live = await inspectServerEnvironment(root);
+        expect(live.serverLock).toMatchObject({
+          state: 'held-live',
+          purpose: 'game',
+          evidence: ['owner-exited', 'child-alive'],
+          childAlive: true,
+        });
+        const refused = await recoverServerEnvironment(root, { acceptUncertain: true });
+        expect(refused.status).toBe('blocked');
+        expect(await readdir(root)).toContain(SERVER_LOCK_DIRECTORY);
 
-      process.kill(child, 'SIGKILL');
-      await waitAbsent(child);
-      const stale = await inspectServerEnvironment(root);
-      expect(stale.serverLock).toMatchObject({
-        state: 'stale-verified',
-        evidence: ['owner-exited', 'child-exited'],
-      });
-      const report = await recoverServerEnvironment(root);
-      expect(report).toMatchObject({
-        status: 'recovered',
-        actions: [{ kind: 'server-lock-reclaimed', basis: 'verified' }],
-      });
-      expect(report.environment.serverLock.state).toBe('free');
-    });
+        process.kill(child, 'SIGKILL');
+        await waitAbsent(child);
+        const stale = await inspectServerEnvironment(root);
+        expect(stale.serverLock).toMatchObject({
+          state: 'stale-verified',
+          evidence: ['owner-exited', 'child-exited'],
+        });
+        const report = await recoverServerEnvironment(root);
+        expect(report).toMatchObject({
+          status: 'recovered',
+          actions: [{ kind: 'server-lock-reclaimed', basis: 'verified' }],
+        });
+        expect(report.environment.serverLock.state).toBe('free');
+      },
+    );
+
+    // Windows counterpart: the child dies with the force-killed host (job-object-like behaviour),
+    // so no live child remains and the lock is stale-verified right away.
+    it.runIf(process.platform === 'win32')(
+      'reclaims a game lock when the killed host takes its child down (Windows)',
+      async () => {
+        const script = await hostScript();
+        const root = await tempDir('torch-kill-root-');
+        const host = runHost(script, ['game', root, SOURCE]);
+        const { child } = await host.message;
+        if (typeof child !== 'number') throw new Error(host.stderr());
+        pids.push(child);
+        host.child.kill('SIGKILL'); // TerminateProcess
+        await host.exited;
+        await waitAbsent(child);
+
+        const stale = await inspectServerEnvironment(root);
+        expect(stale.serverLock).toMatchObject({
+          state: 'stale-verified',
+          purpose: 'game',
+          evidence: ['owner-exited', 'child-exited'],
+        });
+        const report = await recoverServerEnvironment(root);
+        expect(report).toMatchObject({
+          status: 'recovered',
+          actions: [{ kind: 'server-lock-reclaimed', basis: 'verified' }],
+        });
+        expect(report.environment.serverLock.state).toBe('free');
+      },
+    );
 
     it('detects PID reuse through the start identifier and keeps v1 locks uncertain', async () => {
       const root = await tempDir('torch-kill-root-');

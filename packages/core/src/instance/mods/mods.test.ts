@@ -1,4 +1,5 @@
-import { link, mkdir, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { acquireServerDataLock } from '../../minecraft/lock.js';
@@ -23,6 +24,20 @@ import {
   UserModError,
 } from './index.js';
 import { clearIntent, userPaths, writeIntent } from './registry.js';
+
+/** Creating symlinks needs Developer Mode or elevation on Windows; such tests are skipped without it. */
+const canSymlink = await (async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'torch-symlink-probe-'));
+  try {
+    await writeFile(join(dir, 'target'), '');
+    await symlink(join(dir, 'target'), join(dir, 'link'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+})();
 
 afterEach(cleanTemporary);
 
@@ -118,7 +133,7 @@ describe('register / remove / list', () => {
     expect(result.mod.modIds).toEqual([]);
   });
 
-  it('rejects non-jar, missing, symlinked, oversized-structure and corrupt sources without touching mods', async () => {
+  it('rejects non-jar, missing, oversized-structure and corrupt sources without touching mods', async () => {
     const { root, base, jar, inbox } = await setup();
     await expect(
       registerUserMod({ ...base, sourcePath: await jar('a.zip', fabricJar('a')) }),
@@ -127,10 +142,6 @@ describe('register / remove / list', () => {
       registerUserMod({ ...base, sourcePath: join(inbox, 'missing.jar') }),
     ).rejects.toMatchObject({ code: 'invalid-source' });
     const real = await jar('real.jar', fabricJar('real'));
-    await symlink(real, join(inbox, 'link.jar')).catch(() => undefined);
-    await expect(
-      registerUserMod({ ...base, sourcePath: join(inbox, 'link.jar') }),
-    ).rejects.toMatchObject({ code: 'invalid-source' });
     await expect(
       registerUserMod({
         ...base,
@@ -142,6 +153,16 @@ describe('register / remove / list', () => {
     ).rejects.toMatchObject({ code: 'invalid-server-id' });
     expect(await readdir(join(root, 'mods')).catch(() => [])).toEqual([]);
     expect(await readdir(userPaths(root).tmp)).toEqual([]);
+  });
+
+  it.skipIf(!canSymlink)('rejects a symlinked source (needs symlink permission)', async () => {
+    const { root, base, jar, inbox } = await setup();
+    const real = await jar('real.jar', fabricJar('real'));
+    await symlink(real, join(inbox, 'link.jar'));
+    await expect(
+      registerUserMod({ ...base, sourcePath: join(inbox, 'link.jar') }),
+    ).rejects.toMatchObject({ code: 'invalid-source' });
+    expect(await readdir(join(root, 'mods')).catch(() => [])).toEqual([]);
   });
 
   it('refuses duplicate registration, mod-id conflicts and different existing files', async () => {
@@ -182,16 +203,24 @@ describe('register / remove / list', () => {
     ).rejects.toMatchObject({ code: 'path-conflict' });
   });
 
-  it('refuses a symlinked mods directory and hard-linked targets', async () => {
+  it.skipIf(!canSymlink)(
+    'refuses a symlinked mods directory (needs symlink permission)',
+    async () => {
+      const { root, base, jar } = await setup();
+      const outside = await temporary('torch-mods-outside-');
+      await symlink(outside, join(root, 'mods'), 'dir');
+      const source = await jar('s.jar', fabricJar('s'));
+      await expect(registerUserMod({ ...base, sourcePath: source })).rejects.toBeInstanceOf(
+        UserModError,
+      );
+      expect(await readdir(outside)).toEqual([]);
+    },
+  );
+
+  it('refuses hard-linked targets', async () => {
     const { root, base, jar } = await setup();
     const outside = await temporary('torch-mods-outside-');
-    await symlink(outside, join(root, 'mods'), 'dir').catch(() => undefined);
     const source = await jar('s.jar', fabricJar('s'));
-    await expect(registerUserMod({ ...base, sourcePath: source })).rejects.toBeInstanceOf(
-      UserModError,
-    );
-    expect(await readdir(outside)).toEqual([]);
-    await rm(join(root, 'mods'), { force: true, recursive: true });
     await mkdir(join(root, 'mods'));
     await writeFile(join(outside, 'h.jar'), fabricJar('s'));
     await link(join(outside, 'h.jar'), join(root, 'mods/s.jar'));
