@@ -42,7 +42,11 @@ const die = () => {
 if (mode === 'game') {
   const lease = await lock.acquireServerDataLock(root, 'game');
   await lease.recordChild({ state: 'starting' });
-  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+  stdio: 'ignore',
+  detached: extra === 'detached',
+});
+if (extra === 'detached') child.unref();
   await new Promise((resolve) => child.once('spawn', resolve));
   const state = await systemProcessProbe().process(child.pid);
   await lease.recordChild({ state: 'running', pid: child.pid, start: state.start ?? null });
@@ -260,6 +264,47 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
         expect(stale.serverLock).toMatchObject({
           state: 'stale-verified',
           purpose: 'game',
+          evidence: ['owner-exited', 'child-exited'],
+        });
+        const report = await recoverServerEnvironment(root);
+        expect(report).toMatchObject({
+          status: 'recovered',
+          actions: [{ kind: 'server-lock-reclaimed', basis: 'verified' }],
+        });
+        expect(report.environment.serverLock.state).toBe('free');
+      },
+    );
+
+    // Windows: a child started detached (own process group, not tied to the host) survives the
+    // force-killed host, so the lock must stay held-live until that child exits.
+    it.runIf(process.platform === 'win32')(
+      'keeps the lock while a detached game child outlives a killed host (Windows)',
+      async () => {
+        const script = await hostScript();
+        const root = await tempDir('torch-kill-root-');
+        const host = runHost(script, ['game', root, SOURCE, 'detached']);
+        const { child } = await host.message;
+        if (typeof child !== 'number') throw new Error(host.stderr());
+        pids.push(child);
+        host.child.kill('SIGKILL'); // TerminateProcess
+        await host.exited;
+
+        const live = await inspectServerEnvironment(root);
+        expect(live.serverLock).toMatchObject({
+          state: 'held-live',
+          purpose: 'game',
+          evidence: ['owner-exited', 'child-alive'],
+          childAlive: true,
+        });
+        const refused = await recoverServerEnvironment(root, { acceptUncertain: true });
+        expect(refused.status).toBe('blocked');
+        expect(await readdir(root)).toContain(SERVER_LOCK_DIRECTORY);
+
+        process.kill(child, 'SIGKILL'); // TerminateProcess
+        await waitAbsent(child);
+        const stale = await inspectServerEnvironment(root);
+        expect(stale.serverLock).toMatchObject({
+          state: 'stale-verified',
           evidence: ['owner-exited', 'child-exited'],
         });
         const report = await recoverServerEnvironment(root);
