@@ -318,6 +318,26 @@ BASE-03·04 및 QA-01·RELEASE 작업은 가능한 환경을 확인한 뒤 별�
 
 ## 새 세션에 전달할 시작 지시문
 
+## GAME-02 / GAME-03 착수 — 2026-10-21
+
+사용자 승인으로 실제 1.21.1 NeoForge 설치·실행·서버 직접 접속을 먼저, Fabric을 이어서 구현한다.
+#3 단독 담당, 브랜치 `feat/game-02-03-loaders`, worktree `.agents/worktrees/agent-3`.
+설치 프로세스·OS 차이·실행 차단 경계 때문에 Sol, 목표 effort medium(실제 설정 변경은 미확인).
+구현 기준은 [game-launch.md](game-launch.md)이며 다른 구현 세션은 이번에 착수하지 않는다.
+
+독점 범위:
+
+- `packages/core/src/loaders/**`, 기존 `packages/core/src/minecraft/**`의 필요한 설치·메타데이터·실행 변경과 테스트.
+- read-only 실행 검증에 한해 `packages/core/src/instance/sync/launch-guard.ts`,
+  `launch-guard.test.ts`, `index.ts`의 해당 export 추가. 기존 sync engine/state/safety는 읽기만 한다.
+- `apps/launcher/src/main/game-smoke/**`, `scripts/game-smoke.mjs`, `docs/handoffs/GAME-02-03.md`.
+- 공용 package manifest/export·lockfile·앱 빌드 설정·인증 구현은 변경 전에 #0에 요청한다.
+
+루트/인증 테스트와 별도로 실행 가능한 게임 smoke를 준비한다. 접속 직전 최신 배포 확인과
+always 파일 검증이 실패하면 spawn을 금지하며 캐시 우회 옵션은 제공하지 않는다.
+실제 서버·계정·추가 배포 파일 업로드 요청은 실행 절차가 준비되면 #0에게 전달한다.
+설치 성공·모의 테스트와 실계정 서버 접속 성공을 분리해 인계한다.
+
 ## 배포 reader → 동기화 엔진 착수 — 2026-10-21
 
 사용자 승인 범위는 FMT-03을 구현·통합한 뒤 SYNC-01을 이어서 구현하는 것이다.

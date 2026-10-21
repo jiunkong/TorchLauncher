@@ -7,6 +7,9 @@
 
 ## 현재 상태와 다음 작업
 
+- 다음 사용자 승인 범위는 GAME-02/03: 1.21.1 NeoForge를 먼저, Fabric을 이어서 실제 설치·실행·직접 접속한다.
+  #3에 단독 배정하며 [실행 기준](game-launch.md)에 따라 접속 직전 최신 동기화 실패 시 실행을 차단한다.
+  서버·직접 계정 테스트가 필요하면 #0이 준비된 명령과 함께 사용자에게 요청한다.
 - 사용자 승인 범위인 FMT-03 배포 reader와 SYNC-01 동기화 코어를 모두 통합·검증했다.
   reader는 Luna(명세 기반 구현), sync는 Sol(소유권·실패 복구)로 작업별 전환했다.
 - FMT-03을 `9c0dd04`(구현 `375e50e`)로 통합했다. 메인 reader/writer 58개 테스트,
@@ -115,8 +118,8 @@
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 준비 |
-| GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03 | 대기 |
-| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03 | 대기 |
+| GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 진행 |
+| GAME-03 | 1.21.1 Fabric 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 진행 — NeoForge 이후 같은 담당이 검증 |
 | USER-01 | 런처를 통한 추가 모드 등록·삭제·보존, 미등록 파일과 충돌 처리 | SYNC-01 | 대기 |
 | USER-02 | 최초 기본값·필수 설정 구분, 혼합 설정 적용, 리소스팩 활성화·순서 | FMT-01, SYNC-01 | 대기 |
 | USER-03 | 서버별 경로·용량 표시와 실행 중 삭제 차단, 서버 데이터 삭제 | SYNC-01 | 대기 |
@@ -151,6 +154,7 @@ worktree 생성 위치는 실행 환경의 쓰기 권한 범위 안에서 선택
 | AUTH-03 | #4 — `launcher develop #4` | `feat/auth-03-public-java` | `.agents/worktrees/agent-4` | auth host·smoke·런처 manifest·lockfile·필요한 main 빌드 설정·공유 결과 설명/export·인계/라이선스 (상세는 배정 문서) |
 | FMT-03 | #2 — `launcher develop #2` | `feat/fmt-03-reader` | `.agents/worktrees/agent-2` | `packages/core/src/deployment/reader/**`, `docs/handoffs/FMT-03.md` |
 | SYNC-01 | #2 — `launcher develop #2` | `feat/sync-01-engine` | `.agents/worktrees/agent-2` | `packages/core/src/instance/sync/**`, `docs/handoffs/SYNC-01.md` |
+| GAME-02/03 | #3 — `launcher develop #3` | `feat/game-02-03-loaders` | `.agents/worktrees/agent-3` | loaders·minecraft·제한된 sync launch guard·game smoke·인계 (상세 배정 문서) |
 
 ### 실행 세션
 

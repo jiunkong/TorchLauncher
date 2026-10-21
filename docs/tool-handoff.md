@@ -5,9 +5,15 @@ Updated: 2026-10-21. Read `AGENTS.md` before continuing. This checkpoint is main
 ## Role and authorized scope
 
 The current coordinator is user-designated #0. Product implementation belongs to workers; only #0
-updates progress, reviews and integrates into main. The authorized task is FMT-03 reader followed by
-SYNC-01 synchronization. Do not start loaders, Studio or UI work. Preserve generic arbitrary game
-content paths; keybinding presets are a separate convenience feature.
+updates progress, reviews and integrates into main. Reader/sync are complete. The current authorized
+task is GAME-02/03: 1.21.1 NeoForge installation/launch/direct connection first, then Fabric, including
+the latest-sync launch gate. Do not start Studio or product UI work. Preserve generic game content paths.
+
+Active worker: #3, `.agents/worktrees/agent-3`, `feat/game-02-03-loaders`, prepared from the main
+assignment commit. Read `docs/game-launch.md` and the latest assignment in `docs/work-distribution.md`.
+Scope includes loaders/minecraft, narrow read-only sync launch guard, and a separate Electron game-smoke
+runner; auth implementation and other shared files require coordination. Server availability has been
+asked asynchronously; do not assume a reply or start accepting EULAs. No real game connection is verified yet.
 
 ## Git and files
 
@@ -47,9 +53,9 @@ Stale-lock recovery remains GAME-05; never steal a lock based only on an old PID
 - No live test is waiting and there is no pending upload request. Old arm/nonce files must not be signaled.
   Drive currently serves **v2**. Replaying the two-phase harness requires coordinating a v1 upload first;
   do not rerun it against the current v2 URL and mistake an expected-v1 mismatch for a regression.
-- The authorized reader→sync task is complete. Product UI/IPC wiring, loader installation/real game
-  connection, user-mod registry, mixed-setting editing, stale-lock recovery and native OS validation
-  remain separate tasks. Read the tracker and obtain a new assignment before starting another feature.
+- The reader→sync task is complete. GAME-02/03 is now explicitly authorized above; product UI/IPC,
+  user-mod registry, mixed-setting editing, stale-lock recovery and native OS validation remain separate.
+  Read the tracker and obtain a new assignment before starting another feature.
 
 ## Local artifacts and commands
 
