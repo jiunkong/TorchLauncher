@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-21T09:23:46.078Z",
+  "v1TotalLength": 140736,
+  "v2TotalLength": 136648,
+  "retainedOutcome": "source-changed",
+  "sourceGenerationAfterReset": 2,
+  "indexSha256": "8fa6f4208ff6cf0d979e5615291731d61497feb200f80e9b86172b07b8aa0816",
+  "second": {
+    "downloaded": 2,
+    "reused": 2,
+    "preserved": 1,
+    "deleted": 1,
+    "deploymentId": "33333333-3333-4333-8333-333333333333",
+    "recovery": "none"
+  },
+  "payloadRanges": [
+    {
+      "start": 132451,
+      "end": 132494,
+      "status": 206
+    },
+    {
+      "start": 132552,
+      "end": 136647,
+      "status": 206
+    }
+  ],
+  "finalHashes": [
+    {
+      "path": "custom-data/unchanged.bin",
+      "sha256": "2c6750d88b5eb3f299dd72af0393713a0f86da11a77389f283cce25b126d6a99",
+      "length": 131072
+    },
+    {
+      "path": "saves/fixture-world/data/marker.dat",
+      "sha256": "413bbe26c787ef220a100c990da4b204673f58b553c29a206a701968943ea312",
+      "length": 46
+    },
+    {
+      "path": "config/required.txt",
+      "sha256": "fafb39b6c62538a95e34d8c3e22927413fd7d57154316ec35f1bfdfbfe89752d",
+      "length": 24
+    },
+    {
+      "path": "options.txt",
+      "sha256": "174ae0ba87a736ba53f0849cc0d946001e9768b9af8fccb09db083df9c2b70e6",
+      "length": 30
+    },
+    {
+      "path": "custom-data/added.bin",
+      "sha256": "99e56b93848e31b42ae1b2dfe9ba17293865461d8fc355c359389a54ba73aa6d",
+      "length": 4096
+    }
+  ],
+  "initialOnlyPreserved": true,
+  "removedOwnedFileAbsent": true
+}
