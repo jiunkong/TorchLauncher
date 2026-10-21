@@ -12,6 +12,7 @@ export type SettingsErrorCode =
   | 'required-pack-removed'
   | 'required-pack-reordered'
   | 'sync-not-initialized'
+  | 'unsupported-options-version'
   | 'unsafe-path';
 
 export class SettingsError extends Error {
@@ -71,6 +72,10 @@ export type SettingsPathClass = 'required' | 'initial-default' | 'user';
 
 export interface SettingsOperationOptions {
   signal?: AbortSignal;
+  /** Minecraft version used to pick the options.txt format when the file has no `version:` line. */
+  minecraftVersion?: string;
+  /** Which format profiles may be used. Default `verified-only` (rejects everything else). */
+  versionPolicy?: 'verified-only' | 'allow-researched' | 'allow-any';
   /** Test seam: runs after the temporary file is written and before it replaces the target. */
   onBeforeCommit?: (target: string) => void | Promise<void>;
 }
@@ -91,6 +96,9 @@ export interface ApplySettingsResult {
   initialApplied: string[];
   initialSkipped: InitialSkip[];
   resourcePacks: { added: string[]; reordered: boolean; active: string[] };
+  /** Format profile id used (absent for `no-policy`). */
+  formatProfile?: string;
+  warnings: string[];
 }
 
 export interface ResourcePackStatus {

@@ -8,6 +8,8 @@ export {
   describeManagedSettings,
 } from './ownership.js';
 export { parseSettingsPolicy } from './policy.js';
+export type { OptionsFormatProfile, VersionPolicy } from './profiles.js';
+export { OPTIONS_PROFILES } from './profiles.js';
 export type {
   ApplySettingsResult,
   InitialSkip,

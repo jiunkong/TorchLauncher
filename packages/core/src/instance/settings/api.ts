@@ -8,15 +8,15 @@ import {
   withMaintenanceLock,
   writeState,
 } from './io.js';
-import {
-  DEFAULT_PACKS,
-  mergeRequiredPacks,
-  OptionsDocument,
-  readPackList,
-  writePackList,
-} from './options.js';
+import { mergeRequiredPacks, OptionsDocument, readPackList, writePackList } from './options.js';
 import { assertOptionsNotSyncOwned } from './ownership.js';
 import { parseSettingsPolicy, validPackId } from './policy.js';
+import {
+  type OptionsFormatProfile,
+  profileAcceptsKeyValue,
+  profileAcceptsPackId,
+  selectProfile,
+} from './profiles.js';
 import {
   type ApplySettingsResult,
   OPTIONS_PATH,
@@ -49,6 +49,21 @@ async function loadOptions(
   return { path, file, doc: file ? OptionsDocument.parse(file.bytes) : OptionsDocument.empty() };
 }
 
+function checkPolicyAgainstProfile(policy: SettingsPolicy, profile: OptionsFormatProfile): void {
+  for (const [key, value] of [...policy.required, ...policy.initial]) {
+    if (key === 'version')
+      throw new SettingsError('invalid-policy', 'the version: line is owned by the game');
+    if (!profileAcceptsKeyValue(profile, key, value))
+      throw new SettingsError(
+        'invalid-policy',
+        `${key}: legacy numeric key code is not valid for ${profile.id}`,
+      );
+  }
+  const ids = [...policy.resourcePacks.required, ...policy.resourcePacks.initial];
+  if (ids.some((id) => !profileAcceptsPackId(profile, id)))
+    throw new SettingsError('invalid-policy', 'malformed resource pack id');
+}
+
 /**
  * Apply the operator's settings policy to options.txt item by item under the maintenance lock.
  * Call after synchronization finished and before launching the game.
@@ -74,12 +89,18 @@ export async function applySettingsPolicy(
       initialApplied: [],
       initialSkipped: [],
       resourcePacks: { added: [], reordered: false, active: [] },
+      warnings: [],
     };
     if (!policy) return result;
 
     const { state, file: stateFile } = await readState(root, signal);
     const options_ = await loadOptions(root, signal);
     const { doc } = options_;
+    const selection = selectProfile(doc, options.minecraftVersion, options.versionPolicy);
+    const { profile } = selection;
+    checkPolicyAgainstProfile(policy, profile);
+    result.formatProfile = profile.id;
+    result.warnings = selection.warnings;
     const first = state.initial === null;
     const doneKeys = new Set(state.initial?.keys ?? []);
     result.firstConfiguration = first;
@@ -103,7 +124,9 @@ export async function applySettingsPolicy(
     }
 
     const existing = readPackList(doc);
-    let packs = existing ?? [...DEFAULT_PACKS];
+    if (existing?.some((id) => !profileAcceptsPackId(profile, id)))
+      throw new SettingsError('invalid-options', 'malformed resource pack entry');
+    let packs = existing ?? [...profile.defaultPacks];
     let resourcePacksDone = state.initial?.resourcePacks ?? false;
     if (policy.resourcePacks.initial.length > 0 && !resourcePacksDone) {
       if (first && existing === undefined) {
@@ -161,13 +184,14 @@ export async function applySettingsPolicy(
 /** Current resource pack order with required packs flagged. Read-only; takes no lock. */
 export async function getResourcePacks(
   root: string,
-  options: { signal?: AbortSignal } = {},
+  options: SettingsOperationOptions = {},
 ): Promise<ResourcePackList> {
   return guarded(async () => {
     const policy = await loadPolicy(root, options.signal);
     const { doc } = await loadOptions(root, options.signal);
+    const { profile } = selectProfile(doc, options.minecraftVersion, options.versionPolicy);
     const required = policy?.resourcePacks.required ?? [];
-    const list = readPackList(doc) ?? [...DEFAULT_PACKS];
+    const list = readPackList(doc) ?? [...profile.defaultPacks];
     const present = required.filter((id) => list.includes(id));
     const order = list.filter((id) => required.includes(id));
     return {
@@ -204,6 +228,9 @@ export async function setUserResourcePacks(
     if (order.some((id, index) => id !== required[index]))
       throw new SettingsError('required-pack-reordered', 'required packs must keep operator order');
     const loaded = await loadOptions(root, options.signal);
+    const { profile } = selectProfile(loaded.doc, options.minecraftVersion, options.versionPolicy);
+    if (packs.some((id) => !profileAcceptsPackId(profile, id)))
+      throw new SettingsError('invalid-argument', 'malformed resource pack id');
     const changed = writePackList(loaded.doc, packs);
     if (changed) await atomicWrite(loaded.path, loaded.doc.serialize(), loaded.file?.stat, options);
     return { active: [...packs], changed };
