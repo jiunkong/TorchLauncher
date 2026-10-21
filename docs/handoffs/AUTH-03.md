@@ -3,7 +3,8 @@
 - Owner: `launcher develop #4`, branch `feat/auth-03-public-java`.
 - Baseline: `b53d5da` (`docs: authorize temporary public Java authentication provider`).
 - Final commit: reported separately to avoid a self-referential hash.
-- Status: implementation ready for integrated review; real Windows account cycle remains pending.
+- Status: implementation integrated; the user reports a successful Windows public Java cycle.
+  The follow-up smoke lifecycle fix below is ready for #0 review/integration.
 
 ## Behavior and boundaries
 
@@ -78,10 +79,11 @@ only for non-login worker execution.
 - Unit checks cover cache encryption/restart/deletion, insecure storage rejection, payload limits,
   unawaited-write barriers/failures, timeout/cancel/logout/late writes, local-only device-code handling,
   redaction, fresh proof/token caches, ownership/profile failure and non-interactive refresh.
-- No real public Java login, Windows DPAPI cycle, packaged-app host execution, macOS Keychain cycle
-  or authenticated Minecraft game launch has been claimed. Those need separate execution evidence.
+- This initial implementation validation did not perform a real login. The later Windows
+  user-reported cycle is recorded below. Packaged-app host execution, macOS Keychain and authenticated
+  Minecraft game launch still need separate execution evidence.
 
-## Windows verification after #0 integration
+## Windows reproduction commands
 
 Use Windows Node 24 and pnpm 10.34.7. From the integrated checkout root, the exact public-default
 commands are:
@@ -108,3 +110,32 @@ node scripts/auth-smoke.mjs assert-empty --data-dir $data
 The own-app route is available by adding `--provider own-app` with that app's locally entered client
 ID and redirect options. It is not part of this public-provider live cycle. #0 coordinates the next
 user test; this worker has not requested a duplicate login.
+
+## Follow-up: sole-window shutdown during first login
+
+- Branch: `fix/auth-03-smoke-lifecycle`, baseline main `79b0c78`.
+- The user reported that the first browser login completed but Electron exited without the harness
+  result. On rerun, `login`, `refresh`, `logout` and `assert-empty` each reported success, followed by
+  `liveAuthentication: "verified"`. This is user-supplied Windows live-cycle evidence relayed by #0;
+  this worker did not repeat the login or collect credentials/profile values.
+- The standalone harness did not subscribe to Electron's `window-all-closed` event. Its default
+  behavior quits when the sole device-code window closes. `PublicJavaAuthenticator` closes that
+  window before awaiting worker termination/cache drains, so default shutdown can preempt the final
+  JSON report. This timing is consistent with the first Windows symptom; the original Windows
+  process trace was not collected.
+- The fix registers the event only in the standalone smoke entry, keeping `report()`/`app.exit()` in
+  control until cleanup and stdout flushing finish. Product app window/quit behavior is unchanged.
+- New non-auth regression mode `window-cycle` creates and destroys one hidden Electron window,
+  crosses an asynchronous cleanup boundary, confirms no windows remain, and reports the result.
+  It does not use login, credentials or OS token storage. Exact command:
+
+```powershell
+node scripts/auth-smoke.mjs window-cycle --data-dir "$env:LOCALAPPDATA\TorchLauncherAuthSmoke"
+```
+
+Actual Electron 44.9.1 on Linux/WSLg reproduced exit 1 and the same missing-result error before the
+fix. With the listener, the identical regression returned exit 0 with `soleWindowClosed: true` and
+`liveAuthentication: false`. The outer summary correctly does not assert live authentication.
+Launcher Node/web TypeScript, scoped Biome and all **165 authentication tests** passed in the existing
+isolated Linux validation copy. The user's Windows-installed worktree dependencies were preserved.
+No new real-account retry was requested or performed for this lifecycle fix.
