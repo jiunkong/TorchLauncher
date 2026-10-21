@@ -1,6 +1,8 @@
 import { type ChildProcess, spawn as nodeSpawn, type SpawnOptions } from 'node:child_process';
 import { join } from 'node:path';
 import { stat } from './filesystem';
+import { type ProcessProbe, systemProcessProbe } from './identity';
+import { INSTALL_LOCK_DIRECTORY } from './install-transaction';
 import type { Installation } from './installer';
 import { buildLaunchCommand, type LaunchCommand, type LaunchOptions } from './launch';
 import { acquireServerDataLock } from './lock';
@@ -16,6 +18,8 @@ export interface GameProcessOptions {
   /** Trusted read-only final validation under the game lease. Must honor its deadline signal. */
   preSpawn?: (context: { root: string; signal: AbortSignal }) => Promise<void>;
   preSpawnTimeoutMs?: number;
+  /** Process identity boundary recorded in the server lock (owner and Java child). */
+  processProbe?: ProcessProbe;
 }
 export interface GameExit {
   reason: 'exited' | 'stopped' | 'cancelled' | 'process-error' | 'lock-error';
@@ -53,11 +57,12 @@ async function start(
     throw new Error('Invalid game termination grace period');
   const logs = new GameLogs(secrets, options.logs);
   aborted(options.signal);
-  const lease = await acquireServerDataLock(command.cwd, 'game');
+  const probe = options.processProbe ?? systemProcessProbe();
+  const lease = await acquireServerDataLock(command.cwd, 'game', { probe });
   let child: ChildProcess;
   try {
     aborted(options.signal);
-    if (await stat(join(lease.root, '.torchlauncher-install-lock')))
+    if (await stat(join(lease.root, INSTALL_LOCK_DIRECTORY)))
       throw new GameStartError('EINSTALLRECOVERY');
     aborted(options.signal);
     if (options.preSpawn) {
@@ -81,6 +86,8 @@ async function start(
       signal.throwIfAborted();
       aborted(options.signal);
     }
+    // Mark the spawn window: a crash before the child is recorded is never verified stale.
+    await lease.recordChild?.({ state: 'starting' });
     child = (options.spawn ?? nodeSpawn)(command.executable, command.args, {
       cwd: lease.root,
       shell: false,
@@ -175,6 +182,20 @@ async function start(
   } catch (error) {
     await finished;
     throw error;
+  }
+  const pid = child.pid;
+  if (pid && !closed) {
+    try {
+      const state = await probe.process(pid);
+      // An unknown start identifier keeps a crashed host's lock `uncertain`, never stale.
+      await lease.recordChild?.({
+        state: 'running',
+        pid,
+        start: state.state === 'running' ? state.start : null,
+      });
+    } catch {
+      // The `starting` record remains; recovery then treats the lock conservatively.
+    }
   }
   return {
     pid: child.pid ?? 0,
