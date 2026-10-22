@@ -2,6 +2,12 @@
 
 ## 역할과 현재 배정
 
+2026-10-22 기능 연결 승인: [ui-integration.md](ui-integration.md)에 계약과 독점 범위를 기록했다.
+#1 UI-CONNECT-S: `feat/ui-connect-studio` / agent-1, `apps/admin/**`·`packages/core/src/server-config/**`·해당 인계.
+#4 UI-CONNECT-L: `feat/ui-connect-launcher` / agent-4, `apps/launcher/**`·`packages/core/src/server-status/**`·
+`packages/core/src/loaders/launch-gate.ts`와 대응 테스트·해당 인계. 둘 다 `gpt-6.1-sol` medium.
+공유 smoke 스크립트는 이후 한 작업자에게만 배정한다. 공통 desktop·manifest·lockfile 변경은 사전 조정한다.
+
 2026-10-22 UI-BASE: 사용자 승인으로 #1 단독 배정. 브랜치 `feat/ui-base-shells`,
 worktree `.agents/worktrees/agent-1`. 독점 범위: 두 앱 `src/renderer/**`,
 `scripts/smoke.mjs`, `docs/handoffs/UI-BASE.md`. Luna·medium으로 앱별 탐색/화면 구조,

@@ -7,6 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
+- 2026-10-22 사용자 승인: UI 디자인 전에 두 앱 실제 기능 연결을 진행한다.
+  [연결 계약](ui-integration.md)에 따라 #1 UI-CONNECT-S(`feat/ui-connect-studio`, agent-1),
+  #4 UI-CONNECT-L(`feat/ui-connect-launcher`, agent-4)을 배정했다. 두 작업 모두 Sol·medium:
+  파일 저장/내보내기·IPC 또는 인증/프로세스/복구 경계가 포함되기 때문이다. 공유 서버 구성 계약은 #1 소유다.
+  UI-01/UI-02 및 STUDIO-01~03은 필요한 통합·실검증 전 완료로 처리하지 않는다.
 - 2026-10-22 사용자 승인: UI-BASE(Studio·런처 UI 기반)를 #1에 배정했다.
   `feat/ui-base-shells`, `.agents/worktrees/agent-1`에서 두 앱 renderer와
   `scripts/smoke.mjs`, `docs/handoffs/UI-BASE.md`만 수정한다. 앱별 탐색·화면 분리,
@@ -163,6 +168,8 @@
 | MOD-02 | Fabric 연결 해제 시 종료 보조 모드 — 사용자 결정으로 제외 | — | 취소 |
 | UI-01 | 서버 온라인·응답 실패·접속 인원·지연시간 조회와 표시 | BASE-02 | 준비 |
 | UI-BASE | Studio·런처 renderer 화면 구조·탐색·스타일·기본 컴포넌트 | BASE-02 | 완료 — UI 기반만, 실제 기능 연결은 UI-02·STUDIO에서 진행 |
+| UI-CONNECT-L | 서버 상태·인증·설치·동기화·실행·사용자 관리의 런처 UI/IPC 연결 | UI-BASE, 기존 코어 | 진행 — #4, UI-01/UI-02 통합 범위 |
+| UI-CONNECT-S | 프로젝트·배포 생성·링크 검사·폴더 내보내기의 Studio UI/IPC 연결 | UI-BASE, 기존 코어 | 진행 — #1, STUDIO-01~03 통합 범위 |
 | UI-02 | 사용자 런처에 인증·동기화·접속·설정·추가 모드·오류·로그 기능 연결 | AUTH-03, SYNC-01, GAME-02, GAME-03, USER-01, USER-02, USER-03, UI-01 | 대기 |
 | STUDIO-01 | 서버 프로젝트 저장, 버전·로더·주소·이미지·기본 설정 구성 | FMT-01 | 준비 |
 | STUDIO-02 | 배포 파일 선택·생성, 공개 URL 등록·부분 다운로드 검사, 업데이트 흐름 | STUDIO-01, FMT-02, DL-01, DL-02 | 대기 |
