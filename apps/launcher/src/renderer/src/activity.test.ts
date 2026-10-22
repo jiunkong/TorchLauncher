@@ -43,6 +43,20 @@ describe('user-facing installation activity', () => {
     ).toBe('진행 중 · 6개 작업 중');
   });
 
+  it('labels staged server mods, resource packs, configuration, and files as downloading and verifying', () => {
+    const categories: Array<[ProductActivity['component'], string]> = [
+      ['server-mod', '서버 모드'],
+      ['resource-pack', '리소스팩'],
+      ['server-config', '서버 설정'],
+      ['server-file', '서버 파일'],
+    ];
+    for (const [component, name] of categories) {
+      expect(
+        activityLabel({ component, phase: 'staging', active: 1, completed: null, total: null }),
+      ).toBe(`${name} 다운로드·검증 중`);
+    }
+  });
+
   it('renders determinate progress only when the total is known', () => {
     const known = renderToStaticMarkup(
       ActivityProgress({
