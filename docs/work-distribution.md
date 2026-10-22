@@ -2,6 +2,13 @@
 
 ## 역할과 현재 배정
 
+2026-10-22 GAME-ACTIVITY-01: #4(`install_activity`), `feat/install-activity`/agent-4,
+Sol·medium(동기화/설치 이벤트 의미와 실패 전파). 독점: `apps/launcher/src/shared/product.ts`,
+`apps/launcher/src/main/product/service.ts`와 대응 테스트/새 순수 activity helper,
+`packages/core/src/loaders/launch-gate.ts`와 대응 테스트, `docs/handoffs/GAME-ACTIVITY-01.md`.
+UI 재설계/renderer 수정 없이 종류·단계·상대 경로·개수·활성 작업을 ProductState로 전달한다.
+#3은 installer.ts의 optional `onActivity`와 InstallActivity만 소유한다. 연동 계약은 작업자끼리 확인한다.
+
 2026-10-22 GAME-PERF-01: #3(`install_parallel`) / `perf/game-install-parallel` / agent-3.
 Sol·medium(경합·중단 정리·설치 트랜잭션)으로 기본 게임/Java 파일을 제한 병렬 처리한다.
 독점: `packages/core/src/minecraft/installer.ts`, 설치 관련 테스트/새 내부 helper,

@@ -7,6 +7,10 @@
 
 ## 현재 상태와 다음 작업
 
+- 새 UI 실검증 사용자 보고: **서버 접속 성공**. 이번 검증에 선택한 Fabric 배포 환경에서
+  사용자 확인을 접속 근거로 기록한다(서버 로그 미확인). 재시작 후 계정 자동 복원은 별도 미확인이다.
+  사용자 추가 요구: 향후 UI가 게임/Java/로더/서버 모드·리소스팩·설정 등 현재 작업 종류를
+  구분할 수 있어야 한다. #3은 설치 코어 `onActivity`를, #4는 전달 계약·런처 상태 연결을 맡는다.
 - 2026-10-22 사용자 지적: 설치의 순차 파일 처리가 느리므로 제한 병렬화한다.
   GAME-PERF-01을 #3(`install_parallel`, Sol·medium)에 단독 배정했다.
   `perf/game-install-parallel`/agent-3, 독점 범위는 `packages/core/src/minecraft/installer.ts`,
@@ -175,6 +179,7 @@
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 완료 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-PERF-01 | 기본 게임/Java 파일 제한 병렬 처리, 실패·취소 drain과 회귀 검증 | GAME-01, GAME-05 | 진행 — #3, `perf/game-install-parallel` |
+| GAME-ACTIVITY-01 | 작업 종류·단계·파일/개수/활성 작업 정보를 UI까지 전달할 계약 | GAME-PERF-01, UI-CONNECT-L | 진행 — #4, `feat/install-activity` |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
