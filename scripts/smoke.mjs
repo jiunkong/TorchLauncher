@@ -51,7 +51,14 @@ const appCases = [
       ['설정', '설정'],
       ['로그', '로그'],
     ],
-    expectedBridge: ['getApplicationInfo', 'getState', 'command', 'onState'],
+    expectedBridge: [
+      'getApplicationInfo',
+      'getBranding',
+      'onBranding',
+      'getState',
+      'command',
+      'onState',
+    ],
     env: { ...env, TORCH_SERVER_CONFIG: configPath },
   },
   {
@@ -121,6 +128,41 @@ try {
         assert.equal(state.server.name, 'Smoke fixture');
         assert.equal(state.server.address, serverAddress);
         assert.equal(state.account, null);
+        assert.equal(Object.hasOwn(state, 'branding'), false);
+        const branding = await page.evaluate(() => window.torchlauncher.getBranding());
+        assert.deepEqual(branding, {
+          revision: 0,
+          appName: 'TorchLauncher',
+          icon: null,
+          background: null,
+        });
+        const brandingSubscription = await page.evaluate(() => {
+          const probe = { count: 0, acknowledged: 0 };
+          const unsubscribe = window.torchlauncher.onBranding(() => probe.count++);
+          const stopAcknowledging = window.torchlauncher.onBranding(() => probe.acknowledged++);
+          window.brandingSmokeProbe = { probe, unsubscribe, stopAcknowledging };
+          return typeof unsubscribe === 'function' && typeof stopAcknowledging === 'function';
+        });
+        assert.equal(brandingSubscription, true);
+        // Inject fixed default events; all subscription operations use the public isolated bridge.
+        const emitBranding = () =>
+          app.evaluate(({ BrowserWindow }, snapshot) => {
+            BrowserWindow.getAllWindows()[0].webContents.send(
+              'launcher:branding-changed',
+              snapshot,
+            );
+          }, branding);
+        await emitBranding();
+        await page.waitForFunction(() => window.brandingSmokeProbe.probe.acknowledged === 1);
+        assert.equal(await page.evaluate(() => window.brandingSmokeProbe.probe.count), 1);
+        await page.evaluate(() => window.brandingSmokeProbe.unsubscribe());
+        await emitBranding();
+        await page.waitForFunction(() => window.brandingSmokeProbe.probe.acknowledged === 2);
+        assert.equal(await page.evaluate(() => window.brandingSmokeProbe.probe.count), 1);
+        await page.evaluate(() => {
+          window.brandingSmokeProbe.stopAcknowledging();
+          delete window.brandingSmokeProbe;
+        });
         assert.ok(['unknown', 'online', 'unavailable'].includes(state.status.state));
         await page.locator('[data-testid="launch-button"]:not([disabled])').waitFor();
         assert.equal(await page.getByTestId('launch-button').isEnabled(), true);
