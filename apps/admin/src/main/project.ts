@@ -18,7 +18,7 @@ export function parseProject(input: unknown): StudioProject {
   const p = input as Record<string, unknown>;
   const keys = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl', 'game', 'files'];
   if (
-    Object.keys(p).some((k) => ![...keys, 'branding'].includes(k)) ||
+    Object.keys(p).some((k) => ![...keys, 'branding', 'sequence'].includes(k)) ||
     keys.some((k) => !Object.hasOwn(p, k)) ||
     p.format !== 'torchlauncher-project' ||
     p.version !== 1 ||
@@ -29,6 +29,13 @@ export function parseProject(input: unknown): StudioProject {
     throw new StudioFailure('INVALID');
   try {
     if (Object.hasOwn(p, 'branding')) parseBranding(p.branding);
+    if (
+      Object.hasOwn(p, 'sequence') &&
+      (!Number.isSafeInteger(p.sequence) ||
+        (p.sequence as number) < 1 ||
+        (p.sequence as number) >= Number.MAX_SAFE_INTEGER)
+    )
+      throw new StudioFailure('INVALID');
     parseServerConfig({
       format: 'torchlauncher-server',
       version: 1,

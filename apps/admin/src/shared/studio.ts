@@ -30,6 +30,17 @@ export interface StudioProject {
   game: DeploymentGame;
   files: ProjectFile[];
   branding?: StudioBranding;
+  /** Highest deployment sequence used by a build of this project (signing, torchpack 1.2). */
+  sequence?: number;
+}
+export interface StudioSigning {
+  encryptionAvailable: boolean;
+  keyExists: boolean;
+  /** Ed25519 public key (base64url). The private key never leaves the main process. */
+  publicKey: string | null;
+  lastSequence: number;
+  /** Set by the last build or export: what happened to the key and the sequence. */
+  lastOperation: { keyCreated: boolean; sequence: number | null } | null;
 }
 export interface StudioState {
   project: StudioProject | null;
@@ -39,6 +50,7 @@ export interface StudioState {
   busy: 'saving' | 'opening' | 'choosing' | 'building' | 'checking' | 'exporting' | null;
   progress: number;
   result: string | null;
+  signing: StudioSigning | null;
 }
 export type StudioCommand =
   | {
@@ -60,7 +72,11 @@ export type StudioCommand =
 export type StudioBrandingCommand =
   | { action: 'brandingSelect' | 'brandingRemove'; role: 'icon' | 'background' }
   | { action: 'brandingName'; appName: string | null };
-export type StudioRequest = StudioCommand | StudioBrandingCommand;
+export type StudioSigningCommand =
+  | { action: 'keyStatus' | 'keyCreate' }
+  | { action: 'keyExport'; passphrase: string }
+  | { action: 'keyImport'; passphrase: string; replace: boolean };
+export type StudioRequest = StudioCommand | StudioBrandingCommand | StudioSigningCommand;
 export type StudioError =
   | 'INVALID'
   | 'BUSY'
@@ -68,7 +84,16 @@ export type StudioError =
   | 'IO'
   | 'MISMATCH'
   | 'NO_PROJECT'
-  | 'UNTRUSTED';
+  | 'UNTRUSTED'
+  | 'ENCRYPTION_UNAVAILABLE'
+  | 'KEY_EXISTS'
+  | 'KEY_MISSING'
+  | 'KEY_CORRUPT'
+  | 'KEY_MISMATCH'
+  | 'WEAK_PASSPHRASE'
+  | 'BACKUP_INVALID'
+  | 'BACKUP_UNSUPPORTED'
+  | 'BACKUP_AUTH';
 export type StudioReply = { ok: true; state: StudioState } | { ok: false; code: StudioError };
 export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;

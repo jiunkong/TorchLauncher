@@ -5,10 +5,11 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, session } from 'electron';
 import { brandingDialogText, studioChannel } from '../shared/studio.js';
 import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
+import { SigningKeyStore } from './signing.js';
 import { StudioService } from './studio.js';
 
 const applicationName = applicationNames.studio;
@@ -52,6 +53,7 @@ function createWindow(): void {
             output: '비어 있는 출력 폴더 선택',
             icon: brandingDialogText.icon,
             background: brandingDialogText.background,
+            keybackup: '서명 키 백업 파일 선택',
           }[kind],
           ...(root ? { defaultPath: root } : {}),
           properties: directory
@@ -71,7 +73,9 @@ function createWindow(): void {
                       ]
                     : kind === 'binary'
                       ? [{ name: '공통 런처', extensions: ['exe', 'AppImage'] }]
-                      : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
+                      : kind === 'keybackup'
+                        ? [{ name: '서명 키 백업', extensions: ['tlkey'] }]
+                        : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
               }
             : {}),
         });
@@ -79,12 +83,22 @@ function createWindow(): void {
       },
       save: async (kind) => {
         const result = await dialog.showSaveDialog(window, {
-          title: kind === 'project' ? '프로젝트 저장' : 'torchpack 생성',
-          defaultPath: kind === 'project' ? 'server-project.json' : 'server.torchpack',
+          title: {
+            project: '프로젝트 저장',
+            pack: 'torchpack 생성',
+            keybackup: '서명 키 백업 저장',
+          }[kind],
+          defaultPath: {
+            project: 'server-project.json',
+            pack: 'server.torchpack',
+            keybackup: 'signing-key.tlkey',
+          }[kind],
           filters: [
             {
-              name: kind === 'project' ? 'Studio 프로젝트' : '배포 파일',
-              extensions: [kind === 'project' ? 'json' : 'torchpack'],
+              name: { project: 'Studio 프로젝트', pack: '배포 파일', keybackup: '서명 키 백업' }[
+                kind
+              ],
+              extensions: [{ project: 'json', pack: 'torchpack', keybackup: 'tlkey' }[kind]],
             },
           ],
         });
@@ -103,6 +117,7 @@ function createWindow(): void {
     },
     undefined,
     decodeNativeImage,
+    new SigningKeyStore(join(app.getPath('userData'), 'signing-keys'), safeStorage),
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>

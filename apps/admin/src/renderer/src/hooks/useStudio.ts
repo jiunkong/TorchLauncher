@@ -15,6 +15,16 @@ const messages: Record<StudioError, string> = {
   MISMATCH: '배포 파일의 서버 ID, Minecraft 또는 로더가 현재 프로젝트와 다릅니다.',
   NO_PROJECT: '프로젝트를 먼저 만들거나 여세요.',
   UNTRUSTED: '요청을 허용하지 않았습니다. 앱을 다시 실행하세요.',
+  ENCRYPTION_UNAVAILABLE:
+    '이 환경에서는 서명 키를 안전하게 암호화해 보관할 수 없어 서명할 수 없습니다.',
+  KEY_EXISTS: '이 프로젝트에는 이미 다른 서명 키가 있습니다.',
+  KEY_MISSING: '이 프로젝트의 서명 키가 없습니다.',
+  KEY_CORRUPT: '저장된 서명 키를 읽을 수 없습니다. 백업에서 복원하세요.',
+  KEY_MISMATCH: '이 키 백업은 이 프로젝트(서버)의 것이 아닙니다.',
+  WEAK_PASSPHRASE: '패스프레이즈는 12자 이상이어야 합니다.',
+  BACKUP_INVALID: '서명 키 백업 파일이 올바르지 않습니다.',
+  BACKUP_UNSUPPORTED: '지원하지 않는 서명 키 백업 버전입니다.',
+  BACKUP_AUTH: '패스프레이즈가 틀렸거나 백업 파일이 손상되었습니다.',
 };
 export function useStudio() {
   const [state, setState] = useState<StudioState | null>(null);
