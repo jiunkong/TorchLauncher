@@ -5,24 +5,17 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2b done, L2a in flight, L3 next
+## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
 This section supersedes the older sections below where they conflict. Read `docs/launcher-ui.md` (spec, phases),
 `docs/release-policy.md` (updates, torchpack signing, no code signing), `docs/work-distribution.md` (L2a/L3 scopes),
 `docs/progress.md` (integration evidence) and `docs/design/launcher/README.md` (mockup sources).
 
-State: `main` = `e2255de` (clean). Integrated: launcher L1, L1b, menu animation, L1c, L2b (session restore, auto recovery,
-log sources). User confirmed L1/L1b/L1c look good on Windows.
+State: `main` clean (see git log). Integrated: launcher L1, L1b, menu animation, L1c, L2b, L2a. User confirmed L1/L1b/L1c look good on Windows.
 
-**L2a (pages 내 모드/설정/로그, in-app delete+recovery dialogs, real-order progress panel) is NOT integrated.**
-Worker: Sonnet subagent, worktree `.agents/worktrees/agent-1`, branch `feat/launcher-l2a-pages`, base `e2255de`,
-handoff will be `docs/handoffs/LAUNCHER-UI-L2A.md`. At this checkpoint the worktree has UNCOMMITTED changes and the
-subagent was still running (it dies with the Claude session). Do not reset/clean the worktree. Options: inspect
-`git -C .agents/worktrees/agent-1 status`; if the work looks complete, have a worker finish/commit it, or continue it as
-a worker. Late scope change (user decision 2026-10-23): remove BOTH native OS confirm dialogs (`confirmDeletion`,
-`confirmRecovery` in `apps/launcher/src/main/index.ts` / `service.ts`); deletion and recovery are confirmed only by the in-app
-dialog. Keep the core confirmation token, IPC validation, live-lock/game-running refusal. Expected requests from L2a to #0:
-IPC `open-logs`, unregistered-file deletion support.
+**L2a integrated** (2026-10-23, `7c13c82`, main `pnpm check` 896 tests passed; Windows and live end-to-end unverified). Both native OS
+confirm dialogs were removed (user decision); core confirmation token kept. Open follow-ups are listed at the bottom of
+`docs/launcher-ui.md` (`open-logs` IPC, unregistered-file deletion command, data-root in state). Worker worktrees are detached at main.
 
 Review/merge rule (unchanged): #0 reviews diff, `git merge --no-ff`, runs `pnpm check` on `main` (WSL: add
 `/tmp/torchlauncher-tools/node_modules/.bin` to PATH; worker worktrees need `CI=true pnpm install --frozen-lockfile`),
