@@ -7,6 +7,10 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+Studio33e038b integrated179dc91; main check passed1034/9skip, types/Biome/bothbuilds.
+Read docs/handoffs/BRAND-STUDIO-01.md for exact non-UI commands/storage; admin renderer unchanged.
+Launcher runtime still final validation/commit pending in agent-1.
+
 User now explicitly authorized parallel Studio FUNCTIONS ONLY (no admin renderer/UI).
 BRAND-STUDIO-01 #2 Sol medium requested, agent-2 feat/studio-branding-functions baseline907f7d7.
 See docs/branding-studio-task.md; #1 retains launcher runtime exclusively.

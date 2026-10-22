@@ -7,6 +7,12 @@
 
 ## 현재 상태와 다음 작업
 
+BRAND-STUDIO-01 `33e038b` → `179dc91` 통합 완료(UI 변경 없음). main pnpm check 성공:
+1034개 통과/9 skip, 전체 타입·두 앱 빌드·Biome. 로그 `/tmp/torch-brand-studio-check.log`.
+이미지 선택/제거·앱 이름 API, 20MiB 제한 embedded 프로젝트 snapshot/요약 상태,
+동일 bytes pack/sidecar 출력과 원격 역할 mismatch 차단 구현. [인계/API](handoffs/BRAND-STUDIO-01.md).
+Studio 선택 화면은 요청대로 후속. 런처 작업자는 Electron fixture 검증 통과 후 최종 커밋 준비 중이다.
+
 사용자 추가 승인: BRAND-STUDIO-01 기능만 런처와 병렬 진행(Studio renderer/UI 수정 금지).
 #2 Sol medium 요청, agent-2 `feat/studio-branding-functions`, 기준 `907f7d7`.
 독점 main/shared/필요한 preload 및 전용 새 smoke. [배정](branding-studio-task.md).
