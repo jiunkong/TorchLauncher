@@ -26,9 +26,11 @@ export interface LaunchDeploymentOptions {
       | 'authentication'
       | 'latest-deployment'
       | 'synchronization'
+      | 'settings'
       | 'final-guard'
       | 'spawn',
   ) => void;
+  launcherVersion?: string;
   expectedServerId: string;
   server: string;
   signal?: AbortSignal;
@@ -36,6 +38,8 @@ export interface LaunchDeploymentOptions {
   current(signal?: AbortSignal): Promise<DeploymentReader>;
   prepare(reader: DeploymentReader): Promise<Installation>;
   authenticate(): Promise<LaunchAuth>;
+  /** Trusted host-only policy application, after latest sync and before acquiring the game lease. */
+  afterSynchronization?(reader: DeploymentReader): Promise<void>;
   process?: Omit<GameProcessOptions, 'preSpawn' | 'signal'>;
 }
 /** Installation/authentication, a fresh mandatory sync, then final remote/local checks under game lease. */
@@ -67,9 +71,19 @@ export async function launchDeployment(options: LaunchDeploymentOptions): Promis
     expectedServerId: options.expectedServerId,
     ...(options.signal ? { signal: options.signal } : {}),
   });
+  options.signal?.throwIfAborted();
+  if (options.afterSynchronization) {
+    options.onPhase?.('settings');
+    await options.afterSynchronization(accepted);
+    options.signal?.throwIfAborted();
+  }
   return launchMinecraft(
     installation,
-    { auth, launcherVersion: 'game-smoke', quickPlayServer: options.server },
+    {
+      auth,
+      launcherVersion: options.launcherVersion ?? 'game-smoke',
+      quickPlayServer: options.server,
+    },
     {
       ...options.process,
       ...(options.signal ? { signal: options.signal } : {}),
