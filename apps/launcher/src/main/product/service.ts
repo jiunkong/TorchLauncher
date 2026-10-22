@@ -499,6 +499,12 @@ export class ProductService {
       },
       prepare: async (reader) => {
         if (reader.index.game.minecraftVersion !== '1.21.1') throw new Error('unsupported-game');
+        this.state.game = {
+          minecraftVersion: reader.index.game.minecraftVersion,
+          loader: reader.index.game.loader.kind,
+          loaderVersion: reader.index.game.loader.version,
+        };
+        this.publish();
         const base = await installMinecraft({
           root,
           version: '1.21.1',
@@ -549,6 +555,7 @@ export class ProductService {
     });
     this.game = game;
     this.state.running = true;
+    this.state.runningSince = Date.now();
     this.phase('game-running');
     if (this.state.preferences.closeOnLaunch) {
       try {
@@ -558,12 +565,14 @@ export class ProductService {
         this.game = undefined;
         this.relinquished = true;
         this.state.running = false;
+        delete this.state.runningSince;
         this.state.outcome = 'game-detached';
         return;
       } catch (error) {
         await game.stop();
         this.game = undefined;
         this.state.running = false;
+        delete this.state.runningSince;
         throw error;
       }
     }
@@ -577,6 +586,7 @@ export class ProductService {
       clearInterval(interval);
       this.game = undefined;
       this.state.running = false;
+      delete this.state.runningSince;
     }
   }
   async close() {

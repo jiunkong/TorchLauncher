@@ -3,7 +3,7 @@ import { activityLabel, activityProgress, type StepId, stepChips, stepOf } from 
 import torchUrl from '../assets/torch.png';
 import { ActivityProgressBar } from '../components/ActivityProgressBar';
 import { MicrosoftIcon, PlayFilledIcon, RetryIcon, StopIcon } from '../components/Icons';
-import { elapsedParts, homeView } from '../home';
+import { elapsedParts, gameParts, homeView } from '../home';
 import { useT } from '../hooks/useTranslator';
 import { failureMessage, operationLabel, outcomeLabel } from '../labels';
 
@@ -36,6 +36,7 @@ export interface HomeProps {
 export function Home(props: HomeProps) {
   const t = useT();
   const { state } = props;
+  const game = gameParts(state);
   const view = homeView(state, props.productError, props.pending);
   const formatElapsed = (ms: number) => {
     const { h, m, s } = elapsedParts(ms);
@@ -101,7 +102,7 @@ export function Home(props: HomeProps) {
       data-kind={view.kind}
     >
       <div className="scene fallback" aria-hidden="true">
-        <img src={torchUrl} alt="" />
+        <img src={torchUrl} alt="" draggable={false} />
       </div>
       <div className="shade" />
       <div className="copy">
@@ -110,7 +111,11 @@ export function Home(props: HomeProps) {
           {status.text}
         </span>
         <h1>{state.server?.name ?? t('home.noServer')}</h1>
-        <span className="meta2">{t('home.game', { version: homeGameVersion })}</span>
+        <span className="meta2" data-testid="game-version">
+          {[t('home.game', { version: game.minecraft ?? homeGameVersion }), game.loader]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
 
         {view.kind === 'busy' && (
           <div className="panel" role="status" aria-live="polite">
@@ -135,7 +140,7 @@ export function Home(props: HomeProps) {
           </div>
         )}
         {(view.kind === 'error' || view.kind === 'unconfigured' || view.kind === 'unsupported') && (
-          <div className="panel warn" role="alert">
+          <div className="panel warn selectable" role="alert">
             <div className="top">
               <strong>{warnTitle}</strong>
             </div>

@@ -17,6 +17,17 @@ export default defineConfig({
               'utf8',
             ),
           });
+          const fontNotice = (name: string, file: string) =>
+            `${name}\n\n${readFileSync(new URL(`../../third-party/${file}/LICENSE`, import.meta.url), 'utf8').trim()}\n`;
+          this.emitFile({
+            type: 'asset',
+            fileName: 'font-licenses-NOTICE.txt',
+            source: [
+              'Bundled fonts (SIL Open Font License 1.1)\n',
+              fontNotice('Pretendard Variable', 'pretendard'),
+              fontNotice('Pixelify Sans', 'pixelify-sans'),
+            ].join('\n----------------------------------------\n\n'),
+          });
         },
       },
     ],

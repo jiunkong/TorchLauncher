@@ -97,7 +97,7 @@ export function Menu(props: MenuProps) {
     <aside className="side-open" data-testid="menu" data-open="true">
       <div className="side-head">
         <span className="opicon" aria-hidden="true">
-          <img src={torchUrl} alt="" />
+          <img src={torchUrl} alt="" draggable={false} />
         </span>
         <strong className="side-name">{props.serverName ?? t('home.noServer')}</strong>
         <button
