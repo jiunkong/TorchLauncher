@@ -2,6 +2,13 @@
 
 ## 역할과 현재 배정
 
+UI-FEEDBACK-01 사용자 보고: 플레이에서 서버 이름/버튼까지 전부 보이지 않음, 설정 경로 복사 버튼 요청.
+#1 기존 작업자 `branding_contracts`, agent-1 `fix/launcher-play-path-feedback`, 기준 `a0a4bda`.
+배타적 launcher renderer 및 앱 로컬 smoke/fixture·해당 인계만. main/IPC/core/admin/루트 scripts 제외.
+배경 z-index/stacking 실제 가림을 elementFromPoint·화면으로 재현하고 수정한다(원인 확정 전).
+긴 경로 전체를 clipboard로 복사하는 버튼·성공/실패 i18n·760/1100 표시를 확인한다.
+기존 smoke의 DOM 존재 검사와 실제 시각/클릭 가능 검증을 구분한다. #0만 통합/전체 검사한다.
+
 운영자 브랜딩 구현·통합 검사 완료(Windows/실배포 확인은 대기).
 - core `7281829` → `df2af4d`, Studio 기능 `33e038b` → `179dc91`, 런처 `499d53d` → `8ebb64d`.
 - 검증 스크립트 정렬 `9ef99cd` → `553a072`: 새 API exact 목록/기본값/실제 구독 해제를 추가했다.

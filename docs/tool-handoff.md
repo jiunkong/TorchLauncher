@@ -7,6 +7,11 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, #0): launcher L1–L3 and Studio branding functions integrated
 
+New USER regression UI-FEEDBACK-01: Home all text/buttons hidden; add Settings full-path copy button.
+#1 existing worker agent-1 fix/launcher-play-path-feedback baselinea0a4bda, renderer/app-local smoke only.
+Suspect background stacking (not confirmed yet). Verify actual painted/hit-test content, not mere DOM presence.
+No main/IPC/core/admin/root-scripts scope. Integrated branding success below predates user visual report.
+
 Latest overrides historical pending notes below: ALL hybrid branding phases integrated and verified on main.
 Core7281829/df2af4d, Studio33e038b/179dc91, runtime499d53d/8ebb64d, smoke9ef99cd/553a072.
 Full pnpmcheck PASSED1051tests/9skip/types/Biome(8existingCSSwarnings)/bothbuilds.
