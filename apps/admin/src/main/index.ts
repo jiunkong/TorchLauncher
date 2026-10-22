@@ -19,6 +19,10 @@ function createWindow(): void {
     (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) || pathToFileURL(rendererFile).href;
   const window = new BrowserWindow({
     title: applicationName,
+    icon: join(
+      app.isPackaged ? process.resourcesPath : app.getAppPath(),
+      app.isPackaged ? 'branding/icon.png' : '../../assets/branding/icon.png',
+    ),
     width: 1100,
     height: 760,
     minWidth: 760,
