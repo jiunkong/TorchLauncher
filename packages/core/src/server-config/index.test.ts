@@ -108,3 +108,32 @@ describe('optional profile branding', () => {
     },
   );
 });
+
+describe('server config signing', () => {
+  const publicKey = Buffer.alloc(32, 7).toString('base64url');
+  it('accepts a strict ed25519 signing block and keeps old configs unchanged', () => {
+    const signing = { algorithm: 'ed25519', publicKey };
+    expect(parseServerConfig({ ...config, signing })).toEqual({ ...config, signing });
+    expect(parseServerConfig(config)).not.toHaveProperty('signing');
+  });
+  it.each([
+    null,
+    [],
+    {},
+    { algorithm: 'ed25519' },
+    { publicKey },
+    { algorithm: 'rsa', publicKey },
+    { algorithm: 'Ed25519', publicKey },
+    { algorithm: 'ed25519', publicKey, extra: 1 },
+    { algorithm: 'ed25519', publicKey: 1 },
+    { algorithm: 'ed25519', publicKey: '' },
+    { algorithm: 'ed25519', publicKey: `${publicKey}=` },
+    { algorithm: 'ed25519', publicKey: publicKey.slice(0, 42) },
+    { algorithm: 'ed25519', publicKey: `${publicKey}A` },
+    { algorithm: 'ed25519', publicKey: Buffer.alloc(32, 7).toString('base64') + 'x' },
+    { algorithm: 'ed25519', publicKey: Buffer.alloc(33, 7).toString('base64url') },
+    { algorithm: 'ed25519', publicKey: `${publicKey.slice(0, 42)}B` },
+  ])('rejects malformed signing %j', (signing) => {
+    expect(() => parseServerConfig({ ...config, signing })).toThrow('Invalid server configuration');
+  });
+});

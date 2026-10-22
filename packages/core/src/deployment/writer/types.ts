@@ -45,6 +45,16 @@ export interface WriteDeploymentOptions {
   readonly files: readonly DeploymentInputFile[];
   /** When present (even {}), emits v1.1. Omit for byte-compatible v1.0 output. */
   readonly branding?: DeploymentBrandingInputs;
+  /**
+   * v1.2: monotonically increasing deployment number (safe integer >= 1). Must be given together
+   * with `sign`; either alone is invalid input.
+   */
+  readonly sequence?: number;
+  /**
+   * Signs `"TORCHPACK-SIG-v1\0" || header(64)` with the project's Ed25519 key and returns the
+   * 64-byte signature. Core never holds private keys. When present, emits v1.2 (branding optional).
+   */
+  readonly sign?: (message: Buffer) => Buffer | Promise<Buffer>;
   readonly signal?: AbortSignal;
   /** Awaited to provide backpressure; callback failure cancels the operation before commit. */
   readonly onProgress?: (progress: DeploymentWriteProgress) => void | Promise<void>;

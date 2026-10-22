@@ -3,6 +3,7 @@ export { DEPLOYMENT_READ_CHUNK_LENGTH, openDeploymentReader } from './reader.js'
 export type {
   BrandingDeploymentReader,
   DeploymentReader,
+  DeploymentVerification,
   OpenDeploymentReaderOptions,
   StageDeploymentFileOptions,
   StagedBrandingAsset,

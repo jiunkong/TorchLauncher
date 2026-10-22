@@ -4,7 +4,6 @@ import {
   isBrandingAssetMetadata,
 } from '../../branding/index.js';
 import {
-  DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
   DEPLOYMENT_MAGIC,
   type DeploymentBrandingAsset,
@@ -14,6 +13,8 @@ import {
   type DeploymentIndex,
   type DeploymentPayload,
   type DeploymentValidationContext,
+  deploymentIndexStart,
+  deploymentPayloadStart,
   EMPTY_FILE_SHA256,
 } from './types.js';
 
@@ -67,7 +68,7 @@ function integer(value: unknown, maximum: number, field: string, minimum = 0): n
 
 function version(value: unknown, field: string): void {
   const entry = object(value, ['major', 'minor'], field);
-  if (entry.major !== 1 || (entry.minor !== 0 && entry.minor !== 1)) {
+  if (entry.major !== 1 || (entry.minor !== 0 && entry.minor !== 1 && entry.minor !== 2)) {
     fail('unsupported-version', field);
   }
 }
@@ -212,7 +213,8 @@ export function validateDeploymentHeader(value: unknown): DeploymentHeader {
     DEPLOYMENT_LIMITS.containerLength,
     'header.totalLength',
   );
-  if (totalLength < DEPLOYMENT_HEADER_LENGTH + indexLength) {
+  const minor = (entry.formatVersion as { minor: number }).minor;
+  if (totalLength < deploymentIndexStart(minor) + indexLength) {
     fail('invalid-layout', 'header.totalLength');
   }
   hash(entry.indexSha256, 'header.indexSha256');
@@ -234,7 +236,8 @@ export function validateDeploymentIndex(
       'deploymentId',
       'game',
       'files',
-      ...(header.formatVersion.minor === 1 ? ['branding'] : []),
+      ...(header.formatVersion.minor >= 1 ? ['branding'] : []),
+      ...(header.formatVersion.minor === 2 ? ['sequence'] : []),
     ],
     'index',
   );
@@ -244,6 +247,9 @@ export function validateDeploymentIndex(
   }
   id(entry.serverId, 'index.serverId');
   id(entry.deploymentId, 'index.deploymentId');
+  if (header.formatVersion.minor === 2) {
+    integer(entry.sequence, Number.MAX_SAFE_INTEGER, 'index.sequence', 1);
+  }
   if (entry.serverId !== context.expectedServerId) fail('server-mismatch', 'index.serverId');
   const game = object(entry.game, ['minecraftVersion', 'loader'], 'index.game');
   versionToken(game.minecraftVersion, 'index.game.minecraftVersion');
@@ -257,7 +263,7 @@ export function validateDeploymentIndex(
 
   const filePaths = new Set<string>();
   const directories = new Set<string>();
-  const payloadLength = header.totalLength - DEPLOYMENT_HEADER_LENGTH - header.indexLength;
+  const payloadLength = header.totalLength - deploymentPayloadStart(header);
   let cursor = 0;
   let totalOriginalLength = 0;
   for (const [position, candidate] of entry.files.entries()) {
@@ -281,7 +287,7 @@ export function validateDeploymentIndex(
       fail('limit-exceeded', 'index.files.originalLength');
     }
   }
-  if (header.formatVersion.minor === 1) {
+  if (header.formatVersion.minor >= 1) {
     const branding = entry.branding;
     if (branding === null || typeof branding !== 'object' || Array.isArray(branding))
       fail('invalid-shape', 'index.branding');
@@ -314,7 +320,7 @@ export function getDeploymentFileRange(
 ): DeploymentByteRange | null {
   validateDeploymentHeader(header);
   file(entry, 'file');
-  const start = DEPLOYMENT_HEADER_LENGTH + header.indexLength + entry.offset;
+  const start = deploymentPayloadStart(header) + entry.offset;
   if (start + entry.storedLength > header.totalLength) fail('invalid-layout', 'file.storedLength');
   return entry.storedLength === 0 ? null : { start, endInclusive: start + entry.storedLength - 1 };
 }
@@ -326,14 +332,14 @@ export function getDeploymentBrandingRange(
   entry: DeploymentBrandingAsset,
 ): DeploymentByteRange {
   validateDeploymentHeader(header);
-  if (header.formatVersion.minor !== 1) fail('unsupported-version', 'header.formatVersion');
+  if (header.formatVersion.minor < 1) fail('unsupported-version', 'header.formatVersion');
   if (!BRANDING_ROLES.includes(role)) fail('invalid-value', 'role');
   brandingAsset(entry, role, 'branding');
   return getPayloadRange(header, entry);
 }
 
 function getPayloadRange(header: DeploymentHeader, entry: DeploymentPayload): DeploymentByteRange {
-  const start = DEPLOYMENT_HEADER_LENGTH + header.indexLength + entry.offset;
+  const start = deploymentPayloadStart(header) + entry.offset;
   if (start + entry.storedLength > header.totalLength)
     fail('invalid-layout', 'payload.storedLength');
   return { start, endInclusive: start + entry.storedLength - 1 };
