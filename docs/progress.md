@@ -7,6 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
+사용자 추가 승인: BRAND-STUDIO-01 기능만 런처와 병렬 진행(Studio renderer/UI 수정 금지).
+#2 Sol medium 요청, agent-2 `feat/studio-branding-functions`, 기준 `907f7d7`.
+독점 main/shared/필요한 preload 및 전용 새 smoke. [배정](branding-studio-task.md).
+#1은 launcher만, #2는 admin만 변경한다. core/루트 설정/lockfile은 양쪽 모두 제외한다.
+
 BRAND-CORE-01 `7281829` → `df2af4d` 통합 완료. main pnpm check 성공: 1028개 통과/9 skip,
 전체 타입·두 앱 빌드·Biome(기존 경고). 로그 `/tmp/torch-brand-core-check.log`.
 다음 BRAND-RUNTIME-01은 같은 #1 작업자/Sol medium 요청으로 agent-1 `feat/branding-runtime`에 배정한다.

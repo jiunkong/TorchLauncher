@@ -7,6 +7,10 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+User now explicitly authorized parallel Studio FUNCTIONS ONLY (no admin renderer/UI).
+BRAND-STUDIO-01 #2 Sol medium requested, agent-2 feat/studio-branding-functions baseline907f7d7.
+See docs/branding-studio-task.md; #1 retains launcher runtime exclusively.
+
 Core7281829 integrated df2af4d; main check passed1028/9skip (types/Biome/bothbuilds).
 Next BRAND-RUNTIME-01 reuses #1 Sol medium, feat/branding-runtime agent-1, apps/launcher/** only.
 Read docs/branding-runtime-task.md. Studio follows sequentially; no extra concurrent worker.
