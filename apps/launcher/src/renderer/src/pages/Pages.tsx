@@ -27,7 +27,10 @@ export function PageContent({ page, state, command }: Props) {
           <div className="server-details">
             <span className="eyebrow">SERVER SPACE</span>
             <h2>{state.server?.name ?? '서버 구성 없음'}</h2>
-            <p>{state.server?.address ?? 'Studio에서 내보낸 서버 구성 파일을 런처 옆에 두세요.'}</p>
+            <p>
+              {state.server?.address ??
+                '서버 구성이 누락된 배포본입니다. 운영자에게 이 서버용 런처를 다시 받으세요.'}
+            </p>
             <div className="server-meta">
               <span>Minecraft 1.21.1 · Fabric / NeoForge</span>
               <span>Windows / Linux x64</span>
