@@ -133,6 +133,96 @@ try {
     const preferences = (await window.torchlauncher.getState()).preferences;
     return preferences.maxMemoryMiB === 512 && preferences.initialMemoryMiB === 256;
   });
+  const dragMemoryInput = async (testId, deltaX) => {
+    const box = await page.getByTestId(testId).boundingBox();
+    assert.ok(box, `${testId} is visible for dragging`);
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + deltaX, y, { steps: 4 });
+    await page.mouse.up();
+  };
+  await page.evaluate(() => {
+    const input = document.querySelector('[data-testid="max-memory"]');
+    input?.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        pointerId: 900,
+        isPrimary: true,
+        button: 2,
+        clientX: 0,
+      }),
+    );
+    input?.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        pointerId: 900,
+        isPrimary: true,
+        clientX: 100,
+      }),
+    );
+  });
+  assert.equal(await page.getByTestId('max-memory').inputValue(), '0.5');
+  await dragMemoryInput('max-memory', 40);
+  assert.equal(await page.getByTestId('max-memory').inputValue(), '1');
+  await dragMemoryInput('max-memory', -20);
+  assert.equal(await page.getByTestId('max-memory').inputValue(), '0.75');
+  await dragMemoryInput('initial-memory', 40);
+  assert.equal(await page.getByTestId('initial-memory').inputValue(), '0.75');
+  await dragMemoryInput('initial-memory', -20);
+  assert.equal(await page.getByTestId('initial-memory').inputValue(), '0.5');
+  assert.deepEqual(
+    await page.evaluate(async () => {
+      const preferences = (await window.torchlauncher.getState()).preferences;
+      return [preferences.maxMemoryMiB, preferences.initialMemoryMiB];
+    }),
+    [512, 256],
+  );
+  await page.getByTestId('initial-memory').fill('');
+  await page.evaluate(() => {
+    const input = document.querySelector('[data-testid="initial-memory"]');
+    input?.addEventListener(
+      'pointerdown',
+      (event) => {
+        window.__memoryScrubPointerId = event.pointerId;
+      },
+      { capture: true, once: true },
+    );
+  });
+  const initialBox = await page.getByTestId('initial-memory').boundingBox();
+  assert.ok(initialBox);
+  const initialX = initialBox.x + initialBox.width / 2;
+  const initialY = initialBox.y + initialBox.height / 2;
+  await page.mouse.move(initialX, initialY);
+  await page.mouse.down();
+  await page.evaluate((clientX) => {
+    const input = document.querySelector('[data-testid="initial-memory"]');
+    input?.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        pointerId: window.__memoryScrubPointerId + 1,
+        isPrimary: true,
+        clientX,
+      }),
+    );
+  }, initialX + 100);
+  assert.equal(await page.getByTestId('initial-memory').inputValue(), '');
+  await page.mouse.move(initialX + 40, initialY, { steps: 4 });
+  assert.equal(await page.getByTestId('initial-memory').inputValue(), '0.75');
+  await page.evaluate(() => {
+    const input = document.querySelector('[data-testid="initial-memory"]');
+    input?.dispatchEvent(
+      new PointerEvent('pointercancel', {
+        bubbles: true,
+        pointerId: window.__memoryScrubPointerId,
+        isPrimary: true,
+      }),
+    );
+  });
+  await page.mouse.up();
+  assert.equal(await page.getByTestId('initial-memory').inputValue(), '');
+  await page.getByTestId('initial-memory').fill('0.25');
   assert.deepEqual(
     JSON.parse(await readFile(resolve(temp, 'user-data/launcher-preferences.json'), 'utf8')),
     { closeOnLaunch: true, maxMemoryMiB: 512, initialMemoryMiB: 256 },
@@ -163,6 +253,7 @@ try {
   await page.getByRole('button', { name: '플레이', exact: true }).click();
   const home = page.getByTestId('home');
   await home.getByText('서버 상태를 확인하지 못했습니다', { exact: true }).waitFor();
+  assert.equal(await home.getByText(/최근 결과/).count(), 0);
   assert.equal(await page.getByTestId('app-shell').getAttribute('inert'), null);
   await page.getByRole('button', { name: '로그', exact: true }).click();
   await page.getByRole('tab', { name: '런처', exact: true }).click();

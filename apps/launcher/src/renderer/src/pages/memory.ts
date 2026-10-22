@@ -2,6 +2,8 @@ export const defaultMaxMemoryMiB = 2048;
 export const minimumMaxMemoryMiB = 512;
 export const minimumInitialMemoryMiB = 256;
 export const maximumMemoryMiB = 65536;
+export const memoryScrubThresholdPx = 4;
+export const memoryScrubMiBPer20Px = 256;
 
 export function parseMemoryGiB(value: string): number | null {
   if (!value.trim()) return null;
@@ -36,4 +38,14 @@ export function validGameMemory(
 
 export function exceedsRecommendedPhysicalMemory(maxMemoryMiB: number, physicalMemoryMiB: number) {
   return maxMemoryMiB > physicalMemoryMiB * 0.75;
+}
+
+export function scrubMemoryMiB(
+  startMiB: number,
+  deltaX: number,
+  minimumMiB: number,
+  maximumMiB: number,
+): number {
+  const steps = Math.sign(deltaX) * Math.round(Math.abs(deltaX) / 20);
+  return Math.min(maximumMiB, Math.max(minimumMiB, startMiB + steps * memoryScrubMiBPer20Px));
 }

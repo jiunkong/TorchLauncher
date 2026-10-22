@@ -8,7 +8,6 @@ import { useT } from '../hooks/useTranslator';
 import {
   failureMessage,
   operationLabel,
-  outcomeLabel,
   recoveryIssueText,
   stageLabel,
   stageNowLabel,
@@ -184,12 +183,6 @@ export function Home(props: HomeProps) {
             )}
           </div>
         )}
-        {state.outcome && view.kind !== 'busy' && view.kind !== 'running' && (
-          <span className="hintline" role="status">
-            {t('home.recentResult', { outcome: outcomeLabel(t, state.outcome) })}
-          </span>
-        )}
-
         <div className="actions">
           {view.kind === 'running' ? (
             <button
