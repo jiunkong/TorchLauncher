@@ -119,7 +119,7 @@ describe('deployment v1 contracts', () => {
 
   it.each([
     { major: 2, minor: 0 },
-    { major: 1, minor: 2 },
+    { major: 1, minor: 3 },
     { major: '1', minor: 0 },
   ])('rejects unsupported header and index versions: %j', (formatVersion) => {
     const { index, header } = createValidDeployment();

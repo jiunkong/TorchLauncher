@@ -1,4 +1,4 @@
-# TorchLauncher 단일 배포 규격 v1.0 / v1.1
+# TorchLauncher 단일 배포 규격 v1.0 / v1.1 / v1.2
 
 FMT-01 계약과 BRAND-CORE-01 브랜딩 확장. 통합 승인은 #0이 담당한다. 구현 계약은
 `packages/core/src/deployment/contracts/`, reader와 writer는 인접 모듈에 있다. 브랜딩 런타임·캐시·UI는 후속 작업이다.
@@ -14,13 +14,13 @@ FMT-01 계약과 BRAND-CORE-01 브랜딩 확장. 통합 승인은 #0이 담당�
 | --- | --- | --- |
 | 0 | 8 | ASCII `TORCHDEP` (`54 4f 52 43 48 44 45 50`) |
 | 8 | 2 | major = 1 |
-| 10 | 2 | minor = 0 (일반 배포) 또는 1 (브랜딩 확장) |
+| 10 | 2 | minor = 0 (일반 배포), 1 (브랜딩 확장) 또는 2 (서명 + 브랜딩) |
 | 12 | 4 | flags = 0 |
 | 16 | 8 | indexLength: 실제 UTF-8 인덱스 바이트 수 |
 | 24 | 8 | totalLength: 헤더·인덱스·페이로드를 합친 전체 바이트 수 |
 | 32 | 32 | 인덱스 원본 바이트의 SHA-256 (binary digest) |
 
-새 reader는 정확히 1.0 또는 1.1이고 flags가 0인 입력만 수락한다. 미래 minor, major, 새로운 필드,
+새 reader는 정확히 1.0, 1.1 또는 1.2이고 flags가 0인 입력만 수락한다. 미래 minor, major, 새로운 필드,
 압축 방식 또는 적용 정책을 추측해서 처리하지 않는다. 새 필드나 의미 변경에는 버전 갱신이
 필요하다. writer는 헤더와 인덱스에 같은 버전을 기록하며 서로 다른 minor는 거부한다.
 브랜딩 입력이 없으면 기존 1.0을 쓰고, 브랜딩 입력이 있으면 빈 객체나 제거만 있어도 1.1을 쓴다.
@@ -267,3 +267,25 @@ JSON 구조·필드·unsafe 경로 등 계약 오류는 프로파일 오류다. 
 실제 root 이탈을 거부하고 게임 데이터 밖 캐시를 서버 ID·프로파일 기준으로 분리한다. 원격 전체 인덱스가
 잘못되면 여전히 reader 오류다. 이미지 fetch/decode 실패를 게임 실패로 연결하지 않는다.
 프로파일/배포 해시는 무결성 검사이며 운영자 진위 서명이나 rollback 방지를 제공하지 않는다.
+
+
+## v1.2 서명 컨테이너 (SIGN-CORE-01)
+
+정책·위협 모델·롤백 방지는 [배포 서명과 롤백 방지 명세](deployment-signing.md)가 기준이다. 여기서는 바이너리 규격과 코드 계약만 기록한다.
+
+- 레이아웃: `[64바이트 헤더][64바이트 Ed25519 서명][JSON 인덱스][페이로드]`. 헤더는 minor = 2, flags = 0이며 나머지 필드는 동일하다.
+  `totalLength`는 서명을 포함한 전체 길이다. 인덱스는 절대 위치 `128`부터이고(`bytes=128-(127+indexLength)`), 페이로드 절대 위치는 `128 + indexLength + offset`이다.
+  `payloadStart(header) = 64 + (minor === 2 ? 64 : 0) + indexLength`로 모든 범위 계산(`getDeploymentFileRange`, `getDeploymentBrandingRange`)이 공유한다.
+- 서명 대상: `"TORCHPACK-SIG-v1\0"`(17바이트, NUL 포함) `||` 헤더 원본 64바이트. 인덱스는 헤더의 SHA-256·길이를 통해 간접 서명된다. 페이로드는 서명 대상이 아니며 인덱스의 파일 해시로 보호된다.
+- 인덱스: 1.2는 1.1의 필수 `branding`(생략된 역할 = 현재 표시 유지, writer는 입력이 없으면 `{}`를 기록)에 더해 필수 `sequence`(안전한 정수, 1 이상)를 가진다. `sequence`는 1.0/1.1에서 알 수 없는 필드로 거부한다. 브랜딩 규칙·페이로드 순서는 1.1과 같다.
+- reader 검증 순서: 헤더 → (공개 키가 있고 1.0/1.1이면 `signature-required`로 즉시 거부) → 서명 → 인덱스 → 인덱스 SHA-256 = 헤더 값 → 서명 검증 → 그 뒤에야 인덱스 파싱·검증·노출. 검증 전에는 인덱스 내용에 의존하는 요청·스테이징이 없다.
+- reader 옵션 `trustedPublicKey`(base64url 32바이트 문자열 또는 raw 32바이트). 형식이 틀리면 요청 전에 `invalid-signing-key`. 결과 `reader.verification`:
+  `'verified'`(1.2 + 키 검증 성공), `'unverified'`(1.2 구조 검증만, 키 없음 — 아무도 인증하지 않음), `'unsigned'`(1.0/1.1, 키 불요 구성에서만 가능).
+  런처는 구성에 `signing`이 있으면 항상 키를 전달해야 하며, 키가 없을 때의 `unverified`는 서명 도입 전 구성의 호환용이다.
+- 오류 코드(`DeploymentReaderError`): `signature-required`(키가 필요한데 서명 없는 1.0/1.1), `signature-invalid`(서명이 해당 키로 검증되지 않음), `signature-malformed`(서명 블록이 64바이트가 아님), `invalid-signing-key`.
+  서명 값만으로는 '변조된 헤더·인덱스'와 '다른 키'를 구별할 수 없다(Ed25519 검증은 참/거짓뿐이며 키 ID가 규격에 없음). 둘 다 `signature-invalid`다.
+- writer 옵션: `sequence`와 `sign(message) => Buffer | Promise<Buffer>`를 반드시 함께 준다(하나만 있거나 sequence가 안전한 정수 1 이상이 아니면 `invalid-input`). core는 개인 키를 보관하지 않는다.
+  반환 서명이 정확히 64바이트가 아니면 `invalid-signature`이고 출력은 만들어지지 않는다. 헬퍼 `createEd25519Signer(privateKey)`, `deriveEd25519PublicKey(privateKey)`는 Studio용이다.
+- 서버 구성 `signing`: `{ "algorithm": "ed25519", "publicKey": "<정규 base64url, 43자, 32바이트>" }`. 알 수 없는 algorithm·길이·패딩·비정규 인코딩·추가 필드는 구성 거부. `signing`이 없는 기존 구성은 그대로 유효하다.
+- 롤백 판정 순수 함수 `decideRollback(seen | null, incoming)`은 `'accept' | 'reject-lower' | 'reject-conflict'`를 반환한다. 입력은 `{sequence, deploymentId, indexSha256}`이며 잘못된 값은 `TypeError`. 저장·갱신 시점은 런처 책임이다.
+- 위 "v1은 서명되지 않은 배포 규격" 서술은 1.0/1.1에 한한다. 1.2에서 신뢰 기준은 서버 구성의 공개 키다.

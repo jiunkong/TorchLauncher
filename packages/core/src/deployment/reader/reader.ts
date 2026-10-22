@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, type KeyObject } from 'node:crypto';
 import { type FileHandle, open, rm } from 'node:fs/promises';
 import { createInflateRaw } from 'node:zlib';
 import type { ByteRange, ResourceSnapshot } from '../../download/http/index.js';
@@ -12,18 +12,26 @@ import {
   type BrandingRole,
   DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
+  DEPLOYMENT_SIGNATURE_LENGTH,
   type DeploymentByteRange,
   type DeploymentHeader,
   type DeploymentIndex,
   type DeploymentPayload,
+  deploymentIndexStart,
   getDeploymentBrandingRange,
   getDeploymentFileRange,
   validateDeploymentHeader,
   validateDeploymentIndex,
 } from '../contracts/index.js';
+import {
+  DeploymentSigningKeyError,
+  importEd25519PublicKey,
+  verifyDeploymentSignature,
+} from '../signing/index.js';
 import { DeploymentReaderError } from './errors.js';
 import type {
   BrandingDeploymentReader,
+  DeploymentVerification,
   OpenDeploymentReaderOptions,
   StagedBrandingAsset,
   StagedDeploymentFile,
@@ -325,7 +333,13 @@ async function getExactRange(
 async function readIndex(
   source: DownloadSource,
   options: OpenDeploymentReaderOptions,
-): Promise<{ header: DeploymentHeader; index: DeploymentIndex; pin: Pin }> {
+  trustedKey: KeyObject | undefined,
+): Promise<{
+  header: DeploymentHeader;
+  index: DeploymentIndex;
+  pin: Pin;
+  verification: DeploymentVerification;
+}> {
   const pinState: { pin?: Pin } = {};
   const chunkBytes = validateChunkLength(options.rangeChunkBytes);
   const headerBytes = await getExactRange(
@@ -338,7 +352,24 @@ async function readIndex(
   const header = decodeHeader(headerBytes);
   if (!pinState.pin || header.totalLength !== pinState.pin.snapshot.totalLength)
     fail('invalid-header');
-  const indexStart = DEPLOYMENT_HEADER_LENGTH;
+  const signed = header.formatVersion.minor === 2;
+  // A required key means unsigned containers are refused before any further request.
+  if (trustedKey && !signed) fail('signature-required');
+  let signature: Uint8Array | undefined;
+  if (signed) {
+    signature = await getExactRange(
+      pinState,
+      source,
+      {
+        start: DEPLOYMENT_HEADER_LENGTH,
+        end: DEPLOYMENT_HEADER_LENGTH + DEPLOYMENT_SIGNATURE_LENGTH - 1,
+      },
+      DEPLOYMENT_SIGNATURE_LENGTH,
+      options.signal,
+    );
+    if (signature.byteLength !== DEPLOYMENT_SIGNATURE_LENGTH) fail('signature-malformed');
+  }
+  const indexStart = deploymentIndexStart(header.formatVersion.minor);
   const indexBytes = new Uint8Array(header.indexLength);
   let offset = 0;
   while (offset < header.indexLength) {
@@ -349,13 +380,22 @@ async function readIndex(
   }
   const actualHash = createHash('sha256').update(indexBytes).digest('hex');
   if (actualHash !== header.indexSha256) fail('index-hash-mismatch');
+  // The signature covers the header, which carries the index hash: verify before parsing.
+  if (trustedKey && signature && !verifyDeploymentSignature(trustedKey, headerBytes, signature)) {
+    fail('signature-invalid');
+  }
+  const verification: DeploymentVerification = !signed
+    ? 'unsigned'
+    : trustedKey
+      ? 'verified'
+      : 'unverified';
   const parsed = parseIndex(indexBytes);
   const index: DeploymentIndex = validateDeploymentIndex(parsed, header, {
     expectedServerId: options.expectedServerId,
   });
   const frozenHeader = freezeTree({ ...header, formatVersion: { ...header.formatVersion } });
   const frozenIndex = freezeTree(structuredClone(index));
-  return { header: frozenHeader, index: frozenIndex, pin: pinState.pin };
+  return { header: frozenHeader, index: frozenIndex, pin: pinState.pin, verification };
 }
 
 class StoredByteCursor {
@@ -592,6 +632,7 @@ async function stagePayload(
 }
 
 class DeploymentReaderImpl implements BrandingDeploymentReader {
+  readonly verification: DeploymentVerification;
   readonly header: DeploymentHeader;
   readonly index: DeploymentIndex;
   readonly sourceId: string;
@@ -603,6 +644,7 @@ class DeploymentReaderImpl implements BrandingDeploymentReader {
   private readonly maxStoredFileBytes: number;
 
   constructor(result: Awaited<ReturnType<typeof readIndex>>, options: OpenDeploymentReaderOptions) {
+    this.verification = result.verification;
     this.header = result.header;
     this.index = result.index;
     this.pin = result.pin;
@@ -695,8 +737,17 @@ export async function openDeploymentReader(
   options: OpenDeploymentReaderOptions,
 ): Promise<BrandingDeploymentReader> {
   options.signal?.throwIfAborted();
+  let trustedKey: KeyObject | undefined;
+  if (options.trustedPublicKey !== undefined) {
+    try {
+      trustedKey = importEd25519PublicKey(options.trustedPublicKey);
+    } catch (error) {
+      if (error instanceof DeploymentSigningKeyError) fail('invalid-signing-key', error);
+      throw error;
+    }
+  }
   validateFileBudget(options.maxFileBytes);
   validateStoredFileBudget(options.maxStoredFileBytes);
-  const result = await readIndex(source, options);
+  const result = await readIndex(source, options, trustedKey);
   return new DeploymentReaderImpl(result, options);
 }

@@ -14,17 +14,21 @@ import {
   DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
   DEPLOYMENT_MAGIC,
+  DEPLOYMENT_SIGNATURE_LENGTH,
+  DEPLOYMENT_SIGNED_FORMAT_VERSION,
   type DeploymentBranding,
   type DeploymentBrandingAsset,
   type DeploymentFile,
   type DeploymentFormatVersion,
   type DeploymentHeader,
   type DeploymentIndex,
+  deploymentIndexStart,
   EMPTY_FILE_SHA256,
   inspectBrandingImage,
   validateDeploymentHeader,
   validateDeploymentIndex,
 } from '../contracts/index.js';
+import { deploymentSignatureMessage } from '../signing/index.js';
 import type {
   DeploymentInputFile,
   DeploymentWriteProgress,
@@ -38,6 +42,7 @@ export class DeploymentWriteError extends Error {
   constructor(
     public readonly code:
       | 'invalid-input'
+      | 'invalid-signature'
       | 'unsafe-path'
       | 'source-changed'
       | 'output-changed'
@@ -187,7 +192,7 @@ function makeHeader(
     formatVersion,
     flags: 0,
     indexLength: indexBytes.byteLength,
-    totalLength: DEPLOYMENT_HEADER_LENGTH + indexBytes.byteLength + payloadLength,
+    totalLength: deploymentIndexStart(formatVersion.minor) + indexBytes.byteLength + payloadLength,
     indexSha256: createHash('sha256').update(indexBytes).digest('hex'),
   });
 }
@@ -244,7 +249,7 @@ async function stageFile(
         storedLength += chunk.byteLength;
         if (
           storedLength > DEPLOYMENT_LIMITS.fileLength ||
-          payloadOffset + storedLength + DEPLOYMENT_HEADER_LENGTH >
+          payloadOffset + storedLength + DEPLOYMENT_HEADER_LENGTH + DEPLOYMENT_SIGNATURE_LENGTH >
             DEPLOYMENT_LIMITS.containerLength
         ) {
           callback(new DeploymentWriteError('limit-exceeded'));
@@ -290,8 +295,12 @@ function snapshotBranding(options: WriteDeploymentOptions): {
   snapshots: Partial<Record<BrandingRole, BrandingSnapshot>>;
   length: number;
 } {
-  if (options.branding === undefined) return { snapshots: {}, length: 0 };
-  const input = options.branding;
+  // v1.2 inherits the v1.1 branding rules, so a signed deployment always carries `branding`
+  // ({} meaning "retain every role").
+  if (options.branding === undefined && options.sign === undefined) {
+    return { snapshots: {}, length: 0 };
+  }
+  const input = options.branding === undefined ? {} : options.branding;
   if (
     !input ||
     typeof input !== 'object' ||
@@ -353,9 +362,21 @@ export async function writeDeployment(
     fail('invalid-input');
   // Snapshot caller-owned metadata before awaiting filesystem operations.
   const brandingSnapshot = snapshotBranding(options);
-  const formatVersion = brandingSnapshot.branding
-    ? DEPLOYMENT_BRANDING_FORMAT_VERSION
-    : DEPLOYMENT_FORMAT_VERSION;
+  const signing = options.sign !== undefined || options.sequence !== undefined;
+  if (
+    signing &&
+    (typeof options.sign !== 'function' ||
+      typeof options.sequence !== 'number' ||
+      !Number.isSafeInteger(options.sequence) ||
+      options.sequence < 1)
+  )
+    fail('invalid-input');
+  const sign = options.sign;
+  const formatVersion: DeploymentFormatVersion = signing
+    ? DEPLOYMENT_SIGNED_FORMAT_VERSION
+    : brandingSnapshot.branding
+      ? DEPLOYMENT_BRANDING_FORMAT_VERSION
+      : DEPLOYMENT_FORMAT_VERSION;
   const inputs = options.files.map((entry) => ({ ...entry }));
   const placeholders = inputs.map((input): DeploymentFile => {
     if (
@@ -378,6 +399,7 @@ export async function writeDeployment(
     formatVersion,
     serverId: options.serverId,
     deploymentId: options.deploymentId,
+    ...(signing ? { sequence: options.sequence as number } : {}),
     game: structuredClone(options.game),
     files: placeholders,
     ...(brandingSnapshot.branding ? { branding: brandingSnapshot.branding } : {}),
@@ -449,7 +471,10 @@ export async function writeDeployment(
           branding[role] = { ...snapshot.asset, offset: payloadLength };
           options.signal?.throwIfAborted();
           if (
-            payloadLength + snapshot.bytes.byteLength + DEPLOYMENT_HEADER_LENGTH >
+            payloadLength +
+              snapshot.bytes.byteLength +
+              DEPLOYMENT_HEADER_LENGTH +
+              DEPLOYMENT_SIGNATURE_LENGTH >
             DEPLOYMENT_LIMITS.containerLength
           )
             fail('limit-exceeded');
@@ -465,10 +490,19 @@ export async function writeDeployment(
       const indexBytes = encodeIndex(index);
       const header = makeHeader(indexBytes, payloadLength, formatVersion);
       validateDeploymentIndex(index, header, { expectedServerId: index.serverId });
+      let signature: Buffer | undefined;
+      if (sign) {
+        const result: unknown = await sign(deploymentSignatureMessage(encodeHeader(header)));
+        if (!(result instanceof Uint8Array) || result.byteLength !== DEPLOYMENT_SIGNATURE_LENGTH)
+          fail('invalid-signature');
+        signature = Buffer.from(result);
+        options.signal?.throwIfAborted();
+      }
       const candidatePath = join(staging, 'container');
       const candidate = await open(candidatePath, 'wx', 0o600);
       try {
         await writeAll(candidate, encodeHeader(header));
+        if (signature) await writeAll(candidate, signature);
         await writeAll(candidate, indexBytes);
         let copied = 0;
         await progress(options, { phase: 'assembling', processedBytes: 0 });

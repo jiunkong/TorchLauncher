@@ -4,6 +4,7 @@ import {
   isBrandingAssetMetadata,
 } from '../branding/index.js';
 import { validateDeploymentPath } from '../deployment/contracts/validation.js';
+import { isEd25519PublicKeyText } from '../deployment/signing/key-text.js';
 
 export * from '../branding/index.js';
 
@@ -19,6 +20,29 @@ export interface ServerConfig {
   /** Optional hint so the launcher can show the game version before the deployment index is read. */
   readonly game?: ServerConfigGame;
   readonly branding?: ServerConfigBranding;
+  /** Trusted publisher key. When present the launcher rejects unsigned or badly signed deployments. */
+  readonly signing?: ServerConfigSigning;
+}
+
+export interface ServerConfigSigning {
+  readonly algorithm: 'ed25519';
+  /** Canonical unpadded base64url of the raw 32-byte Ed25519 public key. */
+  readonly publicKey: string;
+}
+
+function parseSigning(input: unknown): ServerConfigSigning {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Invalid server configuration');
+  }
+  const value = input as Record<string, unknown>;
+  if (
+    Object.keys(value).length !== 2 ||
+    value.algorithm !== 'ed25519' ||
+    !isEd25519PublicKeyText(value.publicKey)
+  ) {
+    throw new Error('Invalid server configuration');
+  }
+  return { algorithm: 'ed25519', publicKey: value.publicKey };
 }
 
 export interface ServerConfigBrandingAsset extends BrandingAssetMetadata {
@@ -128,8 +152,10 @@ export function parseServerConfig(input: unknown): ServerConfig {
   const fields = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl'];
   const hasGame = Object.hasOwn(value, 'game');
   const hasBranding = Object.hasOwn(value, 'branding');
+  const hasSigning = Object.hasOwn(value, 'signing');
   if (
-    Object.keys(value).length !== fields.length + (hasGame ? 1 : 0) + (hasBranding ? 1 : 0) ||
+    Object.keys(value).length !==
+      fields.length + (hasGame ? 1 : 0) + (hasBranding ? 1 : 0) + (hasSigning ? 1 : 0) ||
     fields.some((key) => !Object.hasOwn(value, key))
   ) {
     return fail();
@@ -187,5 +213,6 @@ export function parseServerConfig(input: unknown): ServerConfig {
     sourceUrl: value.sourceUrl as string,
     ...(game ? { game } : {}),
     ...(hasBranding ? { branding: parseBranding(value.branding) } : {}),
+    ...(hasSigning ? { signing: parseSigning(value.signing) } : {}),
   };
 }

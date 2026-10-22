@@ -4,6 +4,12 @@ import type { BrandingRole, DeploymentHeader, DeploymentIndex } from '../contrac
 export interface OpenDeploymentReaderOptions {
   /** Trusted server identity from local launcher configuration. */
   readonly expectedServerId: string;
+  /**
+   * Trusted Ed25519 public key (base64url text or 32 raw bytes) from the server configuration.
+   * When present the container MUST be v1.2 and verify under this key; unsigned 1.0/1.1 are
+   * rejected ('signature-required'). Launchers pass it whenever the config has `signing`.
+   */
+  readonly trustedPublicKey?: string | Uint8Array;
   readonly signal?: AbortSignal;
   /** Reader operational response chunk cap; cannot exceed 4 MiB. */
   readonly rangeChunkBytes?: number;
@@ -49,6 +55,11 @@ export interface StagedBrandingAsset {
 
 /** Extension preserves existing injected DeploymentReader implementations and game-only mocks. */
 export interface BrandingDeploymentReader extends DeploymentReader {
+  /**
+   * Always set by openDeploymentReader. Optional only so existing injected mocks stay valid;
+   * consumers treat a missing value as unverified.
+   */
+  readonly verification?: DeploymentVerification;
   /** No game-relative destination is accepted. Absent/null roles fail without requesting payload. */
   stageBrandingAsset(
     role: BrandingRole,
@@ -56,3 +67,10 @@ export interface BrandingDeploymentReader extends DeploymentReader {
     options?: StageDeploymentFileOptions,
   ): Promise<StagedBrandingAsset>;
 }
+
+/**
+ * 'verified': v1.2 signature checked against the trusted key before the index was parsed.
+ * 'unverified': v1.2, structurally valid, but no key was supplied (nothing authenticated).
+ * 'unsigned': v1.0/1.1, accepted only because no key was required.
+ */
+export type DeploymentVerification = 'verified' | 'unverified' | 'unsigned';
