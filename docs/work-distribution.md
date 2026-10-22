@@ -2,6 +2,18 @@
 
 ## 역할과 현재 배정
 
+운영자 브랜딩 구현·통합 검사 완료(Windows/실배포 확인은 대기).
+- core `7281829` → `df2af4d`, Studio 기능 `33e038b` → `179dc91`, 런처 `499d53d` → `8ebb64d`.
+- 검증 스크립트 정렬 `9ef99cd` → `553a072`: 새 API exact 목록/기본값/실제 구독 해제를 추가했다.
+- main 전체 검사 **1051개 통과/9 skip**, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개).
+  제품 변경 이후 전체 검사 성공, 이후 smoke-only 수정은 해당 검사로 검증했다.
+- main에서 두 branding smoke 및 기존 두 앱 smoke 성공: native PNG/JPEG·원격 역할 변경/실패 유지·
+  이미지 제거 후 실제 재시작·브라우저 디코드/페이드/reduced-motion·760/1100·IPC 격리 확인.
+- Studio UI는 요청대로 변경하지 않았다. 기능 API/저장 방식은 [Studio 인계](handoffs/BRAND-STUDIO-01.md),
+  런처 표시/갱신/캐시는 [런처 인계](handoffs/BRAND-RUNTIME-01.md). 자동 ZIP은 미구현이다.
+- L1~L3 런처 구현 범위는 통합됨. Windows 네이티브·실제 호스팅 이미지 버전 교체는 아직 검증하지 않았다.
+  스킨/이전 기능의 사용자가 보고한 Windows 성공과 이번 새 브랜딩 검증은 구분한다.
+
 BRAND-RUNTIME-01 `499d53d` → `8ebb64d` 통합 완료. main pnpm check 성공:
 1051개 통과/9 skip, 전체 타입·두 앱 빌드·Biome 기존 경고.
 두 앱 branding-smoke도 main에서 성공(실제 native decode·런처 fade/재시작 포함).

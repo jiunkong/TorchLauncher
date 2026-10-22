@@ -5,7 +5,31 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
+## LATEST (2026-10-23, #0): launcher L1–L3 and Studio branding functions integrated
+
+Latest overrides historical pending notes below: ALL hybrid branding phases integrated and verified on main.
+Core7281829/df2af4d, Studio33e038b/179dc91, runtime499d53d/8ebb64d, smoke9ef99cd/553a072.
+Full pnpmcheck PASSED1051tests/9skip/types/Biome(8existingCSSwarnings)/bothbuilds.
+Both branding scripts PASSED on main, and shared scripts/smoke.mjs PASSED both apps after exact bridge update.
+Logs /tmp/torch-brand-final-check.log, /tmp/torch-brand-{launcher,studio}-smoke.log,
+/tmp/torch-brand-final-app-smoke.log (environment-local; not committed).
+Read docs/handoffs/BRAND-{CORE,RUNTIME,STUDIO,SMOKE}-01.md. Admin renderer/UI unchanged deliberately;
+Studio summary-only API implemented, durable bounded snapshots feed pack+folder sidecars, ZIP still deferred.
+No real account/server/private URL accessed. No new dependencies/root config/lockfile changes.
+Windows native and actual hosted branding-version replacement remain unverified. Native verification commands:
+
+```powershell
+cd D:\TorchLauncherWindowsSmoke
+git pull
+pnpm install --frozen-lockfile
+pnpm build
+node apps/launcher/scripts/branding-smoke.mjs
+node apps/admin/scripts/branding-smoke.mjs
+```
+
+The scripts use isolated temporary fixtures/userData; they do not need account login or the private profile.
+Next work is user-directed Studio UI/release tasks, not automatic scope expansion.
+
 
 Runtime499d53d integrated8ebb64d; maincheck1051passed/9skip, both branding smokes passed.
 Existing shared smoke whitelist lacks new getBranding/onBranding; #1 now test/branding-smoke-api

@@ -63,3 +63,10 @@ Studio renderer/UI는 수정하지 않는다. 아래 초기 직렬 계획보다 
 - writer는 제한된 이미지 bytes를 작업 시작 시 스냅샷으로 고정하며 reader는 별도 stageBrandingAsset을 제공한다.
   기존 DeploymentReader 소비자/테스트의 호환성을 유지한다. 실제 이미지 디코드는 앱 단계에서 검사한다.
 - 현재는 core 구현 중이며 런처/Studio 연결과 Windows 확인은 아직 완료하지 않았다.
+
+## 통합 결과
+
+세 단계와 기존 앱 smoke 보완까지 main 통합 완료. main 전체1051개/9skip,
+두 branding smoke·기존 두 앱 smoke 성공. Studio UI는 제외하고 기능만 구현했다.
+Windows 및 실제 호스팅 파일 버전 교체는 검증 대기이며 자동 ZIP은 이번 구현에 포함하지 않았다.
+구체 API/제한은 각 BRAND 인계를 참조한다.
