@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProductCommand, ProductState } from '../../../shared/product';
 import { ChevronDownIcon, ChevronUpIcon, TrashIcon } from '../components/Icons';
+import { ProgressBar } from '../components/ProgressBar';
 import { formatBytes } from '../format';
 import { useT } from '../hooks/useTranslator';
 import type { LoadState } from './Mods';
@@ -109,6 +110,9 @@ export function SettingsPage({
                   : t('settings.usageLoading')}
             </span>
           </div>
+          {!state.usage && usageLoad !== 'failed' && (
+            <ProgressBar measured={null} unknownLabel={t('operation.usage')} />
+          )}
           <p className="hint spaced-block">{t('settings.dataHint')}</p>
           <button
             className="btn danger"

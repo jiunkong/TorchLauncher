@@ -49,7 +49,9 @@ export function PageFrame({
   children: ReactNode;
 }) {
   const t = useT();
-  const control = state ? operationControl(state) : null;
+  // Short page actions (mods, packs, usage) finish quickly; only the launch flow gets a status strip.
+  const control =
+    state && (state.running || state.operation === 'launch') ? operationControl(state) : null;
   const error = productError ?? state?.error ?? null;
   const label = state
     ? state.running
