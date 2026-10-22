@@ -2,6 +2,12 @@
 
 ## 역할과 현재 배정
 
+2026-10-23 사용자 승인: L2a 후속과 L3 스킨만 병렬 진행. [배타적 범위와 계약](launcher-parallel-followups.md).
+#2 `launcher_followups` / agent-2 / `feat/launcher-l2a-followups`: Astra medium 요청(삭제 안전 경계).
+#3 `player_skin` / agent-3 / `feat/launcher-player-skin`: Sol medium 요청(외부 응답·캐시·아바타).
+서비스/IPC/상태·공유 renderer 연동은 #2만, 스킨 모듈/표시 component는 #3만 소유한다.
+실제 effort 표시는 사용자 보고를 우선하고 도구의 요청값과 구분한다. 추가 작업자/운영자 브랜딩은 제외한다.
+
 BRAND-ICON-01: 사용자 제공 루트 `icon.ico`를 두 앱의 실행 파일·창 아이콘으로 적용한다.
 #1 `app_icon`, Luna medium, agent-1 `feat/app-icon`. 독점: 새 `assets/branding/**`,
 `electron-builder.base.cjs`, 두 앱 `src/main/index.ts`의 아이콘 설정만, 해당 인계.
