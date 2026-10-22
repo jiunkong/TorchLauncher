@@ -890,6 +890,12 @@ svg {
   overflow-wrap: anywhere;
   min-width: 0;
 }
+.kv.settings-data-path > .path {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .mono {
   font-family: var(--font-mono);
   font-size: 12px;

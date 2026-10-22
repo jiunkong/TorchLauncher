@@ -131,6 +131,47 @@ try {
   await page.getByRole('heading', { level: 2, name: '활성 리소스팩 순서' }).waitFor();
   await page.getByTestId('usage').filter({ hasText: '파일' }).waitFor();
   assert.equal(await page.getByText(dataRoot, { exact: true }).count(), 1);
+  const syntheticWindowsRoot =
+    'C:\\Users\\Smoke User\\AppData\\Roaming\\TorchLauncher\\servers\\44444444-4444-4444-8444-444444444444';
+  const currentState = await page.evaluate(() => window.torchlauncher.getState());
+  await app.evaluate(
+    ({ BrowserWindow }, state) => {
+      BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', state);
+    },
+    { ...currentState, serverDataRoot: syntheticWindowsRoot },
+  );
+  await page
+    .locator('.settings-data-path .path')
+    .getByText(syntheticWindowsRoot, { exact: true })
+    .waitFor();
+  const pathSpan = page.locator('.settings-data-path .path');
+  assert.equal(await pathSpan.textContent(), syntheticWindowsRoot);
+  assert.equal(await pathSpan.getAttribute('title'), syntheticWindowsRoot);
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 900 });
+    const layout = await page.evaluate(() => {
+      const path = document.querySelector('.settings-data-path .path');
+      const card = path?.closest('.card');
+      return {
+        pathHeight: path?.getBoundingClientRect().height ?? 0,
+        pathClientWidth: path?.clientWidth ?? 0,
+        pathScrollWidth: path?.scrollWidth ?? 0,
+        cardRight: card?.getBoundingClientRect().right ?? 0,
+        windowWidth: document.documentElement.clientWidth,
+        documentWidth: document.documentElement.scrollWidth,
+      };
+    });
+    assert.ok(layout.pathClientWidth > 0, `path width at ${width}px: ${layout.pathClientWidth}`);
+    assert.ok(layout.pathScrollWidth > layout.pathClientWidth, `path is not clipped at ${width}px`);
+    assert.ok(layout.pathHeight <= 20, `path wraps at ${width}px: ${layout.pathHeight}px`);
+    assert.ok(layout.cardRight <= layout.windowWidth, `card overflows window at ${width}px`);
+    assert.ok(layout.documentWidth <= layout.windowWidth, `window overflows at ${width}px`);
+    assert.equal(await pathSpan.textContent(), syntheticWindowsRoot);
+  }
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await app.evaluate(({ BrowserWindow }, state) => {
+    BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', state);
+  }, currentState);
   assert.equal((await page.evaluate(() => window.torchlauncher.getState())).deletion, null);
   const closeOnLaunch = page.getByRole('switch', { name: '게임 실행 후 런처 종료', exact: true });
   assert.equal((await closeOnLaunch.getAttribute('aria-checked')) === 'true', false);

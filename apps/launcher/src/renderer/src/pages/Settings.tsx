@@ -192,9 +192,11 @@ export function SettingsPage({
         <section className="card" aria-labelledby="settings-data">
           <h2 id="settings-data">{t('settings.data')}</h2>
           {state.serverDataRoot && (
-            <div className="kv">
+            <div className="kv settings-data-path">
               <span>{t('settings.location')}</span>
-              <span className="mono selectable path">{state.serverDataRoot}</span>
+              <span className="mono selectable path" title={state.serverDataRoot}>
+                {state.serverDataRoot}
+              </span>
             </div>
           )}
           <div className="kv">
