@@ -7,6 +7,13 @@ session IDs are not needed.
 
 ## Active LAUNCH-EXIT-01: optional launcher exit after game starts
 
+New active task I18N-01: user requests Korean/English foundation only, future UI application.
+Read `docs/localization.md`. Worker #1 `i18n_foundation`, Luna medium (tool overrides applied),
+agent-1 `feat/i18n-foundation`, starts `a44224f` (product baseline `753e2ac`). Owns new pure core
+i18n module + core ./i18n export, new app renderer i18n adapters/hooks, own handoff only.
+No current App/pages/IPC/styles or existing preferences schema changes; no language picker or claim
+of fully translated UI. #0 coordinates/reviews/merges/tests only. Worker active, no external tests needed.
+
 User deferred UI changes and authorized this feature. Read `docs/close-on-launch.md`.
 One worker #3 `close_on_launch` (Sol medium), agent-3 branch `feat/launcher-close-on-game-start`,
 baseline `2c1fcbe`, owns launcher app + narrow Minecraft process/recovery/gate scope.
