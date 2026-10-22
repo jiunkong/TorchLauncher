@@ -291,10 +291,41 @@ try {
     assert.equal(visible, true);
     await copy.click();
     await page
-      .getByTestId('copy-data-path-result')
+      .getByTestId('toast')
       .filter({ hasText: /경로를 복사했습니다\.|Path copied\./ })
       .waitFor();
+    assert.equal(await page.getByTestId('toast-status').getAttribute('role'), 'status');
+    const covers = await page.evaluate(() => {
+      const toast = document.querySelector('[data-testid="toast"]')?.getBoundingClientRect();
+      const overlap = (selector) => {
+        const box = document.querySelector(selector)?.getBoundingClientRect();
+        return (
+          !!toast &&
+          !!box &&
+          box.width > 0 &&
+          toast.left < box.right &&
+          toast.right > box.left &&
+          toast.top < box.bottom &&
+          toast.bottom > box.top
+        );
+      };
+      return {
+        path: overlap('.settings-data-path .path'),
+        pointer: getComputedStyle(document.querySelector('.toast-host')).pointerEvents,
+      };
+    });
+    const deleteHit = await page.getByTestId('delete-data').evaluate((button) => {
+      button.scrollIntoView({ block: 'center' });
+      const box = button.getBoundingClientRect();
+      return button.contains(
+        document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+      );
+    });
+    assert.equal(deleteHit, true);
+    assert.equal(covers.path, false);
+    assert.equal(covers.pointer, 'none');
     assert.equal(await app.evaluate(() => globalThis.brandingFixture.copiedPath()), exactPath);
+    await page.waitForTimeout(300);
     await page.screenshot({
       path: resolve(`apps/launcher/.cache/ui-feedback/settings-${width}.png`),
     });
@@ -307,10 +338,10 @@ try {
   await app.evaluate(() => globalThis.brandingFixture.failCopy());
   await page.getByTestId('copy-data-path').click();
   await page
-    .getByTestId('copy-data-path-result')
+    .getByTestId('toast')
     .filter({ hasText: /경로를 복사하지 못했습니다\.|Could not copy the path\./ })
     .waitFor();
-  assert.equal(await page.getByTestId('copy-data-path-result').getAttribute('role'), 'alert');
+  assert.equal(await page.getByTestId('toast-alert').getAttribute('role'), 'alert');
   assert.equal(await page.getByTestId('copy-data-path').isEnabled(), true);
   await app.close();
   app = undefined;
