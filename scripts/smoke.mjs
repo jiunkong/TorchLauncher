@@ -9,12 +9,34 @@ const screenshots = resolve('.cache/smoke');
 await mkdir(screenshots, { recursive: true });
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
+const appCases = [
+  {
+    directory: 'launcher',
+    name: 'TorchLauncher',
+    pages: [
+      ['홈 · 플레이', '서버에 접속할 준비를 합니다'],
+      ['내 모드', '내 모드'],
+      ['설정', '설정'],
+      ['로그', '로그'],
+    ],
+    guardedActions: ['launch-button', 'save-button'],
+  },
+  {
+    directory: 'admin',
+    name: 'TorchLauncher Studio',
+    pages: [
+      ['개요', '서버 프로젝트를 시작하세요'],
+      ['서버 구성', '서버 구성'],
+      ['배포', '배포 파일'],
+      ['브랜딩 · 내보내기', '브랜딩과 런처 내보내기'],
+    ],
+    guardedActions: [],
+  },
+];
 
 try {
-  for (const [directory, name] of [
-    ['launcher', 'TorchLauncher'],
-    ['admin', 'TorchLauncher Studio'],
-  ]) {
+  for (const appCase of appCases) {
+    const { directory, name } = appCase;
     const applicationDirectory = resolve(`apps/${directory}`);
     const manifest = JSON.parse(
       await readFile(resolve(applicationDirectory, 'package.json'), 'utf8'),
@@ -29,6 +51,7 @@ try {
       const page = await app.firstWindow();
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
+      await page.setViewportSize({ width: 760, height: 760 });
       await page.getByTestId('app-shell').waitFor();
       await page.getByTestId('application-info').filter({ hasText: process.platform }).waitFor();
 
@@ -45,6 +68,23 @@ try {
       assert.equal(result.hasRequire, false);
       assert.equal(result.hasProcess, false);
       assert.deepEqual(result.bridgeKeys, ['getApplicationInfo']);
+
+      for (const [label, heading] of appCase.pages) {
+        const navButton = page.getByRole('button', { name: label, exact: true });
+        await navButton.click();
+        await page.getByRole('heading', { level: 1, name: heading, exact: true }).waitFor();
+        assert.equal(await navButton.getAttribute('aria-current'), 'page');
+        const productActions = page.locator('button:not(.nav-item)');
+        for (const index of await productActions.evaluateAll((buttons) =>
+          buttons.map((button) => button.disabled),
+        )) {
+          assert.equal(index, true, 'product actions must remain unavailable');
+        }
+        for (const actionId of appCase.guardedActions) {
+          const action = page.getByTestId(actionId);
+          if (await action.count()) assert.equal(await action.isDisabled(), true);
+        }
+      }
       assert.deepEqual(errors, []);
 
       const preferences = await app.evaluate(({ BrowserWindow }) => {
@@ -60,9 +100,11 @@ try {
         sandbox: true,
       });
 
+      await page.getByRole('button', { name: appCase.pages[0][0], exact: true }).click();
       await page.screenshot({ path: resolve(screenshots, `${directory}.png`) });
-
-      console.log(`${name}: renderer, IPC, and sandbox checks passed`);
+      console.log(
+        `${name}: renderer, navigation, disabled actions, IPC, and sandbox checks passed`,
+      );
     } finally {
       await app.close();
     }
