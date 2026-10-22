@@ -1,36 +1,35 @@
 import type { ProductState } from '../../../shared/product';
-import { activityLabel, activityProgress, type StepId, stepChips, stepOf } from '../activity';
+import { type ActivityStage, stageChips, stageMeasure } from '../activity';
 import torchUrl from '../assets/torch.png';
-import { ActivityProgressBar } from '../components/ActivityProgressBar';
 import { MicrosoftIcon, PlayFilledIcon, RetryIcon, StopIcon } from '../components/Icons';
+import { ProgressBar } from '../components/ProgressBar';
 import { elapsedParts, gameParts, homeView } from '../home';
 import { useT } from '../hooks/useTranslator';
-import { failureMessage, operationLabel, outcomeLabel } from '../labels';
+import {
+  failureMessage,
+  operationLabel,
+  outcomeLabel,
+  recoveryIssueText,
+  stageLabel,
+  stageNowLabel,
+} from '../labels';
 
 /** The product state carries no game/loader description yet, so the supported target is fixed. */
 export const homeGameVersion = '1.21.1';
-const stepKeys = {
-  java: 'steps.java',
-  game: 'steps.game',
-  library: 'steps.library',
-  asset: 'steps.asset',
-  loader: 'steps.loader',
-  'server-mod': 'steps.serverMod',
-  config: 'steps.config',
-} as const;
-
 export interface HomeProps {
   state: ProductState;
   productError: string | null;
   pending: boolean;
   elapsedMs: number;
-  seenSteps: readonly StepId[];
+  /** Furthest installation stage reached in the current operation (never moves backwards). */
+  stage: ActivityStage | null;
   applicationVersion: string | null;
   applicationInfoFailed: boolean;
   onPrimary(): void;
   onCancel(): void;
   onStop(): void;
   onViewLogs(): void;
+  onReviewRecovery(): void;
 }
 
 export function Home(props: HomeProps) {
@@ -71,10 +70,27 @@ export function Home(props: HomeProps) {
   })();
 
   const activity = state.activity;
-  const busyLabel = activity
-    ? activityLabel(activity)
-    : operationLabel(state.operation ?? 'launch', state.phase);
+  const stage = activity ? props.stage : null;
+  const measure = stage ? stageMeasure(stage, activity) : null;
+  const busyLabel = stage
+    ? stageNowLabel(t, stage)
+    : operationLabel(t, state.operation ?? 'launch', state.phase);
   const known = state.progress && state.progress.total > 0 ? state.progress : null;
+  const measured =
+    measure?.kind === 'ratio'
+      ? { completed: measure.completed, total: measure.total }
+      : activity
+        ? null
+        : known;
+  const countText =
+    measure?.kind === 'ratio'
+      ? t('progress.count', { completed: measure.completed, total: measure.total })
+      : measure?.kind === 'completed'
+        ? t('progress.done', { completed: measure.completed })
+        : null;
+  const recovery = state.recovery;
+  const recoveryError = view.error === 'recovery-required';
+  const recoveryReview = recoveryError && recovery?.needed === true && recovery.confirmable;
   const primaryLabel =
     view.primary?.type === 'login'
       ? t('home.login')
@@ -89,10 +105,14 @@ export function Home(props: HomeProps) {
         : t('home.errorTitle');
   const warnText =
     view.kind === 'unconfigured'
-      ? failureMessage('configuration-unavailable')
+      ? failureMessage(t, 'configuration-unavailable')
       : view.kind === 'unsupported'
-        ? failureMessage('unsupported-platform')
-        : failureMessage(view.error ?? 'operation-failed');
+        ? failureMessage(t, 'unsupported-platform')
+        : recoveryError
+          ? recovery?.needed && !recovery.confirmable
+            ? recoveryIssueText(t, recovery.issues)
+            : t('recovery.panel')
+          : failureMessage(t, view.error ?? 'operation-failed');
 
   return (
     <section
@@ -121,18 +141,18 @@ export function Home(props: HomeProps) {
           <div className="panel" role="status" aria-live="polite">
             <div className="top">
               <strong>{busyLabel}</strong>
-              {activity && <span>{activityProgress(activity)}</span>}
+              {countText && <span data-testid="progress-count">{countText}</span>}
             </div>
-            <ActivityProgressBar
-              activity={activity}
-              progress={known}
+            <ProgressBar
+              measured={measured}
               unknownLabel={t('home.progressUnknown')}
+              label={busyLabel}
             />
             {activity && (
-              <ul className="cs" aria-label={t('steps.label')}>
-                {stepChips(props.seenSteps, stepOf(activity.component)).map((chip) => (
+              <ul className="cs" aria-label={t('steps.label')} data-testid="stage-chips">
+                {stageChips(stage).map((chip) => (
                   <li key={chip.id} className={chip.state === 'todo' ? '' : chip.state}>
-                    {t(stepKeys[chip.id])}
+                    {stageLabel(t, chip.id)}
                   </li>
                 ))}
               </ul>
@@ -146,15 +166,27 @@ export function Home(props: HomeProps) {
             </div>
             <p>{warnText}</p>
             {view.kind === 'error' && (
-              <button className="hintline linklike" type="button" onClick={props.onViewLogs}>
-                {t('home.viewLogs')}
-              </button>
+              <div className="panel-links">
+                {recoveryReview && (
+                  <button
+                    className="hintline linklike"
+                    type="button"
+                    data-testid="review-recovery"
+                    onClick={props.onReviewRecovery}
+                  >
+                    {t('recovery.review')}
+                  </button>
+                )}
+                <button className="hintline linklike" type="button" onClick={props.onViewLogs}>
+                  {t('home.viewLogs')}
+                </button>
+              </div>
             )}
           </div>
         )}
         {state.outcome && view.kind !== 'busy' && view.kind !== 'running' && (
           <span className="hintline" role="status">
-            {t('home.recentResult', { outcome: outcomeLabel(state.outcome) })}
+            {t('home.recentResult', { outcome: outcomeLabel(t, state.outcome) })}
           </span>
         )}
 

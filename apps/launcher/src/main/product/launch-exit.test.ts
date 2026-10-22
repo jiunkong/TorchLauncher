@@ -30,8 +30,6 @@ async function setup() {
     },
     auth: { login: vi.fn(), refresh: vi.fn(), logout: vi.fn() },
     chooseMod: vi.fn(),
-    confirmDeletion: vi.fn(),
-    confirmRecovery: vi.fn(),
     publish: vi.fn(),
     quit: vi.fn(),
   };

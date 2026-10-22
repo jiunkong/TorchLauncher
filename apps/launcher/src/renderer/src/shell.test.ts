@@ -26,7 +26,8 @@ const homeProps = (overrides: Partial<HomeProps> = {}): HomeProps => ({
   productError: null,
   pending: false,
   elapsedMs: 0,
-  seenSteps: [],
+  stage: null,
+  onReviewRecovery: () => {},
   applicationVersion: '0.1.0',
   applicationInfoFailed: false,
   onPrimary: () => {},
@@ -116,7 +117,7 @@ describe('home states', () => {
     expect(html).not.toContain('role="alert"');
   });
 
-  it('shows the installation panel with indeterminate progress, chips, and cancel', () => {
+  it('shows the installation panel as the real stage order with a stage-level summary', () => {
     const state = productState({
       operation: 'launch',
       phase: 'game-sync',
@@ -128,28 +129,57 @@ describe('home states', () => {
         total: null,
       },
     });
-    const html = render(
-      createElement(Home, homeProps({ state, seenSteps: ['java', 'game', 'library'] })),
-    );
-    expect(html).toContain('라이브러리 다운로드 중');
-    expect(html).toContain('완료 97개 · 4개 작업 중');
+    const html = render(createElement(Home, homeProps({ state, stage: 'game' })));
+    expect(html).toContain('게임 파일을 확인하고 받는 중');
     expect(html).toContain('progress indet');
     expect(html).toContain('전체 개수를 아직 알 수 없습니다');
-    expect(html).toContain('<li class="done">Java</li>');
-    expect(html).toContain('<li class="now">라이브러리</li>');
+    expect(html).toContain('<li class="done">정보 확인</li>');
+    expect(html).toContain('<li class="now">게임 파일 확인·받기</li>');
+    expect(html).toContain('<li class="">로더 설치</li>');
+    expect(html).toContain('<li class="">서버 파일 동기화</li>');
+    expect(html.indexOf('정보 확인')).toBeLessThan(html.indexOf('게임 파일 확인·받기'));
+    expect(html.indexOf('로더 설치')).toBeLessThan(html.indexOf('서버 파일 동기화'));
+    // No per-file names and no invented counts.
+    expect(html).not.toContain('완료 97');
+    expect(html).not.toContain('Java');
     expect(html).toContain('설치하는 중…');
     expect(html).toContain('>취소<');
     expect(html).not.toContain('%');
   });
 
-  it('shows measured progress only with measured counts', () => {
+  it('keeps showing the furthest stage when an earlier component reports late', () => {
+    const state = productState({
+      operation: 'launch',
+      activity: { phase: 'downloading', component: 'asset', active: 1, completed: 5, total: 9 },
+    });
+    const html = render(createElement(Home, homeProps({ state, stage: 'loader' })));
+    expect(html).toContain('<li class="now">로더 설치</li>');
+    expect(html).toContain('로더를 설치하는 중');
+    expect(html).not.toContain('완료 5 / 전체 9');
+  });
+
+  it('shows "completed / total" and a ratio bar for game files only when measured', () => {
     const state = productState({
       operation: 'launch',
       activity: { phase: 'downloading', component: 'asset', active: 1, completed: 2, total: 8 },
     });
-    const html = render(createElement(Home, homeProps({ state })));
+    const html = render(createElement(Home, homeProps({ state, stage: 'game' })));
+    expect(html).toContain('완료 2 / 전체 8');
     expect(html).toContain('aria-valuenow="2"');
     expect(html).toContain('width:25%');
+  });
+
+  it('never shows a ratio for server file synchronization', () => {
+    const state = productState({
+      operation: 'launch',
+      activity: { phase: 'staging', component: 'server-mod', active: 1, completed: 4, total: 9 },
+    });
+    const html = render(createElement(Home, homeProps({ state, stage: 'sync' })));
+    expect(html).toContain('서버 파일을 동기화하는 중');
+    expect(html).toContain('완료 4개');
+    expect(html).toContain('progress indet');
+    expect(html).not.toContain('aria-valuenow');
+    expect(html).not.toContain('/ 전체');
   });
 
   it('shows elapsed time and a red stop button while the game runs', () => {
@@ -208,5 +238,49 @@ describe('splash', () => {
     expect(html).toContain('LAUNCHER');
     expect(html).toContain('role="progressbar"');
     expect(html).toContain('is-waiting');
+  });
+});
+
+describe('recovery on the home screen', () => {
+  const blocked = (recovery: NonNullable<ReturnType<typeof productState>['recovery']>) =>
+    productState({ error: 'recovery-required', recovery });
+  it('offers the previous-run window when confirmation is possible', () => {
+    const html = render(
+      createElement(
+        Home,
+        homeProps({
+          state: blocked({
+            needed: true,
+            lock: 'uncertain',
+            confirmable: true,
+            issues: ['lock-uncertain'],
+          }),
+        }),
+      ),
+    );
+    expect(html).toContain('이전 실행의 정리가 필요합니다.');
+    expect(html).toContain('data-testid="review-recovery"');
+    expect(html).toContain('이전 실행 확인');
+    expect(html).toContain('로그 보기 →');
+  });
+
+  it('explains the cause and offers only logs when it cannot be confirmed away', () => {
+    const html = render(
+      createElement(
+        Home,
+        homeProps({
+          state: blocked({
+            needed: true,
+            lock: 'free',
+            confirmable: false,
+            issues: ['install-invalid', 'something-new'],
+          }),
+        }),
+      ),
+    );
+    expect(html).toContain('게임 설치 상태가 올바르지 않습니다.');
+    expect(html).toContain('자동으로 정리할 수 없는 항목이 있습니다.');
+    expect(html).not.toContain('review-recovery');
+    expect(html).toContain('로그 보기 →');
   });
 });

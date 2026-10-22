@@ -1,50 +1,51 @@
-import { createElement } from 'react';
 import type { ProductActivity } from '../../shared/product';
 
-const components: Record<ProductActivity['component'], string> = {
-  metadata: '게임 정보',
-  game: '게임 파일',
-  java: 'Java',
-  library: '라이브러리',
-  asset: '게임 리소스',
-  logging: '로그 설정',
-  loader: '모드 로더',
-  'server-mod': '서버 모드',
-  'resource-pack': '리소스팩',
-  'server-config': '서버 설정',
-  'server-file': '서버 파일',
+/**
+ * The launch pipeline in its real order. Components are grouped by the stage that works on them;
+ * stages only ever advance during one operation, so parallel work in an earlier stage never moves
+ * the display backwards.
+ */
+export type ActivityStage = 'info' | 'game' | 'loader' | 'sync';
+export const stageOrder: readonly ActivityStage[] = ['info', 'game', 'loader', 'sync'];
+
+const stageOfComponent: Record<ProductActivity['component'], ActivityStage> = {
+  metadata: 'info',
+  game: 'game',
+  java: 'game',
+  library: 'game',
+  asset: 'game',
+  logging: 'game',
+  loader: 'loader',
+  'server-mod': 'sync',
+  'resource-pack': 'sync',
+  'server-config': 'sync',
+  'server-file': 'sync',
 };
 
-const phases: Record<ProductActivity['phase'], string> = {
-  planning: '준비 중',
-  checking: '확인 중',
-  downloading: '다운로드 중',
-  staging: '파일 준비 중',
-  publishing: '파일 적용 중',
-  installing: '설치 중',
-  applying: '적용 중',
-  recovering: '복구 중',
-};
-
-export function activityLabel(activity: ProductActivity): string {
-  const fileComponents: ProductActivity['component'][] = [
-    'server-mod',
-    'resource-pack',
-    'server-config',
-    'server-file',
-  ];
-  const phase =
-    fileComponents.includes(activity.component) && activity.phase === 'staging'
-      ? '다운로드·검증 중'
-      : phases[activity.phase];
-  return `${components[activity.component]} ${phase}`;
+export function stageOf(activity: Pick<ProductActivity, 'phase' | 'component'>): ActivityStage {
+  return activity.phase === 'planning' ? 'info' : stageOfComponent[activity.component];
 }
 
-export function activityProgress(activity: ProductActivity): string {
-  const count = activity.completed === null ? '진행 중' : `완료 ${activity.completed}개`;
-  const active = activity.active > 1 ? ` · ${activity.active}개 작업 중` : '';
-  const total = activity.total === null ? '' : ` / ${activity.total}개`;
-  return `${count}${total}${active}`;
+/** The furthest stage reached so far; `null` activity keeps the previous value. */
+export function advanceStage(
+  reached: ActivityStage | null,
+  activity: Pick<ProductActivity, 'phase' | 'component'> | null,
+): ActivityStage | null {
+  if (!activity) return reached;
+  const next = stageOf(activity);
+  return reached !== null && stageOrder.indexOf(reached) > stageOrder.indexOf(next)
+    ? reached
+    : next;
+}
+
+export function stageChips(
+  current: ActivityStage | null,
+): { id: ActivityStage; state: 'done' | 'now' | 'todo' }[] {
+  const index = current === null ? -1 : stageOrder.indexOf(current);
+  return stageOrder.map((id, position) => ({
+    id,
+    state: position < index ? 'done' : position === index ? 'now' : 'todo',
+  }));
 }
 
 /** A ratio is shown only when both the completed and total counts were measured. */
@@ -52,51 +53,21 @@ export function activityKnown(activity: Pick<ProductActivity, 'completed' | 'tot
   return activity.completed !== null && activity.total !== null && activity.total > 0;
 }
 
-export function ActivityProgress({ activity }: { activity: ProductActivity }) {
-  const known = activityKnown(activity);
-  return known
-    ? createElement('progress', { value: activity.completed, max: activity.total })
-    : createElement('progress', { 'aria-label': '진행 중' });
-}
-
-export type StepId = 'java' | 'game' | 'library' | 'asset' | 'loader' | 'server-mod' | 'config';
-export const stepOrder: StepId[] = [
-  'java',
-  'game',
-  'library',
-  'asset',
-  'loader',
-  'server-mod',
-  'config',
-];
-const stepOfComponent: Record<ProductActivity['component'], StepId> = {
-  java: 'java',
-  metadata: 'game',
-  game: 'game',
-  library: 'library',
-  logging: 'library',
-  asset: 'asset',
-  loader: 'loader',
-  'server-mod': 'server-mod',
-  'resource-pack': 'config',
-  'server-config': 'config',
-  'server-file': 'config',
-};
-
-export function stepOf(component: ProductActivity['component']): StepId {
-  return stepOfComponent[component];
-}
-
 /**
- * Chips are `now` for the step being worked on and `done` only for steps this renderer already
- * saw being worked on earlier in the same operation; nothing is inferred about order or totals.
+ * What the progress panel may state for the current stage. Only the game-file stage has a plan
+ * total, so only it can show "completed / total" and a ratio; server synchronization never does.
+ * Activity from another stage (a straggler of parallel work) contributes nothing.
  */
-export function stepChips(
-  seen: readonly StepId[],
-  current: StepId | null,
-): { id: StepId; state: 'done' | 'now' | 'todo' }[] {
-  return stepOrder.map((id) => ({
-    id,
-    state: id === current ? 'now' : seen.includes(id) ? 'done' : 'todo',
-  }));
+export type StageMeasure =
+  | { kind: 'ratio'; completed: number; total: number }
+  | { kind: 'completed'; completed: number }
+  | { kind: 'none' };
+
+export function stageMeasure(stage: ActivityStage, activity: ProductActivity | null): StageMeasure {
+  if (!activity || stageOf(activity) !== stage) return { kind: 'none' };
+  if (stage === 'game' && activityKnown(activity))
+    return { kind: 'ratio', completed: activity.completed ?? 0, total: activity.total ?? 1 };
+  if (stage === 'sync' && activity.completed !== null)
+    return { kind: 'completed', completed: activity.completed };
+  return { kind: 'none' };
 }

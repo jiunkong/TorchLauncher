@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import torchUrl from './assets/torch.png';
-import { LegacyPage } from './components/LegacyPage';
+import { DeleteDialog } from './components/DeleteDialog';
 import { Menu, type PageId } from './components/Menu';
+import { RecoveryDialog } from './components/RecoveryDialog';
 import { Splash } from './components/Splash';
 import { StopDialog } from './components/StopDialog';
 import { homePrimaryCommand } from './flow';
@@ -9,9 +10,13 @@ import { runningElapsed } from './home';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
 import { useElapsed } from './hooks/useElapsed';
 import { useProduct } from './hooks/useProduct';
-import { useSeenSteps } from './hooks/useSeenSteps';
+import { useStage } from './hooks/useStage';
 import { useT } from './hooks/useTranslator';
 import { Home } from './pages/Home';
+import { LogsPage } from './pages/Logs';
+import { ModsAddButton, ModsPage } from './pages/Mods';
+import { PageFrame } from './pages/PageFrame';
+import { SettingsPage } from './pages/Settings';
 import { appReady } from './splash';
 
 export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
@@ -19,10 +24,13 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const { info, error } = useApplicationInfo();
   const { state, error: productError, pending, command } = useProduct();
   const [page, setPage] = useState<PageId>('home');
-  // Pages other than home stay mounted so edits and loaded lists survive navigation.
-  const [legacyPage, setLegacyPage] = useState<Exclude<PageId, 'home'>>('troubleshooting');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  // Set when the recovery window was opened because a play attempt was blocked.
+  const recoveryPlay = useRef(false);
+  const recoveryShown = useRef(false);
   const [splashDone, setSplashDone] = useState(false);
   const finishSplash = useCallback(() => setSplashDone(true), []);
   const observed = useElapsed(state?.running ?? false);
@@ -33,13 +41,10 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
     return () => clearInterval(timer);
   }, [state?.runningSince]);
   const elapsed = state ? runningElapsed(state, observed, tick) : 0;
-  const seenSteps = useSeenSteps(state);
+  const stage = useStage(state);
   const statusAttempted = useRef(false);
 
-  const navigate = useCallback((next: PageId) => {
-    setPage(next);
-    if (next !== 'home') setLegacyPage(next);
-  }, []);
+  const navigate = useCallback((next: PageId) => setPage(next), []);
 
   // One status query when the home first becomes usable; no polling.
   const busy = (state?.operation ?? null) !== null || pending;
@@ -64,13 +69,64 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
     if (stopOpen && !state?.running) setStopOpen(false);
   }, [stopOpen, state?.running]);
 
+  // The "previous run" window opens by itself once per occurrence of a confirmable recovery.
+  const needsConfirmation = state?.recovery?.needed === true && state.recovery.confirmable;
+  const running = state?.running ?? false;
+  useEffect(() => {
+    if (!needsConfirmation) {
+      recoveryShown.current = false;
+      setRecoveryOpen(false);
+      return;
+    }
+    if (!recoveryShown.current && splashDone && !stopOpen && !deleteOpen && !running) {
+      recoveryShown.current = true;
+      recoveryPlay.current = false;
+      setRecoveryOpen(true);
+    }
+  }, [needsConfirmation, splashDone, stopOpen, deleteOpen, running]);
+
+  useEffect(() => {
+    if (deleteOpen && !state?.deletion) setDeleteOpen(false);
+  }, [deleteOpen, state?.deletion]);
+
+  const openDelete = () => {
+    void command({ type: 'preview-delete' }).then((ok) => {
+      if (ok) setDeleteOpen(true);
+    });
+  };
+  const confirmRecovery = () => {
+    const play = recoveryPlay.current;
+    void command({ type: 'recover', acceptUncertain: true }).then((ok) => {
+      setRecoveryOpen(false);
+      const primary = state ? homePrimaryCommand(state) : null;
+      if (ok && play && primary?.type === 'launch') void command(primary);
+    });
+  };
+
+  const ready = state?.configuration === 'ready' && !busy;
+  const footer = info
+    ? t('footer.version', { version: info.version, platform: info.platform })
+    : '';
+  const frame = {
+    state,
+    stage,
+    productError,
+    command,
+    onNavigate: navigate,
+    onStop: () => setStopOpen(true),
+  };
+
   const logout = () => {
     if (window.confirm(t('menu.logoutConfirm'))) void command({ type: 'logout' });
   };
 
   return (
     <>
-      <main className="app" data-testid="app-shell" inert={!splashDone || stopOpen}>
+      <main
+        className="app"
+        data-testid="app-shell"
+        inert={!splashDone || stopOpen || deleteOpen || recoveryOpen}
+      >
         <Menu
           open={menuOpen}
           onToggle={() => setMenuOpen((open) => !open)}
@@ -89,7 +145,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
                 productError={productError}
                 pending={pending}
                 elapsedMs={elapsed}
-                seenSteps={seenSteps}
+                stage={stage}
                 applicationVersion={info?.version ?? null}
                 applicationInfoFailed={error}
                 onPrimary={() => {
@@ -99,6 +155,10 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
                 onCancel={() => void command({ type: 'cancel' })}
                 onStop={() => setStopOpen(true)}
                 onViewLogs={() => navigate('troubleshooting')}
+                onReviewRecovery={() => {
+                  recoveryPlay.current = true;
+                  setRecoveryOpen(true);
+                }}
               />
             ) : (
               <section className="stage-home" aria-label={t('home.region')}>
@@ -113,16 +173,47 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
                 </div>
               </section>
             ))}
-          <LegacyPage
-            page={legacyPage}
-            state={state}
-            productError={productError}
-            pending={pending}
-            command={command}
-            hidden={page === 'home'}
-            onNavigate={navigate}
-            onStop={() => setStopOpen(true)}
-          />
+          {/* Other pages stay mounted so unsaved edits and loaded lists survive navigation. */}
+          <PageFrame
+            {...frame}
+            testId="page-mods"
+            hidden={page !== 'mods'}
+            title={t('menu.mods')}
+            subtitle={t('mods.subtitle')}
+            footer={footer}
+            actions={
+              <ModsAddButton disabled={!ready} onClick={() => void command({ type: 'add-mod' })} />
+            }
+          >
+            {state && (
+              <ModsPage
+                active={page === 'mods'}
+                state={state}
+                pending={pending}
+                command={command}
+              />
+            )}
+          </PageFrame>
+          <PageFrame
+            {...frame}
+            testId="page-settings"
+            hidden={page !== 'settings'}
+            title={t('menu.settings')}
+            subtitle={t('settings.subtitle')}
+            footer={footer}
+            showOutcome
+          >
+            {state && (
+              <SettingsPage
+                active={page === 'settings'}
+                state={state}
+                pending={pending}
+                command={command}
+                onDelete={openDelete}
+              />
+            )}
+          </PageFrame>
+          <LogsPage frame={frame} hidden={page !== 'troubleshooting'} state={state} />
         </div>
       </main>
       {stopOpen && (
@@ -132,6 +223,27 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
             setStopOpen(false);
             void command({ type: 'stop' });
           }}
+        />
+      )}
+      {deleteOpen && state?.deletion && (
+        <DeleteDialog
+          deletion={state.deletion}
+          usage={state.usage}
+          userModCount={
+            state.mods.length > 0 ? state.mods.filter((mod) => mod.source === 'user').length : null
+          }
+          busy={busy}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={(confirmation) => {
+            void command({ type: 'delete', confirmation }).then(() => setDeleteOpen(false));
+          }}
+        />
+      )}
+      {recoveryOpen && (
+        <RecoveryDialog
+          busy={busy}
+          onLater={() => setRecoveryOpen(false)}
+          onConfirm={confirmRecovery}
         />
       )}
       {!splashDone && (

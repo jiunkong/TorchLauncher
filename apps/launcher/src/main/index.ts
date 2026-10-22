@@ -149,29 +149,6 @@ if (primaryInstance)
         });
         return result.canceled ? null : (result.filePaths[0] ?? null);
       },
-      confirmDeletion: async (root) =>
-        (
-          await dialog.showMessageBox({
-            type: 'warning',
-            title: '서버 데이터 영구 삭제',
-            message: '게임, 모드, 저장 데이터와 개인 설정을 모두 삭제합니다.',
-            detail: root,
-            buttons: ['취소', '영구 삭제'],
-            defaultId: 0,
-            cancelId: 0,
-          })
-        ).response === 1,
-      confirmRecovery: async () =>
-        (
-          await dialog.showMessageBox({
-            type: 'warning',
-            title: '불확실한 잠금 복구',
-            message: '다른 런처와 게임이 모두 종료되었는지 확인하세요.',
-            buttons: ['취소', '모두 종료됨 · 복구'],
-            defaultId: 0,
-            cancelId: 0,
-          })
-        ).response === 1,
       publish: (state) => {
         if (mainWindow && !mainWindow.isDestroyed())
           mainWindow.webContents.send(productStateChannel, state);

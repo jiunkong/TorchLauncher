@@ -56,8 +56,6 @@ export interface ProductHost {
     logout(): Promise<void>;
   };
   chooseMod(): Promise<string | null>;
-  confirmDeletion(root: string): Promise<boolean>;
-  confirmRecovery(): Promise<boolean>;
   publish(state: ProductState): void;
   quit?(): void;
 }
@@ -290,7 +288,6 @@ export class ProductService {
               break;
             case 'recover': {
               await this.verified();
-              if (command.acceptUncertain && !(await this.host.confirmRecovery())) break;
               signal.throwIfAborted();
               const report = await recoverServerEnvironment(this.root(), {
                 serverId: this.config().serverId,
@@ -392,11 +389,6 @@ export class ProductService {
             case 'delete': {
               if (command.confirmation !== this.state.deletion?.confirmation)
                 throw new Error('confirmation-invalid');
-              const root = this.state.deletion.root;
-              if (!(await this.host.confirmDeletion(root))) {
-                this.invalidateDeletion();
-                break;
-              }
               signal.throwIfAborted();
               this.state.deletion = null;
               await deleteServerData(this.host.base, this.config().serverId, command.confirmation, {

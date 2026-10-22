@@ -110,47 +110,50 @@ try {
     1,
   );
   await page.getByRole('button', { name: '내 모드', exact: true }).click();
-  await page.getByText('설치된 모드가 없습니다.', { exact: true }).waitFor();
+  await page.getByText('추가한 모드가 없습니다.', { exact: true }).waitFor();
 
   await page.getByRole('button', { name: '설정', exact: true }).click();
-  await page.getByLabel('활성 팩 ID (위에서 아래 순서)').waitFor();
-  const closeOnLaunch = page.getByRole('checkbox', { name: '게임 실행 후 런처 종료', exact: true });
-  assert.equal(await closeOnLaunch.isChecked(), false);
+  await page.getByRole('heading', { level: 2, name: '활성 리소스팩 순서' }).waitFor();
+  await page.getByTestId('usage').filter({ hasText: '파일' }).waitFor();
+  const closeOnLaunch = page.getByRole('switch', { name: '게임 실행 후 런처 종료', exact: true });
+  assert.equal((await closeOnLaunch.getAttribute('aria-checked')) === 'true', false);
   await closeOnLaunch.click();
   await page.waitForFunction(
     async () => (await window.torchlauncher.getState()).preferences.closeOnLaunch,
   );
-  assert.equal(await closeOnLaunch.isChecked(), true);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="close-on-launch"]')?.getAttribute('aria-checked') ===
+      'true',
+  );
   assert.deepEqual(
     JSON.parse(await readFile(resolve(temp, 'user-data/launcher-preferences.json'), 'utf8')),
     { closeOnLaunch: true },
   );
   await mkdir(resolve('.cache/smoke'), { recursive: true });
   await page.screenshot({ path: resolve('.cache/smoke/launcher-close-on-launch.png') });
-  const packDraft = 'vanilla\nfile/my-local-pack.zip';
-  const editor = page.getByLabel('활성 팩 ID (위에서 아래 순서)');
-  await editor.fill(packDraft);
-
   const status = await page.evaluate(() => window.torchlauncher.command({ type: 'status' }));
   assert.equal(status.state.status.state, 'unavailable');
   assert.equal(status.ok, false);
   await page.getByRole('alert').filter({ hasText: '작업 결과:' }).waitFor();
-  assert.equal(await editor.inputValue(), packDraft);
 
   // Home: failed status shows the amber panel with the existing cause text and a retry.
   await page.getByRole('button', { name: '플레이', exact: true }).click();
   const home = page.getByTestId('home');
   await home.getByText('서버 상태를 확인하지 못했습니다', { exact: true }).waitFor();
   assert.equal(await page.getByTestId('app-shell').getAttribute('inert'), null);
-  // The log page keeps the previous diagnostic content until L2.
   await page.getByRole('button', { name: '로그', exact: true }).click();
-  await page.getByRole('heading', { level: 2, name: '최근 진단 기록' }).waitFor();
-  // Navigating back keeps the pack draft in the still-mounted settings page.
-  await page.getByRole('button', { name: '설정', exact: true }).click();
-  assert.equal(await editor.inputValue(), packDraft);
+  await page.getByRole('tab', { name: '런처', exact: true }).click();
+  await page
+    .getByTestId('log-view')
+    .getByText(/^session: ready|^status: failed/)
+    .first()
+    .waitFor();
+  assert.equal(await page.getByText('폴더 열기').count(), 0);
+  await page.screenshot({ path: resolve('.cache/smoke/l2a-logs.png') });
   assert.deepEqual(pageErrors, []);
   console.log(
-    'Launcher: real mod/pack reads, persisted close-on-launch setting and draft preservation passed',
+    'Launcher: real mod/pack reads, persisted close-on-launch setting, usage and log tabs passed',
   );
 } finally {
   await app?.close();
