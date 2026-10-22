@@ -38,6 +38,7 @@ await writeFile(
     name: 'Smoke fixture',
     address: serverAddress,
     sourceUrl: 'https://example.invalid/smoke.torchpack',
+    game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } },
   })}\n`,
 );
 const appCases = [
@@ -92,7 +93,7 @@ try {
       await page.setViewportSize({ width: 760, height: 760 });
       await page.getByTestId('app-shell').waitFor();
       if (directory === 'launcher') {
-        // The start animation covers the shell for ~2.2s on every launch.
+        // The start animation covers the shell for ~1.6s on every launch.
         await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
         await page.getByTestId('application-info').filter({ hasText: manifest.version }).waitFor();
       } else {

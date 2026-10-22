@@ -17,6 +17,26 @@ describe('server config', () => {
       expect(parseServerConfig({ ...config, sourceUrl }).sourceUrl).toBe(sourceUrl);
     expect(SERVER_CONFIG_FILENAME).toBe('torchlauncher-server.json');
   });
+  it('accepts an optional game and rejects malformed ones', () => {
+    const game = { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } };
+    expect(parseServerConfig({ ...config, game })).toEqual({ ...config, game });
+    for (const bad of [
+      null,
+      [],
+      {},
+      { ...game, extra: 1 },
+      { ...game, minecraftVersion: '' },
+      { ...game, minecraftVersion: '../1' },
+      { ...game, minecraftVersion: 'a'.repeat(65) },
+      { ...game, loader: { kind: 'forge', version: '1' } },
+      { ...game, loader: { kind: 'fabric', version: 'x y' } },
+      { ...game, loader: { kind: 'fabric', version: '1', extra: 1 } },
+      { ...game, loader: null },
+    ])
+      expect(() => parseServerConfig({ ...config, game: bad })).toThrow(
+        'Invalid server configuration',
+      );
+  });
   it.each([
     null,
     { ...config, command: 'run' },

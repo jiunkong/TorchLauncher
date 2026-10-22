@@ -29,9 +29,10 @@ await writeFile(
     format: 'torchlauncher-server',
     version: 1,
     serverId: '44444444-4444-4444-8444-444444444444',
-    name: 'Renderer smoke fixture',
+    name: 'TorchLauncher 접속 검증',
     address: `127.0.0.1:${statusAddress.port}`,
     sourceUrl: 'https://example.invalid/smoke.torchpack',
+    game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } },
   })}\n`,
 );
 
@@ -48,7 +49,7 @@ try {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.getByTestId('app-shell').waitFor();
-  // The start animation plays at least ~2.2s; the shell is inert until it finishes.
+  // The start animation plays at least ~1.6s; the shell is inert until it finishes.
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
   const menu = page.getByTestId('menu');
   assert.equal(await menu.getAttribute('data-open'), 'false');
@@ -57,6 +58,14 @@ try {
   await toggle.click();
   assert.equal(await menu.getAttribute('data-open'), 'true');
   await page.screenshot({ path: resolve('.cache/smoke/launcher-menu-opening.png') });
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="menu"]')?.getBoundingClientRect().width === 232,
+  );
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-menu-open.png') });
+  assert.match(
+    (await page.getByTestId('game-version').textContent()) ?? '',
+    /Minecraft 1\.21\.1.*Fabric 0\.19\.5/,
+  );
   const collapse = page.getByRole('button', { name: '메뉴 닫기', exact: true });
   assert.equal(await collapse.getAttribute('aria-expanded'), 'true');
   assert.equal(await page.getByText(`127.0.0.1:${statusAddress.port}`).count(), 0);
@@ -97,7 +106,7 @@ try {
   );
 
   assert.equal(
-    await page.getByRole('heading', { level: 1, name: 'Renderer smoke fixture' }).count(),
+    await page.getByRole('heading', { level: 1, name: 'TorchLauncher 접속 검증' }).count(),
     1,
   );
   await page.getByRole('button', { name: '내 모드', exact: true }).click();

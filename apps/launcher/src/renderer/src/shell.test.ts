@@ -202,7 +202,7 @@ describe('stop confirmation', () => {
 
 describe('splash', () => {
   it('always shows the TorchLauncher logo and name with a labelled loading bar', () => {
-    const html = render(createElement(SplashView, { phase: 'waiting', minimumMs: 2200 }));
+    const html = render(createElement(SplashView, { phase: 'waiting', minimumMs: 1600 }));
     expect(html).toContain('aria-label="TorchLauncher"');
     expect(html).toContain('TORCH');
     expect(html).toContain('LAUNCHER');

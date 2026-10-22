@@ -7,6 +7,43 @@ export interface ServerConfig {
   readonly name: string;
   readonly address: string;
   readonly sourceUrl: string;
+  /** Optional hint so the launcher can show the game version before the deployment index is read. */
+  readonly game?: ServerConfigGame;
+}
+
+export interface ServerConfigGame {
+  readonly minecraftVersion: string;
+  readonly loader: { readonly kind: 'fabric' | 'neoforge'; readonly version: string };
+}
+
+function versionToken(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length >= 1 &&
+    value.length <= 64 &&
+    /^[A-Za-z0-9][A-Za-z0-9._+-]*$/u.test(value)
+  );
+}
+
+function parseGame(input: unknown): ServerConfigGame | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const game = input as Record<string, unknown>;
+  const loader = game.loader as Record<string, unknown> | null | undefined;
+  if (
+    Object.keys(game).length !== 2 ||
+    !versionToken(game.minecraftVersion) ||
+    !loader ||
+    typeof loader !== 'object' ||
+    Array.isArray(loader) ||
+    Object.keys(loader).length !== 2 ||
+    (loader.kind !== 'fabric' && loader.kind !== 'neoforge') ||
+    !versionToken(loader.version)
+  )
+    return null;
+  return {
+    minecraftVersion: game.minecraftVersion,
+    loader: { kind: loader.kind, version: loader.version },
+  };
 }
 
 export function parseServerConfig(input: unknown): ServerConfig {
@@ -16,12 +53,15 @@ export function parseServerConfig(input: unknown): ServerConfig {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
   const value = input as Record<string, unknown>;
   const fields = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl'];
+  const hasGame = Object.hasOwn(value, 'game');
   if (
-    Object.keys(value).length !== fields.length ||
+    Object.keys(value).length !== fields.length + (hasGame ? 1 : 0) ||
     fields.some((key) => !Object.hasOwn(value, key))
   ) {
     return fail();
   }
+  const game = hasGame ? parseGame(value.game) : undefined;
+  if (game === null) return fail();
   if (value.format !== 'torchlauncher-server' || value.version !== 1) return fail();
   if (
     typeof value.serverId !== 'string' ||
@@ -71,5 +111,6 @@ export function parseServerConfig(input: unknown): ServerConfig {
     name: value.name,
     address: value.address,
     sourceUrl: value.sourceUrl as string,
+    ...(game ? { game } : {}),
   };
 }

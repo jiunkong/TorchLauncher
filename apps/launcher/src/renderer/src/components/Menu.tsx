@@ -55,7 +55,11 @@ export function Menu(props: MenuProps) {
           <span className="opicon fade" aria-hidden="true" inert={!open}>
             <img src={torchUrl} alt="" draggable={false} />
           </span>
-          <strong className="side-name fade" inert={!open}>
+          <strong
+            className="side-name fade"
+            inert={!open}
+            title={props.serverName ?? t('home.noServer')}
+          >
             {props.serverName ?? t('home.noServer')}
           </strong>
           <button
