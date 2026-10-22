@@ -1,6 +1,6 @@
 import type { ProductState } from '../../../shared/product';
 import { type ActivityStage, stageChips, stageMeasure } from '../activity';
-import torchUrl from '../assets/torch.png';
+import { BrandingVisual } from '../components/BrandingVisual';
 import { MicrosoftIcon, PlayFilledIcon, RetryIcon, StopIcon } from '../components/Icons';
 import { ProgressBar } from '../components/ProgressBar';
 import { elapsedParts, gameParts, homeView } from '../home';
@@ -17,6 +17,7 @@ import {
 export const homeGameVersion = '1.21.1';
 export interface HomeProps {
   state: ProductState;
+  brandingBackground?: string | null;
   productError: string | null;
   pending: boolean;
   elapsedMs: number;
@@ -120,9 +121,7 @@ export function Home(props: HomeProps) {
       data-testid="home"
       data-kind={view.kind}
     >
-      <div className="scene fallback" aria-hidden="true">
-        <img src={torchUrl} alt="" draggable={false} />
-      </div>
+      <BrandingVisual kind="background" value={props.brandingBackground ?? null} />
       <div className="shade" />
       <div className="copy">
         <span className="status" data-testid="server-status">

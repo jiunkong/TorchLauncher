@@ -53,12 +53,13 @@ describe('menu accessibility', () => {
     expect(html).toContain('title="설정"');
   });
 
-  it('shows names, the server, and the account controls when expanded', () => {
+  it('shows default app name and account controls when expanded', () => {
     const html = render(createElement(Menu, { ...menuProps, open: true }));
     expect(html).toContain('data-open="true"');
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain('aria-label="메뉴 닫기"');
-    expect(html).toContain('Fixture Server');
+    expect(html).toContain('TorchLauncher');
+    expect(html).not.toContain('Fixture Server');
     expect(html).toContain('Player');
     expect(html).toContain('aria-label="로그아웃"');
     expect(html).not.toMatch(/inert=""/);

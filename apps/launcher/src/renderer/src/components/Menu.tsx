@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import torchUrl from '../assets/torch.png';
 import { useT } from '../hooks/useTranslator';
+import { BrandingVisual } from './BrandingVisual';
 import {
   CollapseIcon,
   LogoutIcon,
@@ -30,6 +30,8 @@ export interface MenuProps {
   page: PageId;
   onNavigate(page: PageId): void;
   serverName: string | null;
+  appName?: string;
+  brandingIcon?: string | null;
   accountName: string | null;
   accountSkin?: string;
   logoutDisabled: boolean;
@@ -47,14 +49,10 @@ export function Menu(props: MenuProps) {
       <nav className="menu-nav" aria-label={t('menu.label')}>
         <div className="side-head">
           <span className="opicon fade" aria-hidden="true" inert={!open}>
-            <img src={torchUrl} alt="" draggable={false} />
+            <BrandingVisual kind="icon" value={props.brandingIcon ?? null} />
           </span>
-          <strong
-            className="side-name fade"
-            inert={!open}
-            title={props.serverName ?? t('home.noServer')}
-          >
-            {props.serverName ?? t('home.noServer')}
+          <strong className="side-name fade" inert={!open} title={props.appName ?? 'TorchLauncher'}>
+            {props.appName ?? 'TorchLauncher'}
           </strong>
           <button
             className="tg"
