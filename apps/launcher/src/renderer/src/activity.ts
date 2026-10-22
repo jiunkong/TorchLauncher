@@ -47,9 +47,56 @@ export function activityProgress(activity: ProductActivity): string {
   return `${count}${total}${active}`;
 }
 
+/** A ratio is shown only when both the completed and total counts were measured. */
+export function activityKnown(activity: Pick<ProductActivity, 'completed' | 'total'>): boolean {
+  return activity.completed !== null && activity.total !== null && activity.total > 0;
+}
+
 export function ActivityProgress({ activity }: { activity: ProductActivity }) {
-  const known = activity.completed !== null && activity.total !== null && activity.total > 0;
+  const known = activityKnown(activity);
   return known
     ? createElement('progress', { value: activity.completed, max: activity.total })
     : createElement('progress', { 'aria-label': '진행 중' });
+}
+
+export type StepId = 'java' | 'game' | 'library' | 'asset' | 'loader' | 'server-mod' | 'config';
+export const stepOrder: StepId[] = [
+  'java',
+  'game',
+  'library',
+  'asset',
+  'loader',
+  'server-mod',
+  'config',
+];
+const stepOfComponent: Record<ProductActivity['component'], StepId> = {
+  java: 'java',
+  metadata: 'game',
+  game: 'game',
+  library: 'library',
+  logging: 'library',
+  asset: 'asset',
+  loader: 'loader',
+  'server-mod': 'server-mod',
+  'resource-pack': 'config',
+  'server-config': 'config',
+  'server-file': 'config',
+};
+
+export function stepOf(component: ProductActivity['component']): StepId {
+  return stepOfComponent[component];
+}
+
+/**
+ * Chips are `now` for the step being worked on and `done` only for steps this renderer already
+ * saw being worked on earlier in the same operation; nothing is inferred about order or totals.
+ */
+export function stepChips(
+  seen: readonly StepId[],
+  current: StepId | null,
+): { id: StepId; state: 'done' | 'now' | 'todo' }[] {
+  return stepOrder.map((id) => ({
+    id,
+    state: id === current ? 'now' : seen.includes(id) ? 'done' : 'todo',
+  }));
 }

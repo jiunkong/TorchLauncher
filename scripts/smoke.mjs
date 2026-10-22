@@ -45,10 +45,10 @@ const appCases = [
     directory: 'launcher',
     name: 'TorchLauncher',
     pages: [
-      ['홈 · 플레이', '서버에 접속할 준비를 합니다'],
+      ['플레이', 'Smoke fixture'],
       ['내 모드', '내 모드'],
       ['설정', '설정'],
-      ['문제 해결', '설정 및 문제 해결'],
+      ['로그', '로그'],
     ],
     expectedBridge: ['getApplicationInfo', 'getState', 'command', 'onState'],
     env: { ...env, TORCH_SERVER_CONFIG: configPath },
@@ -91,7 +91,13 @@ try {
       page.on('pageerror', (error) => errors.push(error.message));
       await page.setViewportSize({ width: 760, height: 760 });
       await page.getByTestId('app-shell').waitFor();
-      await page.getByTestId('application-info').filter({ hasText: process.platform }).waitFor();
+      if (directory === 'launcher') {
+        // The start animation covers the shell for ~2.2s on every launch.
+        await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
+        await page.getByTestId('application-info').filter({ hasText: manifest.version }).waitFor();
+      } else {
+        await page.getByTestId('application-info').filter({ hasText: process.platform }).waitFor();
+      }
 
       const result = await page.evaluate(async () => ({
         info: await window.torchlauncher.getApplicationInfo(),
