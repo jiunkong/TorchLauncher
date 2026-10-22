@@ -1,0 +1,343 @@
+import { createHash } from 'node:crypto';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
+import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
+import { decodeProject, encodeProject, validateImage } from './branding.js';
+import { newProject, parseProject } from './project.js';
+import { type StudioDialogs, StudioService } from './studio.js';
+
+const png = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+  'base64',
+);
+const decode = () => ({ width: 1, height: 1 });
+const roots: string[] = [];
+async function temp() {
+  const root = await mkdtemp(join(tmpdir(), 'studio-brand-'));
+  roots.push(root);
+  return root;
+}
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+function dialogs() {
+  return {
+    open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
+    save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
+    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
+  };
+}
+function source(bytes: Buffer): DownloadSource {
+  const snapshot = { totalLength: bytes.length, etag: '"branding"', lastModified: null };
+  let generation = 0;
+  return {
+    kind: 'https',
+    sourceId: 'branding-test',
+    get generation() {
+      return generation;
+    },
+    snapshot,
+    async getRange(range) {
+      return {
+        sourceId: this.sourceId,
+        sourceGeneration: generation,
+        range,
+        bytes: bytes.subarray(range.start, range.end + 1),
+        snapshot,
+      };
+    },
+    reset() {
+      generation++;
+    },
+  };
+}
+async function service() {
+  const d = dialogs();
+  let pack: Buffer = Buffer.alloc(0);
+  const s = new StudioService(d, () => source(pack), decode);
+  await s.request({ action: 'new' });
+  return {
+    d,
+    s,
+    setPack: (value: Buffer) => {
+      pack = value;
+    },
+  };
+}
+
+describe('Studio durable branding', () => {
+  it('preserves one snapshot across source replacement, save/reopen, writer and folder export', async () => {
+    const root = await temp();
+    const image = join(root, 'input.png');
+    await writeFile(image, png);
+    const { s, d, setPack } = await service();
+    d.open.mockResolvedValueOnce([image]);
+    expect((await s.request({ action: 'brandingSelect', role: 'icon' })).ok).toBe(true);
+    await s.request({ action: 'brandingRemove', role: 'background' });
+    await s.request({ action: 'brandingName', appName: 'Custom launcher' });
+    const summary = s.snapshot().project;
+    expect(JSON.stringify(summary)).not.toContain('base64');
+    expect(summary?.branding?.icon).toMatchObject({ length: png.length });
+    await writeFile(image, 'original replaced');
+    const projectPath = join(root, 'project.json');
+    d.save.mockResolvedValueOnce(projectPath);
+    expect((await s.request({ action: 'save' })).ok).toBe(true);
+    expect(JSON.parse(await readFile(projectPath, 'utf8')).branding.icon.base64).toBe(
+      png.toString('base64'),
+    );
+    d.open.mockResolvedValueOnce([projectPath]);
+    expect((await s.request({ action: 'open' })).ok).toBe(true);
+    expect(s.snapshot().project).toEqual(summary);
+    d.open.mockResolvedValueOnce([root]);
+    await s.request({ action: 'source' });
+    const packPath = join(root, 'server.torchpack');
+    d.save.mockResolvedValueOnce(packPath);
+    expect((await s.request({ action: 'build' })).ok).toBe(true);
+    const pack = await readFile(packPath);
+    setPack(pack);
+    const reader = await openDeploymentReader(source(pack), {
+      expectedServerId: parseProject(summary).serverId,
+    });
+    expect(reader.header.formatVersion.minor).toBe(1);
+    expect(reader.index.files).toEqual([]);
+    await reader.stageBrandingAsset('icon', join(root, 'staged.png'));
+    expect(await readFile(join(root, 'staged.png'))).toEqual(png);
+    expect(reader.index.branding?.background).toBeNull();
+    const project = parseProject(s.snapshot().project);
+    project.sourceUrl = 'https://example.org/pack';
+    await s.request({ action: 'update', project });
+    expect((await s.request({ action: 'check' })).ok).toBe(true);
+    const binary = join(root, 'Torch.exe');
+    await writeFile(binary, 'MZ unchanged binary');
+    const output = join(root, 'output');
+    await mkdir(output);
+    d.open.mockResolvedValueOnce([binary]).mockResolvedValueOnce([output]);
+    expect((await s.request({ action: 'export' })).ok).toBe(true);
+    const config = JSON.parse(await readFile(join(output, 'torchlauncher-server.json'), 'utf8'));
+    expect(config.branding.appName).toBe('Custom launcher');
+    expect(config.branding.icon.sha256).toBe(createHash('sha256').update(png).digest('hex'));
+    expect(config.branding.background).toBeUndefined();
+    expect(await readFile(join(output, config.branding.icon.path))).toEqual(png);
+    expect(await readFile(join(output, 'Torch.exe'), 'utf8')).toBe('MZ unchanged binary');
+    await s.request({ action: 'brandingRemove', role: 'icon' });
+    expect(await s.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
+  });
+  it('supports background snapshots, unchanged renderer edits, appName-only legacy packs and cancelled selection', async () => {
+    const root = await temp();
+    const image = join(root, 'background.png');
+    await writeFile(image, png);
+    const { s, d } = await service();
+    await s.request({ action: 'brandingName', appName: 'Local title' });
+    d.open.mockResolvedValueOnce([root]);
+    await s.request({ action: 'source' });
+    const legacyPath = join(root, 'legacy.torchpack');
+    d.save.mockResolvedValueOnce(legacyPath);
+    expect((await s.request({ action: 'build' })).ok).toBe(true);
+    const legacy = await openDeploymentReader(source(await readFile(legacyPath)), {
+      expectedServerId: parseProject(s.snapshot().project).serverId,
+    });
+    expect(legacy.header.formatVersion.minor).toBe(0);
+    d.open.mockResolvedValueOnce([image]);
+    expect((await s.request({ action: 'brandingSelect', role: 'background' })).ok).toBe(true);
+    const before = parseProject(s.snapshot().project);
+    expect(
+      (await s.request({ action: 'update', project: { ...before, name: 'Edited existing form' } }))
+        .ok,
+    ).toBe(true);
+    expect(s.snapshot().project?.branding).toEqual(before.branding);
+    let finish!: (paths: string[]) => void;
+    d.open.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = s.request({ action: 'brandingSelect', role: 'background' });
+    await s.request({ action: 'cancel' });
+    finish([image]);
+    expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
+    expect(s.snapshot().project?.branding).toEqual(before.branding);
+    const packPath = join(root, 'background.torchpack');
+    d.save.mockResolvedValueOnce(packPath);
+    expect((await s.request({ action: 'build' })).ok).toBe(true);
+    const reader = await openDeploymentReader(source(await readFile(packPath)), {
+      expectedServerId: before.serverId,
+    });
+    await reader.stageBrandingAsset('background', join(root, 'background-staged.png'));
+    expect(await readFile(join(root, 'background-staged.png'))).toEqual(png);
+  });
+  it('rejects forged commands, summary changes, bad names and failed/cancelled imports without replacing selection', async () => {
+    const root = await temp();
+    const path = join(root, 'image.png');
+    await writeFile(path, png);
+    const { s, d } = await service();
+    d.open.mockResolvedValueOnce([path]);
+    await s.request({ action: 'brandingSelect', role: 'icon' });
+    const before = s.snapshot().project;
+    for (const input of [
+      { action: 'brandingSelect', role: 'icon', path },
+      { action: 'brandingSelect', role: 'other' },
+      { action: 'brandingName', appName: 42 },
+      { action: 'brandingRemove', role: 'icon', url: 'https://example.org' },
+    ])
+      expect(await s.request(input)).toEqual({ ok: false, code: 'INVALID' });
+    expect(await s.request({ action: 'update', project: { ...before, branding: {} } })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect(await s.request({ action: 'brandingName', appName: 'bad\nname' })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
+      ok: false,
+      code: 'CANCELLED',
+    });
+    await writeFile(path, 'bad image');
+    d.open.mockResolvedValueOnce([path]);
+    expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect(s.snapshot().project).toEqual(before);
+    await s.request({ action: 'brandingName', appName: 'Title' });
+    await s.request({ action: 'brandingName', appName: null });
+    expect(s.snapshot().project?.branding?.appName).toBeUndefined();
+  });
+  it('rejects malformed/corrupt snapshots, metadata, bounds and actual decoder disagreement', () => {
+    const metadata = validateImage('icon', png, decode);
+    const project = { ...newProject(), branding: { icon: metadata } };
+    const saved = JSON.parse(encodeProject(project, { icon: png }));
+    expect(parseProject(decodeProject(saved, decode).input)).toEqual(project);
+    for (const bad of [
+      { ...saved, branding: { icon: { ...saved.branding.icon, sha256: '0'.repeat(64) } } },
+      {
+        ...saved,
+        branding: { icon: { ...saved.branding.icon, base64: `${png.toString('base64')}\n` } },
+      },
+      { ...saved, branding: { icon: { ...saved.branding.icon, base64: 'A'.repeat(1400004) } } },
+    ])
+      expect(() => decodeProject(bad, decode)).toThrow();
+    expect(() => validateImage('icon', png, () => ({ width: 2, height: 1 }))).toThrow();
+    expect(() =>
+      validateImage('icon', png, () => {
+        throw new Error('decode');
+      }),
+    ).toThrow();
+    const oversized = Buffer.from(png);
+    oversized.writeUInt32BE(513, 16);
+    expect(() => validateImage('icon', oversized, decode)).toThrow();
+    expect(() => validateImage('icon', Buffer.alloc(1024 ** 2 + 1), decode)).toThrow();
+    expect(() =>
+      parseProject({ ...project, branding: { icon: { ...metadata, base64: 'x' } } }),
+    ).toThrow();
+  });
+  it('rejects hardlinks, symlinks and parent links and preserves current project on invalid open', async () => {
+    const root = await temp();
+    const path = join(root, 'image.png');
+    await writeFile(path, png);
+    const { s, d } = await service();
+    const original = s.snapshot().project;
+    const hard = join(root, 'hard.png');
+    await link(path, hard);
+    d.open.mockResolvedValueOnce([hard]);
+    expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    if (process.platform !== 'win32') {
+      const dir = join(root, 'dir');
+      await mkdir(dir);
+      await writeFile(join(dir, 'image.png'), png);
+      const linked = join(root, 'linked');
+      await symlink(dir, linked);
+      d.open.mockResolvedValueOnce([join(linked, 'image.png')]);
+      expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
+        ok: false,
+        code: 'INVALID',
+      });
+    }
+    const bad = join(root, 'project.json');
+    await writeFile(
+      bad,
+      JSON.stringify({
+        ...newProject(),
+        branding: {
+          icon: { sha256: '0'.repeat(64), length: 1, mediaType: 'image/png', base64: 'YQ==' },
+        },
+      }),
+    );
+    d.open.mockResolvedValueOnce([bad]);
+    expect((await s.request({ action: 'open' })).ok).toBe(false);
+    expect(s.snapshot().project).toEqual(original);
+  });
+  it('validates fixed sidecars before output and cleans all own files on late abort', async () => {
+    const { exportLauncher } = await import('./filesystem.js');
+    const root = await temp();
+    const output = join(root, 'out');
+    await mkdir(output);
+    const binary = join(root, 'Torch.exe');
+    await writeFile(binary, 'MZ fake');
+    const metadata = validateImage('icon', png, decode);
+    const { parseServerConfig } = await import(
+      '../../../../packages/core/src/server-config/index.js'
+    );
+    const p = newProject();
+    const config = parseServerConfig({
+      format: 'torchlauncher-server',
+      version: 1,
+      serverId: p.serverId,
+      name: p.name,
+      address: p.address,
+      sourceUrl: 'https://example.org/pack',
+      branding: { icon: { ...metadata, path: 'branding/icon.png' } },
+    });
+    await expect(
+      exportLauncher(binary, output, config, new AbortController().signal, () => {}, {
+        icon: Buffer.from('wrong'),
+      }),
+    ).rejects.toThrow();
+    expect(await readdir(output)).toEqual([]);
+    const badConfig = {
+      ...config,
+      branding: { icon: { ...metadata, path: 'branding/other.png' } },
+    };
+    await expect(
+      exportLauncher(binary, output, badConfig, new AbortController().signal, () => {}, {
+        icon: png,
+      }),
+    ).rejects.toThrow();
+    expect(await readdir(output)).toEqual([]);
+    // Fail after sidecars and JSON were created: cleanup removes only this export's entries.
+    const controller = new AbortController();
+    let checkpoints = 0;
+    vi.spyOn(controller.signal, 'throwIfAborted').mockImplementation(() => {
+      if (++checkpoints === 5) throw new Error('late abort');
+    });
+    await expect(
+      exportLauncher(binary, output, config, controller.signal, () => {}, {
+        icon: png,
+      }),
+    ).rejects.toThrow();
+    expect(await readdir(output)).toEqual([]);
+    const replaced = new AbortController();
+    let secondCheckpoints = 0;
+    vi.spyOn(replaced.signal, 'throwIfAborted').mockImplementation(() => {
+      if (++secondCheckpoints !== 5) return;
+      renameSync(join(output, 'branding'), join(root, 'displaced-branding'));
+      mkdirSync(join(output, 'branding'));
+      writeFileSync(join(output, 'branding', 'icon.png'), 'foreign');
+      throw new Error('directory replaced');
+    });
+    await expect(
+      exportLauncher(binary, output, config, replaced.signal, () => {}, { icon: png }),
+    ).rejects.toThrow();
+    expect(await readdir(output)).toEqual(['branding']);
+    expect(await readFile(join(output, 'branding', 'icon.png'), 'utf8')).toBe('foreign');
+    expect(await readFile(join(root, 'displaced-branding', 'icon.png'))).toEqual(png);
+  });
+});

@@ -5,6 +5,7 @@ import {
 } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import type { StudioProject } from '../shared/studio.js';
+import { parseBranding } from './branding.js';
 
 export class StudioFailure extends Error {
   constructor(readonly code: import('../shared/studio.js').StudioError) {
@@ -17,7 +18,7 @@ export function parseProject(input: unknown): StudioProject {
   const p = input as Record<string, unknown>;
   const keys = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl', 'game', 'files'];
   if (
-    Object.keys(p).length !== keys.length ||
+    Object.keys(p).some((k) => ![...keys, 'branding'].includes(k)) ||
     keys.some((k) => !Object.hasOwn(p, k)) ||
     p.format !== 'torchlauncher-project' ||
     p.version !== 1 ||
@@ -27,6 +28,7 @@ export function parseProject(input: unknown): StudioProject {
   )
     throw new StudioFailure('INVALID');
   try {
+    if (Object.hasOwn(p, 'branding')) parseBranding(p.branding);
     parseServerConfig({
       format: 'torchlauncher-server',
       version: 1,

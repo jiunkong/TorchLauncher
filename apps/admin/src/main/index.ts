@@ -6,8 +6,9 @@ import {
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
 import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
-import { studioChannel } from '../shared/studio.js';
+import { brandingDialogText, studioChannel } from '../shared/studio.js';
 import { handleStudioRequest } from './ipc.js';
+import { decodeNativeImage } from './native-branding.js';
 import { StudioService } from './studio.js';
 
 const applicationName = applicationNames.studio;
@@ -38,58 +39,71 @@ function createWindow(): void {
     },
   });
 
-  const service = new StudioService({
-    open: async (kind, root) => {
-      const directory = kind === 'source' || kind === 'output';
-      const result = await dialog.showOpenDialog(window, {
-        title: {
-          project: '프로젝트 열기',
-          source: '배포 소스 폴더',
-          files: '소스 폴더 안의 파일 선택',
-          binary: '기존 공통 런처 선택',
-          output: '비어 있는 출력 폴더 선택',
-        }[kind],
-        ...(root ? { defaultPath: root } : {}),
-        properties: directory
-          ? ['openDirectory']
-          : kind === 'files'
-            ? ['openFile', 'multiSelections']
-            : ['openFile'],
-        ...(!directory && kind !== 'files'
-          ? {
-              filters:
-                kind === 'binary'
-                  ? [{ name: '공통 런처', extensions: ['exe', 'AppImage'] }]
-                  : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
-            }
-          : {}),
-      });
-      return result.canceled ? null : result.filePaths;
+  const service = new StudioService(
+    {
+      open: async (kind, root) => {
+        const directory = kind === 'source' || kind === 'output';
+        const result = await dialog.showOpenDialog(window, {
+          title: {
+            project: '프로젝트 열기',
+            source: '배포 소스 폴더',
+            files: '소스 폴더 안의 파일 선택',
+            binary: '기존 공통 런처 선택',
+            output: '비어 있는 출력 폴더 선택',
+            icon: brandingDialogText.icon,
+            background: brandingDialogText.background,
+          }[kind],
+          ...(root ? { defaultPath: root } : {}),
+          properties: directory
+            ? ['openDirectory']
+            : kind === 'files'
+              ? ['openFile', 'multiSelections']
+              : ['openFile'],
+          ...(!directory && kind !== 'files'
+            ? {
+                filters:
+                  kind === 'icon' || kind === 'background'
+                    ? [
+                        {
+                          name: brandingDialogText.filter,
+                          extensions: kind === 'icon' ? ['png'] : ['png', 'jpg', 'jpeg'],
+                        },
+                      ]
+                    : kind === 'binary'
+                      ? [{ name: '공통 런처', extensions: ['exe', 'AppImage'] }]
+                      : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
+              }
+            : {}),
+        });
+        return result.canceled ? null : result.filePaths;
+      },
+      save: async (kind) => {
+        const result = await dialog.showSaveDialog(window, {
+          title: kind === 'project' ? '프로젝트 저장' : 'torchpack 생성',
+          defaultPath: kind === 'project' ? 'server-project.json' : 'server.torchpack',
+          filters: [
+            {
+              name: kind === 'project' ? 'Studio 프로젝트' : '배포 파일',
+              extensions: [kind === 'project' ? 'json' : 'torchpack'],
+            },
+          ],
+        });
+        return result.canceled ? null : (result.filePath ?? null);
+      },
+      discard: async () =>
+        (
+          await dialog.showMessageBox(window, {
+            type: 'warning',
+            message: '저장하지 않은 프로젝트 변경을 버리시겠습니까?',
+            buttons: ['돌아가기', '변경 버리기'],
+            defaultId: 0,
+            cancelId: 0,
+          })
+        ).response === 1,
     },
-    save: async (kind) => {
-      const result = await dialog.showSaveDialog(window, {
-        title: kind === 'project' ? '프로젝트 저장' : 'torchpack 생성',
-        defaultPath: kind === 'project' ? 'server-project.json' : 'server.torchpack',
-        filters: [
-          {
-            name: kind === 'project' ? 'Studio 프로젝트' : '배포 파일',
-            extensions: [kind === 'project' ? 'json' : 'torchpack'],
-          },
-        ],
-      });
-      return result.canceled ? null : (result.filePath ?? null);
-    },
-    discard: async () =>
-      (
-        await dialog.showMessageBox(window, {
-          type: 'warning',
-          message: '저장하지 않은 프로젝트 변경을 버리시겠습니까?',
-          buttons: ['돌아가기', '변경 버리기'],
-          defaultId: 0,
-          cancelId: 0,
-        })
-      ).response === 1,
-  });
+    undefined,
+    decodeNativeImage,
+  );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>
     handleStudioRequest(event, window.webContents, rendererUrl, service, input),
