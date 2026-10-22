@@ -5,6 +5,48 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2b done, L2a in flight, L3 next
+
+This section supersedes the older sections below where they conflict. Read `docs/launcher-ui.md` (spec, phases),
+`docs/release-policy.md` (updates, torchpack signing, no code signing), `docs/work-distribution.md` (L2a/L3 scopes),
+`docs/progress.md` (integration evidence) and `docs/design/launcher/README.md` (mockup sources).
+
+State: `main` = `e2255de` (clean). Integrated: launcher L1, L1b, menu animation, L1c, L2b (session restore, auto recovery,
+log sources). User confirmed L1/L1b/L1c look good on Windows.
+
+**L2a (pages 내 모드/설정/로그, in-app delete+recovery dialogs, real-order progress panel) is NOT integrated.**
+Worker: Sonnet subagent, worktree `.agents/worktrees/agent-1`, branch `feat/launcher-l2a-pages`, base `e2255de`,
+handoff will be `docs/handoffs/LAUNCHER-UI-L2A.md`. At this checkpoint the worktree has UNCOMMITTED changes and the
+subagent was still running (it dies with the Claude session). Do not reset/clean the worktree. Options: inspect
+`git -C .agents/worktrees/agent-1 status`; if the work looks complete, have a worker finish/commit it, or continue it as
+a worker. Late scope change (user decision 2026-10-23): remove BOTH native OS confirm dialogs (`confirmDeletion`,
+`confirmRecovery` in `apps/launcher/src/main/index.ts` / `service.ts`); deletion and recovery are confirmed only by the in-app
+dialog. Keep the core confirmation token, IPC validation, live-lock/game-running refusal. Expected requests from L2a to #0:
+IPC `open-logs`, unregistered-file deletion support.
+
+Review/merge rule (unchanged): #0 reviews diff, `git merge --no-ff`, runs `pnpm check` on `main` (WSL: add
+`/tmp/torchlauncher-tools/node_modules/.bin` to PATH; worker worktrees need `CI=true pnpm install --frozen-lockfile`),
+detaches worktrees (`git -C <wt> checkout --detach main`), deletes merged branch, updates `docs/progress.md`.
+Windows check: `cd D:\TorchLauncherWindowsSmoke; git pull; pnpm install --frozen-lockfile; pnpm build;`
+`$env:TORCH_SERVER_CONFIG='D:\Projects\mclauncher\.cache\game-smoke-validation\ui-server.json'`;
+`pnpm --filter @torchlauncher/launcher start`. That config (ignored, has a private URL; never print/commit) includes `game`.
+
+**L3 (next, not started):** operator branding from the server profile (app name/icon/home background; window title and
+icon only, never the exe icon; fallback to `assets/branding/icon.png`) and player skin-face avatar (Mojang session
+server lookup after login, cached, cleared on logout, fallback first-letter avatar). Needs an exclusive file scope
+assigned by #0 before a worker starts.
+
+**Studio rewrite (not started):** user-approved mockup https://claude.ai/artifact/SKzGcDX7d1qx5bp9AXthNa (sources only in
+Claude scratchpad, not in repo; copy into `docs/design/studio` if still available, else re-request). Decisions: non-linear
+sections 개요/서버 정보/브랜딩/파일/게임 설정/배포/내보내기; export = ZIP only; export blocked on server-ID mismatch, game
+env mismatch, or unverified deploy URL (stale deployment only warns); game settings with presets from options.txt, bulk policy
+change, keybind/sound-video/resource pack/shader tabs (shaders need a policy-format extension); same fonts as launcher.
+
+Decisions to keep: Windows x64 + Linux x64 only; no code signing; keep full asset hash verification; single server
+profile; Korean UI first; native OS frame; text selection blocked outside inputs/logs. Other pending: launcher auto-update
+(RELEASE-02; verify electron-updater portable support), torchpack signing + rollback prevention, AUTH-04, BASE-04 (deferred).
+User is cost-sensitive: small scoped tasks, Sonnet-class for most work, strongest model only for data-loss/process work.
+
 ## Current handoff: localization foundation, then Claude UI work
 
 Follow-up BRAND-ICON-01: user supplied root `icon.ico` (untracked, preserve original).
