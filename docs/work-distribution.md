@@ -514,3 +514,11 @@ L2를 둘로 나눈다. L2b(메인 프로세스·상태 계약)를 먼저 통합
 | 작업 | 담당 / 브랜치 / worktree | 모델 | 독점 수정 범위 |
 | --- | --- | --- | --- |
 | L2b | #3 / `feat/launcher-l2b-automation` / `agent-3` | Sonnet medium (안전 판단 문제가 생기면 #0이 상향) | `apps/launcher/src/main/product/**`, `apps/launcher/src/shared/product.ts`, 상태 형태 변경에 따른 렌더러의 **컴파일 유지용 최소 수정**, `docs/handoffs/LAUNCHER-L2B.md` |
+
+## 런처 UI L2a 착수 — 2026-10-22
+
+L2b 통합(`e950189`, 로그 출처·복구 자동화·세션) 후 L2a(렌더러)를 시작한다. 확인 창 정책 결정: 서버 데이터 **삭제**는 메인 프로세스의 네이티브 확인을 최종 안전장치로 유지하고, **복구 확인**은 앱 안의 확인 창(체크박스 필수)만 쓴다(네이티브 이중 확인 제거).
+
+| 작업 | 담당 / 브랜치 / worktree | 모델 | 독점 수정 범위 |
+| --- | --- | --- | --- |
+| L2a | #1 / `feat/launcher-l2a-pages` / `agent-1` | Sonnet medium | `apps/launcher/src/renderer/**`, 복구 네이티브 확인 제거에 필요한 `apps/launcher/src/main/index.ts`·`main/product/service.ts`의 해당 호출부만, `apps/launcher/scripts/renderer-functional-smoke.mjs`, 루트 `scripts/smoke.mjs`의 런처 부분, `docs/handoffs/LAUNCHER-UI-L2A.md` |

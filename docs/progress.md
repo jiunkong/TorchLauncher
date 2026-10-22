@@ -532,3 +532,7 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - L1c(`81a3d48`)를 병합했다: 시작 애니메이션 최소 길이 1.6초(모션 줄이기 0.7초), 메뉴 상단 서버 이름 2줄 줄바꿈·title 전체 이름, 서버 구성 파일 `torchlauncher-server.json`에 선택 필드 `game`
   (`minecraftVersion`, `loader{kind,version}`) 추가 — 런처가 시작 직후부터 버전·로더를 표시하고 Studio 내보내기가 값을 기록한다(기존 파일은 계속 유효). 메인 `pnpm check` 성공.
   구성과 배포 인덱스의 game이 다를 때는 인덱스 값을 따라 설치·표시하고 `unsupported-game`만 실패한다(불일치 시 명시 오류로 막을지는 Studio 내보내기 차단 규칙과 함께 구현 단계에서 결정).
+- L2b(`e950189`)를 병합했다: 시작·플레이 시 서버 환경 자동 점검과 `stale-verified` 자동 복구(확인 없이, 로그 기록), `uncertain`은 자동 복구하지 않고 `recovery.needed/confirmable`로 표시하며
+  플레이를 `recovery-required`로 차단, `held-live`는 복구하지 않음, `invalid` 항목이 섞이면 자동 복구하지 않음. 로그는 `{source: 'launcher'|'game', text}`로 구분(런처 200줄 + 게임 300줄).
+  세션은 시작 시 조용히 복원하고 플레이 중 갱신, 실패 시 로그인 필요로 복귀. 메인 `pnpm check` 성공(873개 테스트). Windows 실제 비정상 종료 시나리오는 미검증.
+  (병합 직후 `pnpm check` 실패는 로컬 무시 파일 `ui-server.json`의 포맷(줄바꿈 누락) 때문이었고 수정했다.) 다음: L2a(렌더러 페이지·확인 창·진행 패널).
