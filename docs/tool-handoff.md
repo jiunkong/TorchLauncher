@@ -5,16 +5,24 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## Active UI-PROD-01 functional workflow work
+## Completed UI-PROD-01 functional workflow phase
 
 User approved starting UI-PROD-01, explicitly functionality before aesthetics. Read `docs/ui-production.md`.
 #4 subagent `ui_prod_launcher` / agent-4 / `feat/ui-prod-launcher-flow` owns launcher renderer + app-local
 smoke/handoff. #1 subagent `ui_prod_studio` / agent-1 / `feat/ui-prod-studio-flow` owns Studio app + root
 `scripts/smoke.mjs` + its handoff. Both Luna medium initially; escalate only if actual task complexity warrants.
 No image/theme/animation redesign, dependencies or new Studio features. Core/launcher IPC changes need #0 coordination.
-#0 only docs/review/merge. Both workers are active; no new live login/server action requested.
-Scope includes actual activity display, clear primary actions, advanced management relocation, page data/error/draft
-handling, Studio step prerequisites/validation/save/cancel/retry and existing behavior preservation.
+#0 only docs/review/merge. Both workers completed, no new live login/server action requested.
+Studio `9b8d7b0` and script followups are integrated; launcher `42b5aef`, label/smoke `aeff584`,
+primary-button contrast selector `95aa7df` are integrated. No core/IPC/auth/install changes or new dependencies.
+UI now displays actual activity, login-or-play primary action, advanced management under troubleshooting,
+queried/empty/failed page data and preserved pack drafts; Studio step prerequisites/field validation/save/cancel/retry.
+Main `pnpm check` passed 796 tests/9 skips, full types/Biome/both builds. Final label addition passed
+9 renderer regressions (one new) plus types/lint/build. Root Electron smoke and both app-local functional
+smokes passed on Linux/WSLg; root temporary socket cleanup and outdated page assertions were test-only fixes.
+Screenshots in ignored `.cache/smoke/` were inspected; primary CTA contrast corrected without theme redesign.
+No new Windows native/live login/join evidence for this renderer change. User's earlier live join remains valid
+for that prior build. Functional phase is done; visual polish and other remaining features need new instruction.
 
 ## Completed follow-up: parallel install and activity metadata
 

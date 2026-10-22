@@ -4,6 +4,14 @@
 기존 색상/테마/장식은 유지하고 실제 기능의 발견·상태·다음 동작·오류 복구를 우선한다.
 #0은 문서/배정/검토/통합만 하고 두 구현 작업자가 앱별로 나눠 작업한다.
 
+## 통합 결과
+
+기능 흐름 단계 통합 완료. Studio `9b8d7b0`와 후속 smoke 수정, 런처 `42b5aef`·`aeff584`·
+`95aa7df`를 통합했다. 메인 전체 검사 796개/9 skip 성공 후 renderer 추가 회귀 9개도 성공했다.
+두 앱의 root Electron smoke와 각 앱 기능 smoke를 Linux/WSLg에서 확인했다. 자세한 증거는
+`docs/progress.md`, `docs/handoffs/UI-PROD-01-{L,S}.md`를 따른다. 새로운 실계정 로그인/게임 실행은
+반복하지 않았고 Windows 네이티브 검증과 시각 디자인 고도화는 별도다. 아래는 작업 시 적용한 범위다.
+
 ## 런처 — #4 / ui_prod_launcher
 
 `feat/ui-prod-launcher-flow`, agent-4. 독점: `apps/launcher/src/renderer/**`,
