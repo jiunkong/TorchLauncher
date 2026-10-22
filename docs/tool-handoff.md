@@ -11,6 +11,8 @@ Active MEM-01 renderer follow-up: user requests removal of 0.5GB recommendation,
 and memory save-success text, plus horizontal scrub drag for both memory inputs. One worker #1
 `memory_scrub`, Luna medium, agent-1 `feat/mem-01-scrub-input`, baseline `f1b3286`.
 Read bottom of work-distribution for exclusive renderer/smoke scopes. No backend/IPC/core changes.
+User additionally requested removal of Play/Home recent-result hintline. Same worker owns that minimal
+Home.tsx change and related catalog/test cleanup; preserve backend outcomes/logs and error/progress panels.
 
 2026-10-23 Codex #0 update: MEM-01 worker #1 `mem_01` (`gpt-6-luna`, medium applied),
 agent-1 branch `feat/mem-01-game-memory`, baseline `cdabfb2`, finished `a2f81b1`.

@@ -565,3 +565,5 @@ UI에서 더 낮은 유효값 저장을 안내하고 실행은 설치 전에 메
 `docs/handoffs/MEM-01-INPUT.md`. main/core/IPC/다른 페이지·L3 작업은 제외한다.
 전역 텍스트 선택·끌기 차단은 유지하며 입력의 pointer 조절만 한정 허용한다. click/keyboard 직접 입력,
 좌우 조절·범위·disabled·pointer cancel/unmount 정리·저장 전 반영 안 됨을 실제 화면 검사한다.
+추가 사용자 요청: 플레이 탭의 ‘최근 결과’ 표시 제거. 같은 작업자가 `pages/Home.tsx`의 해당 표시와
+관련 import/미사용 사전 키·화면 검증만 소유한다. 내부 outcome/로그·오류/진행/복구 표시는 유지한다.
