@@ -5,9 +5,14 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, session, shell } from 'electron';
+import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index';
+import { createDownloadSource } from '../../../../packages/core/src/download/source/index';
+import { brandingChangedChannel } from '../shared/branding';
 import { productStateChannel } from '../shared/product';
 import { createPublicJavaAuthenticator } from './auth/public-java-electron';
+import { type BrandingService, createBrandingService } from './branding';
+import { bindBrandingIpc } from './branding/ipc';
 import { readServerConfig, serverConfigPath } from './product/bootstrap';
 import { bindProductIpc } from './product/ipc';
 import { ProductService } from './product/service';
@@ -19,6 +24,7 @@ const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 
 let product: ProductService | undefined;
+let branding: BrandingService | undefined;
 let mainWindow: BrowserWindow | undefined;
 let shutdownFinished = false;
 let shutdown: Promise<void> | undefined;
@@ -28,7 +34,7 @@ function createWindow(): void {
   const rendererUrl =
     (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) || pathToFileURL(rendererFile).href;
   const window = new BrowserWindow({
-    title: applicationName,
+    title: branding?.snapshot().appName ?? applicationName,
     icon: join(
       app.isPackaged ? process.resourcesPath : app.getAppPath(),
       app.isPackaged ? 'branding/icon.png' : '../../assets/branding/icon.png',
@@ -49,6 +55,12 @@ function createWindow(): void {
   });
 
   mainWindow = window;
+  window.on('page-title-updated', (event) => event.preventDefault());
+  const unbindBranding = branding
+    ? bindBrandingIpc(ipcMain, window, rendererUrl, branding)
+    : () => {};
+  const icon = branding?.snapshot().icon;
+  if (icon) window.setIcon(nativeImage.createFromDataURL(icon));
   const unbind = product ? bindProductIpc(ipcMain, window, rendererUrl, product) : () => {};
   ipcMain.removeHandler(applicationInfoChannel);
   ipcMain.handle(applicationInfoChannel, (event) => {
@@ -83,6 +95,7 @@ function createWindow(): void {
   });
   window.once('closed', () => {
     unbind();
+    unbindBranding();
     ipcMain.removeHandler(applicationInfoChannel);
     mainWindow = undefined;
   });
@@ -97,7 +110,9 @@ app.on('before-quit', (event) => {
   if (shutdownFinished) return;
   event.preventDefault();
   shutdown ??= (async () => {
+    const brandingClosed = branding?.close();
     await product?.close();
+    await brandingClosed;
     shutdownFinished = true;
     app.quit();
   })();
@@ -125,14 +140,40 @@ if (primaryInstance)
       callback(false);
     });
     session.defaultSession.setPermissionCheckHandler(() => false);
-    const config = await readServerConfig(
-      serverConfigPath({
-        packaged: app.isPackaged,
-        appPath: app.getAppPath(),
-        executable: process.execPath,
-        environment: process.env,
-      }),
-    ).catch(() => null);
+    const configPath = serverConfigPath({
+      packaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      executable: process.execPath,
+      environment: process.env,
+    });
+    const config = await readServerConfig(configPath).catch(() => null);
+    branding = createBrandingService({
+      base: app.getPath('userData'),
+      config,
+      configPath,
+      openReader: (signal) => {
+        if (!config) return Promise.reject(new Error('unconfigured'));
+        return openDeploymentReader(createDownloadSource(config.sourceUrl), {
+          expectedServerId: config.serverId,
+          signal,
+        });
+      },
+      publish: (snapshot) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.setTitle(snapshot.appName);
+        mainWindow.setIcon(
+          snapshot.icon
+            ? nativeImage.createFromDataURL(snapshot.icon)
+            : nativeImage.createFromPath(
+                join(
+                  app.isPackaged ? process.resourcesPath : app.getAppPath(),
+                  app.isPackaged ? 'branding/icon.png' : '../../assets/branding/icon.png',
+                ),
+              ),
+        );
+        mainWindow.webContents.send(brandingChangedChannel, snapshot);
+      },
+    });
     const auth = await createPublicJavaAuthenticator({
       cacheDirectory: join(app.getPath('userData'), 'authentication', 'public-java'),
     });
@@ -142,6 +183,7 @@ if (primaryInstance)
       config,
       auth,
       skins: createPlayerSkinService(),
+      observeDeployment: (reader) => branding?.observe(reader),
       quit: () => app.quit(),
       openLogs: (path) => shell.openPath(path),
       chooseMod: async () => {
@@ -158,6 +200,7 @@ if (primaryInstance)
       },
     });
     createWindow();
+    branding.start();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import torchUrl from './assets/torch.png';
+import { BrandingVisual } from './components/BrandingVisual';
 import { DeleteDialog } from './components/DeleteDialog';
 import { Menu, type PageId } from './components/Menu';
 import { RecoveryDialog } from './components/RecoveryDialog';
@@ -9,6 +9,7 @@ import { StopDialog } from './components/StopDialog';
 import { homePrimaryCommand } from './flow';
 import { runningElapsed } from './home';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
+import { useBranding } from './hooks/useBranding';
 import { useElapsed } from './hooks/useElapsed';
 import { useProduct } from './hooks/useProduct';
 import { useStage } from './hooks/useStage';
@@ -22,6 +23,7 @@ import { appReady } from './splash';
 
 export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const t = useT();
+  const branding = useBranding();
   const { info, error } = useApplicationInfo();
   const { state, error: productError, pending, command } = useProduct();
   const [page, setPage] = useState<PageId>('home');
@@ -135,6 +137,8 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
           page={page}
           onNavigate={navigate}
           serverName={state?.server?.name ?? null}
+          appName={branding.appName}
+          brandingIcon={branding.icon}
           accountName={state?.account?.name ?? null}
           {...(state?.account?.skin ? { accountSkin: state.account.skin } : {})}
           logoutDisabled={busy}
@@ -145,6 +149,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
             (state ? (
               <Home
                 state={state}
+                brandingBackground={branding.background}
                 productError={productError}
                 pending={pending}
                 elapsedMs={elapsed}
@@ -165,9 +170,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
               />
             ) : (
               <section className="stage-home" aria-label={t('home.region')}>
-                <div className="scene fallback" aria-hidden="true">
-                  <img src={torchUrl} alt="" />
-                </div>
+                <BrandingVisual kind="background" value={branding.background} />
                 <div className="shade" />
                 <div className="copy">
                   <p role={productError ? 'alert' : 'status'}>

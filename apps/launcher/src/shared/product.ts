@@ -1,4 +1,5 @@
 import type { DesktopApi } from '@torchlauncher/core/desktop';
+import type { BrandingApi } from './branding';
 
 export const productChannel = 'torchlauncher:product';
 export const productStateChannel = 'torchlauncher:product-state';
@@ -115,7 +116,7 @@ export interface ProductState {
 export type ProductResult =
   | { ok: true; state: ProductState }
   | { ok: false; error: string; state: ProductState };
-export interface LauncherApi extends DesktopApi {
+export interface LauncherApi extends DesktopApi, BrandingApi {
   getState(): Promise<ProductState>;
   command(command: ProductCommand): Promise<ProductResult>;
   onState(listener: (state: ProductState) => void): () => void;

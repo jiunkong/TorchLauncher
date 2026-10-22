@@ -1,7 +1,10 @@
 import { lstat, realpath } from 'node:fs/promises';
 import { release, totalmem } from 'node:os';
 import { join } from 'node:path';
-import { openDeploymentReader } from '../../../../../packages/core/src/deployment/reader/index';
+import {
+  type DeploymentReader,
+  openDeploymentReader,
+} from '../../../../../packages/core/src/deployment/reader/index';
 import { createFullDownloader } from '../../../../../packages/core/src/download/full/index';
 import { createDownloadSource } from '../../../../../packages/core/src/download/source/index';
 import {
@@ -59,6 +62,7 @@ export interface ProductHost {
     logout(): Promise<void>;
   };
   skins?: { get(profileId: string, signal?: AbortSignal): Promise<string | null>; clear(): void };
+  observeDeployment?(reader: DeploymentReader): void;
   openLogs?(path: string): Promise<string>;
   chooseMod(): Promise<string | null>;
   publish(state: ProductState): void;
@@ -688,11 +692,18 @@ export class ProductService {
     await this.ensure();
     const root = this.root();
     const download = createFullDownloader();
-    const current = async (requestedSignal?: AbortSignal) =>
-      openDeploymentReader(createDownloadSource(config.sourceUrl), {
+    const current = async (requestedSignal?: AbortSignal) => {
+      const reader = await openDeploymentReader(createDownloadSource(config.sourceUrl), {
         expectedServerId: config.serverId,
         ...(requestedSignal ? { signal: requestedSignal } : {}),
       });
+      try {
+        void Promise.resolve(this.host.observeDeployment?.(reader)).catch(() => {});
+      } catch {
+        /* Optional branding cannot fail game preparation. */
+      }
+      return reader;
+    };
     const game = await launchDeployment({
       root,
       expectedServerId: config.serverId,

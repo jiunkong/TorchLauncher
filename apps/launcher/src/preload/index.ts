@@ -1,5 +1,6 @@
 import { applicationInfoChannel } from '@torchlauncher/core/desktop';
 import { contextBridge, ipcRenderer } from 'electron';
+import { type BrandingSnapshot, brandingChangedChannel, brandingChannel } from '../shared/branding';
 import {
   type LauncherApi,
   type ProductState,
@@ -9,6 +10,13 @@ import {
 
 const api: LauncherApi = {
   getApplicationInfo: () => ipcRenderer.invoke(applicationInfoChannel),
+  getBranding: () => ipcRenderer.invoke(brandingChannel),
+  onBranding: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, snapshot: BrandingSnapshot) =>
+      listener(snapshot);
+    ipcRenderer.on(brandingChangedChannel, handler);
+    return () => ipcRenderer.removeListener(brandingChangedChannel, handler);
+  },
   getState: () => ipcRenderer.invoke(productStateChannel),
   command: (command) => ipcRenderer.invoke(productChannel, command),
   onState: (listener) => {

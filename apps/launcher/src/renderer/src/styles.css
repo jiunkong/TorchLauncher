@@ -1491,3 +1491,45 @@ svg {
     width: 100%;
   }
 }
+
+.branding-icon {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+.branding-icon-layer {
+  position: absolute;
+  inset: 0;
+}
+.branding-icon .branding-icon-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.scene.branding-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.branding-previous {
+  z-index: 0;
+}
+.branding-current {
+  z-index: 1;
+}
+[data-fading="true"] > .branding-current {
+  animation: branding-appear 220ms ease-out both;
+}
+@keyframes branding-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-fading="true"] > .branding-current {
+    animation: none;
+  }
+}
