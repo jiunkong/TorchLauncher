@@ -673,3 +673,8 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 알려진 한계: 760px에서 토스트가 삭제 버튼 왼쪽 가장자리 위에 겹쳐 보일 수 있음(클릭은 통과). 스크린리더 안내는 직접 확인하지 못함. Windows 확인 필요.
 - 사용자 결정: 런처 자동 업데이트(RELEASE-02)는 Studio까지 끝낸 뒤 함께 진행한다.
 - 배포 서명(SIGN) 명세 `docs/deployment-signing.md` 작성, SIGN-CORE-01 배정(진행 중, feat/sign-core, agent-2).
+
+## 인앱 확인 모달 통합 (2026-10-23, #0 Claude)
+- `6b79517`(Sonnet 작업자) 병합: 로그아웃과 등록 모드 제거의 `window.confirm`을 공용 `ConfirmDialog`(기존 `Modal` 기반)로 교체. 확인 후에만 `logout`/`remove-mod` 명령 전송, Esc·취소는 아무 동작 없음. 런처 렌더러에 네이티브 확인창이 남아 있지 않다.
+- 의도적 예외: 메인 프로세스의 종료 확인 실패 오류 상자(창이 닫히는 중). Studio의 네이티브 대화상자는 Studio UI 재작성 단계에서 정리.
+- 메인 `pnpm check` 통과. 스모크는 합성 상태와 IPC 기록기 기반이며 실제 계정 흐름은 Windows 확인 필요.
