@@ -7,6 +7,7 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, #0): launcher L1–L3 and Studio branding functions integrated
 
+UI-FEEDBACK-01 INTEGRATED 2026-10-23 by Claude #0 (home paint fix + copyServerDataPath IPC; main check 1053 passed). Windows native check pending. Text below is historical.
 New USER regression UI-FEEDBACK-01: Home all text/buttons hidden; add Settings full-path copy button.
 #1 existing worker agent-1 fix/launcher-play-path-feedback baselinea0a4bda, renderer/app-local smoke only.
 Suspect background stacking (not confirmed yet). Verify actual painted/hit-test content, not mere DOM presence.
