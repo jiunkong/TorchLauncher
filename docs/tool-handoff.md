@@ -7,6 +7,12 @@ session IDs are not needed.
 
 ## Completed follow-up: parallel install and activity metadata
 
+Latest planning request: user asked for remaining work and a dedicated production UI task.
+`UI-PROD-01` is registered as ready/unassigned in progress.md, with scope/completion criteria and the
+remaining-work order at the top. No implementation is authorized by that planning request; await task start.
+No workers are running. The next suggested task is the two-app production UI cleanup, followed by remaining
+Studio branding/settings/packaging, native verification, full QA and final own-app/release work.
+
 User confirmed **server connection succeeded through the new UI**. Selected environment was Fabric
 1.21.1/0.19.5; server log and restart cached-session restoration remain unverified. Do not request another
 login/join merely to repeat this evidence. The user then pointed out slow sequential base installation and
