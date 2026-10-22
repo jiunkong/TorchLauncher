@@ -62,7 +62,9 @@ AppImage에서는 `APPIMAGE`의 부모, 일반 패키지에서는 `process.execP
 ## 검증·공유 파일
 
 각 앱 작업자가 자신의 preload·main·renderer·Electron 빌드 설정을 소유한다. 공통 manifest/lockfile,
-기존 desktop 계약과 `scripts/smoke.mjs`는 변경 요청 후 한 작업자에게 배정한다.
+기존 desktop 계약은 변경 요청 후 한 작업자에게 배정한다. #2 UI-CONNECT-QA를 Luna·medium으로
+`test/ui-connect-smoke`/agent-2에 배정했다. 독점 범위는 `scripts/smoke.mjs`와
+`docs/handoffs/UI-CONNECT-QA.md`이며 새 bridge/화면에 맞게 Electron 통합 검사를 갱신한다.
 앱별 IPC 타입은 `src/shared/`에 둔다. raw 에러·URL·토큰·argv를 IPC/로그에 흘리지 않는다.
 실제 파일 기반 프로젝트/writer/read/export와 취소·위조 IPC·경합·삭제 보호를 행동 테스트한다.
 모의 로그인/프로세스 성공을 실계정 접속 증거로 기록하지 않는다. 통합 후 #0이 전체 검사와
