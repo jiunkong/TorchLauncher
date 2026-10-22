@@ -8,6 +8,8 @@ Sol·medium(동기화/설치 이벤트 의미와 실패 전파). 독점: `apps/l
 `packages/core/src/loaders/launch-gate.ts`와 대응 테스트, `docs/handoffs/GAME-ACTIVITY-01.md`.
 UI 재설계/renderer 수정 없이 종류·단계·상대 경로·개수·활성 작업을 ProductState로 전달한다.
 #3은 installer.ts의 optional `onActivity`와 InstallActivity만 소유한다. 연동 계약은 작업자끼리 확인한다.
+#4 추가 독점: `instance/sync/types.ts`·`engine.ts` 및 대응 테스트. 기존 onProgress 호출 시점은 유지하고
+별도 optional onFileActivity로 파일 staging/apply 시작·완료를 보고한다. 계획상 다운로드 수를 실제 완료율로 쓰지 않는다.
 
 2026-10-22 GAME-PERF-01: #3(`install_parallel`) / `perf/game-install-parallel` / agent-3.
 Sol·medium(경합·중단 정리·설치 트랜잭션)으로 기본 게임/Java 파일을 제한 병렬 처리한다.
