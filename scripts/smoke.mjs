@@ -118,6 +118,7 @@ try {
       }
 
       if (directory === 'admin') {
+        await page.getByRole('button', { name: '개요', exact: true }).click();
         await page.getByRole('button', { name: '새 프로젝트', exact: true }).first().click();
         await page.getByRole('heading', { level: 2, name: '새 서버', exact: true }).waitFor();
         const projectPath = resolve(temp, 'saved-project.json');
