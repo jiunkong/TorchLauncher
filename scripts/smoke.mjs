@@ -30,7 +30,7 @@ const appCases = [
       ['홈 · 플레이', '서버에 접속할 준비를 합니다'],
       ['내 모드', '내 모드'],
       ['설정', '설정'],
-      ['로그', '로그'],
+      ['문제 해결', '설정 및 문제 해결'],
     ],
     expectedBridge: ['getApplicationInfo', 'getState', 'command', 'onState'],
     env: { ...env, TORCH_SERVER_CONFIG: configPath },
@@ -42,7 +42,7 @@ const appCases = [
       ['개요', '서버 프로젝트를 시작하세요'],
       ['서버 구성', '서버 구성'],
       ['배포', '배포 파일'],
-      ['브랜딩 · 내보내기', '브랜딩과 런처 내보내기'],
+      ['내보내기', '런처 내보내기'],
     ],
     expectedBridge: ['request', 'getApplicationInfo'],
     env,
@@ -92,7 +92,8 @@ try {
         assert.equal(state.server.address, 'localhost:25565');
         assert.equal(state.account, null);
         assert.equal(state.status.state, 'unknown');
-        assert.equal(await page.getByTestId('launch-button').isDisabled(), true);
+        await page.locator('[data-testid="launch-button"]:not([disabled])').waitFor();
+        assert.equal(await page.getByTestId('launch-button').isEnabled(), true);
         const subscription = await page.evaluate(() => {
           const unsubscribe = window.torchlauncher.onState(() => {});
           const callable = typeof unsubscribe === 'function';
@@ -121,6 +122,14 @@ try {
         await page.getByRole('button', { name: '개요', exact: true }).click();
         await page.getByRole('button', { name: '새 프로젝트', exact: true }).first().click();
         await page.getByRole('heading', { level: 2, name: '새 서버', exact: true }).waitFor();
+        await page.locator('.workflow-row').first().getByRole('button').click();
+        assert.equal(await page.getByLabel('공개 torchpack HTTPS URL').count(), 0);
+        await page.getByRole('button', { name: '다음: 소스와 파일 선택' }).waitFor();
+        await page.getByRole('button', { name: '배포' }).click();
+        await page
+          .getByText('팩을 만들려면 먼저 소스 폴더를 선택하세요.', { exact: false })
+          .waitFor();
+        assert.equal(await page.getByRole('button', { name: 'torchpack 생성' }).isDisabled(), true);
         const projectPath = resolve(temp, 'saved-project.json');
         await app.evaluate(({ dialog }, target) => {
           dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });

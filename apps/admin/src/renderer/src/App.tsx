@@ -27,10 +27,10 @@ const pages: { id: PageId; label: string; icon: string; title: string; summary: 
   },
   {
     id: 'branding',
-    label: '브랜딩 · 내보내기',
+    label: '내보내기',
     icon: '↗',
-    title: '브랜딩과 런처 내보내기',
-    summary: '서버 이미지와 이름을 적용한 전용 런처를 전달합니다.',
+    title: '런처 내보내기',
+    summary: '업로드한 배포 파일을 확인하고 공통 런처와 함께 전달합니다.',
   },
 ];
 
@@ -84,7 +84,11 @@ export function App() {
           </div>
           <span className="preview-badge">
             <span className="status-dot" />
-            {studio.state?.dirty ? '저장하지 않은 변경' : 'Studio'}
+            {studio.draft
+              ? studio.state?.dirty
+                ? '저장하지 않은 변경'
+                : '프로젝트 열림'
+              : '프로젝트 없음'}
           </span>
         </header>
         <div className="page-content">
@@ -137,14 +141,18 @@ export function App() {
           {studio.busy && (
             <div className="notice" role="status">
               <span>
-                작업 중… {Math.round((studio.state?.progress ?? 0) / 1024).toLocaleString()} KiB
+                {studio.operationLabel}
+                {studio.showByteProgress &&
+                  ` · ${Math.round((studio.state?.progress ?? 0) / 1024).toLocaleString()} KiB 처리`}
               </span>
-              <button type="button" onClick={() => void studio.run('cancel')}>
-                취소
-              </button>
+              {studio.canCancel && (
+                <button type="button" onClick={() => void studio.run('cancel')}>
+                  취소
+                </button>
+              )}
             </div>
           )}
-          <PageContent page={currentPage} studio={studio} />
+          <PageContent page={currentPage} studio={studio} onNavigate={setCurrentPage} />
         </div>
         <footer className="footer">
           <span>TorchLauncher Studio</span>

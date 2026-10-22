@@ -518,6 +518,14 @@ h1 {
   color: var(--muted);
   font-size: 12px;
 }
+.field-error {
+  color: #ffb7ac;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.field input[aria-invalid="true"] {
+  border-color: #b96e62;
+}
 input,
 select {
   width: 100%;
@@ -542,6 +550,31 @@ select:focus-visible {
 }
 .studio-workflow {
   margin-top: 22px;
+}
+.workflow-list {
+  display: grid;
+  gap: 8px;
+}
+.workflow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.workflow-row h3 {
+  margin: 0 0 5px;
+  font-size: 13px;
+}
+.workflow-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.workflow-row .button {
+  flex: 0 0 auto;
+  margin: 0;
 }
 .file-list {
   margin-top: 22px;
