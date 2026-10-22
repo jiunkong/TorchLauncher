@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ProductCommand, ProductState } from '../../../shared/product';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { FileIcon, ModsIcon, PlusIcon } from '../components/Icons';
 import { useT } from '../hooks/useTranslator';
 import type { Translate } from '../i18n/translate';
@@ -92,6 +93,7 @@ export function ModsView({
   onRemoveUnregistered?(path: string): void;
 }) {
   const t = useT();
+  const [removeMod, setRemoveMod] = useState<string | null>(null);
   const loaded = load === 'loaded';
   // Lists appear only for a successful query; before that the headings carry no counts.
   const entries = loaded ? state.mods : [];
@@ -102,6 +104,27 @@ export function ModsView({
 
   return (
     <>
+      {removeMod && (
+        <ConfirmDialog
+          idPrefix="remove-mod"
+          title={t('mods.removeConfirmTitle')}
+          body={t('mods.removeConfirm', { name: modName(removeMod) })}
+          cancelLabel={t('common.cancel')}
+          confirmLabel={t('mods.remove')}
+          danger
+          disabled={
+            !ready ||
+            state.running ||
+            !state.mods.some((mod) => mod.path === removeMod && mod.source === 'user')
+          }
+          onCancel={() => setRemoveMod(null)}
+          onConfirm={() => {
+            const path = removeMod;
+            setRemoveMod(null);
+            void command({ type: 'remove-mod', path });
+          }}
+        />
+      )}
       {state.modsRecovery && <p role="alert">{t('mods.recoveryPending')}</p>}
       {load === 'loading' && <p role="status">{t('mods.loading')}</p>}
       {load === 'failed' && (
@@ -148,8 +171,7 @@ export function ModsView({
                     disabled={!ready || state.running}
                     aria-label={t('mods.removeLabel', { name: modName(mod.path) })}
                     onClick={() => {
-                      if (window.confirm(t('mods.removeConfirm', { name: modName(mod.path) })))
-                        void command({ type: 'remove-mod', path: mod.path });
+                      setRemoveMod(mod.path);
                     }}
                   >
                     {t('mods.remove')}

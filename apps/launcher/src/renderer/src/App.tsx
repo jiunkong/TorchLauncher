@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrandingVisual } from './components/BrandingVisual';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { DeleteDialog } from './components/DeleteDialog';
 import { Menu, type PageId } from './components/Menu';
 import { RecoveryDialog } from './components/RecoveryDialog';
@@ -31,6 +32,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const [page, setPage] = useState<PageId>('home');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [removeFile, setRemoveFile] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
@@ -122,9 +124,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
     onStop: () => setStopOpen(true),
   };
 
-  const logout = () => {
-    if (window.confirm(t('menu.logoutConfirm'))) void command({ type: 'logout' });
-  };
+  const logout = () => setLogoutOpen(true);
 
   return (
     <>
@@ -245,6 +245,21 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
             const path = removeFile;
             setRemoveFile(null);
             void command({ type: 'remove-unregistered', path });
+          }}
+        />
+      )}
+      {logoutOpen && (
+        <ConfirmDialog
+          idPrefix="logout"
+          title={t('menu.logoutTitle')}
+          body={t('menu.logoutConfirm')}
+          cancelLabel={t('common.cancel')}
+          confirmLabel={t('menu.logout')}
+          disabled={busy}
+          onCancel={() => setLogoutOpen(false)}
+          onConfirm={() => {
+            setLogoutOpen(false);
+            void command({ type: 'logout' });
           }}
         />
       )}

@@ -256,9 +256,81 @@ try {
   await page.locator('.player-avatar-skin[data-ready="true"]').waitFor();
   assert.equal(await page.locator('.player-avatar-face').count(), 1);
   assert.equal(await page.locator('.player-avatar-hat').count(), 1);
+
+  // In-app confirmations: record product commands in the main process and answer with the synthetic state.
+  const fixtureState = await page.evaluate(() => window.torchlauncher.getState());
+  const confirmState = {
+    ...fixtureState,
+    account: { name: 'FixturePlayer', expiresAt: 1 },
+    mods: [
+      { path: 'mods/fixture.jar', source: 'user', state: 'ok', conflicts: 0, modIds: ['fixture'] },
+    ],
+  };
+  await app.evaluate(({ BrowserWindow, ipcMain }, state) => {
+    globalThis.recordedCommands = [];
+    ipcMain.removeHandler('torchlauncher:product');
+    ipcMain.handle('torchlauncher:product', (_event, command) => {
+      globalThis.recordedCommands.push(command.type);
+      return { ok: true, state };
+    });
+    BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', state);
+  }, confirmState);
+  const recorded = () => app.evaluate(() => globalThis.recordedCommands.join(','));
+  const openMenu = async () => {
+    if ((await menu.getAttribute('data-open')) !== 'true') await toggle.click();
+  };
+  // Logout: cancel button, Escape, then confirm; no command until confirmed.
+  for (const size of [760, 1100]) {
+    await page.setViewportSize({ width: size, height: 900 });
+    await openMenu();
+    await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+    const logoutDialog = page.getByTestId('logout-dialog');
+    await logoutDialog.waitFor();
+    await logoutDialog.getByText('저장된 계정을 로그아웃할까요?').waitFor();
+    await page.screenshot({
+      path: resolve(`apps/launcher/.cache/inapp-confirms/logout-${size}.png`),
+    });
+    await page.keyboard.press('Escape');
+    await logoutDialog.waitFor({ state: 'detached' });
+    assert.equal(await recorded(), '');
+  }
+  await openMenu();
+  await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.getByTestId('logout-dialog').locator('[data-autofocus]').click();
+  await page.getByTestId('logout-dialog').waitFor({ state: 'detached' });
+  assert.equal(await recorded(), '');
+  await openMenu();
+  await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.getByTestId('logout-confirm').click();
+  await page.getByTestId('logout-dialog').waitFor({ state: 'detached' });
+  assert.equal(await recorded(), 'logout');
+  // Mod removal: same sequence.
+  await page.getByRole('button', { name: '내 모드', exact: true }).click();
+  const removeButton = page.getByRole('button', { name: 'fixture.jar 삭제', exact: true });
+  for (const size of [760, 1100]) {
+    await page.setViewportSize({ width: size, height: 900 });
+    await removeButton.click();
+    const removeDialog = page.getByTestId('remove-mod-dialog');
+    await removeDialog.waitFor();
+    await removeDialog.getByText('fixture.jar 모드를 삭제할까요?').waitFor();
+    await page.screenshot({
+      path: resolve(`apps/launcher/.cache/inapp-confirms/remove-mod-${size}.png`),
+    });
+    await page.keyboard.press('Escape');
+    await removeDialog.waitFor({ state: 'detached' });
+    assert.equal(await recorded(), 'logout');
+  }
+  await removeButton.click();
+  await page.getByTestId('remove-mod-dialog').locator('[data-autofocus]').click();
+  await page.getByTestId('remove-mod-dialog').waitFor({ state: 'detached' });
+  assert.equal(await recorded(), 'logout');
+  await removeButton.click();
+  await page.getByTestId('remove-mod-confirm').click();
+  await page.getByTestId('remove-mod-dialog').waitFor({ state: 'detached' });
+  assert.equal(await recorded(), 'logout,remove-mod');
   assert.deepEqual(pageErrors, []);
   console.log(
-    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage, unregistered-file confirmation/removal, log-folder failure and wired avatar passed',
+    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage, unregistered-file confirmation/removal, log-folder failure and wired avatar and in-app logout/mod-removal confirmations passed',
   );
 } finally {
   await app?.close();
