@@ -28,7 +28,7 @@ Electron 실제 PNG 디코드/64x32·64x64 얼굴·모자 위치/투명도/fallb
 작업자 통합 범위 200개 테스트·타입/빌드·Electron 임시 파일 취소/삭제·설정 위치·아바타 연결 smoke 통과.
 main 전체 `pnpm check` 성공: 978개 통과·9 skip, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개).
 agent-2/3을 통합 main에 detached로 정리하고 병합된 두 작업 브랜치를 삭제했다. 진행 중 검사/프로세스 없음.
-Windows 실제 shell/junction·실계정 스킨 조회는 미검증이며 사용자 확인을 요청한다.
+이후 사용자가 Windows 최신 빌드가 잘 작동한다고 보고했다. 기능별 로그/네트워크·junction 개별 검증은 미제공이다.
 
 MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
 권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
@@ -302,8 +302,8 @@ macOS는 보류, Linux ARM64와 연결 해제 시 종료 보조 모드는 지원
 | LAUNCH-EXIT-01 | 게임 시작 후 런처 자동 종료 개인 옵션·게임 프로세스 분리·잠금 유지/회수 | UI-CONNECT-L, GAME-05 | 구현·통합 검사 완료 — Windows 실게임 미검증 |
 | I18N-01 | 한국어·영어 공통 번역 및 renderer 연결 기반 | UI-BASE | 기반 구현·통합 검사 완료 — 전체 UI 적용은 후속 |
 | MEM-01 | 개인 Xmx/Xms 설정·코어/서비스/설정 화면 연결 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows 확인 대기 |
-| LAUNCHER-L2A-FOLLOWUPS | 로그 폴더 열기·데이터 위치·미등록 파일 확인/삭제 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows 확인 대기 |
-| LAUNCHER-PLAYER-SKIN | 스킨 조회/검증/캐시·얼굴+모자 아바타·서비스 연결 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows/실계정 확인 대기 |
+| LAUNCHER-L2A-FOLLOWUPS | 로그 폴더 열기·데이터 위치·미등록 파일 확인/삭제 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — 사용자 Windows 정상 작동 보고, junction 개별 미검증 |
+| LAUNCHER-PLAYER-SKIN | 스킨 조회/검증/캐시·얼굴+모자 아바타·서비스 연결 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — 사용자 Windows 정상 작동 보고, 네트워크 별도 계측 없음 |
 | BRAND-ICON-01 | 사용자 레드스톤 토치 ICO를 두 앱 native 아이콘으로 적용 | UI-BASE | 적용·타입/빌드/Linux 패키지 확인 완료 — Windows 표시 미검증 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
