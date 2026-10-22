@@ -1,18 +1,30 @@
 import { randomUUID } from 'node:crypto';
 import { lstat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { BRANDING_LIMITS, BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
 import { DeploymentValidationError } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import { writeDeployment } from '../../../../packages/core/src/deployment/writer/index.js';
 import { createDownloadSource } from '../../../../packages/core/src/download/source/factory.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
-import type { StudioCommand, StudioProject, StudioReply, StudioState } from '../shared/studio.js';
+import type { StudioProject, StudioReply, StudioRequest, StudioState } from '../shared/studio.js';
+import {
+  type BrandingSnapshots,
+  decodeProject,
+  encodeProject,
+  type ImageDecoder,
+  PROJECT_READ_LIMIT,
+  parseBranding,
+  profileBranding,
+  validateImage,
+  writerBranding,
+} from './branding.js';
 import { exportLauncher, noLinks, safeRead, saveProject } from './filesystem.js';
 import { newProject, parseProject, StudioFailure } from './project.js';
 
 export interface StudioDialogs {
   open(
-    kind: 'project' | 'source' | 'files' | 'binary' | 'output',
+    kind: 'project' | 'source' | 'files' | 'binary' | 'output' | 'icon' | 'background',
     root?: string,
   ): Promise<string[] | null>;
   save(kind: 'project' | 'pack'): Promise<string | null>;
@@ -30,12 +42,16 @@ export class StudioService {
   };
   private projectPath: string | null = null;
   private sourceRoot: string | null = null;
+  private snapshots: BrandingSnapshots = {};
   private closing = false;
   private controller: AbortController | null = null;
   private pending: Promise<StudioReply> | null = null;
   constructor(
     private readonly dialogs: StudioDialogs,
     private readonly sourceFactory = createDownloadSource,
+    private readonly decode: ImageDecoder = () => {
+      throw new StudioFailure('INVALID');
+    },
   ) {}
   snapshot(): StudioState {
     return structuredClone(this.state);
@@ -69,11 +85,22 @@ export class StudioService {
       'export',
       'cancel',
     ];
+    const extra =
+      value.action === 'update'
+        ? 'project'
+        : value.action === 'brandingName'
+          ? 'appName'
+          : ['brandingSelect', 'brandingRemove'].includes(String(value.action))
+            ? 'role'
+            : null;
     if (
       typeof value.action !== 'string' ||
-      (!actions.includes(value.action) && value.action !== 'update') ||
-      Object.keys(value).length !== (value.action === 'update' ? 2 : 1) ||
-      (value.action === 'update' && !Object.hasOwn(value, 'project'))
+      (!actions.includes(value.action) &&
+        !['update', 'brandingSelect', 'brandingRemove', 'brandingName'].includes(value.action)) ||
+      Object.keys(value).length !== (extra ? 2 : 1) ||
+      (extra && !Object.hasOwn(value, extra)) ||
+      (extra === 'role' && value.role !== 'icon' && value.role !== 'background') ||
+      (extra === 'appName' && value.appName !== null && typeof value.appName !== 'string')
     )
       return Promise.resolve({ ok: false, code: 'INVALID' });
     if (value.action === 'state') return Promise.resolve({ ok: true, state: this.snapshot() });
@@ -82,7 +109,7 @@ export class StudioService {
       return Promise.resolve({ ok: true, state: this.snapshot() });
     }
     if (this.closing || this.state.busy) return Promise.resolve({ ok: false, code: 'BUSY' });
-    const command = value as unknown as StudioCommand;
+    const command = value as unknown as StudioRequest;
     this.controller = new AbortController();
     this.state.busy =
       (
@@ -129,7 +156,7 @@ export class StudioService {
     if (!paths?.length) throw new StudioFailure('CANCELLED');
     return paths;
   }
-  private async perform(command: StudioCommand, signal: AbortSignal): Promise<void> {
+  private async perform(command: StudioRequest, signal: AbortSignal): Promise<void> {
     switch (command.action) {
       case 'touch':
         this.project();
@@ -141,15 +168,20 @@ export class StudioService {
         signal.throwIfAborted();
         let path: string | null = null;
         let project: StudioProject;
+        let snapshots: BrandingSnapshots = {};
         if (command.action === 'open') {
           path = (await this.selected('project'))[0] ?? null;
           if (!path) throw new StudioFailure('CANCELLED');
-          project = parseProject(
-            JSON.parse((await safeRead(path, 4 * 1024 ** 2)).toString('utf8')),
+          const loaded = decodeProject(
+            JSON.parse((await safeRead(path, PROJECT_READ_LIMIT)).toString('utf8')),
+            this.decode,
           );
+          project = parseProject(loaded.input);
+          snapshots = loaded.snapshots;
         } else project = newProject();
         signal.throwIfAborted();
         this.state.project = project;
+        this.snapshots = snapshots;
         this.projectPath = path;
         this.state.projectName = path ? basename(path) : null;
         this.sourceRoot = null;
@@ -157,11 +189,50 @@ export class StudioService {
         this.state.dirty = !path;
         return;
       }
+      case 'brandingSelect': {
+        const project = this.project();
+        const path = (await this.selected(command.role))[0];
+        if (!path) throw new StudioFailure('CANCELLED');
+        const bytes = await safeRead(path, BRANDING_LIMITS[command.role].length);
+        const metadata = validateImage(command.role, bytes, this.decode);
+        signal.throwIfAborted();
+        this.snapshots[command.role] = bytes;
+        this.state.project = {
+          ...project,
+          branding: { ...project.branding, [command.role]: metadata },
+        };
+        this.state.dirty = true;
+        return;
+      }
+      case 'brandingRemove': {
+        const project = this.project();
+        delete this.snapshots[command.role];
+        this.state.project = {
+          ...project,
+          branding: { ...project.branding, [command.role]: null },
+        };
+        this.state.dirty = true;
+        return;
+      }
+      case 'brandingName': {
+        const project = this.project();
+        const branding = { ...project.branding };
+        if (command.appName === null || command.appName === '') delete branding.appName;
+        else branding.appName = command.appName;
+        parseBranding(branding);
+        this.state.project = { ...project, branding };
+        this.state.dirty = true;
+        return;
+      }
       case 'update': {
         const project = parseProject(command.project);
         const current = this.project();
         const paths = new Set(current.files.map((f) => f.path));
-        if (project.serverId !== current.serverId || project.files.some((f) => !paths.has(f.path)))
+        if (
+          JSON.stringify(project.branding) !== JSON.stringify(current.branding) ||
+          project.serverId !== current.serverId ||
+          project.files.some((f) => !paths.has(f.path))
+        )
           throw new StudioFailure('INVALID');
         if (JSON.stringify(project) !== JSON.stringify(current)) {
           this.state.project = project;
@@ -178,7 +249,7 @@ export class StudioService {
             : await this.dialogs.save('project');
         if (!path) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
-        await saveProject(path, `${JSON.stringify(project, null, 2)}\n`);
+        await saveProject(path, encodeProject(project, this.snapshots));
         this.projectPath = path;
         this.state.projectName = basename(path);
         this.state.dirty = false;
@@ -221,7 +292,9 @@ export class StudioService {
         if (!path) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
         await noLinks(dirname(path));
+        const branding = writerBranding(project, this.snapshots);
         await writeDeployment({
+          ...(branding ? { branding } : {}),
           sourceRoot: this.sourceRoot,
           outputPath: path,
           serverId: project.serverId,
@@ -256,14 +329,22 @@ export class StudioService {
           address: project.address,
           sourceUrl: project.sourceUrl,
           game: project.game,
+          ...(project.branding ? { branding: profileBranding(project) } : {}),
         });
         const binary = (await this.selected('binary'))[0];
         const output = (await this.selected('output'))[0];
         if (!binary || !output) throw new StudioFailure('CANCELLED');
         await this.verify(signal);
-        await exportLauncher(binary, output, config, signal, (bytes) => {
-          this.state.progress = bytes;
-        });
+        await exportLauncher(
+          binary,
+          output,
+          config,
+          signal,
+          (bytes) => {
+            this.state.progress = bytes;
+          },
+          this.snapshots,
+        );
         this.state.result = '공통 런처와 서버 설정을 출력 폴더에 복사했습니다.';
         return;
       }
@@ -291,6 +372,20 @@ export class StudioService {
         reader.index.game.loader.version !== project.game.loader.version
       )
         throw new StudioFailure('MISMATCH');
+      for (const role of BRANDING_ROLES) {
+        const expected = project.branding?.[role];
+        if (expected === undefined) continue;
+        const actual = reader.index.branding?.[role];
+        if (
+          expected === null
+            ? actual !== null
+            : !actual ||
+              actual.sha256 !== expected.sha256 ||
+              actual.originalLength !== expected.length ||
+              actual.mediaType !== expected.mediaType
+        )
+          throw new StudioFailure('MISMATCH');
+      }
       reader.assertCurrent();
     } catch (error) {
       if (error instanceof DeploymentValidationError && error.code === 'server-mismatch')
