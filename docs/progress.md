@@ -7,6 +7,10 @@
 
 ## 현재 상태와 다음 작업
 
+BRAND-CORE-01: #0 기술 설계 검토 승인 후 기존 작업자에게 구현 재개를 지시했다.
+프로파일 선택적 branding, torchpack v1.1 별도 이미지 payload/역할별 staging을 구현 중이다.
+기존 v1.0 유지, 아직 코드 통합·런처/Studio 연결 완료 아님.
+
 사용자가 브랜딩 **동봉 초기본+torchpack 원격 갱신을 모두 승인**했다. 기존 이미지 표시 중 변경분만
 검증/수신 후 자연스럽게 전환한다. [혼합 전달 명세](operator-branding-hybrid.md).
 BRAND-CORE-01 #1 `branding_contracts` Sol medium 요청, agent-1 `feat/branding-contracts`로 공용 계약부터 진행한다.

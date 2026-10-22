@@ -7,6 +7,10 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+BRAND-CORE-01 technical proposal reviewed/approved by #0; existing branding_contracts worker resumed implementation.
+Optional profile branding + separate v1.1 image payloads; legacy1.0 retained. See hybrid spec technical approval.
+Core not yet integrated; launcher/Studio still pending.
+
 NEW approval supersedes local-only recommendation: user wants shipped initial branding AND torchpack image
 updates, keeping old display until verified new image cross-fades. Read docs/operator-branding-hybrid.md.
 BRAND-CORE-01 #1 branding_contracts, Sol medium requested, agent-1 feat/branding-contracts baseline4c55456.
