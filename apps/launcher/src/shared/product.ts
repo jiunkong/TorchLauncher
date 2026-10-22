@@ -23,6 +23,34 @@ export type ProductCommand =
   | { type: 'set-packs'; packs: string[] }
   | { type: 'delete'; confirmation: string }
   | { type: 'recover'; acceptUncertain: boolean };
+/** Structured activity only; totals stay unknown until measured, paths are relative. */
+export interface ProductActivity {
+  phase:
+    | 'planning'
+    | 'checking'
+    | 'downloading'
+    | 'staging'
+    | 'publishing'
+    | 'installing'
+    | 'applying'
+    | 'recovering';
+  component:
+    | 'metadata'
+    | 'game'
+    | 'java'
+    | 'library'
+    | 'asset'
+    | 'logging'
+    | 'loader'
+    | 'server-mod'
+    | 'resource-pack'
+    | 'server-config'
+    | 'server-file';
+  path?: string;
+  active: number;
+  completed: number | null;
+  total: number | null;
+}
 export interface ProductState {
   server: { serverId: string; name: string; address: string } | null;
   configuration: 'ready' | 'unavailable';
@@ -38,6 +66,7 @@ export interface ProductState {
   operation: string | null;
   phase: string;
   progress: { completed: number; total: number } | null;
+  activity: ProductActivity | null;
   running: boolean;
   outcome: string | null;
   error: string | null;

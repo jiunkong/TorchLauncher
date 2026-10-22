@@ -12,6 +12,12 @@ export interface SyncProgress extends SyncCounts {
   readonly path?: string;
 }
 
+export interface SyncFileActivity {
+  readonly phase: 'staging' | 'applying';
+  readonly state: 'started' | 'completed';
+  readonly path: string;
+}
+
 export interface SynchronizeDeploymentOptions {
   readonly root: string;
   readonly expectedServerId: string;
@@ -19,6 +25,8 @@ export interface SynchronizeDeploymentOptions {
   readonly signal?: AbortSignal;
   /** Awaited. A callback failure before commit rolls the transaction back. */
   readonly onProgress?: (progress: SyncProgress) => void | Promise<void>;
+  /** Awaited before/after each file operation. Failure before commit rolls back. */
+  readonly onFileActivity?: (activity: SyncFileActivity) => void | Promise<void>;
 }
 
 export interface SyncResult extends SyncCounts {

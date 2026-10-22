@@ -35,6 +35,7 @@ import {
 import type { ServerConfig } from '../../../../../packages/core/src/server-config/index';
 import { pingServer } from '../../../../../packages/core/src/server-status/index';
 import { type ProductResult, type ProductState, parseProductCommand } from '../../shared/product';
+import { installationActivity, synchronizationActivity } from './activity';
 import { Operations } from './operations';
 
 export interface ProductHost {
@@ -126,6 +127,7 @@ export class ProductService {
       operation: null,
       phase: 'idle',
       progress: null,
+      activity: null,
       running: false,
       outcome: null,
       error: null,
@@ -148,6 +150,7 @@ export class ProductService {
   private phase(phase: string) {
     this.state.phase = phase;
     this.state.progress = null;
+    this.state.activity = null;
     this.publish();
   }
   private config() {
@@ -360,6 +363,7 @@ export class ProductService {
         } finally {
           this.state.operation = null;
           this.state.progress = null;
+          this.state.activity = null;
           if (!this.state.running) this.state.phase = 'idle';
           this.publish();
         }
@@ -435,6 +439,23 @@ export class ProductService {
       signal,
       current,
       onPhase: (phase) => this.phase(phase),
+      onSynchronizationProgress: (progress) => {
+        // SyncCounts describe planned operations, not completed downloads.
+        if (!progress.path) {
+          this.state.activity = {
+            phase: progress.phase,
+            component: 'server-file',
+            active: 0,
+            completed: null,
+            total: null,
+          };
+          this.publish();
+        }
+      },
+      onSynchronizationActivity: (activity) => {
+        this.state.activity = synchronizationActivity(activity);
+        this.publish();
+      },
       prepare: async (reader) => {
         if (reader.index.game.minecraftVersion !== '1.21.1') throw new Error('unsupported-game');
         const base = await installMinecraft({
@@ -447,12 +468,24 @@ export class ProductService {
           },
           download,
           signal,
+          onActivity: (activity) => {
+            this.state.activity = installationActivity(activity);
+            this.publish();
+          },
           onProgress: ({ completed, total }) => {
             this.state.progress = { completed, total };
             this.publish();
           },
         });
         this.phase('loader-installation');
+        this.state.activity = {
+          phase: 'installing',
+          component: 'loader',
+          active: 1,
+          completed: null,
+          total: null,
+        };
+        this.publish();
         return installLoader(base, { selection: reader.index.game.loader, download, signal });
       },
       authenticate: async () => {

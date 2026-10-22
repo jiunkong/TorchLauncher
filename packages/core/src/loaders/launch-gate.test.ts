@@ -124,3 +124,25 @@ it('runs settings after sync before acquiring the game lease; failure blocks spa
   expect(launchMinecraft).not.toHaveBeenCalled();
   expect(state.spawned).toBe(0);
 });
+
+it('forwards optional awaited sync activity and propagates callback failures before spawn', async () => {
+  const onSynchronizationProgress = vi.fn();
+  const onSynchronizationActivity = vi.fn(async () => {
+    throw new Error('activity-failure');
+  });
+  vi.mocked(synchronizeDeployment).mockImplementationOnce(async (options) => {
+    await options.onFileActivity?.({ phase: 'staging', state: 'started', path: 'mods/test.jar' });
+    return {} as never;
+  });
+  await expect(
+    launchDeployment({ ...setup(), onSynchronizationActivity, onSynchronizationProgress }),
+  ).rejects.toThrow('activity-failure');
+  expect(synchronizeDeployment).toHaveBeenCalledWith(
+    expect.objectContaining({
+      onFileActivity: onSynchronizationActivity,
+      onProgress: onSynchronizationProgress,
+    }),
+  );
+  expect(onSynchronizationActivity).toHaveBeenCalledOnce();
+  expect(state.spawned).toBe(0);
+});
