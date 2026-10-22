@@ -121,7 +121,8 @@ try {
     { path: 'custom.data', policy: 'initial-only' },
   ]);
   await page.locator('.project-toolbar').getByRole('button', { name: '열기', exact: true }).click();
-  await page.getByText('선택되지 않음', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '배포', exact: true }).click();
+  await page.getByText('소스 폴더: 선택되지 않음', { exact: false }).waitFor();
   const isolation = await page.evaluate(() => ({
     require: 'require' in window,
     process: 'process' in window,
