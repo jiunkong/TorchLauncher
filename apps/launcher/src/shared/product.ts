@@ -21,6 +21,7 @@ export type ProductCommand =
     }
   | { type: 'remove-mod' | 'adopt-mod'; path: string }
   | { type: 'set-packs'; packs: string[] }
+  | { type: 'set-close-on-launch'; value: boolean }
   | { type: 'delete'; confirmation: string }
   | { type: 'recover'; acceptUncertain: boolean };
 /** Structured activity only; totals stay unknown until measured, paths are relative. */
@@ -52,6 +53,7 @@ export interface ProductActivity {
   total: number | null;
 }
 export interface ProductState {
+  preferences: { closeOnLaunch: boolean; error?: 'preferences-failed' };
   server: { serverId: string; name: string; address: string } | null;
   configuration: 'ready' | 'unavailable';
   supported: boolean;
@@ -125,6 +127,12 @@ export function parseProductCommand(input: unknown): ProductCommand {
     'preview-delete',
   ];
   if (typeof value.type !== 'string') return fail();
+  if (
+    value.type === 'set-close-on-launch' &&
+    exact('type', 'value') &&
+    typeof value.value === 'boolean'
+  )
+    return value as ProductCommand;
   if (simple.includes(value.type) && exact('type')) return value as ProductCommand;
   if (
     (value.type === 'remove-mod' || value.type === 'adopt-mod') &&

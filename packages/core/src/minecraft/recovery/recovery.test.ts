@@ -29,6 +29,7 @@ import {
 } from '../lock';
 import { parseVersion } from '../metadata';
 import { startJavaDiagnostic } from '../process';
+import { recoverExitedGameLock } from './environment';
 import { inspectServerEnvironment, recoverServerEnvironment } from './index';
 import { inspectInstallTransaction, recoverInstallTransaction } from './install';
 
@@ -574,4 +575,33 @@ describe('environment inspection', () => {
       issues: [{ code: 'server-id-required' }],
     });
   });
+});
+
+it('automatically reclaims only an identified dead game lock with no unfinished transactions', async () => {
+  for (const artifact of ['none', 'install', 'sync', 'mods', 'unknown', 'install-purpose']) {
+    const root = await tempRoot();
+    const probe = fakeProbe();
+    await writeOwner(
+      root,
+      v2({
+        pid: 500001,
+        start: 'owner',
+        purpose: artifact === 'install-purpose' ? 'install' : 'game',
+        child: { state: 'running', pid: 500002, start: artifact === 'unknown' ? null : 'child' },
+      }),
+    );
+    if (artifact === 'install') await mkdir(join(root, INSTALL_LOCK_DIRECTORY));
+    if (artifact === 'sync') {
+      await mkdir(join(root, '.torchlauncher-sync'));
+      await writeFile(join(root, '.torchlauncher-sync/journal.json'), '{}');
+    }
+    if (artifact === 'mods') {
+      await mkdir(join(root, '.torchlauncher-user'));
+      await writeFile(join(root, '.torchlauncher-user/mods-intent.json'), '{}');
+    }
+    expect(await recoverExitedGameLock(root, { probe })).toBe(artifact === 'none');
+    expect((await inspectServerEnvironment(root, { probe })).serverLock.state).toBe(
+      artifact === 'none' ? 'free' : 'stale-verified',
+    );
+  }
 });

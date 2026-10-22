@@ -193,6 +193,26 @@ export function PageContent({ page, state, pending, command }: Props) {
     return (
       <>
         <Panel>
+          <h2>런처</h2>
+          {state.preferences.error && (
+            <p role="alert">
+              저장된 런처 설정을 읽지 못해 자동 종료를 껐습니다. 체크박스를 변경해 다시 저장하세요.
+            </p>
+          )}
+          <label>
+            <input
+              type="checkbox"
+              checked={state.preferences.closeOnLaunch}
+              disabled={!ready}
+              onChange={(event) =>
+                run({ type: 'set-close-on-launch', value: event.target.checked })
+              }
+            />
+            게임 실행 후 런처 종료
+          </label>
+          <p>게임 프로세스가 시작되면 런처를 종료합니다. 게임은 계속 실행됩니다.</p>
+        </Panel>
+        <Panel>
           <h2>활성 리소스팩 순서</h2>
           <p>한 줄에 하나의 팩 ID를 입력하세요. 필수 팩의 포함과 순서는 유지해야 합니다.</p>
           {packsLoad === 'loading' && <p role="status">설정을 불러오는 중…</p>}

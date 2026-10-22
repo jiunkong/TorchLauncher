@@ -12,6 +12,7 @@ import {
   fabricJar,
   serverId,
 } from '../../../../../packages/core/src/instance/mods/fixtures';
+import { systemProcessProbe } from '../../../../../packages/core/src/minecraft/identity';
 import { parseServerConfig } from '../../../../../packages/core/src/server-config/index';
 import { type ProductHost, ProductService, safeProductError } from './service';
 
@@ -215,4 +216,66 @@ it('restores cached sessions noninteractively and treats no saved session as cle
   expect(service.snapshot().account?.name).toBe('RestoredUser');
   expect(JSON.stringify(service.snapshot())).not.toContain('restore-secret');
   expect(host.auth.login).not.toHaveBeenCalled();
+});
+
+it('persists personal preference through service recreation and reports save errors without false success', async () => {
+  const { service, host } = await setup();
+  expect(service.snapshot().preferences.closeOnLaunch).toBe(false);
+  expect((await service.command({ type: 'set-close-on-launch', value: true })).ok).toBe(true);
+  const restarted = new ProductService(host);
+  await restarted.command({ type: 'logout' });
+  expect(restarted.snapshot().preferences.closeOnLaunch).toBe(true);
+  await rm(join(host.base, 'launcher-preferences.json'));
+  await mkdir(join(host.base, 'launcher-preferences.json'));
+  expect(await restarted.command({ type: 'set-close-on-launch', value: false })).toMatchObject({
+    ok: false,
+    error: 'preferences-failed',
+  });
+  expect(restarted.snapshot().preferences.closeOnLaunch).toBe(true);
+});
+
+it('uses safe default after corrupt preference read and allows explicit repair without blocking auth', async () => {
+  const { host } = await setup();
+  await writeFile(join(host.base, 'launcher-preferences.json'), '{bad');
+  const service = new ProductService(host);
+  expect((await service.command({ type: 'login' })).ok).toBe(true);
+  expect(service.snapshot().preferences).toEqual({
+    closeOnLaunch: false,
+    error: 'preferences-failed',
+  });
+  expect((await service.command({ type: 'set-close-on-launch', value: true })).ok).toBe(true);
+  expect(service.snapshot().preferences).toEqual({ closeOnLaunch: true });
+  expect(JSON.parse(await readFile(join(host.base, 'launcher-preferences.json'), 'utf8'))).toEqual({
+    closeOnLaunch: true,
+  });
+});
+
+it('reclaims exited game locks for ordinary management but preserves locks protecting a live identified child', async () => {
+  const { host, service, root } = await setup();
+  await ensureServerDataRoot(host.base, serverId);
+  const probe = systemProcessProbe();
+  const hostIdentity = await probe.host();
+  const self = await probe.process(process.pid);
+  if (self.state !== 'running' || !hostIdentity.machine)
+    throw new Error('fixture identity unavailable');
+  const directory = join(root, '.torchlauncher-server-lock');
+  const owner = {
+    version: 2,
+    id: '22222222-2222-4222-8222-222222222222',
+    pid: 2147483000,
+    start: 'dead-owner',
+    purpose: 'game',
+    host: hostIdentity,
+    child: { state: 'running', pid: process.pid, start: self.start },
+  };
+  await mkdir(directory);
+  const path = join(directory, 'owner.json');
+  const liveText = JSON.stringify(owner);
+  await writeFile(path, liveText);
+  expect(await service.command({ type: 'mods' })).toMatchObject({ ok: false, error: 'locked' });
+  expect(await readFile(path, 'utf8')).toBe(liveText);
+  owner.child = { state: 'running', pid: 2147483001, start: 'dead-child' };
+  await writeFile(path, JSON.stringify(owner));
+  expect((await service.command({ type: 'mods' })).ok).toBe(true);
+  expect(service.snapshot().mods).toEqual([]);
 });

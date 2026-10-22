@@ -136,6 +136,7 @@ if (primaryInstance)
       version: app.getVersion(),
       config,
       auth,
+      quit: () => app.quit(),
       chooseMod: async () => {
         const result = await dialog.showOpenDialog({
           title: '사용자 모드 추가',

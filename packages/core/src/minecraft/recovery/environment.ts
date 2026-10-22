@@ -7,6 +7,7 @@ import { stat } from '../filesystem';
 import { type ProcessProbe, systemProcessProbe } from '../identity';
 import {
   acquireServerDataLock,
+  parseLockOwner,
   reclaimServerDataLock,
   type ServerDataLease,
   ServerDataLockedError,
@@ -249,4 +250,38 @@ export async function recoverServerEnvironment(
     }
   }
   return finish(false);
+}
+
+/** Reclaim only a verified dead game lease; never repair unrelated transactions automatically. */
+export async function recoverExitedGameLock(
+  root: string,
+  options: InspectOptions = {},
+): Promise<boolean> {
+  const probe = options.probe ?? systemProcessProbe();
+  const environment = await inspectServerEnvironment(root, { probe });
+  if (
+    environment.install.state !== 'none' ||
+    environment.synchronization !== 'none' ||
+    environment.userMods !== 'none'
+  )
+    return false;
+  const snapshot = await snapshotServerLock(root, probe);
+  if (
+    snapshot.assessment.state !== 'stale-verified' ||
+    snapshot.assessment.purpose !== 'game' ||
+    !snapshot.ownerText
+  )
+    return false;
+  const record = parseLockOwner(snapshot.ownerText);
+  if (
+    record.state !== 'v2' ||
+    !record.owner.start ||
+    !record.owner.host.machine ||
+    record.owner.child?.state !== 'running' ||
+    !record.owner.child.start
+  )
+    return false;
+  const lease = await reclaimServerDataLock(root, snapshot.ownerText, { probe });
+  await lease.release();
+  return true;
 }
