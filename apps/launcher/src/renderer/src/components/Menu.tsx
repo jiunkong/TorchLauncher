@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 import torchUrl from '../assets/torch.png';
 import { useT } from '../hooks/useTranslator';
 import {
@@ -45,97 +45,68 @@ function Avatar({ name, label }: { name: string | null; label: string }) {
 export function Menu(props: MenuProps) {
   const t = useT();
   const { open, page, accountName } = props;
-  const toggle = useRef<HTMLButtonElement>(null);
-  const toggled = useRef(false);
-  // Keyboard users keep their place: the toggle is a different element in each state.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `open` swaps the toggle element, so refocus on change.
-  useEffect(() => {
-    if (toggled.current) toggle.current?.focus();
-  }, [open]);
-  const onToggle = () => {
-    toggled.current = true;
-    props.onToggle();
-  };
   const accountLabel = accountName ?? t('menu.loginRequired');
-
-  if (!open)
-    return (
-      <nav className="rail" aria-label={t('menu.label')} data-testid="menu" data-open="false">
-        <button
-          ref={toggle}
-          className="ri"
-          type="button"
-          aria-label={t('menu.open')}
-          aria-expanded="false"
-          aria-controls="launcher-menu"
-          onClick={onToggle}
-        >
-          <MenuIcon />
-        </button>
+  // One container for both states: only its width (and label visibility) transitions, so the
+  // icons stay put. Hidden labels are `inert` and `visibility: hidden` once collapsed.
+  return (
+    <aside className="menu" data-testid="menu" data-open={open ? 'true' : 'false'}>
+      <nav className="menu-nav" aria-label={t('menu.label')}>
+        <div className="side-head">
+          <span className="opicon fade" aria-hidden="true" inert={!open}>
+            <img src={torchUrl} alt="" draggable={false} />
+          </span>
+          <strong className="side-name fade" inert={!open}>
+            {props.serverName ?? t('home.noServer')}
+          </strong>
+          <button
+            className="tg"
+            type="button"
+            aria-label={open ? t('menu.close') : t('menu.open')}
+            aria-expanded={open ? 'true' : 'false'}
+            aria-controls="launcher-menu"
+            onClick={props.onToggle}
+          >
+            <span className="tg-icon tg-menu">
+              <MenuIcon />
+            </span>
+            <span className="tg-icon tg-collapse">
+              <CollapseIcon />
+            </span>
+          </button>
+        </div>
         <span className="sep" aria-hidden="true" />
-        <div id="launcher-menu" className="rail-items">
+        <div id="launcher-menu" className="nav">
           {items.map((item) => (
             <button
               key={item.id}
-              className={`ri${page === item.id ? ' active' : ''}`}
+              className={`item${page === item.id ? ' active' : ''}`}
               type="button"
               aria-label={t(item.key)}
               aria-current={page === item.id ? 'page' : undefined}
-              title={t(item.key)}
+              title={open ? undefined : t(item.key)}
               onClick={() => props.onNavigate(item.id)}
             >
               {item.icon}
+              <span className="lbl fade" aria-hidden="true">
+                {t(item.key)}
+              </span>
             </button>
           ))}
         </div>
-        <span className="sp" />
-        <Avatar name={accountName} label={accountLabel} />
-      </nav>
-    );
-
-  return (
-    <aside className="side-open" data-testid="menu" data-open="true">
-      <div className="side-head">
-        <span className="opicon" aria-hidden="true">
-          <img src={torchUrl} alt="" draggable={false} />
-        </span>
-        <strong className="side-name">{props.serverName ?? t('home.noServer')}</strong>
-        <button
-          ref={toggle}
-          className="tg"
-          type="button"
-          aria-label={t('menu.close')}
-          aria-expanded="true"
-          aria-controls="launcher-menu"
-          onClick={onToggle}
-        >
-          <CollapseIcon />
-        </button>
-      </div>
-      <nav id="launcher-menu" className="nav" aria-label={t('menu.label')}>
-        {items.map((item) => (
-          <button
-            key={item.id}
-            className={`item${page === item.id ? ' active' : ''}`}
-            type="button"
-            aria-current={page === item.id ? 'page' : undefined}
-            onClick={() => props.onNavigate(item.id)}
-          >
-            {item.icon}
-            {t(item.key)}
-          </button>
-        ))}
       </nav>
       <div className="account">
         <Avatar name={accountName} label={accountLabel} />
-        <strong className="account-name">{accountLabel}</strong>
+        <strong className="account-name fade" inert={!open}>
+          {accountLabel}
+        </strong>
         {accountName && (
           <button
-            className="lo"
+            className="lo fade"
             type="button"
             aria-label={t('menu.logout')}
             title={t('menu.logout')}
             disabled={props.logoutDisabled}
+            inert={!open}
             onClick={props.onLogout}
           >
             <LogoutIcon />
