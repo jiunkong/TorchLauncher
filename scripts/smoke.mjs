@@ -154,11 +154,12 @@ try {
       await page.setViewportSize({ width: 1100, height: 760 });
       await page.waitForTimeout(100);
       const wideLayout = await page.evaluate(() => ({
-        viewport: document.documentElement.clientWidth,
+        viewport: window.innerWidth,
+        client: document.documentElement.clientWidth,
         content: document.documentElement.scrollWidth,
       }));
       assert.equal(wideLayout.viewport, 1100);
-      assert.ok(wideLayout.content <= wideLayout.viewport, `${directory} overflows at 1100px`);
+      assert.ok(wideLayout.content <= wideLayout.client, `${directory} overflows at 1100px`);
       await page.screenshot({ path: resolve(screenshots, `${directory}-wide.png`) });
       console.log(
         `${name}: renderer, navigation, IPC, isolation, and 760px/1100px layout checks passed`,
