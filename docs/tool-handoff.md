@@ -5,6 +5,18 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## Active LAUNCH-EXIT-01: optional launcher exit after game starts
+
+User deferred UI changes and authorized this feature. Read `docs/close-on-launch.md`.
+One worker #3 `close_on_launch` (Sol medium), agent-3 branch `feat/launcher-close-on-game-start`,
+baseline `2c1fcbe`, owns launcher app + narrow Minecraft process/recovery/gate scope.
+#0 only docs/review/integration. Design approved: opted-in detached Java with ignored stdio; verified v2
+child identity recorded before handoff; preserve on-disk lock while child lives; service exits its operation
+before host.quit so ordinary cleanup cannot kill detached game. Default false, persisted personal setting.
+Restart can reclaim only exact verified-stale game lock with no unfinished transactions; no uncertain auto unlock.
+Failures/cancellation before handoff retain normal managed cleanup and no auto exit. Worker is implementing/tests.
+No user login/server/process has been touched or requested. Windows account-free survival validation will be needed.
+
 ## Completed UI-PROD-01 functional workflow phase
 
 User approved starting UI-PROD-01, explicitly functionality before aesthetics. Read `docs/ui-production.md`.
