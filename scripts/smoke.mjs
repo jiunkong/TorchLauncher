@@ -56,6 +56,7 @@ const appCases = [
       'getBranding',
       'onBranding',
       'getState',
+      'copyServerDataPath',
       'command',
       'onState',
     ],

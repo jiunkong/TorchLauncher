@@ -3,6 +3,7 @@ import type { BrandingApi } from './branding';
 
 export const productChannel = 'torchlauncher:product';
 export const productStateChannel = 'torchlauncher:product-state';
+export const copyServerDataPathChannel = 'torchlauncher:copy-server-data-path';
 export type ProductCommand =
   | {
       type:
@@ -117,6 +118,7 @@ export type ProductResult =
   | { ok: true; state: ProductState }
   | { ok: false; error: string; state: ProductState };
 export interface LauncherApi extends DesktopApi, BrandingApi {
+  copyServerDataPath?(): Promise<boolean>;
   getState(): Promise<ProductState>;
   command(command: ProductCommand): Promise<ProductResult>;
   onState(listener: (state: ProductState) => void): () => void;

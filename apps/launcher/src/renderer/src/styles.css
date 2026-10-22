@@ -900,6 +900,12 @@ svg {
   font-family: var(--font-mono);
   font-size: 12px;
 }
+.kv.settings-data-path {
+  align-items: center;
+}
+.settings-data-path > button {
+  flex: none;
+}
 .list {
   display: flex;
   flex-direction: column;
@@ -1492,6 +1498,10 @@ svg {
   }
 }
 
+.branding-background {
+  isolation: isolate;
+  pointer-events: none;
+}
 .branding-icon {
   position: relative;
   width: 32px;

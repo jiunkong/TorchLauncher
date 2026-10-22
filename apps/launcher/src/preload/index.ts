@@ -2,6 +2,7 @@ import { applicationInfoChannel } from '@torchlauncher/core/desktop';
 import { contextBridge, ipcRenderer } from 'electron';
 import { type BrandingSnapshot, brandingChangedChannel, brandingChannel } from '../shared/branding';
 import {
+  copyServerDataPathChannel,
   type LauncherApi,
   type ProductState,
   productChannel,
@@ -18,6 +19,7 @@ const api: LauncherApi = {
     return () => ipcRenderer.removeListener(brandingChangedChannel, handler);
   },
   getState: () => ipcRenderer.invoke(productStateChannel),
+  copyServerDataPath: () => ipcRenderer.invoke(copyServerDataPathChannel),
   command: (command) => ipcRenderer.invoke(productChannel, command),
   onState: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, state: ProductState) => listener(state);

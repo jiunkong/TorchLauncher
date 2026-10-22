@@ -1,7 +1,8 @@
-import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
-import { expect, it } from 'vitest';
-import { parseProductCommand } from '../../shared/product';
-import { trustedProductSender } from './ipc';
+import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
+import { expect, it, vi } from 'vitest';
+import { copyServerDataPathChannel, parseProductCommand } from '../../shared/product';
+import { bindProductIpc, trustedProductSender } from './ipc';
+import type { ProductService } from './service';
 
 it('rejects other windows, child frames and navigated/untrusted documents', () => {
   const mainFrame = { url: 'file:///application/index.html' };
@@ -91,4 +92,70 @@ it('limits log opening to no arguments and unregistered removal to exact mods pa
   expect(() =>
     parseProductCommand({ type: 'remove-unregistered', path: 'mods/a.txt', force: true }),
   ).toThrow('invalid-request');
+});
+
+it('copies only the current main-process data root through trusted no-argument IPC', async () => {
+  const frame = { url: 'file:///application/index.html' };
+  const contents = { mainFrame: frame };
+  const window = { isDestroyed: () => false, webContents: contents } as unknown as BrowserWindow;
+  const event = { sender: contents, senderFrame: frame } as unknown as IpcMainInvokeEvent;
+  const handle = vi.fn();
+  const removeHandler = vi.fn();
+  const copy = vi.fn();
+  let root: string | null = [
+    'C:',
+    'Users',
+    '긴 사용자 이름',
+    ...Array(12).fill('긴 서버 폴더'),
+  ].join(String.fromCharCode(92));
+  const service = { snapshot: () => ({ serverDataRoot: root }) } as ProductService;
+  const unbind = bindProductIpc(
+    { handle, removeHandler } as unknown as IpcMain,
+    window,
+    frame.url,
+    service,
+    copy,
+  );
+  const invoke = handle.mock.calls.find(
+    ([channel]) => channel === copyServerDataPathChannel,
+  )?.[1] as (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<boolean>;
+  await expect(invoke(event)).resolves.toBe(true);
+  expect(copy).toHaveBeenCalledExactlyOnceWith(root);
+  root = '/new/current/server/root';
+  await expect(invoke(event)).resolves.toBe(true);
+  expect(copy).toHaveBeenLastCalledWith(root);
+  const count = copy.mock.calls.length;
+  for (const value of [
+    undefined,
+    '/arbitrary/path',
+    { path: '/outside' },
+    { text: 'arbitrary clipboard text' },
+  ])
+    await expect(invoke(event, value)).rejects.toThrow('Invalid path copy request');
+  await expect(invoke({ ...event, sender: {} } as IpcMainInvokeEvent)).rejects.toThrow('Untrusted');
+  await expect(
+    invoke({ ...event, senderFrame: { url: frame.url } } as IpcMainInvokeEvent),
+  ).rejects.toThrow('Untrusted');
+  frame.url = 'https://example.invalid';
+  await expect(invoke(event)).rejects.toThrow('Untrusted');
+  frame.url = 'file:///application/index.html';
+  root = null;
+  await expect(invoke(event)).resolves.toBe(false);
+  expect(copy).toHaveBeenCalledTimes(count);
+  root = '/safe/root';
+  copy.mockRejectedValue(new Error('private backend failure'));
+  await expect(invoke(event)).resolves.toBe(false);
+  unbind();
+  expect(removeHandler).toHaveBeenCalledWith(copyServerDataPathChannel);
+});
+it('reports a missing main copy backend without attempting any clipboard operation', async () => {
+  const frame = { url: 'file:///application/index.html' };
+  const contents = { mainFrame: frame };
+  const window = { isDestroyed: () => false, webContents: contents } as unknown as BrowserWindow;
+  const handle = vi.fn();
+  bindProductIpc({ handle, removeHandler: vi.fn() } as unknown as IpcMain, window, frame.url, {
+    snapshot: () => ({ serverDataRoot: '/root' }),
+  } as ProductService);
+  const invoke = handle.mock.calls.find(([channel]) => channel === copyServerDataPathChannel)?.[1];
+  await expect(invoke({ sender: contents, senderFrame: frame })).resolves.toBe(false);
 });

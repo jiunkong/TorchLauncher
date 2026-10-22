@@ -5,7 +5,16 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, session, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  nativeImage,
+  session,
+  shell,
+} from 'electron';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index';
 import { createDownloadSource } from '../../../../packages/core/src/download/source/index';
 import { brandingChangedChannel } from '../shared/branding';
@@ -61,7 +70,9 @@ function createWindow(): void {
     : () => {};
   const icon = branding?.snapshot().icon;
   if (icon) window.setIcon(nativeImage.createFromDataURL(icon));
-  const unbind = product ? bindProductIpc(ipcMain, window, rendererUrl, product) : () => {};
+  const unbind = product
+    ? bindProductIpc(ipcMain, window, rendererUrl, product, (text) => clipboard.writeText(text))
+    : () => {};
   ipcMain.removeHandler(applicationInfoChannel);
   ipcMain.handle(applicationInfoChannel, (event) => {
     if (
