@@ -37,24 +37,38 @@ const homeProps = (overrides: Partial<HomeProps> = {}): HomeProps => ({
 });
 
 describe('menu accessibility', () => {
-  it('starts collapsed with icon-only labelled buttons and aria-expanded=false', () => {
+  it('starts collapsed in one container with labelled buttons and aria-expanded=false', () => {
     const html = render(createElement(Menu, menuProps));
+    expect(html).toContain('data-open="false"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-label="메뉴 열기"');
     for (const label of ['플레이', '내 모드', '설정', '로그'])
       expect(html).toContain(`aria-label="${label}"`);
     expect(html).toContain('aria-current="page"');
-    expect(html).not.toContain('Fixture Server');
+    // Hidden labels stay out of the tab order and accessibility tree.
+    expect(html).toMatch(/<strong class="side-name fade" inert=""/);
+    expect(html).toMatch(/<button class="lo fade"[^>]*inert=""/);
+    expect(html).toContain('class="lbl fade" aria-hidden="true"');
+    expect(html).toContain('title="설정"');
   });
 
   it('shows names, the server, and the account controls when expanded', () => {
     const html = render(createElement(Menu, { ...menuProps, open: true }));
+    expect(html).toContain('data-open="true"');
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain('aria-label="메뉴 닫기"');
     expect(html).toContain('Fixture Server');
     expect(html).toContain('Player');
     expect(html).toContain('aria-label="로그아웃"');
+    expect(html).not.toMatch(/inert=""/);
     expect(html).not.toContain('play.example.invalid');
+  });
+
+  it('keeps the same toggle and item buttons in both states', () => {
+    const count = (html: string) => html.match(/<button/g)?.length;
+    expect(count(render(createElement(Menu, menuProps)))).toBe(
+      count(render(createElement(Menu, { ...menuProps, open: true }))),
+    );
   });
 
   it('offers no logout without an account', () => {

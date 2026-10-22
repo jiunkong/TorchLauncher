@@ -56,11 +56,36 @@ try {
   assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
   await toggle.click();
   assert.equal(await menu.getAttribute('data-open'), 'true');
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-menu-opening.png') });
   const collapse = page.getByRole('button', { name: '메뉴 닫기', exact: true });
   assert.equal(await collapse.getAttribute('aria-expanded'), 'true');
   assert.equal(await page.getByText(`127.0.0.1:${statusAddress.port}`).count(), 0);
+  // Mid-transition frame: the container is between 64px and 232px, icons stay put.
   await collapse.click();
   assert.equal(await menu.getAttribute('data-open'), 'false');
+  await page.waitForTimeout(100);
+  const midWidth = await menu.evaluate((node) => node.getBoundingClientRect().width);
+  assert.ok(midWidth > 64 && midWidth < 232, `menu width mid-transition: ${midWidth}`);
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-menu-closing-mid.png') });
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="menu"]')?.getBoundingClientRect().width === 64,
+  );
+  // Rapid toggling ends in a state that matches aria-expanded.
+  const toggler = page.locator('.tg');
+  for (let index = 0; index < 5; index += 1) await toggler.click();
+  assert.equal(await menu.getAttribute('data-open'), 'true');
+  assert.equal(await toggler.getAttribute('aria-expanded'), 'true');
+  await toggler.click();
+  assert.equal(await menu.getAttribute('data-open'), 'false');
+  assert.equal(await toggler.getAttribute('aria-expanded'), 'false');
+  assert.equal(await toggler.evaluate((node) => node === document.activeElement), true);
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="menu"]')?.getBoundingClientRect().width === 64,
+  );
+  assert.equal(
+    await page.locator('.side-name').evaluate((node) => getComputedStyle(node).visibility),
+    'hidden',
+  );
   await page.waitForFunction(() =>
     Array.from(document.querySelectorAll('button')).some(
       (button) => button.textContent?.trim() === 'Microsoft 계정으로 로그인' && !button.disabled,

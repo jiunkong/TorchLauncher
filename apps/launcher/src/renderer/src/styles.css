@@ -109,6 +109,8 @@ button:disabled {
 .content {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  contain: layout paint;
   display: flex;
   flex-direction: column;
 }
@@ -120,88 +122,76 @@ svg {
   stroke-linejoin: round;
 }
 
-/* 접힌 메뉴(기본) */
-.rail {
+/* 메뉴: 하나의 컨테이너에서 폭만 전환한다(64px 레일 <-> 232px). 아이콘은 좌측 고정. */
+.menu {
+  --menu-ease-open: cubic-bezier(0.2, 0.7, 0.2, 1);
   width: 64px;
   flex: none;
+  box-sizing: border-box;
   background: var(--panel);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  align-items: center;
   padding: 12px 0;
   gap: 6px;
+  overflow: hidden;
+  contain: layout paint;
+  transition: width 200ms ease-in-out;
 }
-.rail-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.rail .ri {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: var(--text-2);
-  background: none;
-  border: 0;
-  padding: 0;
-}
-.rail .ri:hover {
-  background: var(--panel-2);
-  color: var(--text);
-}
-.rail .ri.active {
-  background: rgba(229, 65, 43, 0.18);
-  color: #fff;
-  box-shadow: inset 3px 0 0 var(--red);
-}
-.rail svg {
-  width: 22px;
-  height: 22px;
-}
-.rail .sep {
-  width: 28px;
-  height: 1px;
-  background: var(--line);
-  margin: 6px 0;
-}
-.rail .sp {
-  flex: 1;
-}
-
-/* 펼친 메뉴 */
-.side-open {
+.menu[data-open="true"] {
   width: 232px;
-  flex: none;
-  background: var(--panel);
-  border-right: 1px solid var(--line);
-  padding: 12px;
+  transition: width 220ms var(--menu-ease-open);
+}
+.menu-nav {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+}
+/* 라벨: 닫힐 때 먼저 사라지고, 열릴 때 폭이 늘어난 뒤(100ms 지연) 나타난다. */
+.fade {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-6px);
+  transition:
+    opacity 80ms ease-in,
+    transform 80ms ease-in,
+    visibility 0s linear 80ms;
+}
+.menu[data-open="true"] .fade {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 140ms ease-out 100ms,
+    transform 140ms ease-out 100ms,
+    visibility 0s linear 100ms;
 }
 .side-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   height: 44px;
-  padding-left: 4px;
+  padding: 0 10px 0 15px;
+  min-width: 0;
 }
 .side-name {
   font-size: 14px;
   line-height: 1.3;
   min-width: 0;
   flex: 1;
+  margin-right: 44px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .side-head .tg {
+  position: absolute;
+  left: 10px;
+  top: 0;
   width: 44px;
   height: 44px;
-  flex: none;
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -209,12 +199,34 @@ svg {
   background: none;
   border: 0;
   padding: 0;
+  transition: transform 220ms var(--menu-ease-open);
+}
+.menu[data-open="true"] .side-head .tg {
+  transform: translateX(168px);
+}
+.menu:not([data-open="true"]) .side-head .tg {
+  transition: transform 200ms ease-in-out;
 }
 .side-head .tg:hover {
   background: var(--panel-2);
   color: var(--text);
 }
-.side-head .tg svg {
+.tg-icon {
+  grid-area: 1 / 1;
+  display: grid;
+  transition: opacity 120ms ease;
+}
+.tg-collapse,
+.menu[data-open="true"] .tg-menu {
+  opacity: 0;
+  transition-delay: 60ms; /* the outgoing icon lingers so the toggle never blanks mid-fade */
+}
+.menu[data-open="true"] .tg-collapse,
+.menu:not([data-open="true"]) .tg-menu {
+  opacity: 1;
+  transition-delay: 0s;
+}
+.side-head svg {
   width: 22px;
   height: 22px;
 }
@@ -231,24 +243,31 @@ svg {
   width: 24px;
   height: 24px;
 }
+.sep {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 18px;
+}
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 10px;
+  gap: 6px;
+  padding: 0 10px;
 }
 .item {
   display: flex;
   align-items: center;
   gap: 12px;
   height: 44px;
-  padding: 0 12px;
+  padding: 0 0 0 11px;
   border: 0;
   background: none;
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-2);
   font-size: 14px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .item:hover {
   background: var(--panel-2);
@@ -256,13 +275,16 @@ svg {
 }
 .item.active {
   color: var(--text);
-  background: linear-gradient(90deg, rgba(229, 65, 43, 0.2), rgba(229, 65, 43, 0.04));
+  background: rgba(229, 65, 43, 0.18);
   box-shadow: inset 3px 0 0 var(--red);
+}
+.menu[data-open="true"] .item.active {
+  background: linear-gradient(90deg, rgba(229, 65, 43, 0.2), rgba(229, 65, 43, 0.04));
   font-weight: 700;
 }
 .item svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex: none;
 }
 .account {
@@ -270,8 +292,9 @@ svg {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px;
-  border-top: 1px solid var(--line);
+  padding: 10px 10px 10px 15px;
+  min-width: 0;
+  white-space: nowrap;
 }
 .account-name {
   font-size: 13px;
@@ -298,6 +321,7 @@ svg {
 }
 .account .lo {
   margin-left: auto;
+  margin-right: -3px;
   width: 36px;
   height: 36px;
   flex: none;
@@ -654,6 +678,7 @@ svg {
 
 /* 기존 페이지(L2에서 재작성) */
 .page-scroll {
+  scrollbar-gutter: stable;
   flex: 1;
   min-height: 0;
   overflow: auto;
