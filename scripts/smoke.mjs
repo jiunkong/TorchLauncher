@@ -76,6 +76,11 @@ try {
     });
 
     try {
+      if (directory === 'admin') {
+        await app.evaluate(({ dialog }) => {
+          dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+        });
+      }
       const page = await app.firstWindow();
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
@@ -146,7 +151,6 @@ try {
         const projectPath = resolve(temp, 'saved-project.json');
         await app.evaluate(({ dialog }, target) => {
           dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
-          dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
         }, projectPath);
         await page.getByRole('button', { name: '저장', exact: true }).click();
         await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
