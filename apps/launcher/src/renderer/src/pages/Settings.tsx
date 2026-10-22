@@ -4,6 +4,7 @@ import { ChevronDownIcon, ChevronUpIcon, TrashIcon } from '../components/Icons';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatBytes } from '../format';
 import { useT } from '../hooks/useTranslator';
+import { MemoryScrubInput } from './MemoryScrubInput';
 import type { LoadState } from './Mods';
 import {
   defaultMaxMemoryMiB,
@@ -42,7 +43,6 @@ export function SettingsPage({
     initialMemoryMiB === undefined ? '' : String(initialMemoryMiB / 1024),
   );
   const [memorySaving, setMemorySaving] = useState(false);
-  const [memorySaved, setMemorySaved] = useState(false);
   const maxDraftMiB = parseMemoryGiB(maxMemoryDraft);
   const initialDraftMiB = initialMemoryDraft ? parseMemoryGiB(initialMemoryDraft) : undefined;
   const memoryValid =
@@ -118,49 +118,35 @@ export function SettingsPage({
         </section>
         <section className="card" aria-labelledby="settings-memory">
           <h2 id="settings-memory">{t('settings.gameMemory')}</h2>
-          <p className="hint">{t('settings.gameMemoryHint')}</p>
-          <label className="field">
+          <p className="hint">{t('settings.memoryInitialHint')}</p>
+          <div className="field">
             <span>{t('settings.maxMemory')}</span>
-            <span className="input-unit">
-              <input
-                type="number"
-                min="0.5"
-                max={memoryLimit / 1024}
-                step="0.5"
-                inputMode="decimal"
-                value={maxMemoryDraft}
-                aria-label={t('settings.maxMemory')}
-                data-testid="max-memory"
-                disabled={memorySaving}
-                onChange={(event) => {
-                  setMaxMemoryDraft(event.target.value);
-                  setMemorySaved(false);
-                }}
-              />
-              <span>{t('settings.memoryUnit')}</span>
-            </span>
-          </label>
-          <label className="field">
+            <MemoryScrubInput
+              value={maxMemoryDraft}
+              label={t('settings.maxMemory')}
+              unit={t('settings.memoryUnit')}
+              testId="max-memory"
+              min={512}
+              max={memoryLimit}
+              step={256}
+              disabled={memorySaving}
+              onChange={setMaxMemoryDraft}
+            />
+          </div>
+          <div className="field">
             <span>{t('settings.initialMemory')}</span>
-            <span className="input-unit">
-              <input
-                type="number"
-                min="0.25"
-                max={maxDraftMiB === null ? 64 : maxDraftMiB / 1024}
-                step="0.25"
-                inputMode="decimal"
-                value={initialMemoryDraft}
-                aria-label={t('settings.initialMemory')}
-                data-testid="initial-memory"
-                disabled={memorySaving}
-                onChange={(event) => {
-                  setInitialMemoryDraft(event.target.value);
-                  setMemorySaved(false);
-                }}
-              />
-              <span>{t('settings.memoryUnit')}</span>
-            </span>
-          </label>
+            <MemoryScrubInput
+              value={initialMemoryDraft}
+              label={t('settings.initialMemory')}
+              unit={t('settings.memoryUnit')}
+              testId="initial-memory"
+              min={256}
+              max={maxDraftMiB === null ? 0 : Math.min(maxDraftMiB, memoryLimit)}
+              step={256}
+              disabled={memorySaving}
+              onChange={setInitialMemoryDraft}
+            />
+          </div>
           {!memoryValid && (
             <p role="alert" className="hint">
               {memoryLimit < 512
@@ -189,20 +175,12 @@ export function SettingsPage({
                   type: 'set-game-memory',
                   maxMemoryMiB: maxDraftMiB,
                   ...(initialDraftMiB == null ? {} : { initialMemoryMiB: initialDraftMiB }),
-                }).then((ok) => {
-                  setMemorySaving(false);
-                  setMemorySaved(ok);
-                });
+                }).then(() => setMemorySaving(false));
               }}
             >
               {t('settings.save')}
             </button>
           </div>
-          {memorySaved && (
-            <p className="hintline" role="status">
-              {t('settings.saved')}
-            </p>
-          )}
         </section>
         <section className="card" aria-labelledby="settings-data">
           <h2 id="settings-data">{t('settings.data')}</h2>

@@ -950,6 +950,20 @@ svg {
   border-radius: 6px;
   font: inherit;
 }
+.memory-scrub input:not(:disabled) {
+  cursor: ew-resize;
+  touch-action: pan-y;
+  user-select: text;
+}
+.memory-scrub input::-webkit-inner-spin-button,
+.memory-scrub input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+.memory-scrub input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
 .muted-card .row strong {
   color: var(--text-2);
 }

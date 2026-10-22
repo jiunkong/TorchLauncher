@@ -10,6 +10,7 @@ import { formatBytes } from './format';
 import { LauncherLocaleProvider } from './i18n';
 import { launcherTranslations } from './i18n/catalog';
 import { failureMessage, operationLabel, outcomeLabel, recoveryIssueText } from './labels';
+import { Home } from './pages/Home';
 import { filterLogs, LogsPage } from './pages/Logs';
 import { ModsAddButton, ModsPage, ModsView, modNeedsCheck, modNotes } from './pages/Mods';
 import { arrangePacks, canMove, movePack, packIds } from './pages/packs';
@@ -59,6 +60,29 @@ describe('labels moved to the dictionary', () => {
     expect(formatBytes(0)).toBe('0 B');
     expect(formatBytes(1536)).toBe('1.5 KB');
     expect(formatBytes(4.2 * 1024 ** 3)).toBe('4.2 GB');
+  });
+});
+
+describe('play page', () => {
+  it('does not show the previous operation outcome', () => {
+    const html = render(
+      createElement(Home, {
+        state: productState({ outcome: 'exited-1' }),
+        productError: null,
+        pending: false,
+        elapsedMs: 0,
+        stage: null,
+        applicationVersion: null,
+        applicationInfoFailed: false,
+        onPrimary: () => {},
+        onCancel: () => {},
+        onStop: () => {},
+        onViewLogs: () => {},
+        onReviewRecovery: () => {},
+      }),
+    );
+    expect(html).not.toContain('최근 결과');
+    expect(html).not.toContain('게임이 종료되었습니다 (코드 1).');
   });
 });
 
@@ -167,6 +191,10 @@ describe('settings page', () => {
     expect(html).toContain('data-testid="initial-memory"');
     expect(html).toContain('최대 메모리 (Xmx)');
     expect(html).toContain('저장한 값은 다음 실행부터 적용됩니다.');
+    expect(html).toContain('초기 메모리는 비워 두면 Java 기본값을 사용합니다.');
+    expect(html).not.toContain('0.5 GB 단위로 권장합니다');
+    expect(html).not.toContain('저장했습니다.');
+    expect(html.match(/step="0\.25"/g)).toHaveLength(2);
   });
 
   it('locks required packs and offers move buttons for user packs only', () => {

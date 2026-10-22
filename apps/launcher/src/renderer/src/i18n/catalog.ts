@@ -165,8 +165,7 @@ const ko = {
   'settings.prefsFailed':
     '저장된 런처 설정을 읽지 못해 자동 종료를 껐습니다. 스위치를 다시 설정하세요.',
   'settings.gameMemory': '게임 메모리',
-  'settings.gameMemoryHint':
-    '최대 메모리는 0.5 GB 단위로 권장합니다. 초기 메모리는 비워 두면 Java 기본값을 사용합니다.',
+  'settings.memoryInitialHint': '초기 메모리는 비워 두면 Java 기본값을 사용합니다.',
   'settings.maxMemory': '최대 메모리 (Xmx)',
   'settings.initialMemory': '초기 메모리 (Xms, 선택)',
   'settings.memoryNextLaunch': '저장한 값은 다음 실행부터 적용됩니다.',
