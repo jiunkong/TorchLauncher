@@ -7,9 +7,17 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
-Active user correction: remove memory horizontal dragging only. Worker #1 `memory_no_drag`, Luna low,
-agent-1 `fix/memory-input-no-drag`, baseline `fb5ca70`. Plain numeric entry, hidden spinners, no recommendation
-or memory save-success text, no Home recent-result remain. Renderer-only cleanup; no backend/IPC changes.
+LATEST override: user approved parallel L2a followups and L3 player skin only (operator branding excluded).
+Read `docs/launcher-parallel-followups.md`. Worker #2 `launcher_followups`, Astra medium requested,
+agent-2 `feat/launcher-l2a-followups`; worker #3 `player_skin`, Sol medium requested,
+agent-3 `feat/launcher-player-skin`; both baseline `08244b2`. Actual runtime effort unverified by #0.
+User reported earlier agents all displayed low; requested settings and actual UI observation are now recorded separately.
+Shared files owned only by #2; module/components owned only by #3. Merge module first then #2 updates baseline
+and completes production/menu wiring. #0 docs/review/noffmerge/maincheck only. No extra agents.
+
+Memory drag removal `4179715` integrated. Main pnpm check passed 912 tests/9 skips, all types/builds/Biome
+(8 existing CSS warnings); worker renderer 23 tests+Electron smoke passed. Agent-1 detached, branch deleted.
+Plain numeric entry, hidden spinners, no recommendation/memory save-success text/Home recent-result remain.
 
 MEM-01 renderer follow-up: #1 `memory_scrub`, Luna medium, agent-1 `feat/mem-01-scrub-input`,
 baseline `f1b3286`, commit `717ae43` integrated by #0 via `cca1bf5`.
@@ -39,7 +47,8 @@ Suggested check: maximum 2 GB / initial 1 GB → save → restart confirms persi
 blank initial field saves/launches without explicit Xms. Existing auto-close setting must stay preserved.
 If launcher remains running, saving different valid values during the game must affect only next launch.
 Never ask for raw Java command line (contains credentials); share only filtered Xmx/Xms arguments if needed.
-L3 and L2a follow-ups remain pending separate user approval after MEM-01 integration. Other worktrees untouched.
+Superseded approval state: the newer top entry records user approval of L2a followups + L3 skin.
+Operator branding remains unstarted. Worker-2/3 have now been assigned from the latest baseline.
 System Node v24.21.0 is available; `/tmp/torchlauncher-tools/node_modules/.bin` contains pnpm only.
 
 This section supersedes the older sections below where they conflict. Read `docs/launcher-ui.md` (spec, phases),

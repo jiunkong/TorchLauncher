@@ -7,8 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
-사용자 피드백으로 메모리 좌우 드래그 제거 진행: #1 `memory_no_drag`, Luna low,
-`fix/memory-input-no-drag`/agent-1, baseline `fb5ca70`. 드래그만 제거하고 나머지 입력/표시 정책을 유지한다.
+사용자 피드백으로 메모리 좌우 드래그 제거 완료: #1 `memory_no_drag`, Luna low의 `4179715` 통합.
+main 전체 검사 성공(912개 통과·9 skip, 전체 타입·두 앱 빌드·Biome 기존 CSS 경고 8개).
+드래그만 제거하고 스피너/권장·저장 성공 문구/플레이 최근 결과 숨김 및 직접 입력·검증·저장은 유지한다.
+agent-1 detached·작업 브랜치 삭제, 작업자 renderer 23개와 Electron smoke도 통과했다.
+
+사용자 승인으로 **L2a 후속과 L3 스킨만 병렬 진행 중**이다. #2 `launcher_followups`(Astra medium 요청),
+#3 `player_skin`(Sol medium 요청), agent-2/3의 별도 브랜치에서 작업한다. 실제 effort UI 반영은 미확인이다.
+공용 서비스/IPC/상태/메뉴·페이지 연결은 #2 한 명, 스킨 모듈/아바타 component는 #3 한 명이 소유한다.
+[배정·계약](launcher-parallel-followups.md). 운영자 브랜딩/Studio는 미착수이며 추가 작업자는 만들지 않는다.
 
 MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
 권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
@@ -18,7 +25,7 @@ renderer 관련 테스트 24개·타입/빌드·Electron pointer/저장 전 미�
 main `pnpm check` 성공: 913개 통과·9개 skip, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개).
 인계 정확도 문서 후속 `e7a207d`도 통합했다. agent-1 detached·병합 브랜치 정리, 다른 worktree 미변경.
 Windows 드래그 사용감 및 MEM-01 실제 게임 메모리 확인은 사용자 검증 대기다.
-[인계](handoffs/MEM-01-INPUT.md). L3/L2a 후속은 계속 대기한다.
+[인계](handoffs/MEM-01-INPUT.md). 이후 사용자 승인으로 L2a 후속/L3 스킨만 병렬 착수했다.
 
 MEM-01 구현·검토·통합: #1 `mem_01`, Luna medium의 `a2f81b1`을 #0이 `91d47c9`로 --no-ff 병합했다.
 코어 Xms(미지정이면 생략), 기존 Xmx 기본 2048 MiB 유지, 개인 설정 호환·원자적 저장,
@@ -30,7 +37,7 @@ main 전체 `pnpm check` 성공: 911개 통과·9개 skip, 전체 타입·두 �
 agent-1을 통합 main(`91d47c9`)에 detached로 정리하고 병합된 작업 브랜치를 삭제했다. 다른 worktree는 그대로다.
 Windows 실제 UI/Java 메모리 인자 검증은 미실시이며 사용자 확인을 요청한다.
 [인계](handoffs/MEM-01.md), `docs/work-distribution.md` 맨 아래 MEM-01을 참고한다.
-L3와 L2a 후속은 MEM-01 통합 후 별도 배정안 승인까지 착수하지 않는다.
+운영자 브랜딩은 아직 미승인/미착수다. L2a 후속/L3 스킨의 새 배정은 문서 상단을 따른다.
 
 BRAND-ICON-01 구현·통합: #1 `app_icon` Luna medium의 `35d4f90`를 #0이 `8b2e946`으로 병합했다.
 사용자 ICO를 공유 `assets/branding/`에 복사하고 내장 PNG를 무손실 추출했다. 두 앱 native 창 및
