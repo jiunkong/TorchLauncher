@@ -2,6 +2,11 @@
 
 ## 역할과 현재 배정
 
+BRAND-CORE-01 `7281829` → `df2af4d` 통합 완료. main pnpm check 성공: 1028개 통과/9 skip,
+전체 타입·두 앱 빌드·Biome(기존 경고). 로그 `/tmp/torch-brand-core-check.log`.
+다음 BRAND-RUNTIME-01은 같은 #1 작업자/Sol medium 요청으로 agent-1 `feat/branding-runtime`에 배정한다.
+배타적 범위 `apps/launcher/**`와 해당 인계. [세부 계약](branding-runtime-task.md). Studio는 이후 순차.
+
 BRAND-CORE-01: #0 기술 설계 검토 승인 후 기존 작업자에게 구현 재개를 지시했다.
 프로파일 선택적 branding, torchpack v1.1 별도 이미지 payload/역할별 staging을 구현 중이다.
 기존 v1.0 유지, 아직 코드 통합·런처/Studio 연결 완료 아님.

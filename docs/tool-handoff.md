@@ -7,6 +7,10 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+Core7281829 integrated df2af4d; main check passed1028/9skip (types/Biome/bothbuilds).
+Next BRAND-RUNTIME-01 reuses #1 Sol medium, feat/branding-runtime agent-1, apps/launcher/** only.
+Read docs/branding-runtime-task.md. Studio follows sequentially; no extra concurrent worker.
+
 BRAND-CORE-01 technical proposal reviewed/approved by #0; existing branding_contracts worker resumed implementation.
 Optional profile branding + separate v1.1 image payloads; legacy1.0 retained. See hybrid spec technical approval.
 Core not yet integrated; launcher/Studio still pending.
