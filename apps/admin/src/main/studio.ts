@@ -255,6 +255,7 @@ export class StudioService {
           name: project.name,
           address: project.address,
           sourceUrl: project.sourceUrl,
+          game: project.game,
         });
         const binary = (await this.selected('binary'))[0];
         const output = (await this.selected('output'))[0];

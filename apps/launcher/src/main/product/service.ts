@@ -127,6 +127,15 @@ export class ProductService {
       server: config
         ? { serverId: config.serverId, name: config.name, address: config.address }
         : null,
+      ...(config?.game
+        ? {
+            game: {
+              minecraftVersion: config.game.minecraftVersion,
+              loader: config.game.loader.kind,
+              loaderVersion: config.game.loader.version,
+            },
+          }
+        : {}),
       configuration: config ? 'ready' : 'unavailable',
       supported:
         (process.platform === 'linux' || process.platform === 'win32') && process.arch === 'x64',

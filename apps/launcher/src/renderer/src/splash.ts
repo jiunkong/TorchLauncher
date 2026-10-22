@@ -1,7 +1,7 @@
 import type { ProductState } from '../../shared/product';
 
-export const splashMinimumMs = 2200;
-export const splashReducedMinimumMs = 900;
+export const splashMinimumMs = 1600;
+export const splashReducedMinimumMs = 700;
 /** The splash never hides a stuck startup indefinitely; the home then shows the real operation. */
 export const splashMaximumMs = 15_000;
 export const splashFinishMs = 800;

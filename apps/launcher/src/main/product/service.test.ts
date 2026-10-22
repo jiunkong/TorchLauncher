@@ -54,6 +54,25 @@ async function setup(overrides: Partial<ProductHost> = {}) {
   };
   return { host, service: new ProductService(host), root: resolveServerDataRoot(base, serverId) };
 }
+it('shows the configured game before login and without a game', async () => {
+  const withGame = await setup({
+    config: parseServerConfig({
+      format: 'torchlauncher-server',
+      version: 1,
+      serverId,
+      name: 'Fixture',
+      address: 'localhost:25565',
+      sourceUrl: 'https://example.org/x',
+      game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } },
+    }),
+  });
+  expect(withGame.service.snapshot().game).toEqual({
+    minecraftVersion: '1.21.1',
+    loader: 'fabric',
+    loaderVersion: '0.19.5',
+  });
+  expect((await setup()).service.snapshot().game).toBeUndefined();
+});
 it('keeps account credentials, private URL and arbitrary errors out of snapshots/events/results', async () => {
   const { service, host } = await setup();
   expect((await service.command({ type: 'login' })).ok).toBe(true);

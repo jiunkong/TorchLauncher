@@ -77,6 +77,7 @@ function config() {
     name: p.name,
     address: p.address,
     sourceUrl: 'https://example.org/pack',
+    game: p.game,
   });
 }
 
