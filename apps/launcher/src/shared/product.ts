@@ -52,6 +52,11 @@ export interface ProductActivity {
   completed: number | null;
   total: number | null;
 }
+/** `launcher`: launcher events (codes only); `game`: sanitized game process output. */
+export interface ProductLogEntry {
+  source: 'launcher' | 'game';
+  text: string;
+}
 export interface ProductState {
   preferences: { closeOnLaunch: boolean; error?: 'preferences-failed' };
   server: { serverId: string; name: string; address: string } | null;
@@ -96,7 +101,7 @@ export interface ProductState {
     confirmation: string | null;
   } | null;
   recovery: { needed: boolean; lock: string; confirmable: boolean; issues: string[] } | null;
-  logs: string[];
+  logs: ProductLogEntry[];
 }
 export type ProductResult =
   | { ok: true; state: ProductState }
