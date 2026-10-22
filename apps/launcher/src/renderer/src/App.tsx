@@ -51,7 +51,7 @@ function failureMessage(code: string): string {
       '운영자가 options.txt 전체를 관리하고 있습니다. 운영자에게 설정 정책 구성을 요청하세요.',
     'sync-not-initialized': '게임 동기화가 완료된 뒤 설정을 변경하세요.',
     'configuration-unavailable':
-      '서버 구성을 읽지 못했습니다. Studio에서 내보낸 구성 파일을 확인하세요.',
+      '서버 구성을 읽지 못했습니다. 운영자에게 이 서버용 런처를 다시 받으세요.',
   };
   return messages[code] ?? code;
 }
