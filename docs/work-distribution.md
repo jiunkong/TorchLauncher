@@ -2,6 +2,10 @@
 
 ## 역할과 현재 배정
 
+운영자 브랜딩 혼합 전달 승인: [동봉+원격 계약/순서](operator-branding-hybrid.md).
+BRAND-CORE-01 #1 `branding_contracts`, Sol medium 요청, agent-1 `feat/branding-contracts`, baseline `4c55456`.
+공용 core 계약/reader/writer만 먼저, runtime/Studio는 순차. 동시 작업자는 한 명이며 처음 기술안을 #0 검토 후 구현한다.
+
 BRAND-PLAN-01: 사용자 운영자 브랜딩 착수 요청에 따라 자산 전달 방식을 먼저 조사한다.
 #1 `branding_proposal`, Luna medium 요청, agent-1 `docs/operator-branding-proposal`, baseline `0c60ddd`.
 독점: `docs/operator-branding-proposal.md`만 작성. apps/admin 내보내기·프로젝트, core server-config/배포,

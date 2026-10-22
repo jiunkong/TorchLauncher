@@ -7,6 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
+사용자가 브랜딩 **동봉 초기본+torchpack 원격 갱신을 모두 승인**했다. 기존 이미지 표시 중 변경분만
+검증/수신 후 자연스럽게 전환한다. [혼합 전달 명세](operator-branding-hybrid.md).
+BRAND-CORE-01 #1 `branding_contracts` Sol medium 요청, agent-1 `feat/branding-contracts`로 공용 계약부터 진행한다.
+동시 작업자는 한 명이며 이후 런처/Studio를 순차 연결한다. 게임 소유권/필수 동기화와 이미지는 분리한다.
+
 운영자 브랜딩 조사 BRAND-PLAN-01 완료: #1 `branding_proposal` Luna medium 요청의 `07c3d0f`·`d080084`를
 #0이 검토·통합했다. [선택지/계약 제안](operator-branding-proposal.md)에 동봉/torchpack/별도 URL,
 업데이트·오프라인·검증·호환성 영향을 기록했다. 작은 이미지를 JSON 옆에 동봉하는 안을 우선 권고하되

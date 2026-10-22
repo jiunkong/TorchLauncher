@@ -7,6 +7,12 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+NEW approval supersedes local-only recommendation: user wants shipped initial branding AND torchpack image
+updates, keeping old display until verified new image cross-fades. Read docs/operator-branding-hybrid.md.
+BRAND-CORE-01 #1 branding_contracts, Sol medium requested, agent-1 feat/branding-contracts baseline4c55456.
+One worker at a time; core contract/reader/writer first (technical design requires #0 review), then launcher,
+then Studio. No product image/IPC/app edits in core phase. Existing game files/ownership remain separate.
+
 BRAND-PLAN-01 proposal integrated: user wants operator branding next and asked what image transport means.
 One worker #1 `branding_proposal`, Luna medium requested, agent-1 `docs/operator-branding-proposal`,
 baseline0c60ddd. Owns only docs/operator-branding-proposal.md, read-only repository investigation.
