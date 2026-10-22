@@ -7,11 +7,22 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
-2026-10-23 Codex #0 update: user approved MEM-01 assignment, one worker #1 `mem_01`
-(`gpt-6-luna`, medium applied), agent-1 branch `feat/mem-01-game-memory`, baseline `cdabfb2`.
-Read the bottom of `docs/work-distribution.md` for exclusive scopes. Worker implementing core Xms,
-personal Xmx/Xms persistence and validated IPC/service/UI card; no process-lifetime changes or Studio work.
-#0 reviews, --no-ff merges, runs main pnpm check and requests Windows verification.
+2026-10-23 Codex #0 update: MEM-01 worker #1 `mem_01` (`gpt-6-luna`, medium applied),
+agent-1 branch `feat/mem-01-game-memory`, baseline `cdabfb2`, finished `a2f81b1`.
+#0 reviewed and --no-ff merged via `91d47c9`; main pnpm check passed: 911 passed/9 skipped,
+all types, Biome (8 existing CSS warnings/no errors), both app builds. Log `/tmp/torch-mem-01-check.log`.
+Read `docs/handoffs/MEM-01.md` for exact worker checks: 79 targeted tests, core/launcher types,
+launcher build and renderer functional smoke passed. Main lint has 8 existing stylesheet warnings, no errors.
+Core Xms/personal Xmx+Xms/IPC/service/card ready; whole preference snapshot per launch, separate serialized
+memory saves affect next launch only, existing closeOnLaunch gate preserved, shutdown drains started saves.
+Default Xmx2048 remains unchanged; too-low RAM blocks before install, stored values retained for correction.
+No Studio/process/lock implementation changes or real account/server tests. Worker finished, worktree clean.
+Agent-1 detached at `91d47c9`, merged branch deleted. Other worktree heads remain unchanged; no running task checks.
+Windows UI/save/restart/actual JVM Xmx+Xms verification requested from user; result still pending.
+Suggested check: maximum 2 GB / initial 1 GB → save → restart confirms persistence → start game;
+blank initial field saves/launches without explicit Xms. Existing auto-close setting must stay preserved.
+If launcher remains running, saving different valid values during the game must affect only next launch.
+Never ask for raw Java command line (contains credentials); share only filtered Xmx/Xms arguments if needed.
 L3 and L2a follow-ups remain pending separate user approval after MEM-01 integration. Other worktrees untouched.
 System Node v24.21.0 is available; `/tmp/torchlauncher-tools/node_modules/.bin` contains pnpm only.
 

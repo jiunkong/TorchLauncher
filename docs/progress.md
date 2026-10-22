@@ -7,10 +7,16 @@
 
 ## 현재 상태와 다음 작업
 
-MEM-01 사용자 배정안 승인·착수: #1 `mem_01`, Luna medium 한 명이 `feat/mem-01-game-memory`
-(agent-1, 제품 기준 `cdabfb2`)에서 Xmx/Xms 코어→개인 설정→서비스→설정 카드 연결을 소유한다.
-상세 범위/기본값/검증 규칙은 `docs/work-distribution.md` 맨 아래 MEM-01을 따른다.
-#0은 구현하지 않고 검토·통합·main 전체 검사 후 Windows 확인을 요청한다.
+MEM-01 구현·검토·통합: #1 `mem_01`, Luna medium의 `a2f81b1`을 #0이 `91d47c9`로 --no-ff 병합했다.
+코어 Xms(미지정이면 생략), 기존 Xmx 기본 2048 MiB 유지, 개인 설정 호환·원자적 저장,
+서비스 전달·물리 RAM 상한 검사·설정 카드/75% 경고·i18n을 연결했다.
+실행 시작 때 전체 개인 설정을 고정하고 실행 중 메모리 저장은 다음 실행에만 반영한다.
+설정 저장 전용 직렬화와 종료 시 진행 중 저장 대기를 추가했으며 게임 수명/잠금은 유지했다.
+작업자 관련 테스트 79개·core/launcher 타입·런처 빌드·Electron 설정 화면 기능 smoke 통과.
+main 전체 `pnpm check` 성공: 911개 통과·9개 skip, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개, 오류 없음).
+agent-1을 통합 main(`91d47c9`)에 detached로 정리하고 병합된 작업 브랜치를 삭제했다. 다른 worktree는 그대로다.
+Windows 실제 UI/Java 메모리 인자 검증은 미실시이며 사용자 확인을 요청한다.
+[인계](handoffs/MEM-01.md), `docs/work-distribution.md` 맨 아래 MEM-01을 참고한다.
 L3와 L2a 후속은 MEM-01 통합 후 별도 배정안 승인까지 착수하지 않는다.
 
 BRAND-ICON-01 구현·통합: #1 `app_icon` Luna medium의 `35d4f90`를 #0이 `8b2e946`으로 병합했다.
@@ -262,6 +268,7 @@ macOS는 보류, Linux ARM64와 연결 해제 시 종료 보조 모드는 지원
 | GAME-ACTIVITY-01 | 작업 종류·단계·파일/개수/활성 작업 정보를 UI까지 전달할 계약 | GAME-PERF-01, UI-CONNECT-L | 완료 — 구조화 상태/IPC 전달, renderer 표현은 후속 UI 작업 |
 | LAUNCH-EXIT-01 | 게임 시작 후 런처 자동 종료 개인 옵션·게임 프로세스 분리·잠금 유지/회수 | UI-CONNECT-L, GAME-05 | 구현·통합 검사 완료 — Windows 실게임 미검증 |
 | I18N-01 | 한국어·영어 공통 번역 및 renderer 연결 기반 | UI-BASE | 기반 구현·통합 검사 완료 — 전체 UI 적용은 후속 |
+| MEM-01 | 개인 Xmx/Xms 설정·코어/서비스/설정 화면 연결 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows 확인 대기 |
 | BRAND-ICON-01 | 사용자 레드스톤 토치 ICO를 두 앱 native 아이콘으로 적용 | UI-BASE | 적용·타입/빌드/Linux 패키지 확인 완료 — Windows 표시 미검증 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
