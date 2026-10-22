@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -63,6 +63,19 @@ try {
 
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByLabel('활성 팩 ID (위에서 아래 순서)').waitFor();
+  const closeOnLaunch = page.getByRole('checkbox', { name: '게임 실행 후 런처 종료', exact: true });
+  assert.equal(await closeOnLaunch.isChecked(), false);
+  await closeOnLaunch.click();
+  await page.waitForFunction(
+    async () => (await window.torchlauncher.getState()).preferences.closeOnLaunch,
+  );
+  assert.equal(await closeOnLaunch.isChecked(), true);
+  assert.deepEqual(
+    JSON.parse(await readFile(resolve(temp, 'user-data/launcher-preferences.json'), 'utf8')),
+    { closeOnLaunch: true },
+  );
+  await mkdir(resolve('.cache/smoke'), { recursive: true });
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-close-on-launch.png') });
   const packDraft = 'vanilla\nfile/my-local-pack.zip';
   const editor = page.getByLabel('활성 팩 ID (위에서 아래 순서)');
   await editor.fill(packDraft);
@@ -73,7 +86,9 @@ try {
   await page.getByRole('alert').filter({ hasText: '작업 결과:' }).waitFor();
   assert.equal(await editor.inputValue(), packDraft);
   assert.deepEqual(pageErrors, []);
-  console.log('Launcher: real mod/pack reads and draft preservation across a status event passed');
+  console.log(
+    'Launcher: real mod/pack reads, persisted close-on-launch setting and draft preservation passed',
+  );
 } finally {
   await app?.close();
   for (const socket of statusSockets) socket.destroy();

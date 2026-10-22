@@ -51,6 +51,8 @@ function failureMessage(code: string): string {
     'required-pack-reordered': '운영자 필수 리소스팩의 순서를 유지하세요.',
     'options-owned-by-sync':
       '운영자가 options.txt 전체를 관리하고 있습니다. 운영자에게 설정 정책 구성을 요청하세요.',
+    'preferences-failed':
+      '런처 설정을 읽거나 저장하지 못했습니다. 설정 파일과 접근 권한을 확인하세요.',
     'sync-not-initialized': '게임 동기화가 완료된 뒤 설정을 변경하세요.',
     'configuration-unavailable':
       '서버 구성을 읽지 못했습니다. 운영자에게 이 서버용 런처를 다시 받으세요.',

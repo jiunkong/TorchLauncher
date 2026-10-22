@@ -25,6 +25,9 @@ it('rejects other windows, child frames and navigated/untrusted documents', () =
 it('uses a closed IPC union with no absolute path/source URL/command injection slot', () => {
   for (const value of [
     null,
+    { type: 'set-close-on-launch', value: 'true' },
+    { type: 'set-close-on-launch', value: true, path: '/outside' },
+    { type: 'set-close-on-launch' },
     { type: 'launch', root: '/outside' },
     { type: 'login', accessToken: 'secret' },
     { type: 'remove-mod', path: '/outside.jar' },
@@ -37,5 +40,12 @@ it('uses a closed IPC union with no absolute path/source URL/command injection s
   expect(parseProductCommand({ type: 'delete', confirmation: 'a'.repeat(43) })).toEqual({
     type: 'delete',
     confirmation: 'a'.repeat(43),
+  });
+});
+
+it('accepts only the boolean personal setting command', () => {
+  expect(parseProductCommand({ type: 'set-close-on-launch', value: true })).toEqual({
+    type: 'set-close-on-launch',
+    value: true,
   });
 });

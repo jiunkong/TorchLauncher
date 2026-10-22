@@ -216,3 +216,62 @@ it('times out a stuck read-only guard, does not spawn, and releases its lease', 
   const lease = await acquireServerDataLock(installed.root, 'maintenance');
   await lease.release();
 });
+
+it('detaches only an opted-in identified child and keeps its lease/finished semantics until real exit', async () => {
+  const installed = await installation();
+  const controller = new AbortController();
+  const adapter = vi.fn(node('setInterval(()=>{},1000)'));
+  const game = await startJavaDiagnostic(installed, {
+    detachable: true,
+    spawn: adapter,
+    signal: controller.signal,
+  });
+  // Explicit test cleanup uses only this fixture's real PID after handoff.
+  try {
+    await game.detach?.();
+    expect(adapter.mock.calls[0]?.[2]).toMatchObject({ detached: true, stdio: 'ignore' });
+    controller.abort();
+    let finished = false;
+    void game.finished.then(() => {
+      finished = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(finished).toBe(false);
+    expect(await readdir(installed.root)).toContain('.torchlauncher-server-lock');
+    await expect(acquireServerDataLock(installed.root, 'install')).rejects.toThrow();
+  } finally {
+    process.kill(game.pid, 'SIGTERM');
+  }
+  expect((await game.finished).reason).toBe('exited');
+  expect(await readdir(installed.root)).not.toContain('.torchlauncher-server-lock');
+});
+it('refuses handoff on unknown identity and retains cancellation/reaping', async () => {
+  const installed = await installation();
+  const controller = new AbortController();
+  const game = await startJavaDiagnostic(installed, {
+    detachable: true,
+    spawn: node('setInterval(()=>{},1000)'),
+    signal: controller.signal,
+    processProbe: {
+      host: async () => ({ machine: null }),
+      process: async () => ({ state: 'unknown' }),
+    },
+  });
+  processes.push(game);
+  await expect(game.detach?.()).rejects.toMatchObject({ code: 'EDETACH' });
+  controller.abort();
+  expect((await game.finished).reason).toBe('cancelled');
+});
+it('rejects a cancelled handoff and reaps the detached-capable child', async () => {
+  const installed = await installation();
+  const controller = new AbortController();
+  const game = await startJavaDiagnostic(installed, {
+    detachable: true,
+    spawn: node('setInterval(()=>{},1000)'),
+    signal: controller.signal,
+  });
+  processes.push(game);
+  controller.abort();
+  await expect(game.detach?.()).rejects.toMatchObject({ name: 'AbortError' });
+  expect((await game.finished).reason).toBe('cancelled');
+});

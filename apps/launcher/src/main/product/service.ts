@@ -8,6 +8,7 @@ import {
   ensureServerDataRoot,
   getServerDataUsage,
   previewServerDataDeletion,
+  readServerDataMarker,
   resolveServerDataRoot,
 } from '../../../../../packages/core/src/instance/data/index';
 import { verifyServerRoot } from '../../../../../packages/core/src/instance/data/paths';
@@ -28,6 +29,7 @@ import { launchDeployment } from '../../../../../packages/core/src/loaders/launc
 import { installMinecraft } from '../../../../../packages/core/src/minecraft/installer';
 import type { LaunchAuth } from '../../../../../packages/core/src/minecraft/launch';
 import type { RunningGame } from '../../../../../packages/core/src/minecraft/process';
+import { recoverExitedGameLock } from '../../../../../packages/core/src/minecraft/recovery/environment';
 import {
   inspectServerEnvironment,
   recoverServerEnvironment,
@@ -37,6 +39,7 @@ import { pingServer } from '../../../../../packages/core/src/server-status/index
 import { type ProductResult, type ProductState, parseProductCommand } from '../../shared/product';
 import { installationActivity, synchronizationActivity } from './activity';
 import { Operations } from './operations';
+import { readPreferences, writePreferences } from './preferences';
 
 export interface ProductHost {
   base: string;
@@ -51,9 +54,11 @@ export interface ProductHost {
   confirmDeletion(root: string): Promise<boolean>;
   confirmRecovery(): Promise<boolean>;
   publish(state: ProductState): void;
+  quit?(): void;
 }
 const safeCodes = new Set([
   'busy',
+  'preferences-failed',
   'invalid-request',
   'unsupported-platform',
   'unsupported-game',
@@ -112,10 +117,13 @@ export function safeProductError(error: unknown, cancelled = false): string {
 export class ProductService {
   private readonly operations = new Operations();
   private game: RunningGame | undefined;
+  private preferencesLoaded = false;
+  private relinquished = false;
   private readonly state: ProductState;
   constructor(private readonly host: ProductHost) {
     const config = host.config;
     this.state = {
+      preferences: { closeOnLaunch: false },
       server: config
         ? { serverId: config.serverId, name: config.name, address: config.address }
         : null,
@@ -161,6 +169,17 @@ export class ProductService {
     return resolveServerDataRoot(this.host.base, this.config().serverId);
   }
   private async ensure() {
+    try {
+      await this.verified();
+      const marker = await readServerDataMarker(this.root(), this.config().serverId);
+      if (marker.state === 'valid') {
+        await recoverExitedGameLock(this.root());
+        const environment = await inspectServerEnvironment(this.root());
+        if (environment.serverLock.state !== 'free') throw new Error('locked');
+      }
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'root-not-found') throw error;
+    }
     return ensureServerDataRoot(this.host.base, this.config().serverId);
   }
   private async verified() {
@@ -187,7 +206,7 @@ export class ProductService {
     }
     if (command.type === 'cancel' || command.type === 'stop') {
       this.operations.cancel();
-      if (this.game) await this.game.stop();
+      if (this.game && !this.game.detached) await this.game.stop();
       return { ok: true, state: this.snapshot() };
     }
     try {
@@ -197,9 +216,26 @@ export class ProductService {
         this.state.outcome = null;
         this.phase(command.type);
         try {
+          if (!this.preferencesLoaded) {
+            try {
+              this.state.preferences = await readPreferences(this.host.base);
+            } catch {
+              this.state.preferences = { closeOnLaunch: false, error: 'preferences-failed' };
+            }
+            this.preferencesLoaded = true;
+          }
+          signal.throwIfAborted();
           if (command.type !== 'delete' && command.type !== 'preview-delete')
             this.invalidateDeletion();
           switch (command.type) {
+            case 'set-close-on-launch':
+              try {
+                await writePreferences(this.host.base, { closeOnLaunch: command.value });
+              } catch {
+                throw new Error('preferences-failed');
+              }
+              this.state.preferences = { closeOnLaunch: command.value };
+              break;
             case 'login':
             case 'refresh': {
               const auth = await this.host.auth[command.type](signal);
@@ -368,6 +404,10 @@ export class ProductService {
           this.publish();
         }
       });
+      if (this.relinquished) {
+        await this.operations.close();
+        this.host.quit?.();
+      }
       return { ok: true, state: this.snapshot() };
     } catch (error) {
       return { ok: false, error: safeProductError(error), state: this.snapshot() };
@@ -437,6 +477,7 @@ export class ProductService {
       server: config.address,
       launcherVersion: this.host.version,
       signal,
+      process: this.state.preferences.closeOnLaunch ? { detachable: true } : {},
       current,
       onPhase: (phase) => this.phase(phase),
       onSynchronizationProgress: (progress) => {
@@ -509,6 +550,23 @@ export class ProductService {
     this.game = game;
     this.state.running = true;
     this.phase('game-running');
+    if (this.state.preferences.closeOnLaunch) {
+      try {
+        signal.throwIfAborted();
+        if (!game.detach || !this.host.quit) throw new Error('handoff-unavailable');
+        await game.detach();
+        this.game = undefined;
+        this.relinquished = true;
+        this.state.running = false;
+        this.state.outcome = 'game-detached';
+        return;
+      } catch (error) {
+        await game.stop();
+        this.game = undefined;
+        this.state.running = false;
+        throw error;
+      }
+    }
     const interval = setInterval(() => this.logs(), 1000);
     try {
       const exit = await game.finished;
@@ -524,7 +582,7 @@ export class ProductService {
   async close() {
     const closing = this.operations.close();
     try {
-      await this.game?.stop();
+      if (this.game && !this.game.detached) await this.game.stop();
       await closing;
       this.invalidateDeletion();
     } catch (error) {

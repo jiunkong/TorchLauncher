@@ -5,12 +5,14 @@ import { type ProcessProbe, systemProcessProbe } from './identity';
 import { INSTALL_LOCK_DIRECTORY } from './install-transaction';
 import type { Installation } from './installer';
 import { buildLaunchCommand, type LaunchCommand, type LaunchOptions } from './launch';
-import { acquireServerDataLock } from './lock';
+import { acquireServerDataLock, readLockOwner } from './lock';
 import { type GameLogLimits, type GameLogSnapshot, GameLogs } from './logs';
 
 export type ProcessSpawner = (file: string, args: string[], options: SpawnOptions) => ChildProcess;
 export interface GameProcessOptions {
   signal?: AbortSignal;
+  /** Spawn independently; relinquish only after verified lease/child identity. */
+  detachable?: boolean;
   terminationGraceMs?: number;
   logs?: GameLogLimits;
   /** Host/test boundary; the production default uses node:child_process.spawn. */
@@ -30,9 +32,11 @@ export interface GameExit {
 }
 export interface RunningGame {
   pid: number;
+  readonly detached?: boolean;
   finished: Promise<GameExit>;
   stop(): Promise<GameExit>;
   getLogs(): GameLogSnapshot;
+  detach?(): Promise<void>;
 }
 export class GameStartError extends Error {
   constructor(readonly code: string) {
@@ -92,7 +96,9 @@ async function start(
       cwd: lease.root,
       shell: false,
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      ...(options.detachable
+        ? { detached: true, stdio: 'ignore' as const }
+        : { stdio: ['ignore', 'pipe', 'pipe'] as SpawnOptions['stdio'] }),
     });
   } catch (error) {
     await lease.release();
@@ -104,6 +110,7 @@ async function start(
   let errorCode: string | undefined;
   let closed = false;
   let started = false;
+  let detached = false;
   let killTimer: ReturnType<typeof setTimeout> | undefined;
   let resolveFinished: (result: GameExit) => void = () => {};
   const finished = new Promise<GameExit>((resolve) => {
@@ -116,7 +123,7 @@ async function start(
     rejectStarted = reject;
   });
   const terminate = (requested: 'stopped' | 'cancelled') => {
-    if (closed || reason === 'stopped' || reason === 'cancelled') return;
+    if (detached || closed || reason === 'stopped' || reason === 'cancelled') return;
     reason = requested;
     try {
       child.kill('SIGTERM');
@@ -199,12 +206,58 @@ async function start(
   }
   return {
     pid: child.pid ?? 0,
+    get detached() {
+      return detached;
+    },
     finished,
     stop: () => {
       terminate('stopped');
       return finished;
     },
     getLogs: () => logs.snapshot(),
+    ...(options.detachable
+      ? {
+          detach: async () => {
+            if (detached) return;
+            aborted(options.signal);
+            if (closed || reason !== 'exited' || !pid || !lease.recordChild)
+              throw new GameStartError('EDETACH');
+            const state = await probe.process(pid);
+            if (state.state !== 'running' || !state.start) throw new GameStartError('EDETACH');
+            await lease.recordChild({ state: 'running', pid, start: state.start });
+            const record = await readLockOwner(lease.root);
+            const host = await probe.host();
+            const owner = await probe.process(process.pid);
+            if (
+              record.state !== 'v2' ||
+              record.owner.pid !== process.pid ||
+              record.owner.purpose !== 'game' ||
+              !host.machine ||
+              record.owner.host.machine !== host.machine ||
+              owner.state !== 'running' ||
+              !record.owner.start ||
+              record.owner.start !== owner.start ||
+              record.owner.child?.state !== 'running' ||
+              record.owner.child.pid !== pid ||
+              record.owner.child.start !== state.start
+            )
+              throw new GameStartError('EDETACH');
+            const current = await probe.process(pid);
+            aborted(options.signal);
+            if (
+              closed ||
+              reason !== 'exited' ||
+              current.state !== 'running' ||
+              current.start !== state.start
+            )
+              throw new GameStartError('EDETACH');
+            // No await between final cancellation check and ownership handoff.
+            child.unref();
+            options.signal?.removeEventListener('abort', cancel);
+            detached = true;
+          },
+        }
+      : {}),
   };
 }
 /** Authenticated game process. Never exposes original argv or a raw ChildProcess/Error object. */
