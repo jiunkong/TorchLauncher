@@ -5,13 +5,22 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## Active UI-PROD-01 functional workflow work
+
+User approved starting UI-PROD-01, explicitly functionality before aesthetics. Read `docs/ui-production.md`.
+#4 subagent `ui_prod_launcher` / agent-4 / `feat/ui-prod-launcher-flow` owns launcher renderer + app-local
+smoke/handoff. #1 subagent `ui_prod_studio` / agent-1 / `feat/ui-prod-studio-flow` owns Studio app + root
+`scripts/smoke.mjs` + its handoff. Both Luna medium initially; escalate only if actual task complexity warrants.
+No image/theme/animation redesign, dependencies or new Studio features. Core/launcher IPC changes need #0 coordination.
+#0 only docs/review/merge. Both workers are active; no new live login/server action requested.
+Scope includes actual activity display, clear primary actions, advanced management relocation, page data/error/draft
+handling, Studio step prerequisites/validation/save/cancel/retry and existing behavior preservation.
+
 ## Completed follow-up: parallel install and activity metadata
 
-Latest planning request: user asked for remaining work and a dedicated production UI task.
-`UI-PROD-01` is registered as ready/unassigned in progress.md, with scope/completion criteria and the
-remaining-work order at the top. No implementation is authorized by that planning request; await task start.
-No workers are running. The next suggested task is the two-app production UI cleanup, followed by remaining
-Studio branding/settings/packaging, native verification, full QA and final own-app/release work.
+Previous planning registered UI-PROD-01; the newer approval and active assignments above supersede the
+earlier idle state. Remaining later work is Studio branding/settings/packaging, native verification,
+full QA and final own-app/release work.
 
 User confirmed **server connection succeeded through the new UI**. Selected environment was Fabric
 1.21.1/0.19.5; server log and restart cached-session restoration remain unverified. Do not request another
