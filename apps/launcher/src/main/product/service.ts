@@ -36,7 +36,12 @@ import {
 } from '../../../../../packages/core/src/minecraft/recovery/index';
 import type { ServerConfig } from '../../../../../packages/core/src/server-config/index';
 import { pingServer } from '../../../../../packages/core/src/server-status/index';
-import { type ProductResult, type ProductState, parseProductCommand } from '../../shared/product';
+import {
+  type ProductLogEntry,
+  type ProductResult,
+  type ProductState,
+  parseProductCommand,
+} from '../../shared/product';
 import { installationActivity, synchronizationActivity } from './activity';
 import { Operations } from './operations';
 import { readPreferences, writePreferences } from './preferences';
@@ -119,6 +124,8 @@ export class ProductService {
   private game: RunningGame | undefined;
   private preferencesLoaded = false;
   private relinquished = false;
+  private launcherLogs: ProductLogEntry[] = [];
+  private gameLogs: ProductLogEntry[] = [];
   private readonly state: ProductState;
   constructor(private readonly host: ProductHost) {
     const config = host.config;
@@ -164,6 +171,11 @@ export class ProductService {
   private publish() {
     this.host.publish(this.snapshot());
   }
+  /** Launcher events carry fixed codes only: never tokens, accounts, URLs or paths. */
+  private log(text: string) {
+    this.launcherLogs = [...this.launcherLogs, { source: 'launcher' as const, text }].slice(-200);
+    this.state.logs = [...this.launcherLogs, ...this.gameLogs];
+  }
   private phase(phase: string) {
     this.state.phase = phase;
     this.state.progress = null;
@@ -200,7 +212,9 @@ export class ProductService {
       discardDeletionConfirmation(this.state.deletion.confirmation);
     this.state.deletion = null;
   }
+  /** Startup automation: safe environment recovery first, then silent session restore. */
   async restoreSession(): Promise<void> {
+    await this.execute({ type: 'inspect' }, true);
     await this.execute({ type: 'refresh' }, true);
   }
   command(raw: unknown): Promise<ProductResult> {
@@ -249,11 +263,13 @@ export class ProductService {
             case 'refresh': {
               const auth = await this.host.auth[command.type](signal);
               this.state.account = { name: auth.profile.name, expiresAt: auth.expiresAt };
+              this.log(command.type === 'login' ? 'session: signed-in' : 'session: ready');
               break;
             }
             case 'logout':
               this.state.account = null;
               await this.host.auth.logout();
+              this.log('session: signed-out');
               break;
             case 'status':
               try {
@@ -270,7 +286,7 @@ export class ProductService {
               await this.launch(signal);
               break;
             case 'inspect':
-              await this.inspect();
+              await this.checkEnvironment(signal);
               break;
             case 'recover': {
               await this.verified();
@@ -288,6 +304,9 @@ export class ProductService {
                 issues: report.issues.map((issue) => issue.code),
               };
               this.state.outcome = report.status;
+              this.log(
+                `recovery: ${command.acceptUncertain ? 'confirmed' : 'requested'} ${report.status}`,
+              );
               break;
             }
             case 'mods':
@@ -395,7 +414,10 @@ export class ProductService {
               this.state.missingPacks = [];
               this.state.usage = null;
               this.state.recovery = null;
+              this.launcherLogs = [];
+              this.gameLogs = [];
               this.state.logs = [];
+              this.log('data: deleted');
               this.state.outcome = 'deleted';
               break;
             }
@@ -403,6 +425,9 @@ export class ProductService {
         } catch (error) {
           if (command.type === 'login' || command.type === 'refresh') this.state.account = null;
           const code = safeProductError(error, signal.aborted);
+          if (code === 'no_session' || code === 'reauthentication_required')
+            this.state.account = null;
+          if (!(restoring && code === 'no_session')) this.log(`${command.type}: failed ${code}`);
           this.state.error = restoring && code === 'no_session' ? null : code;
           throw new Error(code);
         } finally {
@@ -422,7 +447,12 @@ export class ProductService {
       return { ok: false, error: safeProductError(error), state: this.snapshot() };
     }
   }
-  private async inspect() {
+  /**
+   * Inspects the server environment and, only when the core proves it stale (verified dead owner
+   * and child, or interrupted install/sync with a free or stale-verified lock), recovers it
+   * without asking. `uncertain` locks and invalid journals are reported, never cleared here.
+   */
+  private async checkEnvironment(signal: AbortSignal) {
     try {
       await this.verified();
     } catch (error) {
@@ -432,13 +462,43 @@ export class ProductService {
       }
       throw error;
     }
-    const environment = await inspectServerEnvironment(this.root());
-    this.state.recovery = {
-      needed: environment.needsRecovery,
-      lock: environment.serverLock.state,
-      confirmable: environment.serverLock.confirmable,
-      issues: [],
-    };
+    const root = this.root();
+    let environment = await inspectServerEnvironment(root);
+    const lock = environment.serverLock.state;
+    const invalid =
+      environment.install.state === 'invalid' ||
+      environment.synchronization === 'invalid' ||
+      environment.userMods === 'invalid';
+    let issues: string[] = [];
+    if (environment.needsRecovery && (lock === 'free' || lock === 'stale-verified') && !invalid) {
+      signal.throwIfAborted();
+      const report = await recoverServerEnvironment(root, {
+        serverId: this.config().serverId,
+        acceptUncertain: false,
+        signal,
+      });
+      signal.throwIfAborted();
+      environment = report.environment;
+      issues = report.issues.map((issue) => issue.code);
+      this.log(
+        `recovery: automatic ${report.status}${issues.length ? ` ${issues.join(',')}` : ''}`,
+      );
+    } else if (environment.needsRecovery) {
+      if (lock === 'uncertain') issues.push('lock-uncertain');
+      if (environment.install.state === 'invalid') issues.push('install-invalid');
+      if (environment.synchronization === 'invalid') issues.push('synchronization-invalid');
+      if (environment.userMods === 'invalid') issues.push('user-mods-invalid');
+      this.log(`recovery: confirmation-required ${issues.join(',')}`);
+    }
+    this.state.recovery =
+      environment.needsRecovery || environment.serverLock.state !== 'free'
+        ? {
+            needed: environment.needsRecovery,
+            lock: environment.serverLock.state,
+            confirmable: environment.serverLock.confirmable,
+            issues,
+          }
+        : null;
   }
   private async mods(signal: AbortSignal) {
     const mods = await listMods({ root: this.root(), serverId: this.config().serverId, signal });
@@ -459,20 +519,25 @@ export class ProductService {
   private logs() {
     if (!this.game) return;
     // Core already removes credentials/account IDs; discard URL-bearing content and terminal controls again at IPC.
-    this.state.logs = this.game
+    this.gameLogs = this.game
       .getLogs()
-      .entries.map((entry) =>
-        entry.text.replace(/https?:\/\/\S+/gi, '[URL]').replace(/[\p{Cc}\p{Cf}]/gu, ''),
-      )
+      .entries.map((entry) => ({
+        source: 'game' as const,
+        text: entry.text.replace(/https?:\/\/\S+/gi, '[URL]').replace(/[\p{Cc}\p{Cf}]/gu, ''),
+      }))
       .slice(-300);
+    this.state.logs = [...this.launcherLogs, ...this.gameLogs];
     this.publish();
   }
   private async launch(signal: AbortSignal) {
     if (!this.state.supported) throw new Error('unsupported-platform');
     const config = this.config();
-    await this.ensure();
-    await this.inspect();
+    this.log('launch: started');
+    // Per-attempt check: verified-stale state is recovered silently; held-live falls through to
+    // ensure() ('locked'); uncertain or invalid state blocks until the user confirms.
+    await this.checkEnvironment(signal);
     if (this.state.recovery?.needed) throw new Error('recovery-required');
+    await this.ensure();
     const root = this.root();
     const download = createFullDownloader();
     const current = async (requestedSignal?: AbortSignal) =>
@@ -488,7 +553,10 @@ export class ProductService {
       signal,
       process: this.state.preferences.closeOnLaunch ? { detachable: true } : {},
       current,
-      onPhase: (phase) => this.phase(phase),
+      onPhase: (phase) => {
+        this.log(`launch: ${phase}`);
+        this.phase(phase);
+      },
       onSynchronizationProgress: (progress) => {
         // SyncCounts describe planned operations, not completed downloads.
         if (!progress.path) {
@@ -563,6 +631,7 @@ export class ProductService {
       },
     });
     this.game = game;
+    this.log('game: started');
     this.state.running = true;
     this.state.runningSince = Date.now();
     this.phase('game-running');
@@ -591,6 +660,7 @@ export class ProductService {
       this.logs();
       this.state.outcome =
         exit.reason === 'exited' ? `exited-${exit.code ?? 'unknown'}` : exit.reason;
+      this.log(`game: ${this.state.outcome}`);
     } finally {
       clearInterval(interval);
       this.game = undefined;

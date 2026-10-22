@@ -383,7 +383,7 @@ export function PageContent({ page, state, pending, command }: Props) {
         <h2>최근 진단 기록</h2>
         <p>인증 정보와 URL을 가린 제한된 로그입니다. 게임 종료 결과: {state.outcome ?? '없음'}</p>
         <pre className="game-log" aria-live="off">
-          {state.logs.join('\n') || '실행 로그가 없습니다.'}
+          {state.logs.map((entry) => entry.text).join('\n') || '실행 로그가 없습니다.'}
         </pre>
       </Panel>
     </>
