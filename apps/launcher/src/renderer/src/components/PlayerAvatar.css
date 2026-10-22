@@ -1,0 +1,38 @@
+.player-avatar {
+  position: relative;
+  overflow: hidden;
+}
+
+.player-avatar-skin {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.player-avatar-skin[data-ready="true"] {
+  visibility: visible;
+}
+
+.player-avatar:has(.player-avatar-skin[data-ready="true"]) .player-avatar-fallback {
+  visibility: hidden;
+}
+
+.player-avatar-skin img {
+  position: absolute;
+  max-width: none;
+  width: 800%;
+  height: calc(var(--skin-height) * 100% / 8);
+  top: -100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+.player-avatar-face {
+  left: -100%;
+}
+
+.player-avatar-hat {
+  left: -500%;
+}

@@ -1,0 +1,11 @@
+body {
+  margin: 0;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: black;
+  color: white;
+}
