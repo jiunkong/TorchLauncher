@@ -5,6 +5,18 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## Latest update: UI-BASE (2026-10-22, Codex #0)
+
+The user authorized renderer foundations for both apps. Worker #1 implemented `f4b89c7` and cleanup
+`af28d54`, integrated into main. Read `docs/handoffs/UI-BASE.md`. Each app now owns its local
+components, pages, app-info hook, navigation and CSS tokens; no dependencies, main/preload or IPC changed.
+Product actions remain disabled until real services are wired. UI-01/UI-02 and STUDIO tasks remain pending.
+Integrated `pnpm check` passed: 705 tests, 9 skips, TypeScript/Biome and both builds. Linux/WSLg
+`node scripts/smoke.mjs` passed both apps' navigation at 760px, disabled actions, IPC and sandbox checks.
+Screenshots are ignored `.cache/smoke/{launcher,admin}.png`; inspected visually. Native Windows validation
+of this UI change has not been run. No further task is assigned; await the user's next instruction.
+The older checkpoint below describes the pre-UI baseline; inspect current git status/log before resuming.
+
 ## State at hand-off
 
 - Coordinator checkout: `/mnt/d/Projects/mclauncher`, branch `main` at `fd328d0`, clean, no other local branches.
