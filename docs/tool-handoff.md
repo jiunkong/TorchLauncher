@@ -7,6 +7,10 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+Runtime499d53d integrated8ebb64d; maincheck1051passed/9skip, both branding smokes passed.
+Existing shared smoke whitelist lacks new getBranding/onBranding; #1 now test/branding-smoke-api
+(only scripts/smoke.mjs + handoff) to align exact public API checks. Windows still pending.
+
 Studio33e038b integrated179dc91; main check passed1034/9skip, types/Biome/bothbuilds.
 Read docs/handoffs/BRAND-STUDIO-01.md for exact non-UI commands/storage; admin renderer unchanged.
 Launcher runtime still final validation/commit pending in agent-1.

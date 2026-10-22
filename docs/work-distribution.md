@@ -2,6 +2,13 @@
 
 ## 역할과 현재 배정
 
+BRAND-RUNTIME-01 `499d53d` → `8ebb64d` 통합 완료. main pnpm check 성공:
+1051개 통과/9 skip, 전체 타입·두 앱 빌드·Biome 기존 경고.
+두 앱 branding-smoke도 main에서 성공(실제 native decode·런처 fade/재시작 포함).
+기존 공통 smoke의 bridge exact 목록이 새 API 두 개를 누락해 실패했고,
+BRAND-SMOKE-01 기존 #1에게 `scripts/smoke.mjs` 및 인계만 수정 배정했다.
+agent-1 `test/branding-smoke-api`, 기준 `8ebb64d`; 제품 추가 변경 없음.
+
 BRAND-STUDIO-01 `33e038b` → `179dc91` 통합 완료(UI 변경 없음). main pnpm check 성공:
 1034개 통과/9 skip, 전체 타입·두 앱 빌드·Biome. 로그 `/tmp/torch-brand-studio-check.log`.
 이미지 선택/제거·앱 이름 API, 20MiB 제한 embedded 프로젝트 snapshot/요약 상태,
