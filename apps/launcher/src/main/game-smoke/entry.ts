@@ -20,6 +20,8 @@ interface Config {
   loader: LoaderSelection;
   sourceFile?: string;
   serverId?: string;
+  /** Optional Ed25519 key; when set, only a verified signed deployment is accepted. */
+  signingPublicKey?: string;
   server?: string;
   durationSeconds: number;
   cancelFile: string;
@@ -78,11 +80,16 @@ async function main() {
   if (!config.sourceFile || !config.serverId || !config.server)
     throw new Error('Invalid launch configuration');
   const sourceUrl = (await readFile(config.sourceFile, 'utf8')).trim();
-  const current = async (signal?: AbortSignal) =>
-    openDeploymentReader(createDownloadSource(sourceUrl), {
+  const current = async (signal?: AbortSignal) => {
+    const reader = await openDeploymentReader(createDownloadSource(sourceUrl), {
       expectedServerId: config.serverId as string,
+      ...(config.signingPublicKey ? { trustedPublicKey: config.signingPublicKey } : {}),
       ...(signal ? { signal } : {}),
     });
+    if (config.signingPublicKey && reader.verification !== 'verified')
+      throw new Error('signature-unverified');
+    return reader;
+  };
   const authenticator = await createPublicJavaAuthenticator({
     cacheDirectory: join(config.dataDirectory, 'public-java'),
     workerPath: join(__dirname, 'public-java-worker.cjs'),

@@ -98,6 +98,20 @@ const ko = {
     '확인 시간이 지나 삭제 확인이 만료되었습니다. 서버 데이터 삭제를 다시 여세요.',
   'failure.confirmation-invalid':
     '삭제 확인이 만료되었거나 올바르지 않습니다. 서버 데이터 삭제를 다시 여세요.',
+  'failure.signature-required':
+    '이 서버는 서명된 배포만 허용하지만 받은 배포에 서명이 없습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
+  'failure.signature-invalid':
+    '배포의 서명을 확인하지 못했습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
+  'failure.signature-malformed':
+    '배포의 서명 형식이 올바르지 않습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
+  'failure.invalid-signing-key':
+    '런처에 들어 있는 서버 서명 키가 올바르지 않습니다. 운영자에게 이 서버용 런처를 다시 받으세요.',
+  'failure.rollback-lower':
+    '이미 적용한 배포보다 오래된 배포라서 거부했습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
+  'failure.rollback-conflict':
+    '같은 버전 번호인데 내용이 다른 배포라서 거부했습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
+  'failure.rollback-state-unreadable':
+    '배포 버전 기록을 읽거나 저장하지 못해 안전을 위해 중단했습니다. 서버 데이터 폴더의 접근 권한을 확인하거나 설정에서 서버 데이터를 삭제한 뒤 다시 시도하세요.',
   'failure.default': '작업을 완료하지 못했습니다. 로그에서 상태를 확인하세요.',
   'operation.login': 'Microsoft 계정 로그인 중',
   'operation.refresh': '계정 세션 확인 중',
