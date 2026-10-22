@@ -567,3 +567,6 @@ UI에서 더 낮은 유효값 저장을 안내하고 실행은 설치 전에 메
 좌우 조절·범위·disabled·pointer cancel/unmount 정리·저장 전 반영 안 됨을 실제 화면 검사한다.
 추가 사용자 요청: 플레이 탭의 ‘최근 결과’ 표시 제거. 같은 작업자가 `pages/Home.tsx`의 해당 표시와
 관련 import/미사용 사전 키·화면 검증만 소유한다. 내부 outcome/로그·오류/진행/복구 표시는 유지한다.
+결과: `717ae43` 및 문서 후속 `e7a207d` 통합. main 전체 검사 성공(913개/9 skip, 타입/Biome/두 앱 빌드).
+작업자 24개 renderer 테스트와 Electron 실제 pointer smoke 성공. agent-1 detached, 병합 브랜치 삭제.
+Windows 입력 사용감과 실제 게임 메모리 검증은 사용자 확인 대기다. L3/L2a 후속은 시작하지 않는다.

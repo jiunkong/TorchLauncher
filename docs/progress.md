@@ -7,9 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
-MEM-01 입력 후속 착수: #1 `memory_scrub` Luna medium 한 명에게 권장 단위 문구/스피너/저장 성공 문구
-제거와 좌우 드래그 조절을 배정했다. renderer만 변경하며 직접 입력·검증·명시 저장을 유지한다.
-`feat/mem-01-scrub-input`, agent-1, baseline `f1b3286`. L3/L2a 후속은 계속 대기한다.
+MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
+권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
+4px 임계값, 약 20px당 256MiB 조절, 범위 제한·취소 복원·직접 입력·명시 저장을 유지한다.
+추가 사용자 요청으로 플레이 탭의 최근 결과 표시도 제거했다. 내부 outcome/로그·오류·복구는 유지한다.
+renderer 관련 테스트 24개·타입/빌드·Electron pointer/저장 전 미반영 smoke 성공.
+main `pnpm check` 성공: 913개 통과·9개 skip, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개).
+인계 정확도 문서 후속 `e7a207d`도 통합했다. agent-1 detached·병합 브랜치 정리, 다른 worktree 미변경.
+Windows 드래그 사용감 및 MEM-01 실제 게임 메모리 확인은 사용자 검증 대기다.
+[인계](handoffs/MEM-01-INPUT.md). L3/L2a 후속은 계속 대기한다.
 
 MEM-01 구현·검토·통합: #1 `mem_01`, Luna medium의 `a2f81b1`을 #0이 `91d47c9`로 --no-ff 병합했다.
 코어 Xms(미지정이면 생략), 기존 Xmx 기본 2048 MiB 유지, 개인 설정 호환·원자적 저장,
