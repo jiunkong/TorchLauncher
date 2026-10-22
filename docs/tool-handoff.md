@@ -7,11 +7,14 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
-BRAND-PLAN-01 active: user wants operator branding next and asked what image transport means.
+BRAND-PLAN-01 proposal integrated: user wants operator branding next and asked what image transport means.
 One worker #1 `branding_proposal`, Luna medium requested, agent-1 `docs/operator-branding-proposal`,
 baseline0c60ddd. Owns only docs/operator-branding-proposal.md, read-only repository investigation.
-No product/schema/IPC changes until concrete proposal reviewed and user approves. Candidate recommendation:
-small branding assets beside server JSON in export ZIP; heavy gamefiles remain remote torchpack.
+`07c3d0f` + `d080084` reviewed/integrated; worker finished/clean. Read `docs/operator-branding-proposal.md`.
+No product/schema/IPC changes until user approves. Recommendation: small assets beside actual server JSON,
+heavy gamefiles remain remote torchpack. Local image changes require resend; remote branding can update but
+needs startup/cache/fallback flow (not necessarily torchpack format change). Current Studio export is folder-only;
+automatic ZIP remains unimplemented. Docs-only task, diffcheck passed, no redundant code tests run.
 
 New user feedback: latest Windows build 'works well'; no per-feature/junction test details supplied.
 PATH-01 #1 `settings_path`, Luna low requested, baseline2725d1d, `e842492` integrated via `36bbf7d`.

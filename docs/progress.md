@@ -7,9 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
-운영자 브랜딩 착수의 첫 단계 BRAND-PLAN-01: 사용자에게 이미지 전달 방식(동봉/원격)의 의미를 설명하고,
-#1 `branding_proposal` Luna medium 한 명에게 기존 내보내기/프로필/배포 형식 조사를 배정한다.
-`docs/operator-branding-proposal.md`만 작성하며 제품 코드·형식/IPC 변경은 구체안 사용자 승인 이후다.
+운영자 브랜딩 조사 BRAND-PLAN-01 완료: #1 `branding_proposal` Luna medium 요청의 `07c3d0f`·`d080084`를
+#0이 검토·통합했다. [선택지/계약 제안](operator-branding-proposal.md)에 동봉/torchpack/별도 URL,
+업데이트·오프라인·검증·호환성 영향을 기록했다. 작은 이미지를 JSON 옆에 동봉하는 안을 우선 권고하되
+원격도 게임 설치 전 별도 startup/cache 흐름으로 가능하다. 기존 torchpack 형식 확장이 필수는 아니다.
+현재 Studio는 폴더 내보내기만 하며 자동 ZIP은 아직 미구현이다. 제품/형식/IPC 변경은 사용자 결정 전 대기한다.
 
 사용자가 최신 Windows 빌드가 잘 작동한다고 보고했다. 개별 기능/네이티브 junction 테스트 내역은 제공되지 않았다.
 추가 피드백 PATH-01 구현·통합: #1 `settings_path`, Luna low 요청, `e842492`를 #0이 `36bbf7d`로 병합했다.
