@@ -7,6 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
+LAUNCH-EXIT-01 착수: 사용자가 UI 개편을 미루고 게임 시작 후 런처 자동 종료 옵션을 요청했다.
+[종료 기능 범위](close-on-launch.md)에 따라 #3 `close_on_launch`(Sol medium)에 단독 배정한다.
+기본 off·개인 설정 저장, 게임은 계속 실행, 실패 시 런처 유지, 게임 생존 중 잠금 유지가 필수다.
+기존 Windows 실측에서 보통 자식은 호스트 종료 시 같이 종료되므로 명시적 분리/생존 검증이 필요하다.
+
 UI-PROD-01 기능 흐름 단계 구현·통합을 마쳤다. 사용자의 지시에 따라 시각 디자인 고도화는 하지 않았다.
 #1 Studio `9b8d7b0` 및 smoke 후속 수정, #4 런처 `42b5aef`·`aeff584`와 주 버튼 가독성 `95aa7df`를
 통합했다. 둘 다 Luna·medium으로 배정했으며 #0은 문서/검토/통합/검증만 수행했다.
@@ -229,6 +234,7 @@ macOS는 보류, Linux ARM64와 연결 해제 시 종료 보조 모드는 지원
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
 | GAME-PERF-01 | 기본 게임/Java 파일 제한 병렬 처리, 실패·취소 drain과 회귀 검증 | GAME-01, GAME-05 | 완료 — 제한 병렬화/안전 정리 통합, 실제 속도·Windows 측정 별도 |
 | GAME-ACTIVITY-01 | 작업 종류·단계·파일/개수/활성 작업 정보를 UI까지 전달할 계약 | GAME-PERF-01, UI-CONNECT-L | 완료 — 구조화 상태/IPC 전달, renderer 표현은 후속 UI 작업 |
+| LAUNCH-EXIT-01 | 게임 시작 후 런처 자동 종료 개인 옵션·게임 프로세스 분리·잠금 유지/회수 | UI-CONNECT-L, GAME-05 | 진행 — #3, `feat/launcher-close-on-game-start` |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |

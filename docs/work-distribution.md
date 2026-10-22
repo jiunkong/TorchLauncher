@@ -2,6 +2,10 @@
 
 ## 역할과 현재 배정
 
+2026-10-22 LAUNCH-EXIT-01: #3 `close_on_launch`, `feat/launcher-close-on-game-start`/agent-3,
+Sol·medium(프로세스 수명·설정 저장·잠금 경계). [close-on-launch.md](close-on-launch.md)가 상세 범위다.
+launcher 앱과 Minecraft process/recovery 최소 변경을 한 작업자가 독점한다. 다른 기능/UI 개편은 착수하지 않는다.
+
 2026-10-22 UI-PROD-01: [ui-production.md](ui-production.md)의 기능 우선 범위로 배정.
 #4 `ui_prod_launcher` / `feat/ui-prod-launcher-flow` / agent-4: launcher renderer·app-local smoke·해당 인계.
 #1 `ui_prod_studio` / `feat/ui-prod-studio-flow` / agent-1: `apps/admin/**`·공통 `scripts/smoke.mjs`·해당 인계.
