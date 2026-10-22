@@ -27,8 +27,14 @@ const phases: Record<ProductActivity['phase'], string> = {
 };
 
 export function activityLabel(activity: ProductActivity): string {
+  const fileComponents: ProductActivity['component'][] = [
+    'server-mod',
+    'resource-pack',
+    'server-config',
+    'server-file',
+  ];
   const phase =
-    activity.component === 'server-file' && activity.phase === 'staging'
+    fileComponents.includes(activity.component) && activity.phase === 'staging'
       ? '다운로드·검증 중'
       : phases[activity.phase];
   return `${components[activity.component]} ${phase}`;
