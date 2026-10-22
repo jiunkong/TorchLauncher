@@ -7,6 +7,12 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+BRAND-PLAN-01 active: user wants operator branding next and asked what image transport means.
+One worker #1 `branding_proposal`, Luna medium requested, agent-1 `docs/operator-branding-proposal`,
+baseline0c60ddd. Owns only docs/operator-branding-proposal.md, read-only repository investigation.
+No product/schema/IPC changes until concrete proposal reviewed and user approves. Candidate recommendation:
+small branding assets beside server JSON in export ZIP; heavy gamefiles remain remote torchpack.
+
 New user feedback: latest Windows build 'works well'; no per-feature/junction test details supplied.
 PATH-01 #1 `settings_path`, Luna low requested, baseline2725d1d, `e842492` integrated via `36bbf7d`.
 Settings path now one-line ellipsis with full title/unchanged selectable DOM text. Narrow renderer/CSS only,

@@ -2,6 +2,13 @@
 
 ## 역할과 현재 배정
 
+BRAND-PLAN-01: 사용자 운영자 브랜딩 착수 요청에 따라 자산 전달 방식을 먼저 조사한다.
+#1 `branding_proposal`, Luna medium 요청, agent-1 `docs/operator-branding-proposal`, baseline `0c60ddd`.
+독점: `docs/operator-branding-proposal.md`만 작성. apps/admin 내보내기·프로젝트, core server-config/배포,
+launcher bootstrap/CSP/이미지 로딩을 읽기 전용 조사한다. 제품 코드/공용 형식/IPC는 아직 변경하지 않는다.
+프로필 옆 이미지 동봉/원격 torchpack/별도 URL의 선택지와 권고, 업데이트·오프라인·검증·버전 호환 영향을 제시한다.
+서명 없는 공통 exe는 유지, 시작 TorchLauncher 로고 고정. #0이 구체 계약안을 보고하고 사용자 승인 후 구현 배정한다.
+
 PATH-01 사용자 피드백: 설정 서버 데이터 경로가 여러 줄로 꺾임. #1 `settings_path`, Luna low 요청,
 agent-1 `fix/settings-path-ellipsis`, baseline `2725d1d`. 독점: Settings.tsx의 경로 한 줄 표시/title만,
 styles.css의 설정 경로 전용 레이아웃, 기존 관련 renderer 테스트/smoke의 최소 검증,

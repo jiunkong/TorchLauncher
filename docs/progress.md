@@ -7,6 +7,10 @@
 
 ## 현재 상태와 다음 작업
 
+운영자 브랜딩 착수의 첫 단계 BRAND-PLAN-01: 사용자에게 이미지 전달 방식(동봉/원격)의 의미를 설명하고,
+#1 `branding_proposal` Luna medium 한 명에게 기존 내보내기/프로필/배포 형식 조사를 배정한다.
+`docs/operator-branding-proposal.md`만 작성하며 제품 코드·형식/IPC 변경은 구체안 사용자 승인 이후다.
+
 사용자가 최신 Windows 빌드가 잘 작동한다고 보고했다. 개별 기능/네이티브 junction 테스트 내역은 제공되지 않았다.
 추가 피드백 PATH-01 구현·통합: #1 `settings_path`, Luna low 요청, `e842492`를 #0이 `36bbf7d`로 병합했다.
 설정 데이터 위치는 한 줄 말줄임+전체 경로 title, 기존 선택 가능 문자열·값을 유지한다.
