@@ -2,6 +2,13 @@
 
 ## 역할과 현재 배정
 
+2026-10-22 GAME-PERF-01: #3(`install_parallel`) / `perf/game-install-parallel` / agent-3.
+Sol·medium(경합·중단 정리·설치 트랜잭션)으로 기본 게임/Java 파일을 제한 병렬 처리한다.
+독점: `packages/core/src/minecraft/installer.ts`, 설치 관련 테스트/새 내부 helper,
+`docs/handoffs/GAME-PERF-01.md`. main/preload/renderer/다운로드 계약/공유 설정은 수정하지 않는다.
+첫 실패/취소 시 새 작업을 멈추고 진행 작업을 모두 회수한 후 staging/lease를 정리한다.
+해시·게시·복구 계약과 진행 이벤트 호환을 유지한다. 현재 실행 중인 사용자 설치는 건드리지 않는다.
+
 2026-10-22 기능 연결 승인: [ui-integration.md](ui-integration.md)에 계약과 독점 범위를 기록했다.
 #1 UI-CONNECT-S: `feat/ui-connect-studio` / agent-1, `apps/admin/**`·`packages/core/src/server-config/**`·해당 인계.
 #4 UI-CONNECT-L: `feat/ui-connect-launcher` / agent-4, `apps/launcher/**`·`packages/core/src/server-status/**`·

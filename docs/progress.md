@@ -7,6 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
+- 2026-10-22 사용자 지적: 설치의 순차 파일 처리가 느리므로 제한 병렬화한다.
+  GAME-PERF-01을 #3(`install_parallel`, Sol·medium)에 단독 배정했다.
+  `perf/game-install-parallel`/agent-3, 독점 범위는 `packages/core/src/minecraft/installer.ts`,
+  설치 관련 테스트·새 내부 helper, `docs/handoffs/GAME-PERF-01.md`다. 해시·원자적 게시·취소/실패 정리는 유지한다.
+  현재 사용자의 Windows 설치 프로세스에는 실행 중 패치를 적용하지 않는다.
 - 최신 통합: Studio `27003a6`을 `e90b289`, 런처 `fc1dbfb`를
   `c21c4c5`, 검증 worker를 `f99e7d4`로 통합했다. 후속 smoke 탐색/스크롤바 수정과
   단일 서버 프로파일 오류 안내 `5712b7f`도 통합했다. #0은 제품 코드를 구현하지 않았다.
@@ -169,6 +174,7 @@
 | FMT-03 | 인덱스 읽기·입력 검증·파일별 부분 다운로드·해시 검사 | FMT-01, DL-02 | 완료 |
 | SYNC-01 | 로컬 관리 목록, 변경 비교·적용·운영자 파일 삭제·실패 복구 | FMT-02, FMT-03, DL-01 | 완료 |
 | GAME-01 | Java·Minecraft·라이브러리·자산 설치와 실행 인자 조립 코어, fixture 검증 | BASE-02 | 완료 |
+| GAME-PERF-01 | 기본 게임/Java 파일 제한 병렬 처리, 실패·취소 drain과 회귀 검증 | GAME-01, GAME-05 | 진행 — #3, `perf/game-install-parallel` |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
