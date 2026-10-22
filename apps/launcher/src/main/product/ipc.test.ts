@@ -63,3 +63,32 @@ it('accepts only integer MiB game memory settings', () => {
     'invalid-request',
   );
 });
+
+it('limits log opening to no arguments and unregistered removal to exact mods paths', () => {
+  expect(parseProductCommand({ type: 'open-logs' })).toEqual({ type: 'open-logs' });
+  expect(
+    parseProductCommand({ type: 'remove-unregistered', path: 'mods/nested/readme.txt' }),
+  ).toEqual({ type: 'remove-unregistered', path: 'mods/nested/readme.txt' });
+  for (const path of [
+    '/tmp/file',
+    'mods/../file',
+    'mods/./file',
+    'mods/file:stream',
+    'mods/file\\bad',
+    'mods/folder/',
+    'mods/file.',
+    'mods/ trailing ',
+    'mods/‮file',
+    'mods//file',
+    'other/file',
+  ]) {
+    expect(() => parseProductCommand({ type: 'remove-unregistered', path })).toThrow(
+      'invalid-request',
+    );
+  }
+  for (const extra of [{ path: '/tmp' }, { url: 'https://example.org' }, { command: 'sh' }])
+    expect(() => parseProductCommand({ type: 'open-logs', ...extra })).toThrow('invalid-request');
+  expect(() =>
+    parseProductCommand({ type: 'remove-unregistered', path: 'mods/a.txt', force: true }),
+  ).toThrow('invalid-request');
+});

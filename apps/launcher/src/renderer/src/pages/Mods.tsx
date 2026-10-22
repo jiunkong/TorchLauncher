@@ -43,11 +43,13 @@ export function ModsPage({
   state,
   pending,
   command,
+  onRemoveUnregistered,
 }: {
   active: boolean;
   state: ProductState;
   pending: boolean;
   command(request: ProductCommand): Promise<boolean>;
+  onRemoveUnregistered?(path: string): void;
 }) {
   const busy = state.operation !== null || pending;
   const ready = state.configuration === 'ready' && !busy;
@@ -62,7 +64,16 @@ export function ModsPage({
     void command({ type: 'mods' }).then((ok) => setLoad(ok ? 'loaded' : 'failed'));
   }, [active, ready, load, command]);
 
-  return <ModsView state={state} load={load} ready={ready} command={command} onRetry={refresh} />;
+  return (
+    <ModsView
+      state={state}
+      load={load}
+      ready={ready}
+      command={command}
+      onRetry={refresh}
+      {...(onRemoveUnregistered ? { onRemoveUnregistered } : {})}
+    />
+  );
 }
 
 export function ModsView({
@@ -71,12 +82,14 @@ export function ModsView({
   ready,
   command,
   onRetry,
+  onRemoveUnregistered,
 }: {
   state: ProductState;
   load: LoadState;
   ready: boolean;
   command(request: ProductCommand): Promise<boolean>;
   onRetry(): void;
+  onRemoveUnregistered?(path: string): void;
 }) {
   const t = useT();
   const loaded = load === 'loaded';
@@ -94,7 +107,12 @@ export function ModsView({
       {load === 'failed' && (
         <div className="error" role="alert">
           <p>{t('mods.failed')}</p>
-          <button className="btn sm" type="button" disabled={!ready} onClick={onRetry}>
+          <button
+            className="btn sm"
+            type="button"
+            disabled={!ready || state.running}
+            onClick={onRetry}
+          >
             {t('home.retry')}
           </button>
         </div>
@@ -127,7 +145,7 @@ export function ModsView({
                   <button
                     className="btn sm danger"
                     type="button"
-                    disabled={!ready}
+                    disabled={!ready || state.running}
                     aria-label={t('mods.removeLabel', { name: modName(mod.path) })}
                     onClick={() => {
                       if (window.confirm(t('mods.removeConfirm', { name: modName(mod.path) })))
@@ -178,17 +196,26 @@ export function ModsView({
                         <strong className="selectable">{modName(mod.path)}</strong>
                         <small>{[t('mods.unregisteredHint'), ...notes].join(' · ')}</small>
                       </span>
-                      {mod.state === 'ok' && (
+                      {mod.state === 'ok' && /\.jar$/i.test(mod.path) && (
                         <button
                           className="btn sm"
                           type="button"
-                          disabled={!ready}
+                          disabled={!ready || state.running}
                           aria-label={t('mods.adoptLabel', { name: modName(mod.path) })}
                           onClick={() => void command({ type: 'adopt-mod', path: mod.path })}
                         >
                           {t('mods.adopt')}
                         </button>
                       )}
+                      <button
+                        className="btn sm danger"
+                        type="button"
+                        disabled={!ready || state.running}
+                        aria-label={t('mods.removeLabel', { name: modName(mod.path) })}
+                        onClick={() => onRemoveUnregistered?.(mod.path)}
+                      >
+                        {t('mods.remove')}
+                      </button>
                     </div>
                   );
                 })}

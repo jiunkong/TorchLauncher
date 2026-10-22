@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -363,8 +363,156 @@ it('reclaims exited game locks for ordinary management but preserves locks prote
   await writeFile(path, liveText);
   expect(await service.command({ type: 'mods' })).toMatchObject({ ok: false, error: 'locked' });
   expect(await readFile(path, 'utf8')).toBe(liveText);
+  expect(
+    await service.command({ type: 'remove-unregistered', path: 'mods/readme.txt' }),
+  ).toMatchObject({ ok: false, error: 'locked' });
+  expect(await readFile(path, 'utf8')).toBe(liveText);
   owner.child = { state: 'running', pid: 2147483001, start: 'dead-child' };
   await writeFile(path, JSON.stringify(owner));
   expect((await service.command({ type: 'mods' })).ok).toBe(true);
   expect(service.snapshot().mods).toEqual([]);
+});
+
+it('exposes the planned server location without querying or creating data', async () => {
+  const { service, root } = await setup();
+  expect(service.snapshot().serverDataRoot).toBe(root);
+  expect(service.snapshot().usage).toBeNull();
+  expect(service.snapshot().deletion).toBeNull();
+  expect((await service.command({ type: 'usage' })).ok).toBe(false);
+  expect(service.snapshot().usage).toBeNull();
+  expect((await setup({ config: null })).service.snapshot().serverDataRoot).toBeNull();
+});
+it('opens only the existing fixed logs directory and preserves deletion confirmation', async () => {
+  const openLogs = vi.fn(async () => '');
+  const { service, host, root } = await setup({ openLogs });
+  expect((await service.command({ type: 'open-logs' })).ok).toBe(false);
+  expect(openLogs).not.toHaveBeenCalled();
+  await ensureServerDataRoot(host.base, serverId);
+  await mkdir(join(root, 'logs'));
+  await service.command({ type: 'preview-delete' });
+  const before = service.snapshot();
+  expect((await service.command({ type: 'open-logs' })).ok).toBe(true);
+  expect(openLogs).toHaveBeenCalledWith(join(root, 'logs'));
+  expect(service.snapshot()).toEqual(before);
+  openLogs.mockResolvedValue('private OS detail');
+  expect(await service.command({ type: 'open-logs' })).toMatchObject({
+    ok: false,
+    error: 'operation-failed',
+  });
+});
+it.skipIf(process.platform === 'win32')(
+  'rejects logs and ancestor symlinks without invoking the shell',
+  async () => {
+    const openLogs = vi.fn(async () => '');
+    const { service, host, root } = await setup({ openLogs });
+    await ensureServerDataRoot(host.base, serverId);
+    await mkdir(join(host.base, 'outside'));
+    await symlink(join(host.base, 'outside'), join(root, 'logs'), 'dir');
+    expect(await service.command({ type: 'open-logs' })).toMatchObject({
+      ok: false,
+      error: 'unsafe-path',
+    });
+    await rm(root, { recursive: true });
+    await symlink(join(host.base, 'outside'), root, 'dir');
+    expect(await service.command({ type: 'open-logs' })).toMatchObject({
+      ok: false,
+      error: 'unsafe-path',
+    });
+    expect(openLogs).not.toHaveBeenCalled();
+  },
+);
+it('opens logs independently while another operation holds serialization', async () => {
+  const openLogs = vi.fn(async () => '');
+  const { service, host, root } = await setup({ openLogs });
+  await ensureServerDataRoot(host.base, serverId);
+  await mkdir(join(root, 'logs'));
+  let finish!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  vi.mocked(host.auth.logout).mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+        entered();
+      }),
+  );
+  const pending = service.command({ type: 'logout' });
+  await started;
+  expect((await service.command({ type: 'open-logs' })).ok).toBe(true);
+  expect(service.snapshot().operation).toBe('logout');
+  expect(await service.command({ type: 'remove-unregistered', path: 'mods/a.txt' })).toMatchObject({
+    ok: false,
+    error: 'busy',
+  });
+  finish();
+  await pending;
+});
+it('removes exact unregistered non-jar files but preserves managed files and directories', async () => {
+  const { service, host, root } = await setup();
+  await ensureServerDataRoot(host.base, serverId);
+  await deploy(
+    root,
+    [{ path: 'mods/operator.jar', data: fabricJar('operator_mod') }],
+    '22222222-2222-4222-8222-222222222222',
+  );
+  await writeFile(join(root, 'mods/manual.jar'), fabricJar('manual_mod'));
+  await service.command({ type: 'adopt-mod', path: 'mods/manual.jar' });
+  for (const path of ['mods/operator.jar', 'mods/manual.jar']) {
+    expect(await service.command({ type: 'remove-unregistered', path })).toMatchObject({
+      ok: false,
+      error: 'not-unregistered',
+    });
+    expect((await readFile(join(root, path))).length).toBeGreaterThan(0);
+  }
+  await mkdir(join(root, 'mods/nested'));
+  await writeFile(join(root, 'mods/nested/readme.txt'), 'temporary fixture');
+  expect(
+    (await service.command({ type: 'remove-unregistered', path: 'mods/nested/readme.txt' })).ok,
+  ).toBe(true);
+  expect(service.snapshot().mods.some((mod) => mod.path.endsWith('readme.txt'))).toBe(false);
+  await expect(readFile(join(root, 'mods/nested/readme.txt'))).rejects.toMatchObject({
+    code: 'ENOENT',
+  });
+  expect(await service.command({ type: 'remove-unregistered', path: 'mods/nested' })).toMatchObject(
+    { ok: false, error: 'unsafe-path' },
+  );
+});
+it('keeps cosmetic skin work off the authentication path and invalidates stale responses', async () => {
+  const completions: ((skin: string | null) => void)[] = [];
+  const skins = {
+    get: vi.fn(() => new Promise<string | null>((resolve) => completions.push(resolve))),
+    clear: vi.fn(),
+  };
+  const { service, host } = await setup({ skins });
+  expect((await service.command({ type: 'login' })).ok).toBe(true);
+  expect(skins.get).toHaveBeenCalledWith('a'.repeat(32), expect.any(AbortSignal));
+  await service.command({ type: 'login' });
+  completions[0]?.('old');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(service.snapshot().account?.skin).toBeUndefined();
+  completions[1]?.('current');
+  await vi.waitFor(() => expect(service.snapshot().account?.skin).toBe('current'));
+  await service.command({ type: 'login' });
+  await service.command({ type: 'logout' });
+  completions[2]?.('late');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(service.snapshot().account).toBeNull();
+  expect(skins.clear).toHaveBeenCalled();
+  await service.command({ type: 'login' });
+  vi.mocked(host.auth.refresh).mockRejectedValue(new Error('network_failed'));
+  await service.command({ type: 'refresh' });
+  completions[3]?.('failed');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(service.snapshot().account).toBeNull();
+  await service.command({ type: 'login' });
+  await service.close();
+  completions[4]?.('closed');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(service.snapshot().account?.skin).toBeUndefined();
 });

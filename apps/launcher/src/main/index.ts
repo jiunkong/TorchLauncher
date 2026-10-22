@@ -5,7 +5,7 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import { productStateChannel } from '../shared/product';
 import { createPublicJavaAuthenticator } from './auth/public-java-electron';
 import { readServerConfig, serverConfigPath } from './product/bootstrap';
@@ -141,6 +141,7 @@ if (primaryInstance)
       config,
       auth,
       quit: () => app.quit(),
+      openLogs: (path) => shell.openPath(path),
       chooseMod: async () => {
         const result = await dialog.showOpenDialog({
           title: '사용자 모드 추가',

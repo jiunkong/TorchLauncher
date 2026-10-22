@@ -29,6 +29,15 @@ export function useProduct() {
     };
   }, []);
   const command = useCallback(async (request: ProductCommand): Promise<boolean> => {
+    if (request.type === 'open-logs') {
+      // Read-only shell action may run while launch owns the normal command slot.
+      // Do not replay its snapshot over newer game/auth events.
+      try {
+        return (await window.torchlauncher.command(request)).ok;
+      } catch {
+        return false;
+      }
+    }
     const isControl = request.type === 'cancel' || request.type === 'stop';
     const isMemorySave = request.type === 'set-game-memory';
     if (
