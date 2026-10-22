@@ -725,7 +725,7 @@ textarea {
   font-size: 12px;
   line-height: 1.8;
 }
-.page-panel .button,
+.page-panel .button:not(.play-button),
 .operation-status .button,
 .play-area > .button:not(.play-button) {
   background: #30363c;
