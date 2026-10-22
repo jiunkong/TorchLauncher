@@ -6,6 +6,8 @@ export function useProduct() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
+  const memoryInFlight = useRef(false);
+  const pendingCount = useRef(0);
   useEffect(() => {
     let active = true;
     let received = false;
@@ -28,12 +30,20 @@ export function useProduct() {
   }, []);
   const command = useCallback(async (request: ProductCommand): Promise<boolean> => {
     const isControl = request.type === 'cancel' || request.type === 'stop';
-    if (inFlight.current && !isControl) {
+    const isMemorySave = request.type === 'set-game-memory';
+    if (
+      (!isMemorySave && inFlight.current && !isControl) ||
+      (isMemorySave && memoryInFlight.current)
+    ) {
       setError('busy');
       return false;
     }
-    if (!isControl) {
+    if (!isControl && !isMemorySave) {
       inFlight.current = true;
+    }
+    if (isMemorySave) memoryInFlight.current = true;
+    if (!isControl) {
+      pendingCount.current++;
       setPending(true);
     }
     setError(null);
@@ -47,8 +57,10 @@ export function useProduct() {
       return false;
     } finally {
       if (!isControl) {
-        inFlight.current = false;
-        setPending(false);
+        if (!isMemorySave) inFlight.current = false;
+        if (isMemorySave) memoryInFlight.current = false;
+        pendingCount.current--;
+        setPending(pendingCount.current > 0);
       }
     }
   }, []);

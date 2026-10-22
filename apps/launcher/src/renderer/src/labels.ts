@@ -15,6 +15,7 @@ const failureKeys = {
   'required-pack-reordered': 'failure.required-pack-reordered',
   'options-owned-by-sync': 'failure.options-owned-by-sync',
   'preferences-failed': 'failure.preferences-failed',
+  'memory-limit': 'failure.memory-limit',
   'sync-not-initialized': 'failure.sync-not-initialized',
   'configuration-unavailable': 'failure.configuration-unavailable',
   network_failed: 'failure.network_failed',

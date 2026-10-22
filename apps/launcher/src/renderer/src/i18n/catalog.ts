@@ -76,6 +76,7 @@ const ko = {
     '운영자가 options.txt 전체를 관리하고 있습니다. 운영자에게 설정 정책 구성을 요청하세요.',
   'failure.preferences-failed':
     '런처 설정을 읽거나 저장하지 못했습니다. 설정 파일과 접근 권한을 확인하세요.',
+  'failure.memory-limit': '현재 컴퓨터의 RAM에 맞게 게임 메모리를 낮춘 뒤 다시 실행하세요.',
   'failure.sync-not-initialized': '게임 동기화가 완료된 뒤 설정을 변경하세요.',
   'failure.configuration-unavailable':
     '서버 구성을 읽지 못했습니다. 운영자에게 이 서버용 런처를 다시 받으세요.',
@@ -163,6 +164,19 @@ const ko = {
     '게임이 정상적으로 시작되면 런처를 닫습니다. 게임은 계속 실행됩니다.',
   'settings.prefsFailed':
     '저장된 런처 설정을 읽지 못해 자동 종료를 껐습니다. 스위치를 다시 설정하세요.',
+  'settings.gameMemory': '게임 메모리',
+  'settings.gameMemoryHint':
+    '최대 메모리는 0.5 GB 단위로 권장합니다. 초기 메모리는 비워 두면 Java 기본값을 사용합니다.',
+  'settings.maxMemory': '최대 메모리 (Xmx)',
+  'settings.initialMemory': '초기 메모리 (Xms, 선택)',
+  'settings.memoryNextLaunch': '저장한 값은 다음 실행부터 적용됩니다.',
+  'settings.memoryInvalid':
+    '최대 메모리는 0.5 GB 이상 {limit} GB 이하여야 하고, 초기 메모리는 0.25 GB 이상 최대값 이하여야 합니다.',
+  'settings.memoryUnit': 'GB',
+  'settings.memoryUnsupported':
+    '사용 가능한 RAM이 512 MiB보다 적어 게임 메모리를 설정할 수 없습니다.',
+  'settings.memoryHigh':
+    '최대 메모리가 실제 RAM의 75%를 넘습니다. 다른 앱을 위한 메모리가 부족할 수 있습니다.',
   'settings.packs': '활성 리소스팩 순서',
   'settings.packList': '활성 리소스팩',
   'settings.save': '저장',

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { launchDeployment } from '../../../../../packages/core/src/loaders/launch-gate';
 import type { RunningGame } from '../../../../../packages/core/src/minecraft/process';
+import * as preferences from './preferences';
 import { type ProductHost, ProductService } from './service';
 
 vi.mock('../../../../../packages/core/src/loaders/launch-gate', () => ({
@@ -123,7 +124,8 @@ it('serializes saving the setting before launch and rejects changes while launch
     entered = resolve;
   });
   let release: () => void = () => {};
-  vi.mocked(launchDeployment).mockImplementation(async () => {
+  vi.mocked(launchDeployment).mockImplementation(async (options) => {
+    expect(options.process).toEqual({ detachable: true });
     entered();
     await new Promise<void>((resolve) => {
       release = resolve;
@@ -132,6 +134,10 @@ it('serializes saving the setting before launch and rejects changes while launch
   });
   const launch = service.command({ type: 'launch' });
   await start;
+  expect(await service.command({ type: 'set-game-memory', maxMemoryMiB: 512 })).toMatchObject({
+    ok: true,
+  });
+  expect(service.snapshot().preferences).toMatchObject({ closeOnLaunch: true, maxMemoryMiB: 512 });
   expect(await service.command({ type: 'set-close-on-launch', value: false })).toMatchObject({
     ok: false,
     error: 'busy',
@@ -139,6 +145,74 @@ it('serializes saving the setting before launch and rejects changes while launch
   expect(service.snapshot().preferences.closeOnLaunch).toBe(true);
   release();
   await launch;
+});
+
+it('saves memory during a live game, drains an active save on close, and uses it next launch', async () => {
+  const { host, service, game } = await setup();
+  await service.command({ type: 'set-close-on-launch', value: false });
+  let finish: (exit: Awaited<RunningGame['finished']>) => void = () => {};
+  const finished = new Promise<Awaited<RunningGame['finished']>>((resolve) => {
+    finish = resolve;
+  });
+  Object.defineProperty(game, 'finished', { value: finished });
+  vi.mocked(game.stop).mockImplementation(async () => {
+    const exit = {
+      reason: 'stopped',
+      code: null,
+      signal: null,
+      logs: game.getLogs(),
+    } as const;
+    finish(exit);
+    return exit;
+  });
+  vi.mocked(launchDeployment).mockResolvedValue(game);
+  const firstLaunch = service.command({ type: 'launch' });
+  await vi.waitFor(() => expect(service.snapshot().running).toBe(true));
+
+  let saveEntered: () => void = () => {};
+  const saving = new Promise<void>((resolve) => {
+    saveEntered = resolve;
+  });
+  let releaseSave: () => void = () => {};
+  const saveBarrier = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  const originalWrite = preferences.writePreferences;
+  const write = vi.spyOn(preferences, 'writePreferences');
+  write.mockImplementation(async (root, value) => {
+    if (value.maxMemoryMiB === 1024) {
+      saveEntered();
+      await saveBarrier;
+    }
+    return originalWrite(root, value);
+  });
+  const memorySave = service.command({
+    type: 'set-game-memory',
+    maxMemoryMiB: 1024,
+    initialMemoryMiB: 512,
+  });
+  await saving;
+  let closeSettled = false;
+  const closing = service.close().then(() => {
+    closeSettled = true;
+  });
+  await firstLaunch;
+  await Promise.resolve();
+  expect(closeSettled).toBe(false);
+  releaseSave();
+  expect((await memorySave).ok).toBe(true);
+  await closing;
+  expect(closeSettled).toBe(true);
+  expect(game.stop).toHaveBeenCalledOnce();
+  write.mockRestore();
+
+  vi.mocked(launchDeployment).mockImplementation(async (options) => {
+    expect(options.maxMemoryMiB).toBe(1024);
+    expect(options.initialMemoryMiB).toBe(512);
+    return game;
+  });
+  const nextService = new ProductService(host);
+  expect((await nextService.command({ type: 'launch' })).ok).toBe(true);
 });
 
 it('does not await or stop the real child if close enters after core handoff but before service continuation', async () => {

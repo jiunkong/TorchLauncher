@@ -56,7 +56,7 @@ beforeEach(() => {
 });
 it('syncs the reread deployment and checks fresh remote/local state immediately before spawn', async () => {
   const options = setup();
-  await launchDeployment(options);
+  await launchDeployment({ ...options, maxMemoryMiB: 4096, initialMemoryMiB: 1024 });
   expect(options.current).toHaveBeenCalledTimes(3);
   expect(synchronizeDeployment).toHaveBeenCalledOnce();
   expect(assertSynchronizedForLaunch).toHaveBeenCalledOnce();
@@ -64,6 +64,11 @@ it('syncs the reread deployment and checks fresh remote/local state immediately 
   expect(launchMinecraft).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ quickPlayServer: 'localhost:25565' }),
+    expect.anything(),
+  );
+  expect(launchMinecraft).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ maxMemoryMiB: 4096, initialMemoryMiB: 1024 }),
     expect.anything(),
   );
 });

@@ -1,4 +1,4 @@
-import { release } from 'node:os';
+import { release, totalmem } from 'node:os';
 import { openDeploymentReader } from '../../../../../packages/core/src/deployment/reader/index';
 import { createFullDownloader } from '../../../../../packages/core/src/download/full/index';
 import { createDownloadSource } from '../../../../../packages/core/src/download/source/index';
@@ -62,6 +62,7 @@ export interface ProductHost {
 const safeCodes = new Set([
   'busy',
   'preferences-failed',
+  'memory-limit',
   'invalid-request',
   'unsupported-platform',
   'unsupported-game',
@@ -121,14 +122,20 @@ export class ProductService {
   private readonly operations = new Operations();
   private game: RunningGame | undefined;
   private preferencesLoaded = false;
+  private preferencesQueue: Promise<void> = Promise.resolve();
+  private closing = false;
   private relinquished = false;
   private launcherLogs: ProductLogEntry[] = [];
   private gameLogs: ProductLogEntry[] = [];
   private readonly state: ProductState;
   constructor(private readonly host: ProductHost) {
     const config = host.config;
+    const reportedMemoryMiB = Math.floor(totalmem() / (1024 * 1024));
     this.state = {
       preferences: { closeOnLaunch: false },
+      physicalMemoryMiB: Number.isSafeInteger(reportedMemoryMiB)
+        ? Math.max(0, reportedMemoryMiB)
+        : 0,
       server: config
         ? { serverId: config.serverId, name: config.name, address: config.address }
         : null,
@@ -218,6 +225,65 @@ export class ProductService {
   command(raw: unknown): Promise<ProductResult> {
     return this.execute(raw);
   }
+  private withPreferences<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.preferencesQueue.then(work);
+    this.preferencesQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+  private async loadPreferences(): Promise<void> {
+    if (this.preferencesLoaded) return;
+    try {
+      this.state.preferences = await readPreferences(this.host.base);
+    } catch {
+      this.state.preferences = { closeOnLaunch: false, error: 'preferences-failed' };
+    }
+    this.preferencesLoaded = true;
+  }
+  private async saveGameMemory(
+    command: Extract<ReturnType<typeof parseProductCommand>, { type: 'set-game-memory' }>,
+  ): Promise<ProductResult> {
+    try {
+      if (this.closing || this.relinquished) throw new Error('busy');
+      await this.withPreferences(async () => {
+        if (this.closing || this.relinquished) throw new Error('busy');
+        await this.loadPreferences();
+        if (this.state.preferences.error) throw new Error('preferences-failed');
+        const maximum = Math.min(65536, this.state.physicalMemoryMiB);
+        const initial = command.initialMemoryMiB;
+        if (
+          maximum < 512 ||
+          command.maxMemoryMiB < 512 ||
+          command.maxMemoryMiB > maximum ||
+          (initial !== undefined &&
+            (initial < 256 || initial > command.maxMemoryMiB || initial > maximum))
+        )
+          throw new Error('memory-limit');
+        const preferences = {
+          ...this.state.preferences,
+          maxMemoryMiB: command.maxMemoryMiB,
+          ...(initial === undefined
+            ? { initialMemoryMiB: undefined }
+            : { initialMemoryMiB: initial }),
+        };
+        const persisted = {
+          closeOnLaunch: preferences.closeOnLaunch,
+          maxMemoryMiB: preferences.maxMemoryMiB,
+          ...(preferences.initialMemoryMiB === undefined
+            ? {}
+            : { initialMemoryMiB: preferences.initialMemoryMiB }),
+        };
+        await writePreferences(this.host.base, persisted);
+        this.state.preferences = persisted;
+      });
+      this.publish();
+      return { ok: true as const, state: this.snapshot() };
+    } catch (error) {
+      return { ok: false as const, error: safeProductError(error), state: this.snapshot() };
+    }
+  }
   private async execute(raw: unknown, restoring = false): Promise<ProductResult> {
     let command: ReturnType<typeof parseProductCommand>;
     try {
@@ -225,6 +291,7 @@ export class ProductService {
     } catch {
       return { ok: false, error: 'invalid-request', state: this.snapshot() };
     }
+    if (command.type === 'set-game-memory') return this.saveGameMemory(command);
     if (command.type === 'cancel' || command.type === 'stop') {
       this.operations.cancel();
       if (this.game && !this.game.detached) await this.game.stop();
@@ -237,25 +304,29 @@ export class ProductService {
         this.state.outcome = null;
         this.phase(command.type);
         try {
-          if (!this.preferencesLoaded) {
-            try {
-              this.state.preferences = await readPreferences(this.host.base);
-            } catch {
-              this.state.preferences = { closeOnLaunch: false, error: 'preferences-failed' };
-            }
-            this.preferencesLoaded = true;
-          }
+          await this.withPreferences(() => this.loadPreferences());
           signal.throwIfAborted();
           if (command.type !== 'delete' && command.type !== 'preview-delete')
             this.invalidateDeletion();
           switch (command.type) {
             case 'set-close-on-launch':
               try {
-                await writePreferences(this.host.base, { closeOnLaunch: command.value });
+                await this.withPreferences(async () => {
+                  await this.loadPreferences();
+                  const next = { ...this.state.preferences, closeOnLaunch: command.value };
+                  const persisted = {
+                    closeOnLaunch: command.value,
+                    ...(next.maxMemoryMiB === undefined ? {} : { maxMemoryMiB: next.maxMemoryMiB }),
+                    ...(next.initialMemoryMiB === undefined
+                      ? {}
+                      : { initialMemoryMiB: next.initialMemoryMiB }),
+                  };
+                  await writePreferences(this.host.base, persisted);
+                  this.state.preferences = persisted;
+                });
               } catch {
                 throw new Error('preferences-failed');
               }
-              this.state.preferences = { closeOnLaunch: command.value };
               break;
             case 'login':
             case 'refresh': {
@@ -281,7 +352,10 @@ export class ProductService {
               }
               break;
             case 'launch':
-              await this.launch(signal);
+              await this.launch(
+                signal,
+                await this.withPreferences(async () => ({ ...this.state.preferences })),
+              );
               break;
             case 'inspect':
               await this.checkEnvironment(signal);
@@ -521,8 +595,16 @@ export class ProductService {
     this.state.logs = [...this.launcherLogs, ...this.gameLogs];
     this.publish();
   }
-  private async launch(signal: AbortSignal) {
+  private async launch(signal: AbortSignal, preferences: ProductState['preferences']) {
     if (!this.state.supported) throw new Error('unsupported-platform');
+    const maximum = preferences.maxMemoryMiB ?? 2048;
+    const memoryLimit = Math.min(65536, this.state.physicalMemoryMiB);
+    if (
+      memoryLimit < 512 ||
+      maximum > memoryLimit ||
+      (preferences.initialMemoryMiB !== undefined && preferences.initialMemoryMiB > maximum)
+    )
+      throw new Error('memory-limit');
     const config = this.config();
     this.log('launch: started');
     // Per-attempt check: verified-stale state is recovered silently; held-live falls through to
@@ -543,7 +625,11 @@ export class ProductService {
       server: config.address,
       launcherVersion: this.host.version,
       signal,
-      process: this.state.preferences.closeOnLaunch ? { detachable: true } : {},
+      ...(preferences.maxMemoryMiB === undefined ? {} : { maxMemoryMiB: preferences.maxMemoryMiB }),
+      ...(preferences.initialMemoryMiB === undefined
+        ? {}
+        : { initialMemoryMiB: preferences.initialMemoryMiB }),
+      process: preferences.closeOnLaunch ? { detachable: true } : {},
       current,
       onPhase: (phase) => {
         this.log(`launch: ${phase}`);
@@ -627,7 +713,7 @@ export class ProductService {
     this.state.running = true;
     this.state.runningSince = Date.now();
     this.phase('game-running');
-    if (this.state.preferences.closeOnLaunch) {
+    if (preferences.closeOnLaunch) {
       try {
         signal.throwIfAborted();
         if (!game.detach || !this.host.quit) throw new Error('handoff-unavailable');
@@ -661,6 +747,7 @@ export class ProductService {
     }
   }
   async close() {
+    this.closing = true;
     const closing = this.operations.close();
     try {
       if (this.game && !this.game.detached) await this.game.stop();
@@ -671,6 +758,8 @@ export class ProductService {
       this.state.phase = 'shutdown-blocked';
       this.publish();
       throw error;
+    } finally {
+      await this.preferencesQueue;
     }
   }
 }

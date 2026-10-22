@@ -5,6 +5,13 @@ import { ProgressBar } from '../components/ProgressBar';
 import { formatBytes } from '../format';
 import { useT } from '../hooks/useTranslator';
 import type { LoadState } from './Mods';
+import {
+  defaultMaxMemoryMiB,
+  exceedsRecommendedPhysicalMemory,
+  memoryLimitMiB,
+  parseMemoryGiB,
+  validGameMemory,
+} from './memory';
 import { arrangePacks, canMove, movePack, packIds } from './packs';
 
 export function SettingsPage({
@@ -28,6 +35,26 @@ export function SettingsPage({
   // The user's unsaved pack order; null means "no draft". Progress events never touch it.
   const [draft, setDraft] = useState<string[] | null>(null);
   const [saved, setSaved] = useState(false);
+  const maxMemoryMiB = state.preferences.maxMemoryMiB ?? defaultMaxMemoryMiB;
+  const initialMemoryMiB = state.preferences.initialMemoryMiB;
+  const [maxMemoryDraft, setMaxMemoryDraft] = useState(String(maxMemoryMiB / 1024));
+  const [initialMemoryDraft, setInitialMemoryDraft] = useState(
+    initialMemoryMiB === undefined ? '' : String(initialMemoryMiB / 1024),
+  );
+  const [memorySaving, setMemorySaving] = useState(false);
+  const [memorySaved, setMemorySaved] = useState(false);
+  const maxDraftMiB = parseMemoryGiB(maxMemoryDraft);
+  const initialDraftMiB = initialMemoryDraft ? parseMemoryGiB(initialMemoryDraft) : undefined;
+  const memoryValid =
+    maxDraftMiB !== null &&
+    (initialMemoryDraft === '' || initialDraftMiB !== null) &&
+    validGameMemory(maxDraftMiB, initialDraftMiB ?? undefined, state.physicalMemoryMiB);
+  const memoryLimit = memoryLimitMiB(state.physicalMemoryMiB);
+
+  useEffect(() => {
+    setMaxMemoryDraft(String(maxMemoryMiB / 1024));
+    setInitialMemoryDraft(initialMemoryMiB === undefined ? '' : String(initialMemoryMiB / 1024));
+  }, [maxMemoryMiB, initialMemoryMiB]);
 
   const loadPacks = useCallback(() => {
     setPacksLoad('loading');
@@ -88,6 +115,94 @@ export function SettingsPage({
               }
             />
           </div>
+        </section>
+        <section className="card" aria-labelledby="settings-memory">
+          <h2 id="settings-memory">{t('settings.gameMemory')}</h2>
+          <p className="hint">{t('settings.gameMemoryHint')}</p>
+          <label className="field">
+            <span>{t('settings.maxMemory')}</span>
+            <span className="input-unit">
+              <input
+                type="number"
+                min="0.5"
+                max={memoryLimit / 1024}
+                step="0.5"
+                inputMode="decimal"
+                value={maxMemoryDraft}
+                aria-label={t('settings.maxMemory')}
+                data-testid="max-memory"
+                disabled={memorySaving}
+                onChange={(event) => {
+                  setMaxMemoryDraft(event.target.value);
+                  setMemorySaved(false);
+                }}
+              />
+              <span>{t('settings.memoryUnit')}</span>
+            </span>
+          </label>
+          <label className="field">
+            <span>{t('settings.initialMemory')}</span>
+            <span className="input-unit">
+              <input
+                type="number"
+                min="0.25"
+                max={maxDraftMiB === null ? 64 : maxDraftMiB / 1024}
+                step="0.25"
+                inputMode="decimal"
+                value={initialMemoryDraft}
+                aria-label={t('settings.initialMemory')}
+                data-testid="initial-memory"
+                disabled={memorySaving}
+                onChange={(event) => {
+                  setInitialMemoryDraft(event.target.value);
+                  setMemorySaved(false);
+                }}
+              />
+              <span>{t('settings.memoryUnit')}</span>
+            </span>
+          </label>
+          {!memoryValid && (
+            <p role="alert" className="hint">
+              {memoryLimit < 512
+                ? t('settings.memoryUnsupported')
+                : t('settings.memoryInvalid', { limit: (memoryLimit / 1024).toFixed(2) })}
+            </p>
+          )}
+          {memoryValid &&
+            maxDraftMiB !== null &&
+            exceedsRecommendedPhysicalMemory(maxDraftMiB, state.physicalMemoryMiB) && (
+              <p role="status" className="hint">
+                {t('settings.memoryHigh')}
+              </p>
+            )}
+          <div className="row">
+            <small className="grow">{t('settings.memoryNextLaunch')}</small>
+            <button
+              className="btn sm primary"
+              type="button"
+              data-testid="save-memory"
+              disabled={!memoryValid || memorySaving || maxDraftMiB === null}
+              onClick={() => {
+                if (maxDraftMiB === null) return;
+                setMemorySaving(true);
+                void command({
+                  type: 'set-game-memory',
+                  maxMemoryMiB: maxDraftMiB,
+                  ...(initialDraftMiB == null ? {} : { initialMemoryMiB: initialDraftMiB }),
+                }).then((ok) => {
+                  setMemorySaving(false);
+                  setMemorySaved(ok);
+                });
+              }}
+            >
+              {t('settings.save')}
+            </button>
+          </div>
+          {memorySaved && (
+            <p className="hintline" role="status">
+              {t('settings.saved')}
+            </p>
+          )}
         </section>
         <section className="card" aria-labelledby="settings-data">
           <h2 id="settings-data">{t('settings.data')}</h2>

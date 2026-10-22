@@ -249,6 +249,79 @@ it('persists personal preference through service recreation and reports save err
   });
   expect(restarted.snapshot().preferences.closeOnLaunch).toBe(true);
 });
+it('preserves both settings when close-on-launch and game memory saves race', async () => {
+  const { service, host } = await setup();
+  const [memory, close] = await Promise.all([
+    service.command({ type: 'set-game-memory', maxMemoryMiB: 512, initialMemoryMiB: 256 }),
+    service.command({ type: 'set-close-on-launch', value: true }),
+  ]);
+  expect(memory.ok).toBe(true);
+  expect(close.ok).toBe(true);
+  expect(service.snapshot().preferences).toEqual({
+    closeOnLaunch: true,
+    maxMemoryMiB: 512,
+    initialMemoryMiB: 256,
+  });
+  expect(JSON.parse(await readFile(join(host.base, 'launcher-preferences.json'), 'utf8'))).toEqual({
+    closeOnLaunch: true,
+    maxMemoryMiB: 512,
+    initialMemoryMiB: 256,
+  });
+});
+
+it('rejects physically invalid values without acknowledging or overwriting preferences', async () => {
+  const { service, host } = await setup();
+  const mutable = service as unknown as { state: { physicalMemoryMiB: number } };
+  mutable.state.physicalMemoryMiB = 4096;
+  expect(await service.command({ type: 'set-game-memory', maxMemoryMiB: 8192 })).toMatchObject({
+    ok: false,
+    error: 'memory-limit',
+  });
+  expect(service.snapshot().preferences).toEqual({ closeOnLaunch: false });
+  expect(
+    await readFile(join(host.base, 'launcher-preferences.json'), 'utf8').catch(() => null),
+  ).toBe(null);
+});
+
+it('keeps valid saved values and close-on-launch when a smaller machine requires correction', async () => {
+  const { service, host } = await setup();
+  const mutable = service as unknown as { state: { physicalMemoryMiB: number } };
+  mutable.state.physicalMemoryMiB = 8192;
+  expect(
+    await service.command({
+      type: 'set-game-memory',
+      maxMemoryMiB: 4096,
+      initialMemoryMiB: 1024,
+    }),
+  ).toMatchObject({ ok: true });
+  expect((await service.command({ type: 'set-close-on-launch', value: true })).ok).toBe(true);
+  mutable.state.physicalMemoryMiB = 2048;
+  const restarted = new ProductService(host);
+  expect((await restarted.command({ type: 'logout' })).ok).toBe(true);
+  expect(restarted.snapshot().preferences).toEqual({
+    closeOnLaunch: true,
+    maxMemoryMiB: 4096,
+    initialMemoryMiB: 1024,
+  });
+  expect(JSON.parse(await readFile(join(host.base, 'launcher-preferences.json'), 'utf8'))).toEqual({
+    closeOnLaunch: true,
+    maxMemoryMiB: 4096,
+    initialMemoryMiB: 1024,
+  });
+});
+
+it('does not acknowledge an in-memory update after an atomic save failure', async () => {
+  const { service, host } = await setup();
+  expect((await service.command({ type: 'set-game-memory', maxMemoryMiB: 512 })).ok).toBe(true);
+  const previous = service.snapshot().preferences;
+  await rm(join(host.base, 'launcher-preferences.json'));
+  await mkdir(join(host.base, 'launcher-preferences.json'));
+  expect(await service.command({ type: 'set-game-memory', maxMemoryMiB: 1024 })).toMatchObject({
+    ok: false,
+    error: 'preferences-failed',
+  });
+  expect(service.snapshot().preferences).toEqual(previous);
+});
 
 it('uses safe default after corrupt preference read and allows explicit repair without blocking auth', async () => {
   const { host } = await setup();
