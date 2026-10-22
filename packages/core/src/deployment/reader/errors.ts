@@ -7,6 +7,7 @@ export class DeploymentReaderError extends Error {
       | 'index-hash-mismatch'
       | 'source-changed'
       | 'file-not-found'
+      | 'branding-not-found'
       | 'limit-exceeded'
       | 'invalid-gzip'
       | 'file-hash-mismatch',

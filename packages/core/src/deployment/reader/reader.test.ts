@@ -492,3 +492,159 @@ describe('deployment reader', () => {
     await expect(readFile(storedOutput)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
+
+async function buildBrandedDeployment() {
+  const { tinyPng } = await import('../../branding/fixtures/images.js');
+  const root = await tempDirectory();
+  const icon = tinyPng();
+  const background = tinyPng();
+  await writeFile(join(root, 'game.dat'), 'game payload is independent');
+  const result = await writeDeployment({
+    sourceRoot: root,
+    outputPath: join(root, 'branded.torchpack'),
+    serverId,
+    deploymentId,
+    game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.16.9' } },
+    files: [{ sourcePath: 'game.dat', compression: 'none', policy: 'always' }],
+    branding: {
+      icon: { bytes: icon, mediaType: 'image/png' },
+      background: { bytes: background, mediaType: 'image/png' },
+    },
+  });
+  return { ...result, bytes: await readFile(result.outputPath), root, icon, background };
+}
+
+describe('isolated branding reader', () => {
+  it('fetches only a changed role, reuses the pinned index and keeps the game namespace separate', async () => {
+    const pack = await buildBrandedDeployment();
+    const source = new MemorySource(pack.bytes);
+    const reader = await openDeploymentReader(source, {
+      expectedServerId: serverId,
+      rangeChunkBytes: 16,
+    });
+    source.ranges.length = 0;
+    // Consumer compares verified cached hashes: unchanged icon never calls stageBrandingAsset.
+    const cachedIconHash = sha256(pack.icon);
+    expect(reader.index.branding?.icon?.sha256).toBe(cachedIconHash);
+    expect(source.ranges).toHaveLength(0);
+    const output = join(pack.root, 'background.stage');
+    await expect(reader.stageBrandingAsset('background', output)).resolves.toMatchObject({
+      role: 'background',
+      outputPath: output,
+      length: pack.background.length,
+      sha256: sha256(pack.background),
+    });
+    expect(await readFile(output)).toEqual(pack.background);
+    const asset = reader.index.branding?.background;
+    if (!asset) throw new Error('Missing background');
+    expect(source.ranges[0]?.start).toBe(64 + reader.header.indexLength + asset.offset);
+    expect(
+      source.ranges.every((range) => range.start >= 64 + reader.header.indexLength + asset.offset),
+    ).toBe(true);
+    await expect(
+      reader.stageFile('background', join(pack.root, 'not-a-game-file')),
+    ).rejects.toMatchObject({ code: 'file-not-found' });
+    const count = source.ranges.length;
+    await expect(reader.stageBrandingAsset('background', output)).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+    expect(source.ranges).toHaveLength(count);
+    expect(await readFile(output)).toEqual(pack.background);
+    const game = join(pack.root, 'game.stage');
+    await reader.stageFile('game.dat', game);
+    expect(await readFile(game, 'utf8')).toBe('game payload is independent');
+  });
+  it('does not fetch or stage absent/removed roles in v1.0/v1.1', async () => {
+    const { bytes } = await buildDeployment();
+    const legacySource = new MemorySource(bytes);
+    const legacy = await openDeploymentReader(legacySource, { expectedServerId: serverId });
+    const pack = await buildBrandedDeployment();
+    const index = { ...pack.index, branding: { icon: null } };
+    const raw = rebuildContainer(
+      pack.bytes,
+      JSON.stringify(index),
+      getPayload(pack.bytes).subarray(0, pack.index.files[0]?.storedLength),
+    );
+    const source = new MemorySource(raw);
+    const cleared = await openDeploymentReader(source, { expectedServerId: serverId });
+    expect(cleared.index.branding).toEqual({ icon: null });
+    for (const [reader, memory] of [
+      [legacy, legacySource],
+      [cleared, source],
+    ] as const) {
+      const count = memory.ranges.length;
+      for (const role of ['icon', 'background'] as const)
+        await expect(
+          reader.stageBrandingAsset(role, join(pack.root, `${role}.missing`)),
+        ).rejects.toMatchObject({ code: 'branding-not-found' });
+      expect(memory.ranges).toHaveLength(count);
+    }
+  });
+  it('removes corrupted partial branding and permits a clean retry from a reopened source', async () => {
+    const pack = await buildBrandedDeployment();
+    const corrupted = Buffer.from(pack.bytes);
+    const asset = pack.index.branding?.icon;
+    if (!asset) throw new Error('Missing icon');
+    const corruptedPosition = 64 + pack.header.indexLength + asset.offset;
+    corrupted[corruptedPosition] = (corrupted[corruptedPosition] ?? 0) ^ 1;
+    const reader = await openDeploymentReader(new MemorySource(corrupted), {
+      expectedServerId: serverId,
+      rangeChunkBytes: 16,
+    });
+    const output = join(pack.root, 'retry.stage');
+    await expect(reader.stageBrandingAsset('icon', output)).rejects.toMatchObject({
+      code: 'file-hash-mismatch',
+    });
+    await expect(readFile(output)).rejects.toMatchObject({ code: 'ENOENT' });
+    const retry = await openDeploymentReader(new MemorySource(pack.bytes), {
+      expectedServerId: serverId,
+    });
+    await retry.stageBrandingAsset('icon', output);
+    expect(await readFile(output)).toEqual(pack.icon);
+  });
+  it('keeps malformed branding indexes fatal and honors smaller local payload budgets', async () => {
+    const pack = await buildBrandedDeployment();
+    const malformed = rebuildContainer(
+      pack.bytes,
+      JSON.stringify({ ...pack.index, branding: { icon: null } }),
+      getPayload(pack.bytes),
+    );
+    const source = new MemorySource(malformed);
+    await expect(openDeploymentReader(source, { expectedServerId: serverId })).rejects.toThrow();
+    // Opening requests metadata only; unreferenced image bytes cannot become an optional warning.
+    const metadataEnd = 64 + Number(Buffer.from(malformed).readBigUInt64LE(16));
+    expect(source.ranges.every((range) => range.end < metadataEnd)).toBe(true);
+    for (const budget of [{ maxFileBytes: 32 }, { maxStoredFileBytes: 32 }]) {
+      const limitedSource = new MemorySource(pack.bytes);
+      const reader = await openDeploymentReader(limitedSource, {
+        expectedServerId: serverId,
+        ...budget,
+      });
+      const before = limitedSource.ranges.length;
+      await expect(
+        reader.stageBrandingAsset('icon', join(pack.root, 'limited.stage')),
+      ).rejects.toMatchObject({ code: 'limit-exceeded' });
+      expect(limitedSource.ranges).toHaveLength(before);
+    }
+  });
+  it('enforces source pinning and cancellation with scratch cleanup', async () => {
+    const pack = await buildBrandedDeployment();
+    for (const action of ['reset', 'abort'] as const) {
+      const source = new MemorySource(pack.bytes);
+      const reader = await openDeploymentReader(source, {
+        expectedServerId: serverId,
+        rangeChunkBytes: 16,
+      });
+      const controller = new AbortController();
+      source.beforeResponse = () => {
+        if (action === 'reset') source.reset();
+        else controller.abort();
+      };
+      const output = join(pack.root, `${action}.stage`);
+      await expect(
+        reader.stageBrandingAsset('icon', output, { signal: controller.signal }),
+      ).rejects.toThrow();
+      await expect(readFile(output)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+  });
+});

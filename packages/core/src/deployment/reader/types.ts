@@ -1,5 +1,5 @@
 import type { ResourceSnapshot } from '../../download/http/index.js';
-import type { DeploymentHeader, DeploymentIndex } from '../contracts/index.js';
+import type { BrandingRole, DeploymentHeader, DeploymentIndex } from '../contracts/index.js';
 
 export interface OpenDeploymentReaderOptions {
   /** Trusted server identity from local launcher configuration. */
@@ -38,4 +38,21 @@ export interface DeploymentReader {
     newScratchPath: string,
     options?: StageDeploymentFileOptions,
   ): Promise<StagedDeploymentFile>;
+}
+
+export interface StagedBrandingAsset {
+  readonly role: BrandingRole;
+  readonly outputPath: string;
+  readonly length: number;
+  readonly sha256: string;
+}
+
+/** Extension preserves existing injected DeploymentReader implementations and game-only mocks. */
+export interface BrandingDeploymentReader extends DeploymentReader {
+  /** No game-relative destination is accepted. Absent/null roles fail without requesting payload. */
+  stageBrandingAsset(
+    role: BrandingRole,
+    newScratchPath: string,
+    options?: StageDeploymentFileOptions,
+  ): Promise<StagedBrandingAsset>;
 }

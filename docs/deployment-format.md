@@ -1,7 +1,7 @@
-# TorchLauncher 단일 배포 규격 v1.0
+# TorchLauncher 단일 배포 규격 v1.0 / v1.1
 
-FMT-01 계약 초안. 통합 승인은 #0이 담당한다. 구현 계약은
-`packages/core/src/deployment/contracts/`에 있으며 writer·reader·동기화는 이 작업에 포함하지 않는다.
+FMT-01 계약과 BRAND-CORE-01 브랜딩 확장. 통합 승인은 #0이 담당한다. 구현 계약은
+`packages/core/src/deployment/contracts/`, reader와 writer는 인접 모듈에 있다. 브랜딩 런타임·캐시·UI는 후속 작업이다.
 아키텍처의 미확정 바이너리 규격은 이 문서를 기준으로 구체화한다.
 
 ## 컨테이너와 호환성
@@ -14,15 +14,18 @@ FMT-01 계약 초안. 통합 승인은 #0이 담당한다. 구현 계약은
 | --- | --- | --- |
 | 0 | 8 | ASCII `TORCHDEP` (`54 4f 52 43 48 44 45 50`) |
 | 8 | 2 | major = 1 |
-| 10 | 2 | minor = 0 |
+| 10 | 2 | minor = 0 (일반 배포) 또는 1 (브랜딩 확장) |
 | 12 | 4 | flags = 0 |
 | 16 | 8 | indexLength: 실제 UTF-8 인덱스 바이트 수 |
 | 24 | 8 | totalLength: 헤더·인덱스·페이로드를 합친 전체 바이트 수 |
 | 32 | 32 | 인덱스 원본 바이트의 SHA-256 (binary digest) |
 
-v1.0은 버전이 정확히 1.0이고 flags가 0인 입력만 수락한다. 미래 minor, major, 새로운 필드,
+새 reader는 정확히 1.0 또는 1.1이고 flags가 0인 입력만 수락한다. 미래 minor, major, 새로운 필드,
 압축 방식 또는 적용 정책을 추측해서 처리하지 않는다. 새 필드나 의미 변경에는 버전 갱신이
-필요하다. writer는 헤더와 인덱스에 같은 버전을 기록한다. 헤더의 u64는 변환 전에
+필요하다. writer는 헤더와 인덱스에 같은 버전을 기록하며 서로 다른 minor는 거부한다.
+브랜딩 입력이 없으면 기존 1.0을 쓰고, 브랜딩 입력이 있으면 빈 객체나 제거만 있어도 1.1을 쓴다.
+**이전 런처는 1.1 전체를 거부한다.** 브랜딩 배포 전 런처 업그레이드가 필요하며, 알 수 없는 필드를
+무시하거나 이미지 제거 의도를 잃는 자동 1.0 다운그레이드는 하지 않는다. 헤더의 u64는 변환 전에
 `Number.MAX_SAFE_INTEGER` 이하인지 검사한다. 계약의 정수는 JavaScript `number`이며
 음수·소수·NaN·무한대와 안전하지 않은 정수를 거부한다.
 
@@ -66,7 +69,7 @@ JSON 공백·키 순서는 자유이고 해시는 파싱/재직렬화한 값이 
   문법 검증 성공은 해당 Minecraft/로더 조합의 지원·호환성 검증을 뜻하지 않는다.
 - `files`: 운영자가 제공하는 일반 파일 목록. 디렉터리·심볼릭 링크·하드 링크·실행 권한
   메타데이터는 표현하지 않는다. 빈 목록도 유효하다. 서버 이름·접속 주소·브랜딩·공개 URL은
-  별도 전용 런처/Studio 설정이며 v1 인덱스의 필수 필드에 포함하지 않는다.
+  별도 전용 런처/Studio 설정이다. 이미지 갱신만 v1.1의 선택 역할로 제공하며 아래 규칙을 따른다.
 - `sha256`: 압축 해제 후 원본 파일의 SHA-256, 소문자 64자리 hex.
 - `offset`: **페이로드 시작점 기준** 위치. 절대 위치는 `64 + indexLength + offset`이다.
   인덱스 길이가 변해도 상대 offset은 변하지 않으므로 writer의 직렬화 순환 의존이 없다.
@@ -82,10 +85,12 @@ JSON 공백·키 순서는 자유이고 해시는 파싱/재직렬화한 값이 
   같은 경로의 정책 전환을 자동 덮어쓰기·삭제 허가로 해석하지 않는다. 구체적인 전환과
   충돌 처리는 SYNC-01/USER-02에서 확정하고, 미지원 전환은 명시적으로 거부한다.
 
-목록 순서가 페이로드 순서다. 첫 offset은 0, 이후 offset은 이전 offset + storedLength다.
+일반 파일 목록 순서가 페이로드의 앞부분 순서다. 첫 offset은 0, 이후 offset은 이전 offset + storedLength다.
+v1.1에서는 일반 파일 다음에 icon, background 순서로 실재하는 브랜딩 자산을 이어 붙인다.
 빈 파일은 길이 0의 구간과 빈 바이트의 알려진 SHA-256으로 표현하며 `none`만 허용한다.
 중복·겹침·빈틈·미참조 데이터·
 trailer는 허용하지 않는다. 마지막 구간 끝은 `totalLength - 64 - indexLength`와 같아야 한다.
+v1.0은 일반 파일, v1.1은 일반 파일과 실재하는 브랜딩 자산 전체를 대상으로 이 경계를 검사한다.
 빈 파일은 HTTP 요청을 만들지 않고 로컬에서 빈 바이트의 해시를 검사한다. 비어 있지 않은
 파일의 HTTP 범위는 `[absoluteOffset, absoluteOffset + storedLength - 1]`이다.
 
@@ -160,7 +165,7 @@ reader는 헤더 → 인덱스 → 필요한 페이로드 순서로 읽고, 인�
 다시 확인한다. ETag가 없어도 인덱스/파일 해시와 길이 검사는 생략하지 않는다. 해시가 모두
 일치하는 데이터만 해당 인덱스의 배포로 사용할 수 있다. 검증 전 기존 환경을 수정하지 않는다.
 전송 계층은 206·Content-Range·본문 길이를 검사하며 Range 무시에 조용히 전체 다운로드로
-전환하지 않는다. 실제 다운로드·검증·압축 해제·적용 절차는 후속 reader/sync 작업이다.
+전환하지 않는다. reader는 실제 다운로드·검증·압축 해제·scratch 저장을 수행하고, sync가 게임 파일 적용을 담당한다.
 
 ## 코드 계약과 검증 예제
 
@@ -178,4 +183,87 @@ reader는 헤더 → 인덱스 → 필요한 페이로드 순서로 읽고, 인�
 루트 export 추가는 #0의 후속 공유 파일 배정 대상이며 이번 작업에서 수정하지 않는다.
 `fixtures/valid.ts`의 두 로더 예제와 인접 테스트는 writer/reader가 재사용할 계약 예제다.
 테스트는 잘못된 버전·경로/alias·범위·길이·압축/해시 문법·서버 ID를 거부하는지 검증한다.
-바이너리 인코딩/디코딩과 HTTP/실제 gzip/해시 검증은 이 작업의 검증 완료 범위가 아니다.
+바이너리 인코딩/디코딩과 실제 gzip/해시 검증은 인접 reader/writer 테스트에서 검증한다.
+실서버/Windows·이미지 실제 디코드와 UI/캐시는 BRAND-CORE-01의 검증 범위가 아니다.
+
+
+## v1.1 브랜딩 전용 페이로드
+
+v1.1 인덱스는 필수 `branding` 객체를 추가한다. 객체에는 `icon`, `background`만 허용하며
+각 역할은 생략, `null`, 자산 descriptor 중 하나다. v1.0에서는 `branding` 필드를 거부한다.
+앱 이름은 원격으로 바꾸지 않는다.
+
+```json
+{
+  "branding": {
+    "icon": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "offset": 123,
+      "storedLength": 456,
+      "originalLength": 456,
+      "compression": "none",
+      "mediaType": "image/png"
+    },
+    "background": null
+  }
+}
+```
+
+위 descriptor는 구조 예시이며 offset/해시는 실제 페이로드와 맞춰야 한다. 이미지 역할은 게임
+경로·적용 정책을 갖지 않고 일반 `files` 목록, 동기화 원장, 게임 준비 검사에 편입되지 않는다.
+자산 개수는 최대 2개이며 임의 역할·추가 필드를 거부한다. `files`의 100,000개 제한은 유지한다.
+
+- 기존 v1.0/`branding` 미지원: 현재 표시 유지.
+- v1.1의 `branding: {}` 또는 생략한 역할: 해당 역할 현재 표시 유지.
+- 역할 값 `null`: 기본 표시로 전환하는 명시적 의도. 페이로드 없음. 런타임은 제거 상태를
+  tombstone으로 지속 저장해 다음 시작에서 동봉 이미지가 다시 나타나지 않게 한다.
+- descriptor: 마지막 검증본과 해시를 비교하고, 바뀐 역할만 받는다. 검증/디코드가 끝날 때까지
+  기존 표시를 유지한다. 역할 이름이나 파일 경로로 이미지를 조회하지 않는다.
+
+이미지에는 길이 0을 허용하지 않는다. PNG/JPEG는 이미 압축된 데이터이므로 v1.1 이미지
+`compression`은 `none`만 허용하고 저장/원본 길이가 같아야 한다. 원본 바이트 해시·안전한 정수·
+전체 컨테이너/원본 합 제한도 동일하게 검사한다. 게임 파일 뒤에 **icon → background** 순서로
+실재하는 descriptor를 배치한다. JSON 키 순서는 자유다. null/생략은 범위를 소비하지 않는다.
+전체 일반 파일·이미지의 offset을 단일 cursor로 검사하므로 교차 중첩·빈틈·미참조 trailer를 거부한다.
+
+| 역할 | 형식 | 인코딩 길이 | 너비 × 높이 | 픽셀 수 |
+| --- | --- | --- | --- | --- |
+| icon | PNG | 1 MiB 이하 | 512 × 512 이하 | 262,144 이하 |
+| background | PNG/JPEG | 8 MiB 이하 | 3840 × 2160 이하 | 8,294,400 이하 |
+
+`branding/index.ts`의 순수 `inspectBrandingImage(role, mediaType, bytes)`는 크기 제한 내 PNG
+signature/IHDR와 JPEG marker/SOF를 경계 검사하며 차원을 확인한다. 픽셀 데이터·완전한 이미지
+무결성·실제 디코드 성공을 보장하지 않는다. Studio와 런처는 실제 디코드와 동일 차원/픽셀 상한을
+검사한 뒤 저장/표시해야 한다. descriptor 검증만으로 image header를 확인할 수는 없다.
+
+`openDeploymentReader`는 기존 `DeploymentReader`를 확장한 `BrandingDeploymentReader`를 반환한다.
+`stageBrandingAsset(role, newScratchPath, options?)`는 해당 역할의 검증 바이트만 새 파일로 저장하고
+`{role, outputPath, length, sha256}`을 반환한다. 기존 `stageFile(path, ...)`는 게임 `files`만 찾는다.
+기존 reader 인터페이스와 주입 mock에는 새 필수 메서드를 넣지 않았다. 주입형 소비자는 확장 인터페이스를
+요구하거나 메서드 존재를 확인해야 한다. null/없는 역할은 `branding-not-found`이며 요청을 만들지 않는다.
+두 경로 모두 동일 source ID/generation/snapshot pin, chunk 범위 제한, 해시, 길이, 취소 및 scratch
+정리 규칙을 사용한다. 작은 `maxFileBytes`/`maxStoredFileBytes` 운영 예산은 이미지에도 적용된다.
+
+`writeDeployment` 입력에 `branding?: {icon?: {bytes, mediaType} | null, background?: ...}`를 둔다.
+writer는 첫 await 전에 제한 크기를 확인하고 `Uint8Array`를 복사한 후 header/차원을 검사하고 해시를
+계산한다. 선택 파일은 Studio가 안전하게 읽고 실제 디코드한 bounded 스냅샷으로 전달한다. 같은 스냅샷을
+로컬 sidecar로도 내보낸다. 원본 파일을 나중에 다시 읽어 두 출력의 이미지가 달라지게 하지 않는다.
+writer는 게임 파일의 기존 안전한 root 상대경로 스트리밍을 그대로 유지한다.
+
+## 프로파일 v1 선택 브랜딩
+
+`torchlauncher-server.json`의 선택 `branding`은 `{appName?, icon?, background?}`다. 각 이미지
+참조는 `{path, sha256, length, mediaType}`이며 위 해시/길이/형식 제한을 적용한다. `path`는 위
+portable 경로 규칙을 적용한 NFC 상대 경로이며 **실제 프로파일 JSON 디렉터리**를 기준으로 해석한다.
+실행 파일 디렉터리나 게임 루트가 아니다. 바이트·data URL을 JSON에 넣지 않으며 기존 앱의 16 KiB
+설정 파일 읽기 제한을 늘리지 않는다. 로컬 이미지 생략은 기본 표시이며 `null`은 허용하지 않는다.
+`appName`은 trim된 1–40 Unicode code point이고 제어/서식/고립 surrogate를 거부한다. 창 제목·메뉴
+표시에만 쓰며 `app.setName`, appId, userData, 인증 캐시, 홈 서버 이름, 시작 TorchLauncher 로고와
+EXE 아이콘은 변경하지 않는다. 생략하면 기존 제목/메뉴 표시를 유지한다.
+
+새 parser는 브랜딩 없는 기존 v1 프로파일을 계속 읽지만 이전 strict parser는 새 필드를 거부한다.
+JSON 구조·필드·unsafe 경로 등 계약 오류는 프로파일 오류다. 구조상 올바른 참조의 파일 누락·hash 불일치·
+실제 decode 실패는 런타임 자산 실패이며 기본/이전 표시를 유지해야 한다. 런타임은 symlink/hardlink와
+실제 root 이탈을 거부하고 게임 데이터 밖 캐시를 서버 ID·프로파일 기준으로 분리한다. 원격 전체 인덱스가
+잘못되면 여전히 reader 오류다. 이미지 fetch/decode 실패를 게임 실패로 연결하지 않는다.
+프로파일/배포 해시는 무결성 검사이며 운영자 진위 서명이나 rollback 방지를 제공하지 않는다.

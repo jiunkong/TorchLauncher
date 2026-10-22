@@ -52,3 +52,59 @@ describe('server config', () => {
     expect(() => parseServerConfig(input)).toThrow('Invalid server configuration');
   });
 });
+
+describe('optional profile branding', () => {
+  const asset = {
+    path: 'branding/아이콘.png',
+    sha256: 'a'.repeat(64),
+    length: 100,
+    mediaType: 'image/png',
+  };
+  it('preserves legacy profiles and snapshots sidecar metadata without filesystem access', () => {
+    const input = { ...config, branding: { appName: '운영자 런처', icon: { ...asset } } };
+    const parsed = parseServerConfig(input);
+    expect(parsed.branding).toEqual(input.branding);
+    input.branding.icon.path = 'changed.png';
+    expect(parsed.branding?.icon?.path).toBe(asset.path);
+    expect(parseServerConfig({ ...config, branding: {} }).branding).toEqual({});
+    expect(
+      parseServerConfig({
+        ...config,
+        branding: { background: { ...asset, mediaType: 'image/jpeg' } },
+      }).branding?.background?.mediaType,
+    ).toBe('image/jpeg');
+  });
+  it.each([
+    null,
+    { appName: '' },
+    { appName: ' leading' },
+    { appName: 'x'.repeat(41) },
+    { appName: 'bad\u202ename' },
+    { appName: '\ud800' },
+    { icon: null },
+    { icon: { ...asset, mediaType: 'image/jpeg' } },
+    { icon: { ...asset, length: 1_048_577 } },
+    { icon: { ...asset, length: 0 } },
+    { icon: { ...asset, length: 1.5 } },
+    { background: { ...asset, length: 8_388_609 } },
+    { icon: { ...asset, sha256: 'A'.repeat(64) } },
+    { icon: { ...asset, extra: true } },
+    { appName: 'ok', extra: true },
+    ...[
+      '../icon.png',
+      '/icon.png',
+      'C:/icon.png',
+      'branding\\icon.png',
+      'NUL.png',
+      '.torchlauncher/icon.png',
+      'branding/e\u0301.png',
+    ].map((path) => ({ icon: { ...asset, path } })),
+  ])(
+    'rejects structurally invalid branding while runtime file/decode failures remain separate',
+    (branding) => {
+      expect(() => parseServerConfig({ ...config, branding })).toThrow(
+        'Invalid server configuration',
+      );
+    },
+  );
+});
