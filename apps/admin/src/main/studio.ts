@@ -4,10 +4,17 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path
 import { BRANDING_LIMITS, BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
 import { DeploymentValidationError } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
+import { createEd25519Signer } from '../../../../packages/core/src/deployment/signing/index.js';
 import { writeDeployment } from '../../../../packages/core/src/deployment/writer/index.js';
 import { createDownloadSource } from '../../../../packages/core/src/download/source/factory.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
-import type { StudioProject, StudioReply, StudioRequest, StudioState } from '../shared/studio.js';
+import type {
+  StudioProject,
+  StudioReply,
+  StudioRequest,
+  StudioSigning,
+  StudioState,
+} from '../shared/studio.js';
 import {
   type BrandingSnapshots,
   decodeProject,
@@ -21,13 +28,22 @@ import {
 } from './branding.js';
 import { exportLauncher, noLinks, safeRead, saveProject } from './filesystem.js';
 import { newProject, parseProject, StudioFailure } from './project.js';
+import type { SigningKeyStore } from './signing.js';
 
 export interface StudioDialogs {
   open(
-    kind: 'project' | 'source' | 'files' | 'binary' | 'output' | 'icon' | 'background',
+    kind:
+      | 'project'
+      | 'source'
+      | 'files'
+      | 'binary'
+      | 'output'
+      | 'icon'
+      | 'background'
+      | 'keybackup',
     root?: string,
   ): Promise<string[] | null>;
-  save(kind: 'project' | 'pack'): Promise<string | null>;
+  save(kind: 'project' | 'pack' | 'keybackup'): Promise<string | null>;
   discard(): Promise<boolean>;
 }
 export class StudioService {
@@ -39,6 +55,7 @@ export class StudioService {
     busy: null,
     progress: 0,
     result: null,
+    signing: null,
   };
   private projectPath: string | null = null;
   private sourceRoot: string | null = null;
@@ -52,6 +69,8 @@ export class StudioService {
     private readonly decode: ImageDecoder = () => {
       throw new StudioFailure('INVALID');
     },
+    /** Production always injects a store; without one (tests only) builds stay unsigned. */
+    private readonly keys: SigningKeyStore | null = null,
   ) {}
   snapshot(): StudioState {
     return structuredClone(this.state);
@@ -93,7 +112,22 @@ export class StudioService {
           : ['brandingSelect', 'brandingRemove'].includes(String(value.action))
             ? 'role'
             : null;
-    if (
+    const keyActions: Record<string, string[]> = {
+      keyStatus: [],
+      keyCreate: [],
+      keyExport: ['passphrase'],
+      keyImport: ['passphrase', 'replace'],
+    };
+    const keyFields = typeof value.action === 'string' ? keyActions[value.action] : undefined;
+    if (keyFields) {
+      if (
+        Object.keys(value).length !== keyFields.length + 1 ||
+        keyFields.some((k) => !Object.hasOwn(value, k)) ||
+        (keyFields.includes('passphrase') && typeof value.passphrase !== 'string') ||
+        (keyFields.includes('replace') && typeof value.replace !== 'boolean')
+      )
+        return Promise.resolve({ ok: false, code: 'INVALID' });
+    } else if (
       typeof value.action !== 'string' ||
       (!actions.includes(value.action) &&
         !['update', 'brandingSelect', 'brandingRemove', 'brandingName'].includes(value.action)) ||
@@ -120,8 +154,9 @@ export class StudioService {
           build: 'building',
           check: 'checking',
           export: 'exporting',
+          keyStatus: 'checking',
         } as const
-      )[command.action as 'save'] ?? 'choosing';
+      )[command.action as 'save'] ?? (command.action.startsWith('key') ? 'saving' : 'choosing');
     this.state.progress = 0;
     this.state.result = null;
     this.pending = this.perform(command, this.controller.signal)
@@ -187,6 +222,8 @@ export class StudioService {
         this.sourceRoot = null;
         this.state.sourceName = null;
         this.state.dirty = !path;
+        this.state.signing = null;
+        await this.refreshSigning();
         return;
       }
       case 'brandingSelect': {
@@ -231,6 +268,7 @@ export class StudioService {
         if (
           JSON.stringify(project.branding) !== JSON.stringify(current.branding) ||
           project.serverId !== current.serverId ||
+          project.sequence !== current.sequence ||
           project.files.some((f) => !paths.has(f.path))
         )
           throw new StudioFailure('INVALID');
@@ -285,6 +323,44 @@ export class StudioService {
         this.state.dirty = true;
         return;
       }
+      case 'keyStatus':
+        this.project();
+        this.state.signing = null;
+        await this.refreshSigning();
+        return;
+      case 'keyCreate': {
+        const project = this.project();
+        const keys = this.keys ?? this.noKeys();
+        await keys.create(project.serverId);
+        await this.refreshSigning({ keyCreated: true, sequence: null });
+        this.state.result = '새 서명 키를 만들었습니다.';
+        return;
+      }
+      case 'keyExport': {
+        const project = this.project();
+        const keys = this.keys ?? this.noKeys();
+        const path = await this.dialogs.save('keybackup');
+        if (!path) throw new StudioFailure('CANCELLED');
+        signal.throwIfAborted();
+        await noLinks(dirname(path));
+        await saveProject(path, await keys.exportBackup(project.serverId, command.passphrase));
+        this.state.result = '서명 키 백업 파일을 저장했습니다.';
+        return;
+      }
+      case 'keyImport': {
+        const project = this.project();
+        const keys = this.keys ?? this.noKeys();
+        const path = (await this.selected('keybackup'))[0];
+        if (!path) throw new StudioFailure('CANCELLED');
+        const content = await safeRead(path, 16 * 1024);
+        signal.throwIfAborted();
+        await keys.importBackup(project.serverId, content, command.passphrase, {
+          replace: command.replace,
+        });
+        await this.refreshSigning();
+        this.state.result = '서명 키를 복원했습니다.';
+        return;
+      }
       case 'build': {
         const project = this.project();
         if (!this.sourceRoot) throw new StudioFailure('INVALID');
@@ -293,8 +369,21 @@ export class StudioService {
         signal.throwIfAborted();
         await noLinks(dirname(path));
         const branding = writerBranding(project, this.snapshots);
+        let signing: { sequence: number; sign: ReturnType<typeof createEd25519Signer> } | null =
+          null;
+        let keyCreated = false;
+        if (this.keys) {
+          keyCreated = await this.ensureKey(this.keys, project.serverId);
+          const key = await this.keys.load(project.serverId);
+          // Reserved (persisted) before writing: a failed build burns the number, never reuses it.
+          const sequence = await this.keys.reserveSequence(project.serverId, project.sequence ?? 0);
+          this.state.project = { ...project, sequence };
+          this.state.dirty = true;
+          signing = { sequence, sign: createEd25519Signer(key) };
+        }
         await writeDeployment({
           ...(branding ? { branding } : {}),
+          ...(signing ? signing : {}),
           sourceRoot: this.sourceRoot,
           outputPath: path,
           serverId: project.serverId,
@@ -310,8 +399,12 @@ export class StudioService {
             this.state.progress = p.processedBytes;
           },
         });
-        this.state.result =
-          'torchpack 배포 파일을 생성했습니다. 공개 호스팅에 직접 업로드한 뒤 URL을 검사하세요.';
+        await this.refreshSigning({ keyCreated, sequence: signing?.sequence ?? null });
+        this.state.result = `torchpack 배포 파일을 생성했습니다${
+          signing
+            ? ` (서명됨, sequence ${signing.sequence}${keyCreated ? ', 새 서명 키 생성' : ''})`
+            : ''
+        }. 공개 호스팅에 직접 업로드한 뒤 URL을 검사하세요.`;
         return;
       }
       case 'check': {
@@ -321,6 +414,16 @@ export class StudioService {
       }
       case 'export': {
         const project = this.project();
+        const binary = (await this.selected('binary'))[0];
+        const output = (await this.selected('output'))[0];
+        if (!binary || !output) throw new StudioFailure('CANCELLED');
+        await this.verify(signal);
+        let keyCreated = false;
+        let publicKey: string | null = null;
+        if (this.keys) {
+          keyCreated = await this.ensureKey(this.keys, project.serverId);
+          publicKey = (await this.keys.status(project.serverId)).publicKey;
+        }
         const config = parseServerConfig({
           format: 'torchlauncher-server',
           version: 1,
@@ -330,11 +433,8 @@ export class StudioService {
           sourceUrl: project.sourceUrl,
           game: project.game,
           ...(project.branding ? { branding: profileBranding(project) } : {}),
+          ...(publicKey ? { signing: { algorithm: 'ed25519', publicKey } } : {}),
         });
-        const binary = (await this.selected('binary'))[0];
-        const output = (await this.selected('output'))[0];
-        if (!binary || !output) throw new StudioFailure('CANCELLED');
-        await this.verify(signal);
         await exportLauncher(
           binary,
           output,
@@ -345,10 +445,37 @@ export class StudioService {
           },
           this.snapshots,
         );
-        this.state.result = '공통 런처와 서버 설정을 출력 폴더에 복사했습니다.';
+        await this.refreshSigning({ keyCreated, sequence: null });
+        this.state.result = `공통 런처와 서버 설정을 출력 폴더에 복사했습니다${
+          keyCreated ? ' (새 서명 키 생성: 이전 런처 사용자는 새 런처가 필요합니다)' : ''
+        }.`;
         return;
       }
     }
+  }
+  private noKeys(): never {
+    throw new StudioFailure('ENCRYPTION_UNAVAILABLE');
+  }
+  /** Creates the project's key if missing (explicit, reported by the caller). */
+  private async ensureKey(keys: SigningKeyStore, serverId: string): Promise<boolean> {
+    if ((await keys.status(serverId)).keyExists) return false;
+    await keys.create(serverId);
+    return true;
+  }
+  private async refreshSigning(lastOperation?: StudioSigning['lastOperation']): Promise<void> {
+    const project = this.state.project;
+    if (!project || !this.keys) {
+      this.state.signing = null;
+      return;
+    }
+    const status = await this.keys.status(project.serverId);
+    this.state.signing = {
+      encryptionAvailable: status.encryptionAvailable,
+      keyExists: status.keyExists,
+      publicKey: status.publicKey,
+      lastSequence: Math.max(status.lastSequence, project.sequence ?? 0),
+      lastOperation: lastOperation ?? this.state.signing?.lastOperation ?? null,
+    };
   }
   private async verify(signal: AbortSignal): Promise<void> {
     const project = this.project();
