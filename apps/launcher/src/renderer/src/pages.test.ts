@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { ProductState } from '../../shared/product';
 import { DeleteDialog } from './components/DeleteDialog';
 import { RecoveryDialog } from './components/RecoveryDialog';
+import { RemoveUnregisteredDialog } from './components/RemoveUnregisteredDialog';
 import { productState } from './fixtures';
 import { formatBytes } from './format';
 import { LauncherLocaleProvider } from './i18n';
@@ -124,9 +125,9 @@ describe('my mods page', () => {
     expect(html).toContain('모드 ID 충돌 2건');
     expect(html).toContain('서버 모드와 호환되지 않을 수 있습니다.');
     expect(html).toContain('서버 목록에도 내 모드 목록에도 없습니다');
-    // Only a readable, intact unregistered file can be adopted; there is no delete for it.
+    // Only a readable, intact unregistered jar can be adopted; there is no delete for it.
     expect(html.match(/내 모드로 등록<\/button>/g)).toHaveLength(1);
-    expect(html.match(/>삭제<\/button>/g)).toHaveLength(3);
+    expect(html.match(/>삭제<\/button>/g)).toHaveLength(5);
   });
 
   it('distinguishes loading, failure, and an empty list', () => {
@@ -218,13 +219,17 @@ describe('settings page', () => {
     );
   });
 
-  it('shows usage and no deletion location before a preview exists', () => {
+  it('shows the server location without a deletion preview', () => {
     const html = settings(
-      productState({ usage: { bytes: 4.2 * 1024 ** 3, files: 18342, directories: 3 } }),
+      productState({
+        serverDataRoot: '/fixture/server',
+        usage: { bytes: 4.2 * 1024 ** 3, files: 18342, directories: 3 },
+      }),
     );
     expect(html).toContain('4.2 GB');
     expect(html).toContain('서버 데이터 삭제…');
-    expect(html).not.toContain('>위치<');
+    expect(html).toContain('>위치<');
+    expect(html).toContain('/fixture/server');
   });
 });
 
@@ -269,7 +274,7 @@ describe('logs page', () => {
     expect(filterLogs(logs, 'game')).toEqual(['Loading Minecraft']);
   });
 
-  it('renders accessible tabs, a selectable log, a copy button, and no open-folder button', () => {
+  it('renders accessible tabs, a selectable log, a copy button, and an open-folder button', () => {
     const state = productState({ logs });
     const html = render(
       createElement(LogsPage, {
@@ -292,7 +297,7 @@ describe('logs page', () => {
     expect(html).toContain('game-log');
     expect(html).toContain('session: ready');
     expect(html).toContain('>복사<');
-    expect(html).not.toContain('폴더 열기');
+    expect(html).toContain('폴더 열기');
     expect(html).not.toContain('계정 세션');
     expect(html).not.toContain('안전한 복구');
   });
@@ -355,4 +360,20 @@ describe('confirmation windows', () => {
     );
     expect(html).toContain('정리하고 계속');
   });
+});
+
+it('shows exact unregistered removal target and disables confirmation while blocked', () => {
+  const html = render(
+    createElement(RemoveUnregisteredDialog, {
+      path: 'mods/nested/readme.txt',
+      disabled: true,
+      onCancel() {},
+      onConfirm() {},
+    }),
+  );
+  expect(html).toContain('mods/nested/readme.txt');
+  expect(html).toContain('되돌릴 수 없습니다');
+  expect(html).toMatch(
+    /disabled=""[^>]*data-testid="remove-file-confirm"|data-testid="remove-file-confirm"[^>]*disabled=""/,
+  );
 });

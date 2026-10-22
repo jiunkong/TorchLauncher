@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -70,7 +70,10 @@ it('holds product ownership through game reaping and applies policy before handi
       }),
     };
   });
+  const openLogs = vi.fn(async () => '');
+  await mkdir(join(root, 'logs'));
   const service = new ProductService({
+    openLogs,
     base,
     version: 'product-test',
     config: {
@@ -99,6 +102,12 @@ it('holds product ownership through game reaping and applies policy before handi
   await running;
   await vi.waitFor(() => expect(service.snapshot().running).toBe(true));
   expect(service.snapshot().operation).toBe('launch');
+  expect((await service.command({ type: 'open-logs' })).ok).toBe(true);
+  expect(openLogs).toHaveBeenCalledWith(join(root, 'logs'));
+  expect(stop).not.toHaveBeenCalled();
+  expect(
+    await service.command({ type: 'remove-unregistered', path: 'mods/file.txt' }),
+  ).toMatchObject({ ok: false, error: 'busy' });
   expect(service.snapshot().runningSince).toBeGreaterThan(0);
   expect(service.snapshot().game).toBeUndefined();
   expect(JSON.stringify(service.snapshot())).not.toContain('secret-fixture');

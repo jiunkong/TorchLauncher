@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ProductLogEntry, ProductState } from '../../../shared/product';
+import type { ProductCommand, ProductLogEntry, ProductState } from '../../../shared/product';
 import { useT } from '../hooks/useTranslator';
 import { type FrameProps, PageFrame } from './PageFrame';
 
@@ -30,12 +30,16 @@ export function LogsPage({
   frame,
   hidden,
   state,
+  command,
 }: {
   frame: FrameProps;
   hidden: boolean;
   state: ProductState | null;
+  command?(request: ProductCommand): Promise<boolean>;
 }) {
   const t = useT();
+  const [opening, setOpening] = useState(false);
+  const [openFailed, setOpenFailed] = useState(false);
   const [filter, setFilter] = useState<LogFilter>('all');
   const [copyResult, setCopyResult] = useState<'idle' | 'copied' | 'failed'>('idle');
   const lines = filterLogs(state?.logs ?? [], filter);
@@ -83,6 +87,23 @@ export function LogsPage({
       footer={null}
       actions={
         <div className="head-actions">
+          {openFailed && <span role="alert">{t('logs.openFailed')}</span>}
+          <button
+            className="btn sm"
+            type="button"
+            data-testid="open-logs"
+            disabled={!command || state?.configuration !== 'ready' || opening}
+            onClick={() => {
+              if (!command) return;
+              setOpening(true);
+              setOpenFailed(false);
+              void command({ type: 'open-logs' })
+                .then((ok) => setOpenFailed(!ok))
+                .finally(() => setOpening(false));
+            }}
+          >
+            {t('logs.openFolder')}
+          </button>
           {copyResult !== 'idle' && (
             <span
               className={copyResult === 'failed' ? 'copy-note failed' : 'copy-note'}

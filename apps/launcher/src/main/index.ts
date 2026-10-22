@@ -5,12 +5,13 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import { productStateChannel } from '../shared/product';
 import { createPublicJavaAuthenticator } from './auth/public-java-electron';
 import { readServerConfig, serverConfigPath } from './product/bootstrap';
 import { bindProductIpc } from './product/ipc';
 import { ProductService } from './product/service';
+import { createPlayerSkinService } from './skins';
 
 const applicationName = applicationNames.launcher;
 app.setName(applicationName);
@@ -140,7 +141,9 @@ if (primaryInstance)
       version: app.getVersion(),
       config,
       auth,
+      skins: createPlayerSkinService(),
       quit: () => app.quit(),
+      openLogs: (path) => shell.openPath(path),
       chooseMod: async () => {
         const result = await dialog.showOpenDialog({
           title: '사용자 모드 추가',

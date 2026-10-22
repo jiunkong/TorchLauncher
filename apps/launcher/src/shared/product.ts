@@ -17,9 +17,10 @@ export type ProductCommand =
         | 'add-mod'
         | 'packs'
         | 'usage'
-        | 'preview-delete';
+        | 'preview-delete'
+        | 'open-logs';
     }
-  | { type: 'remove-mod' | 'adopt-mod'; path: string }
+  | { type: 'remove-mod' | 'adopt-mod' | 'remove-unregistered'; path: string }
   | { type: 'set-packs'; packs: string[] }
   | { type: 'set-close-on-launch'; value: boolean }
   | { type: 'set-game-memory'; maxMemoryMiB: number; initialMemoryMiB?: number }
@@ -69,7 +70,7 @@ export interface ProductState {
   server: { serverId: string; name: string; address: string } | null;
   configuration: 'ready' | 'unavailable';
   supported: boolean;
-  account: { name: string; expiresAt: number } | null;
+  account: { name: string; expiresAt: number; skin?: string } | null;
   status: {
     state: 'unknown' | 'online' | 'unavailable';
     online?: number;
@@ -98,6 +99,7 @@ export interface ProductState {
   modsRecovery: boolean;
   packs: { id: string; required: boolean }[];
   missingPacks: string[];
+  serverDataRoot: string | null;
   usage: { bytes: number; files: number; directories: number } | null;
   deletion: {
     root: string;
@@ -141,6 +143,7 @@ export function parseProductCommand(input: unknown): ProductCommand {
     'packs',
     'usage',
     'preview-delete',
+    'open-logs',
   ];
   if (typeof value.type !== 'string') return fail();
   if (
@@ -164,6 +167,18 @@ export function parseProductCommand(input: unknown): ProductCommand {
     /^mods\/(?:[^/\\:]+\/)*[^/\\:]+\.jar$/i.test(value.path) &&
     value.path.length <= 512 &&
     !value.path.includes('..') &&
+    !/[\p{Cc}\p{Cf}]/u.test(value.path)
+  )
+    return value as ProductCommand;
+  if (
+    value.type === 'remove-unregistered' &&
+    exact('type', 'path') &&
+    typeof value.path === 'string' &&
+    /^mods\/(?:[^/\\:]+\/)*[^/\\:]+$/u.test(value.path) &&
+    value.path.length <= 512 &&
+    !value.path
+      .split('/')
+      .some((part) => part === '.' || part.includes('..') || /[. ]$/.test(part)) &&
     !/[\p{Cc}\p{Cf}]/u.test(value.path)
   )
     return value as ProductCommand;

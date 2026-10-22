@@ -21,6 +21,7 @@ export function productState(overrides: Partial<ProductState> = {}): ProductStat
     modsRecovery: false,
     packs: [],
     missingPacks: [],
+    serverDataRoot: null,
     usage: null,
     deletion: null,
     recovery: null,

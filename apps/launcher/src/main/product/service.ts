@@ -1,4 +1,6 @@
+import { lstat, realpath } from 'node:fs/promises';
 import { release, totalmem } from 'node:os';
+import { join } from 'node:path';
 import { openDeploymentReader } from '../../../../../packages/core/src/deployment/reader/index';
 import { createFullDownloader } from '../../../../../packages/core/src/download/full/index';
 import { createDownloadSource } from '../../../../../packages/core/src/download/source/index';
@@ -16,6 +18,7 @@ import {
   adoptUnregistered,
   listMods,
   registerUserMod,
+  removeUnregistered,
   removeUserMod,
 } from '../../../../../packages/core/src/instance/mods/index';
 import {
@@ -55,6 +58,8 @@ export interface ProductHost {
     refresh(signal?: AbortSignal): Promise<LaunchAuth>;
     logout(): Promise<void>;
   };
+  skins?: { get(profileId: string, signal?: AbortSignal): Promise<string | null>; clear(): void };
+  openLogs?(path: string): Promise<string>;
   chooseMod(): Promise<string | null>;
   publish(state: ProductState): void;
   quit?(): void;
@@ -124,6 +129,8 @@ export class ProductService {
   private preferencesLoaded = false;
   private preferencesQueue: Promise<void> = Promise.resolve();
   private closing = false;
+  private skinGeneration = 0;
+  private skinRequest: AbortController | undefined;
   private relinquished = false;
   private launcherLogs: ProductLogEntry[] = [];
   private gameLogs: ProductLogEntry[] = [];
@@ -164,11 +171,69 @@ export class ProductService {
       modsRecovery: false,
       packs: [],
       missingPacks: [],
+      serverDataRoot: config ? resolveServerDataRoot(host.base, config.serverId) : null,
       usage: null,
       deletion: null,
       recovery: null,
       logs: [],
     };
+  }
+  private clearSkin() {
+    this.skinGeneration++;
+    this.skinRequest?.abort();
+    this.skinRequest = undefined;
+    this.host.skins?.clear();
+    if (this.state.account) delete this.state.account.skin;
+  }
+  private setAccount(auth: LaunchAuth) {
+    this.skinRequest?.abort();
+    const generation = ++this.skinGeneration;
+    this.state.account = { name: auth.profile.name, expiresAt: auth.expiresAt };
+    if (!this.host.skins || this.closing) return;
+    const account = this.state.account;
+    const controller = new AbortController();
+    this.skinRequest = controller;
+    // Cosmetic lookup must never delay authentication or the game launch gate.
+    void Promise.resolve()
+      .then(() =>
+        controller.signal.aborted || this.closing
+          ? null
+          : this.host.skins?.get(auth.profile.id, controller.signal),
+      )
+      .then((skin) => {
+        if (
+          !skin ||
+          controller.signal.aborted ||
+          this.closing ||
+          generation !== this.skinGeneration ||
+          this.state.account !== account
+        )
+          return;
+        account.skin = skin;
+        this.publish();
+      })
+      .catch(() => {});
+  }
+  private async openLogs(): Promise<ProductResult> {
+    try {
+      if (this.closing || this.relinquished) throw new Error('busy');
+      if (!this.host.openLogs) throw new Error('operation-failed');
+      const root = await this.verified();
+      const path = join(root.realRoot, 'logs');
+      const info = await lstat(path).catch((error: unknown) => {
+        if ((error as { code?: string }).code === 'ENOENT') throw new Error('root-not-found');
+        throw error;
+      });
+      if (!info.isDirectory() || info.isSymbolicLink() || (await realpath(path)) !== path)
+        throw new Error('unsafe-path');
+      // Recheck the owned ancestry immediately before passing the fixed canonical folder to the host.
+      if ((await this.verified()).realRoot !== root.realRoot) throw new Error('unsafe-path');
+      if (this.closing || this.relinquished) throw new Error('busy');
+      if (await this.host.openLogs(path)) throw new Error('operation-failed');
+      return { ok: true, state: this.snapshot() };
+    } catch (error) {
+      return { ok: false, error: safeProductError(error), state: this.snapshot() };
+    }
   }
   snapshot(): ProductState {
     return structuredClone(this.state);
@@ -291,6 +356,7 @@ export class ProductService {
     } catch {
       return { ok: false, error: 'invalid-request', state: this.snapshot() };
     }
+    if (command.type === 'open-logs') return this.openLogs();
     if (command.type === 'set-game-memory') return this.saveGameMemory(command);
     if (command.type === 'cancel' || command.type === 'stop') {
       this.operations.cancel();
@@ -331,11 +397,12 @@ export class ProductService {
             case 'login':
             case 'refresh': {
               const auth = await this.host.auth[command.type](signal);
-              this.state.account = { name: auth.profile.name, expiresAt: auth.expiresAt };
+              this.setAccount(auth);
               this.log(command.type === 'login' ? 'session: signed-in' : 'session: ready');
               break;
             }
             case 'logout':
+              this.clearSkin();
               this.state.account = null;
               await this.host.auth.logout();
               this.log('session: signed-out');
@@ -405,6 +472,7 @@ export class ProductService {
               }
               break;
             }
+            case 'remove-unregistered':
             case 'remove-mod':
             case 'adopt-mod': {
               await this.ensure();
@@ -415,6 +483,7 @@ export class ProductService {
                 signal,
               };
               if (command.type === 'remove-mod') await removeUserMod(options);
+              else if (command.type === 'remove-unregistered') await removeUnregistered(options);
               else await adoptUnregistered(options);
               await this.mods(signal);
               break;
@@ -489,10 +558,15 @@ export class ProductService {
             }
           }
         } catch (error) {
-          if (command.type === 'login' || command.type === 'refresh') this.state.account = null;
-          const code = safeProductError(error, signal.aborted);
-          if (code === 'no_session' || code === 'reauthentication_required')
+          if (command.type === 'login' || command.type === 'refresh') {
+            this.clearSkin();
             this.state.account = null;
+          }
+          const code = safeProductError(error, signal.aborted);
+          if (code === 'no_session' || code === 'reauthentication_required') {
+            this.clearSkin();
+            this.state.account = null;
+          }
           if (!(restoring && code === 'no_session')) this.log(`${command.type}: failed ${code}`);
           this.state.error = restoring && code === 'no_session' ? null : code;
           throw new Error(code);
@@ -692,10 +766,11 @@ export class ProductService {
       },
       authenticate: async () => {
         const auth = await this.host.auth.refresh(signal).catch((error: unknown) => {
+          this.clearSkin();
           this.state.account = null;
           throw error;
         });
-        this.state.account = { name: auth.profile.name, expiresAt: auth.expiresAt };
+        this.setAccount(auth);
         return auth;
       },
       afterSynchronization: async () => {
@@ -748,6 +823,7 @@ export class ProductService {
   }
   async close() {
     this.closing = true;
+    this.clearSkin();
     const closing = this.operations.close();
     try {
       if (this.game && !this.game.detached) await this.game.stop();

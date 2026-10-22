@@ -2,6 +2,10 @@ import { defineTranslations } from '@torchlauncher/core/i18n';
 
 // Korean is the reference language. English values are temporary copies except the generic keys below.
 const ko = {
+  'logs.openFolder': '폴더 열기',
+  'logs.openFailed': '로그 폴더를 열지 못했습니다.',
+  'mods.removeFileTitle': '등록되지 않은 파일을 삭제할까요?',
+  'mods.removeFileBody': '아래 파일을 삭제합니다. 이 작업은 되돌릴 수 없습니다.',
   'common.cancel': '취소',
   'common.close': '닫기',
   'common.retry': '다시 시도',

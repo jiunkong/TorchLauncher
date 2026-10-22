@@ -111,10 +111,27 @@ try {
   );
   await page.getByRole('button', { name: '내 모드', exact: true }).click();
   await page.getByText('추가한 모드가 없습니다.', { exact: true }).waitFor();
+  const dataRoot = resolve(temp, 'user-data/servers/44444444-4444-4444-8444-444444444444');
+  await mkdir(resolve(dataRoot, 'mods'), { recursive: true });
+  const unregistered = resolve(dataRoot, 'mods/readme.txt');
+  await writeFile(unregistered, 'smoke fixture only');
+  await page.evaluate(() => window.torchlauncher.command({ type: 'mods' }));
+  await page.getByRole('button', { name: 'readme.txt 삭제', exact: true }).click();
+  await page.getByTestId('remove-file-dialog').waitFor();
+  await page.getByTestId('remove-file-dialog').locator('[data-autofocus]').click();
+  assert.equal(await readFile(unregistered, 'utf8'), 'smoke fixture only');
+  await page.getByRole('button', { name: 'readme.txt 삭제', exact: true }).click();
+  await page.getByTestId('remove-file-confirm').click();
+  await page
+    .getByRole('button', { name: 'readme.txt 삭제', exact: true })
+    .waitFor({ state: 'detached' });
+  await assert.rejects(readFile(unregistered), { code: 'ENOENT' });
 
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('heading', { level: 2, name: '활성 리소스팩 순서' }).waitFor();
   await page.getByTestId('usage').filter({ hasText: '파일' }).waitFor();
+  assert.equal(await page.getByText(dataRoot, { exact: true }).count(), 1);
+  assert.equal((await page.evaluate(() => window.torchlauncher.getState())).deletion, null);
   const closeOnLaunch = page.getByRole('switch', { name: '게임 실행 후 런처 종료', exact: true });
   assert.equal((await closeOnLaunch.getAttribute('aria-checked')) === 'true', false);
   await closeOnLaunch.click();
@@ -181,11 +198,26 @@ try {
     .getByText(/^session: ready|^status: failed/)
     .first()
     .waitFor();
-  assert.equal(await page.getByText('폴더 열기').count(), 0);
+  await page.getByTestId('open-logs').click();
+  await page.getByText('로그 폴더를 열지 못했습니다.', { exact: true }).waitFor();
   await page.screenshot({ path: resolve('.cache/smoke/l2a-logs.png') });
+  // Inject a local synthetic account state solely to verify App → Menu → PlayerAvatar wiring.
+  const avatarState = await page.evaluate(() => window.torchlauncher.getState());
+  await app.evaluate(({ BrowserWindow, nativeImage }, state) => {
+    const skin = nativeImage
+      .createFromBitmap(Buffer.alloc(64 * 64 * 4, 255), { width: 64, height: 64 })
+      .toDataURL();
+    BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', {
+      ...state,
+      account: { name: 'FixturePlayer', expiresAt: 1, skin },
+    });
+  }, avatarState);
+  await page.locator('.player-avatar-skin[data-ready="true"]').waitFor();
+  assert.equal(await page.locator('.player-avatar-face').count(), 1);
+  assert.equal(await page.locator('.player-avatar-hat').count(), 1);
   assert.deepEqual(pageErrors, []);
   console.log(
-    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage and log tabs passed',
+    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage, unregistered-file confirmation/removal, log-folder failure and wired avatar passed',
   );
 } finally {
   await app?.close();

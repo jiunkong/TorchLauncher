@@ -3,6 +3,7 @@ import torchUrl from './assets/torch.png';
 import { DeleteDialog } from './components/DeleteDialog';
 import { Menu, type PageId } from './components/Menu';
 import { RecoveryDialog } from './components/RecoveryDialog';
+import { RemoveUnregisteredDialog } from './components/RemoveUnregisteredDialog';
 import { Splash } from './components/Splash';
 import { StopDialog } from './components/StopDialog';
 import { homePrimaryCommand } from './flow';
@@ -26,6 +27,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const [page, setPage] = useState<PageId>('home');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stopOpen, setStopOpen] = useState(false);
+  const [removeFile, setRemoveFile] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   // Set when the recovery window was opened because a play attempt was blocked.
@@ -125,7 +127,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
       <main
         className="app"
         data-testid="app-shell"
-        inert={!splashDone || stopOpen || deleteOpen || recoveryOpen}
+        inert={!splashDone || stopOpen || deleteOpen || recoveryOpen || removeFile !== null}
       >
         <Menu
           open={menuOpen}
@@ -134,6 +136,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
           onNavigate={navigate}
           serverName={state?.server?.name ?? null}
           accountName={state?.account?.name ?? null}
+          {...(state?.account?.skin ? { accountSkin: state.account.skin } : {})}
           logoutDisabled={busy}
           onLogout={logout}
         />
@@ -187,6 +190,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
           >
             {state && (
               <ModsPage
+                onRemoveUnregistered={setRemoveFile}
                 active={page === 'mods'}
                 state={state}
                 pending={pending}
@@ -213,9 +217,30 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
               />
             )}
           </PageFrame>
-          <LogsPage frame={frame} hidden={page !== 'troubleshooting'} state={state} />
+          <LogsPage
+            frame={frame}
+            hidden={page !== 'troubleshooting'}
+            state={state}
+            command={command}
+          />
         </div>
       </main>
+      {removeFile && (
+        <RemoveUnregisteredDialog
+          path={removeFile}
+          disabled={
+            busy ||
+            !!state?.running ||
+            !state?.mods.some((mod) => mod.path === removeFile && mod.source === 'unregistered')
+          }
+          onCancel={() => setRemoveFile(null)}
+          onConfirm={() => {
+            const path = removeFile;
+            setRemoveFile(null);
+            void command({ type: 'remove-unregistered', path });
+          }}
+        />
+      )}
       {stopOpen && (
         <StopDialog
           onCancel={() => setStopOpen(false)}
