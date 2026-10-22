@@ -25,7 +25,7 @@ renderer 관련 테스트 24개·타입/빌드·Electron pointer/저장 전 미�
 main `pnpm check` 성공: 913개 통과·9개 skip, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개).
 인계 정확도 문서 후속 `e7a207d`도 통합했다. agent-1 detached·병합 브랜치 정리, 다른 worktree 미변경.
 Windows 드래그 사용감 및 MEM-01 실제 게임 메모리 확인은 사용자 검증 대기다.
-[인계](handoffs/MEM-01-INPUT.md). L3/L2a 후속은 계속 대기한다.
+[인계](handoffs/MEM-01-INPUT.md). 이후 사용자 승인으로 L2a 후속/L3 스킨만 병렬 착수했다.
 
 MEM-01 구현·검토·통합: #1 `mem_01`, Luna medium의 `a2f81b1`을 #0이 `91d47c9`로 --no-ff 병합했다.
 코어 Xms(미지정이면 생략), 기존 Xmx 기본 2048 MiB 유지, 개인 설정 호환·원자적 저장,
@@ -37,7 +37,7 @@ main 전체 `pnpm check` 성공: 911개 통과·9개 skip, 전체 타입·두 �
 agent-1을 통합 main(`91d47c9`)에 detached로 정리하고 병합된 작업 브랜치를 삭제했다. 다른 worktree는 그대로다.
 Windows 실제 UI/Java 메모리 인자 검증은 미실시이며 사용자 확인을 요청한다.
 [인계](handoffs/MEM-01.md), `docs/work-distribution.md` 맨 아래 MEM-01을 참고한다.
-L3와 L2a 후속은 MEM-01 통합 후 별도 배정안 승인까지 착수하지 않는다.
+운영자 브랜딩은 아직 미승인/미착수다. L2a 후속/L3 스킨의 새 배정은 문서 상단을 따른다.
 
 BRAND-ICON-01 구현·통합: #1 `app_icon` Luna medium의 `35d4f90`를 #0이 `8b2e946`으로 병합했다.
 사용자 ICO를 공유 `assets/branding/`에 복사하고 내장 PNG를 무손실 추출했다. 두 앱 native 창 및

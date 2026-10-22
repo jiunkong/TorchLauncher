@@ -47,7 +47,8 @@ Suggested check: maximum 2 GB / initial 1 GB → save → restart confirms persi
 blank initial field saves/launches without explicit Xms. Existing auto-close setting must stay preserved.
 If launcher remains running, saving different valid values during the game must affect only next launch.
 Never ask for raw Java command line (contains credentials); share only filtered Xmx/Xms arguments if needed.
-L3 and L2a follow-ups remain pending separate user approval after MEM-01 integration. Other worktrees untouched.
+Superseded approval state: the newer top entry records user approval of L2a followups + L3 skin.
+Operator branding remains unstarted. Worker-2/3 have now been assigned from the latest baseline.
 System Node v24.21.0 is available; `/tmp/torchlauncher-tools/node_modules/.bin` contains pnpm only.
 
 This section supersedes the older sections below where they conflict. Read `docs/launcher-ui.md` (spec, phases),
