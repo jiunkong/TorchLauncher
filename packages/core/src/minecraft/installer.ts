@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { chmod, copyFile, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, posix, resolve, sep } from 'node:path';
 import { secureDirectory, stat } from './filesystem';
+import { runInstallPool } from './install-pool';
 import {
   INSTALL_LOCK_DIRECTORY,
   type InstallOperation,
@@ -38,6 +39,15 @@ export type Downloader = (
   url: string,
   options: { signal?: AbortSignal; maxBytes: number },
 ) => Promise<Uint8Array>;
+export interface InstallActivity {
+  phase: 'planning' | 'checking' | 'downloading' | 'staging' | 'publishing';
+  component: 'metadata' | 'game' | 'java' | 'library' | 'asset' | 'logging';
+  /** Canonical installation-relative path, never a download URL. */
+  path?: string;
+  active: number;
+  completed: number;
+  total: number | null;
+}
 export interface InstallOptions {
   /** Dedicated server directory; caller must serialize game launch, updates and deletion. */
   root: string;
@@ -45,6 +55,9 @@ export interface InstallOptions {
   platform: Platform;
   download: Downloader;
   signal?: AbortSignal;
+  /** Maximum simultaneous file operations (1–16, default 6). */
+  concurrency?: number;
+  onActivity?: (event: InstallActivity) => void;
   onProgress?: (event: { path: string; completed: number; total: number; cached: boolean }) => void;
 }
 export interface Installation {
@@ -263,10 +276,18 @@ async function destination(root: string, path: string): Promise<string> {
 /** All downloads finish before publication; commit failures roll back replacements. One writer per root. */
 export async function installMinecraft(options: InstallOptions): Promise<Installation> {
   aborted(options.signal);
+  const concurrency = options.concurrency ?? 6;
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16)
+    throw new Error('Install concurrency must be an integer from 1 to 16');
+  const controller = new AbortController();
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, controller.signal])
+    : controller.signal;
   const lease = await acquireServerDataLock(options.root, 'install');
   try {
-    return await installLocked(options, lease.root);
+    return await installLocked({ ...options, signal, concurrency }, lease.root);
   } finally {
+    controller.abort();
     await lease.release();
   }
 }
@@ -280,6 +301,13 @@ async function installLocked(options: InstallOptions, root: string): Promise<Ins
   try {
     await mkdir(staging);
     await mkdir(backups);
+    options.onActivity?.({
+      phase: 'planning',
+      component: 'metadata',
+      active: 0,
+      completed: 0,
+      total: null,
+    });
     const plan = await createPlan(options);
     const updates: { path: string; staged: string }[] = [];
     const runtimeStage = join(staging, 'runtime');
@@ -287,39 +315,101 @@ async function installLocked(options: InstallOptions, root: string): Promise<Ins
     const runtimeFiles = Object.entries(plan.runtime).filter(([, entry]) => entry.type === 'file');
     const total = plan.files.length + runtimeFiles.length;
     let completed = 0;
+    let active = 0;
+    const activity = (
+      phase: InstallActivity['phase'],
+      component: InstallActivity['component'],
+      path?: string,
+    ) => {
+      options.onActivity?.({
+        phase,
+        component,
+        ...(path ? { path } : {}),
+        active,
+        completed,
+        total,
+      });
+    };
     const report = (path: string, hit: boolean) => {
       completed++;
       options.onProgress?.({ path, completed, total, cached: hit });
     };
-    for (const file of plan.files) {
+    // Prepare the complete runtime directory layout before concurrent writes; links come last.
+    for (const [path, entry] of Object.entries(plan.runtime)) {
       aborted(options.signal);
-      const target = await destination(root, file.path);
-      if (await cached(target, file.source)) {
-        report(file.path, true);
-        continue;
-      }
-      const staged = join(staging, randomUUID());
-      await writeFile(staged, await fetchBytes(options, file.source), { flag: 'wx' });
-      updates.push({ path: file.path, staged });
-      report(file.path, false);
+      await secureDirectory(
+        entry.type === 'directory' ? join(runtimeStage, path) : dirname(join(runtimeStage, path)),
+      );
+    }
+    const tasks = [
+      ...plan.files.map((file) => ({ ...file, runtime: false, executable: false })),
+      ...runtimeFiles.flatMap(([path, entry]) =>
+        entry.type === 'file'
+          ? [
+              {
+                path: `${plan.runtimePath}/${path}`,
+                source: entry.download,
+                runtime: true,
+                executable: entry.executable,
+              },
+            ]
+          : [],
+      ),
+    ];
+    // Indexed slots keep journal/publication order stable despite completion order.
+    const stagedFiles: ({ path: string; staged: string } | undefined)[] = [];
+    await runInstallPool(
+      tasks,
+      options.concurrency ?? 6,
+      (file) => file.source.size,
+      async (file, index, signal) => {
+        active++;
+        try {
+          const component = file.runtime
+            ? 'java'
+            : file.path.startsWith('libraries/')
+              ? 'library'
+              : file.path.startsWith('assets/objects/')
+                ? 'asset'
+                : file.path.startsWith('assets/log_configs/')
+                  ? 'logging'
+                  : 'game';
+          activity('checking', component, file.path);
+          const target = await destination(root, file.path);
+          signal.throwIfAborted();
+          const hit = await cached(target, file.source);
+          signal.throwIfAborted();
+          if (!hit) activity('downloading', component, file.path);
+          if (file.runtime) {
+            const staged = join(runtimeStage, file.path.slice(plan.runtimePath.length + 1));
+            if (hit) {
+              activity('staging', component, file.path);
+              await copyFile(target, staged);
+            } else
+              await writeFile(staged, await fetchBytes({ ...options, signal }, file.source), {
+                flag: 'wx',
+              });
+            signal.throwIfAborted();
+            await chmod(staged, file.executable ? 0o755 : 0o644);
+          } else if (!hit) {
+            const staged = join(staging, randomUUID());
+            await writeFile(staged, await fetchBytes({ ...options, signal }, file.source), {
+              flag: 'wx',
+            });
+            stagedFiles[index] = { path: file.path, staged };
+          }
+          signal.throwIfAborted();
+          report(file.path, hit);
+        } finally {
+          active--;
+        }
+      },
+      options.signal,
+    );
+    for (const file of stagedFiles) {
+      if (file) updates.push(file);
     }
     // Runtime is replaced as one complete tree, avoiding mixed Java versions and unsafe old links.
-    for (const [path, entry] of Object.entries(plan.runtime)) {
-      const target = join(runtimeStage, path);
-      if (entry.type === 'directory') {
-        await secureDirectory(target);
-        continue;
-      }
-      if (entry.type === 'link') continue;
-      aborted(options.signal);
-      await secureDirectory(dirname(target));
-      const oldPath = await destination(root, `${plan.runtimePath}/${path}`);
-      const hit = await cached(oldPath, entry.download);
-      if (hit) await copyFile(oldPath, target);
-      else await writeFile(target, await fetchBytes(options, entry.download), { flag: 'wx' });
-      await chmod(target, entry.executable ? 0o755 : 0o644);
-      report(`${plan.runtimePath}/${path}`, hit);
-    }
     for (const [path, entry] of Object.entries(plan.runtime)) {
       if (entry.type !== 'link') continue;
       await secureDirectory(dirname(join(runtimeStage, path)));
@@ -354,6 +444,7 @@ async function installLocked(options: InstallOptions, root: string): Promise<Ins
         ...(info ? { backup: join(backups, randomUUID()) } : {}),
       });
     }
+    activity('publishing', 'metadata');
     await writeInstallJournal(lock, root, operations);
     // Cancellation stops before this commit boundary. Publication finishes or rolls back as a unit.
     aborted(options.signal);

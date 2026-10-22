@@ -16,13 +16,20 @@ import { join, sep } from 'node:path';
 import { afterEach, describe, expect, it, type TestContext, vi } from 'vitest';
 import realVersion from './fixtures/1.21.1.json';
 import { fixture } from './fixtures/installation';
-import { installMinecraft, VERSION_MANIFEST_URL } from './installer';
+import { type InstallActivity, installMinecraft, VERSION_MANIFEST_URL } from './installer';
 import { allows, type Platform, parseVersion, runtimePlatform, safePath } from './metadata';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return { ...actual, rename: vi.fn(actual.rename) };
 });
+function gate() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 const roots: string[] = [];
 async function root() {
   const path = await mkdtemp(join(await realpath(tmpdir()), 'torch-game-01-'));
@@ -81,6 +88,216 @@ describe('Minecraft installation', () => {
     expect(progress.mock.calls.at(-1)?.[0].completed).toBe(progress.mock.calls.at(-1)?.[0].total);
     expect(await readdir(path)).not.toContain('.torchlauncher-install-lock');
   });
+  it('overlaps all resource kinds by default and reports safe activity with bounded counts', async () => {
+    const data = fixture();
+    const path = await root();
+    const release = gate();
+    const allStarted = gate();
+    const metadata = new Set([
+      VERSION_MANIFEST_URL,
+      data.version.url,
+      data.assetIndex.url,
+      data.runtime.url,
+      'https://piston-meta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json',
+    ]);
+    const activity: InstallActivity[] = [];
+    const progress = vi.fn();
+    let started = 0;
+    const pending = installMinecraft({
+      root: path,
+      platform: data.platform,
+      onActivity: (event) => activity.push(event),
+      onProgress: progress,
+      download: async (url, options) => {
+        if (!metadata.has(url)) {
+          started++;
+          if (started === 6) allStarted.resolve();
+          await release.promise;
+        }
+        return data.downloader(url, options);
+      },
+    });
+    await allStarted.promise;
+    expect(progress).not.toHaveBeenCalled();
+    expect(started).toBe(6);
+    release.resolve();
+    await pending;
+    expect(new Set(activity.map((event) => event.component))).toEqual(
+      new Set(['metadata', 'game', 'library', 'asset', 'logging', 'java']),
+    );
+    expect(activity[0]).toEqual({
+      phase: 'planning',
+      component: 'metadata',
+      active: 0,
+      completed: 0,
+      total: null,
+    });
+    expect(activity.at(-1)).toEqual({
+      phase: 'publishing',
+      component: 'metadata',
+      active: 0,
+      completed: 6,
+      total: 6,
+    });
+    expect(Math.max(...activity.map((event) => event.active))).toBe(6);
+    for (const event of activity) {
+      if (event.path) expect(safePath(event.path)).toBe(event.path);
+      expect(JSON.stringify(event)).not.toContain('https:');
+    }
+    expect(progress.mock.calls.map(([event]) => event.completed)).toEqual([1, 2, 3, 4, 5, 6]);
+    const published = vi
+      .mocked(rename)
+      .mock.calls.filter(([from]) =>
+        String(from).startsWith(`${join(path, '.torchlauncher-install-lock', 'staging')}${sep}`),
+      )
+      .map(([, to]) =>
+        String(to)
+          .slice(path.length + 1)
+          .split(sep)
+          .join('/'),
+      );
+    expect(published).toEqual([
+      'versions/1.21.1/1.21.1.jar',
+      'libraries/test/common/1/common.jar',
+      `assets/objects/${data.asset.sha1.slice(0, 2)}/${data.asset.sha1}`,
+      'assets/log_configs/client.xml',
+      `runtime/java-runtime-delta/${runtimePlatform(data.platform)}`,
+      'versions/1.21.1/1.21.1.json',
+      'assets/indexes/17.json',
+    ]);
+    data.requests.length = 0;
+    activity.length = 0;
+    await installMinecraft({
+      root: path,
+      platform: data.platform,
+      download: data.downloader,
+      onActivity: (event) => activity.push(event),
+    });
+    expect(activity.some((event) => event.phase === 'downloading')).toBe(false);
+    expect(
+      activity.filter((event) => event.phase === 'staging').map((event) => event.component),
+    ).toEqual(['java', 'java']);
+  });
+
+  it.each(['integrity', 'progress', 'activity', 'cancel'] as const)(
+    'drains stalled downloads before cleanup on %s failure',
+    async (kind) => {
+      const data = fixture();
+      const path = await root();
+      if (kind === 'activity') {
+        // Reuse Java, but force two game transfers so the cached Java activity callback
+        // fails while the first transfer remains stalled.
+        await installMinecraft({ root: path, platform: data.platform, download: data.downloader });
+        await writeFile(join(path, 'libraries/test/common/1/common.jar'), 'corrupt');
+        data.requests.length = 0;
+      }
+      await mkdir(join(path, 'versions/1.21.1'), { recursive: true });
+      await writeFile(join(path, 'versions/1.21.1/1.21.1.jar'), 'previous');
+      const clientStarted = gate();
+      const release = gate();
+      const aborted = gate();
+      const controller = new AbortController();
+      const callbackError = new Error('callback failed');
+      const progress = vi.fn(() => {
+        if (kind === 'progress') throw callbackError;
+      });
+      let settled = false;
+      const pending = installMinecraft({
+        root: path,
+        platform: data.platform,
+        concurrency: 2,
+        signal: controller.signal,
+        onProgress: progress,
+        onActivity: (event) => {
+          if (kind === 'activity' && event.phase === 'staging' && event.component === 'java')
+            throw callbackError;
+        },
+        download: async (url, options) => {
+          if (url === data.client.url) {
+            options.signal?.addEventListener('abort', () => aborted.resolve(), { once: true });
+            clientStarted.resolve();
+            await release.promise; // Deliberately ignore cancellation until explicitly drained.
+          }
+          if (url === data.library.url) {
+            await clientStarted.promise;
+            if (kind === 'cancel') controller.abort();
+            if (kind === 'integrity') return Buffer.from('corrupt');
+          }
+          // This adapter also ignores an already-aborted signal.
+          return data.downloader(url, { maxBytes: options.maxBytes });
+        },
+      });
+      const outcome = pending.catch((error: unknown) => {
+        settled = true;
+        return error;
+      });
+      await aborted.promise;
+      expect(settled).toBe(false);
+      expect(await readdir(path)).toContain('.torchlauncher-install-lock');
+      expect(await readdir(path)).toContain('.torchlauncher-server-lock');
+      expect(await readdir(join(path, '.torchlauncher-install-lock', 'staging'))).toContain(
+        'runtime',
+      );
+      expect(await readFile(join(path, 'versions/1.21.1/1.21.1.jar'), 'utf8')).toBe('previous');
+      await expect(
+        installMinecraft({ root: path, platform: data.platform, download: data.downloader }),
+      ).rejects.toThrow('in use');
+      const calls = progress.mock.calls.length;
+      release.resolve();
+      const error = await outcome;
+      if (kind === 'integrity')
+        expect(error).toEqual(
+          expect.objectContaining({ message: expect.stringContaining('integrity mismatch') }),
+        );
+      else if (kind === 'cancel') expect(error).toBe(controller.signal.reason);
+      else expect(error).toBe(callbackError);
+      expect(progress).toHaveBeenCalledTimes(calls);
+      expect(await readFile(join(path, 'versions/1.21.1/1.21.1.jar'), 'utf8')).toBe('previous');
+      expect(await readdir(path)).not.toContain('.torchlauncher-install-lock');
+      expect(await readdir(path)).not.toContain('.torchlauncher-server-lock');
+      expect(data.requests).not.toContain(data.asset.url);
+    },
+  );
+
+  it.each(['planning', 'checking', 'downloading', 'publishing'] as const)(
+    'cleans up when the %s activity callback throws',
+    async (phase) => {
+      const data = fixture();
+      const path = await root();
+      const failure = new Error('activity failed');
+      await expect(
+        installMinecraft({
+          root: path,
+          platform: data.platform,
+          download: data.downloader,
+          onActivity: (event) => {
+            if (event.phase === phase) throw failure;
+          },
+        }),
+      ).rejects.toBe(failure);
+      expect(await readdir(path)).not.toContain('.torchlauncher-install-lock');
+      expect(await readdir(path)).not.toContain('.torchlauncher-server-lock');
+      await expect(readFile(join(path, 'versions/1.21.1/1.21.1.jar'))).rejects.toThrow();
+    },
+  );
+
+  it.each([0, 17, 1.5, Number.NaN])(
+    'rejects invalid concurrency %s before acquiring locks',
+    async (concurrency) => {
+      const data = fixture();
+      const path = await root();
+      await expect(
+        installMinecraft({
+          root: path,
+          platform: data.platform,
+          download: data.downloader,
+          concurrency,
+        }),
+      ).rejects.toThrow('concurrency');
+      expect(await readdir(path)).toEqual([]);
+    },
+  );
+
   it('installs safe relative Java license links when the host permits symlinks', async (context) => {
     const path = await root();
     const probeTarget = join(path, 'probe-target');
