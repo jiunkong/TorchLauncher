@@ -678,3 +678,9 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - `6b79517`(Sonnet 작업자) 병합: 로그아웃과 등록 모드 제거의 `window.confirm`을 공용 `ConfirmDialog`(기존 `Modal` 기반)로 교체. 확인 후에만 `logout`/`remove-mod` 명령 전송, Esc·취소는 아무 동작 없음. 런처 렌더러에 네이티브 확인창이 남아 있지 않다.
 - 의도적 예외: 메인 프로세스의 종료 확인 실패 오류 상자(창이 닫히는 중). Studio의 네이티브 대화상자는 Studio UI 재작성 단계에서 정리.
 - 메인 `pnpm check` 통과. 스모크는 합성 상태와 IPC 기록기 기반이며 실제 계정 흐름은 Windows 확인 필요.
+
+## SIGN-CORE-01 통합 (2026-10-23, #0 Claude)
+- `63c89e0`(Sonnet 작업자) 병합: 배포 형식 1.2(헤더 64B + 서명 64B + 인덱스 + 페이로드, `sequence` 필수), 서명 메시지 `"TORCHPACK-SIG-v1\0"||헤더`, writer의 주입식 `sign`, reader의 `trustedPublicKey`(검증 순서 강제, 키가 있으면 무서명 1.0/1.1을 인덱스 요청 전에 거부), `reader.verification`(`verified|unverified|unsigned`), 서버 구성 `signing`, 순수 `decideRollback`, Studio용 `deriveEd25519PublicKey`/`createEd25519Signer`.
+- 메인 `pnpm check` 통과(1124 테스트). 명세는 [배포 서명 명세](deployment-signing.md).
+- 알려진 설계 한계: 잘못된 서명과 잘못된 키는 구분되지 않음(`signature-invalid`, 키 ID 없음). 페이로드 바이트는 직접 서명하지 않고 서명된 인덱스의 파일 해시가 보호한다.
+- 후속: SIGN-STUDIO-01(Studio 비UI), SIGN-LAUNCHER-01(런처 메인) 배정. 런처는 `verification`을 필수로 조이고 구성에 `signing`이 있으면 항상 키를 전달해야 한다.
