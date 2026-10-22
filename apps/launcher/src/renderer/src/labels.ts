@@ -26,6 +26,14 @@ const failureKeys = {
   'limit-exceeded': 'failure.limit-exceeded',
   'confirmation-expired': 'failure.confirmation-expired',
   'confirmation-invalid': 'failure.confirmation-invalid',
+  'signature-required': 'failure.signature-required',
+  'signature-invalid': 'failure.signature-invalid',
+  'signature-malformed': 'failure.signature-malformed',
+  'signature-unverified': 'failure.signature-invalid',
+  'invalid-signing-key': 'failure.invalid-signing-key',
+  'rollback-lower': 'failure.rollback-lower',
+  'rollback-conflict': 'failure.rollback-conflict',
+  'rollback-state-unreadable': 'failure.rollback-state-unreadable',
 } as const satisfies Record<string, LauncherKey>;
 
 const operationKeys = {

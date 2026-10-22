@@ -15,14 +15,13 @@ import {
   session,
   shell,
 } from 'electron';
-import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index';
-import { createDownloadSource } from '../../../../packages/core/src/download/source/index';
 import { brandingChangedChannel } from '../shared/branding';
 import { productStateChannel } from '../shared/product';
 import { createPublicJavaAuthenticator } from './auth/public-java-electron';
 import { type BrandingService, createBrandingService } from './branding';
 import { bindBrandingIpc } from './branding/ipc';
 import { readServerConfig, serverConfigPath } from './product/bootstrap';
+import { openServerDeployment } from './product/deployment-trust';
 import { bindProductIpc } from './product/ipc';
 import { ProductService } from './product/service';
 import { createPlayerSkinService } from './skins';
@@ -164,10 +163,8 @@ if (primaryInstance)
       configPath,
       openReader: (signal) => {
         if (!config) return Promise.reject(new Error('unconfigured'));
-        return openDeploymentReader(createDownloadSource(config.sourceUrl), {
-          expectedServerId: config.serverId,
-          signal,
-        });
+        // Verifies with the configured key and checks rollback read-only; never advances the state.
+        return openServerDeployment(app.getPath('userData'), config, signal);
       },
       publish: (snapshot) => {
         if (!mainWindow || mainWindow.isDestroyed()) return;

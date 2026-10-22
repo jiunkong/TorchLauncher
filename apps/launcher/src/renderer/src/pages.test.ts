@@ -42,6 +42,17 @@ describe('labels moved to the dictionary', () => {
     );
     expect(failureMessage(t, 'required-pack-reordered')).toContain('순서를 유지');
     expect(failureMessage(t, 'confirmation-expired')).toContain('만료');
+    for (const code of [
+      'signature-required',
+      'signature-invalid',
+      'signature-malformed',
+      'signature-unverified',
+      'invalid-signing-key',
+      'rollback-lower',
+      'rollback-conflict',
+      'rollback-state-unreadable',
+    ])
+      expect(failureMessage(t, code)).not.toBe(failureMessage(t, 'unknown-code'));
     expect(failureMessage(t, 'constructor')).toBe(failureMessage(t, 'unknown-code'));
     expect(operationLabel(t, 'launch', 'game-running')).toBe('게임 실행 중');
     expect(operationLabel(t, 'usage', 'idle')).toBe('서버 데이터 용량 확인 중');

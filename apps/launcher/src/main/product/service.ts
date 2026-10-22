@@ -1,12 +1,8 @@
 import { lstat, realpath } from 'node:fs/promises';
 import { release, totalmem } from 'node:os';
 import { join } from 'node:path';
-import {
-  type DeploymentReader,
-  openDeploymentReader,
-} from '../../../../../packages/core/src/deployment/reader/index';
+import type { DeploymentReader } from '../../../../../packages/core/src/deployment/reader/index';
 import { createFullDownloader } from '../../../../../packages/core/src/download/full/index';
-import { createDownloadSource } from '../../../../../packages/core/src/download/source/index';
 import {
   deleteServerData,
   discardDeletionConfirmation,
@@ -49,6 +45,7 @@ import {
   parseProductCommand,
 } from '../../shared/product';
 import { installationActivity, synchronizationActivity } from './activity';
+import { openServerDeployment, recordAppliedDeployment } from './deployment-trust';
 import { Operations } from './operations';
 import { readPreferences, writePreferences } from './preferences';
 
@@ -118,6 +115,14 @@ const safeCodes = new Set([
   'EINSTALLIDENTITY',
   'ESYNCGUARD',
   'EAUTHEXPIRED',
+  'signature-required',
+  'signature-invalid',
+  'signature-malformed',
+  'invalid-signing-key',
+  'signature-unverified',
+  'rollback-lower',
+  'rollback-conflict',
+  'rollback-state-unreadable',
 ]);
 export function safeProductError(error: unknown, cancelled = false): string {
   if (cancelled) return 'cancelled';
@@ -693,10 +698,7 @@ export class ProductService {
     const root = this.root();
     const download = createFullDownloader();
     const current = async (requestedSignal?: AbortSignal) => {
-      const reader = await openDeploymentReader(createDownloadSource(config.sourceUrl), {
-        expectedServerId: config.serverId,
-        ...(requestedSignal ? { signal: requestedSignal } : {}),
-      });
+      const reader = await openServerDeployment(this.host.base, config, requestedSignal);
       try {
         void Promise.resolve(this.host.observeDeployment?.(reader)).catch(() => {});
       } catch {
@@ -784,7 +786,9 @@ export class ProductService {
         this.setAccount(auth);
         return auth;
       },
-      afterSynchronization: async () => {
+      afterSynchronization: async (applied) => {
+        // The files of this deployment are now applied: only here may the rollback floor rise.
+        await recordAppliedDeployment(this.host.base, config, applied);
         await applySettingsPolicy(root, {
           minecraftVersion: '1.21.1',
           signal,
