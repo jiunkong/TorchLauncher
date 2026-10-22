@@ -47,8 +47,6 @@ async function setup(overrides: Partial<ProductHost> = {}) {
       logout: vi.fn(async () => {}),
     },
     chooseMod: vi.fn(async () => null),
-    confirmDeletion: vi.fn(async () => true),
-    confirmRecovery: vi.fn(async () => false),
     publish: vi.fn(),
     ...overrides,
   };
@@ -162,23 +160,22 @@ it('previews and confirms exact server deletion while preserving separate auth a
     error: 'confirmation-invalid',
   });
   expect((await service.command({ type: 'delete', confirmation })).ok).toBe(true);
-  expect(host.confirmDeletion).toHaveBeenCalledWith(root);
   expect(await readFile(join(host.base, 'authentication/session'), 'utf8')).toBe('secret');
   expect(await readFile(join(other.root, 'other.txt'), 'utf8')).toBe('other');
   expect((await service.command({ type: 'delete', confirmation })).ok).toBe(false);
 });
-it('rejects stale deletion previews after another operation and honors native decline', async () => {
-  const { service, host } = await setup();
+it('rejects stale or unknown deletion confirmations and keeps the data', async () => {
+  const { service, host, root } = await setup();
   await ensureServerDataRoot(host.base, serverId);
-  await service.command({ type: 'preview-delete' });
-  const confirmation = service.snapshot().deletion?.confirmation;
-  vi.mocked(host.confirmDeletion).mockResolvedValue(false);
-  expect((await service.command({ type: 'delete', confirmation })).ok).toBe(true);
-  expect(service.snapshot().deletion).toBeNull();
+  await writeFile(join(root, 'game.txt'), 'game');
   await service.command({ type: 'preview-delete' });
   const old = service.snapshot().deletion?.confirmation;
   await service.command({ type: 'usage' });
-  expect((await service.command({ type: 'delete', confirmation: old })).ok).toBe(false);
+  expect(service.snapshot().deletion).toBeNull();
+  expect(await service.command({ type: 'delete', confirmation: old })).toMatchObject({
+    ok: false,
+  });
+  expect(await readFile(join(root, 'game.txt'), 'utf8')).toBe('game');
 });
 it('enforces required resource packs through the real locked settings policy', async () => {
   const { service, host, root } = await setup();

@@ -1,119 +1,98 @@
-import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ProductActivity } from '../../shared/product';
 import {
-  ActivityProgress,
   activityKnown,
-  activityLabel,
-  activityProgress,
-  stepChips,
-  stepOf,
+  advanceStage,
+  stageChips,
+  stageMeasure,
+  stageOf,
+  stageOrder,
 } from './activity';
 
-describe('user-facing installation activity', () => {
-  it('uses Korean component and phase names for each operation category', () => {
-    const components: Array<[ProductActivity['component'], string]> = [
-      ['metadata', '게임 정보'],
-      ['game', '게임 파일'],
-      ['java', 'Java'],
-      ['library', '라이브러리'],
-      ['asset', '게임 리소스'],
-      ['logging', '로그 설정'],
-      ['loader', '모드 로더'],
-      ['server-mod', '서버 모드'],
-      ['resource-pack', '리소스팩'],
-      ['server-config', '서버 설정'],
-      ['server-file', '서버 파일'],
+const activity = (
+  component: ProductActivity['component'],
+  extra: Partial<ProductActivity> = {},
+): ProductActivity => ({
+  phase: 'downloading',
+  component,
+  active: 1,
+  completed: null,
+  total: null,
+  ...extra,
+});
+
+describe('installation stages (real processing order)', () => {
+  it('maps every component to one of the four stages', () => {
+    const table: Array<[ProductActivity['component'], string]> = [
+      ['metadata', 'info'],
+      ['game', 'game'],
+      ['java', 'game'],
+      ['library', 'game'],
+      ['asset', 'game'],
+      ['logging', 'game'],
+      ['loader', 'loader'],
+      ['server-mod', 'sync'],
+      ['resource-pack', 'sync'],
+      ['server-config', 'sync'],
+      ['server-file', 'sync'],
     ];
-    for (const [component, expectedLabel] of components) {
-      const actualLabel = activityLabel({
-        component,
-        phase: 'downloading',
-        active: 1,
-        completed: null,
-        total: null,
-      });
-      expect(actualLabel).toContain('다운로드 중');
-      expect(actualLabel).toContain(expectedLabel);
-    }
+    for (const [component, stage] of table) expect(stageOf(activity(component))).toBe(stage);
+    expect(stageOrder).toEqual(['info', 'game', 'loader', 'sync']);
   });
 
-  it('does not invent counts or identify one current file for parallel work', () => {
-    expect(
-      activityProgress({
-        component: 'game',
-        phase: 'downloading',
-        active: 6,
-        completed: null,
-        total: null,
-      }),
-    ).toBe('진행 중 · 6개 작업 중');
+  it('treats planning as the information stage whatever the component', () => {
+    expect(stageOf(activity('game', { phase: 'planning' }))).toBe('info');
   });
 
-  it('labels staged server mods, resource packs, configuration, and files as downloading and verifying', () => {
-    const categories: Array<[ProductActivity['component'], string]> = [
-      ['server-mod', '서버 모드'],
-      ['resource-pack', '리소스팩'],
-      ['server-config', '서버 설정'],
-      ['server-file', '서버 파일'],
-    ];
-    for (const [component, name] of categories) {
-      expect(
-        activityLabel({ component, phase: 'staging', active: 1, completed: null, total: null }),
-      ).toBe(`${name} 다운로드·검증 중`);
-    }
+  it('never moves backwards when parallel work interleaves components', () => {
+    let reached = advanceStage(null, activity('metadata', { phase: 'planning' }));
+    expect(reached).toBe('info');
+    reached = advanceStage(reached, activity('asset'));
+    expect(reached).toBe('game');
+    reached = advanceStage(reached, activity('java'));
+    reached = advanceStage(reached, activity('loader'));
+    expect(reached).toBe('loader');
+    // A straggler from the game-file pool must not pull the display back.
+    reached = advanceStage(reached, activity('library'));
+    expect(reached).toBe('loader');
+    reached = advanceStage(reached, activity('server-mod'));
+    expect(reached).toBe('sync');
+    expect(advanceStage(reached, null)).toBe('sync');
   });
 
-  it('renders determinate progress only when the total is known', () => {
-    const known = renderToStaticMarkup(
-      ActivityProgress({
-        activity: { component: 'game', phase: 'downloading', active: 2, completed: 3, total: 8 },
-      }),
-    );
-    const unknown = renderToStaticMarkup(
-      ActivityProgress({
-        activity: {
-          component: 'game',
-          phase: 'downloading',
-          active: 2,
-          completed: null,
-          total: null,
-        },
-      }),
-    );
-    expect(known).toContain('value="3"');
-    expect(known).toContain('max="8"');
-    expect(unknown).not.toContain('value=');
-    expect(unknown).not.toContain('max=');
-  });
-
-  it('shows measured counts when available', () => {
-    expect(
-      activityProgress({
-        component: 'server-mod',
-        phase: 'applying',
-        active: 1,
-        completed: 4,
-        total: 9,
-      }),
-    ).toBe('완료 4개 / 9개');
+  it('derives done, now, and todo from the stage alone', () => {
+    expect(stageChips('loader').map((chip) => chip.state)).toEqual(['done', 'done', 'now', 'todo']);
+    expect(stageChips(null).map((chip) => chip.state)).toEqual(['todo', 'todo', 'todo', 'todo']);
   });
 });
 
-describe('installation step chips', () => {
-  it('marks only observed earlier steps as done and the current one as now', () => {
-    expect(stepOf('logging')).toBe('library');
-    expect(stepOf('resource-pack')).toBe('config');
-    const chips = stepChips(['java', 'game', 'library'], 'library');
-    expect(chips.map((chip) => chip.state)).toEqual([
-      'done',
-      'done',
-      'now',
-      'todo',
-      'todo',
-      'todo',
-      'todo',
-    ]);
+describe('what a stage may claim to know', () => {
+  it('shows completed / total for game files only when both were measured', () => {
+    expect(stageMeasure('game', activity('asset', { completed: 3, total: 8 }))).toEqual({
+      kind: 'ratio',
+      completed: 3,
+      total: 8,
+    });
+    expect(stageMeasure('game', activity('asset', { completed: 3, total: null }))).toEqual({
+      kind: 'none',
+    });
+    expect(stageMeasure('game', activity('asset', { completed: null, total: 8 }))).toEqual({
+      kind: 'none',
+    });
+  });
+
+  it('never makes a ratio for server synchronization, even with numbers present', () => {
+    expect(stageMeasure('sync', activity('server-mod', { completed: 4, total: 9 }))).toEqual({
+      kind: 'completed',
+      completed: 4,
+    });
+    expect(stageMeasure('sync', activity('server-mod'))).toEqual({ kind: 'none' });
+  });
+
+  it('ignores activity that belongs to another stage', () => {
+    expect(stageMeasure('loader', activity('library', { completed: 9, total: 9 }))).toEqual({
+      kind: 'none',
+    });
   });
 
   it('reports a ratio only when both counts were measured', () => {

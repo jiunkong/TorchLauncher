@@ -70,3 +70,29 @@ export const RetryIcon = () => (
     <path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5" />
   </Svg>
 );
+export const PlusIcon = () => (
+  <Svg>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+export const TrashIcon = () => (
+  <Svg>
+    <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
+  </Svg>
+);
+export const ChevronUpIcon = () => (
+  <Svg>
+    <path d="M6 15l6-6 6 6" />
+  </Svg>
+);
+export const ChevronDownIcon = () => (
+  <Svg>
+    <path d="M6 9l6 6 6-6" />
+  </Svg>
+);
+export const FileIcon = () => (
+  <Svg>
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4" />
+  </Svg>
+);

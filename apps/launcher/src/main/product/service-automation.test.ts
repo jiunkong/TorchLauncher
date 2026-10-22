@@ -36,8 +36,6 @@ async function setup() {
     },
     auth: { login: vi.fn(), refresh: vi.fn(), logout: vi.fn(async () => {}) },
     chooseMod: vi.fn(),
-    confirmDeletion: vi.fn(),
-    confirmRecovery: vi.fn(async () => true),
     publish: vi.fn(),
   };
   const root = resolveServerDataRoot(base, serverId);
@@ -89,7 +87,6 @@ it('recovers a verified-stale lock silently at startup, leaving no recovery flag
     Object.assign(new Error('no_session'), { code: 'no_session' }),
   );
   await service.restoreSession();
-  expect(host.confirmRecovery).not.toHaveBeenCalled();
   expect(service.snapshot().recovery).toBeNull();
   expect(await readdir(root)).not.toContain(directory.split('/').pop());
   expect(
@@ -108,7 +105,7 @@ it('recovers stale state at the start of a play attempt and then proceeds to lau
 });
 
 it('does not clear an uncertain lock, blocks play, and proceeds only after explicit confirmation', async () => {
-  const { service, root, host } = await setup();
+  const { service, root } = await setup();
   const { path } = await writeOwner(root, { version: 1, id: 'x', pid: 4242, purpose: 'game' });
   vi.mocked(launchDeployment).mockResolvedValue(fakeGame());
   const blocked = await service.command({ type: 'launch' });
@@ -120,9 +117,7 @@ it('does not clear an uncertain lock, blocks play, and proceeds only after expli
     lock: 'uncertain',
   });
   expect(await readFile(path, 'utf8')).toContain('"version":1');
-  expect(host.confirmRecovery).not.toHaveBeenCalled();
   expect((await service.command({ type: 'recover', acceptUncertain: true })).ok).toBe(true);
-  expect(host.confirmRecovery).toHaveBeenCalledOnce();
   expect((await service.command({ type: 'launch' })).ok).toBe(true);
   expect(launchDeployment).toHaveBeenCalledOnce();
   expect(service.snapshot().recovery).toBeNull();

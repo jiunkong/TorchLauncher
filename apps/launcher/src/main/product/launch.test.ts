@@ -93,8 +93,6 @@ it('holds product ownership through game reaping and applies policy before handi
       })),
     },
     chooseMod: vi.fn(),
-    confirmDeletion: vi.fn(),
-    confirmRecovery: vi.fn(),
     publish: vi.fn(),
   });
   const launch = service.command({ type: 'launch' });
