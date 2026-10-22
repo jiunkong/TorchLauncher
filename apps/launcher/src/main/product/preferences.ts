@@ -6,6 +6,8 @@ import { verifyUserDataBase } from '../../../../../packages/core/src/instance/da
 
 export interface Preferences {
   closeOnLaunch: boolean;
+  maxMemoryMiB?: number;
+  initialMemoryMiB?: number;
 }
 function parse(text: string): Preferences {
   const value = JSON.parse(text);
@@ -13,11 +15,30 @@ function parse(text: string): Preferences {
     !value ||
     typeof value !== 'object' ||
     Array.isArray(value) ||
-    Object.keys(value).length !== 1 ||
+    Object.keys(value).some(
+      (key) => !['closeOnLaunch', 'maxMemoryMiB', 'initialMemoryMiB'].includes(key),
+    ) ||
     typeof value.closeOnLaunch !== 'boolean'
   )
     throw new Error('preferences-failed');
-  return { closeOnLaunch: value.closeOnLaunch };
+  const maxMemoryMiB = value.maxMemoryMiB;
+  const initialMemoryMiB = value.initialMemoryMiB;
+  if (
+    (maxMemoryMiB !== undefined &&
+      (!Number.isSafeInteger(maxMemoryMiB) ||
+        (maxMemoryMiB as number) < 512 ||
+        (maxMemoryMiB as number) > 65536)) ||
+    (initialMemoryMiB !== undefined &&
+      (!Number.isSafeInteger(initialMemoryMiB) ||
+        (initialMemoryMiB as number) < 256 ||
+        (initialMemoryMiB as number) > (maxMemoryMiB ?? 2048)))
+  )
+    throw new Error('preferences-failed');
+  return {
+    closeOnLaunch: value.closeOnLaunch,
+    ...(maxMemoryMiB === undefined ? {} : { maxMemoryMiB: maxMemoryMiB as number }),
+    ...(initialMemoryMiB === undefined ? {} : { initialMemoryMiB: initialMemoryMiB as number }),
+  };
 }
 async function plain(path: string): Promise<void> {
   try {

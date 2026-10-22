@@ -14,6 +14,7 @@ export interface LaunchAuth {
 export interface LaunchOptions {
   auth: LaunchAuth;
   maxMemoryMiB?: number;
+  initialMemoryMiB?: number;
   resolution?: { width: number; height: number };
   quickPlayServer?: string;
   launcherVersion: string;
@@ -74,6 +75,12 @@ export function buildLaunchCommand(
   const memory = options.maxMemoryMiB ?? 2048;
   if (!Number.isSafeInteger(memory) || memory < 512 || memory > 65536)
     throw new Error('Invalid JVM memory limit');
+  const initialMemory = options.initialMemoryMiB;
+  if (
+    initialMemory !== undefined &&
+    (!Number.isSafeInteger(initialMemory) || initialMemory < 256 || initialMemory > memory)
+  )
+    throw new Error('Invalid JVM initial memory');
   if (!options.launcherVersion || options.launcherVersion.includes('\0'))
     throw new Error('Invalid launcher version');
   if (
@@ -120,6 +127,7 @@ export function buildLaunchCommand(
     quickPlayPath: join(installation.root, 'quickPlay', 'log.json'),
   };
   const assemble = (values: Record<string, string>) => [
+    ...(initialMemory === undefined ? [] : [`-Xms${initialMemory}M`]),
     `-Xmx${memory}M`,
     ...select(installation.version.arguments.jvm, installation, features, values),
     ...(installation.version.logging

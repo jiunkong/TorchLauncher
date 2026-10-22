@@ -925,6 +925,31 @@ svg {
   color: var(--text-3);
   line-height: 1.35;
 }
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.input-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3);
+}
+.input-unit input {
+  width: 92px;
+  min-height: 34px;
+  padding: 5px 8px;
+  color: var(--text-1);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+}
 .muted-card .row strong {
   color: var(--text-2);
 }

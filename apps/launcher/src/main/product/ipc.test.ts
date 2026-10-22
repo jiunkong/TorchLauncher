@@ -28,6 +28,8 @@ it('uses a closed IPC union with no absolute path/source URL/command injection s
     { type: 'set-close-on-launch', value: 'true' },
     { type: 'set-close-on-launch', value: true, path: '/outside' },
     { type: 'set-close-on-launch' },
+    { type: 'set-game-memory', maxMemoryMiB: '2048' },
+    { type: 'set-game-memory', maxMemoryMiB: 2048, initialMemoryMiB: 1024, extra: true },
     { type: 'launch', root: '/outside' },
     { type: 'login', accessToken: 'secret' },
     { type: 'remove-mod', path: '/outside.jar' },
@@ -48,4 +50,16 @@ it('accepts only the boolean personal setting command', () => {
     type: 'set-close-on-launch',
     value: true,
   });
+});
+it('accepts only integer MiB game memory settings', () => {
+  expect(parseProductCommand({ type: 'set-game-memory', maxMemoryMiB: 4096 })).toEqual({
+    type: 'set-game-memory',
+    maxMemoryMiB: 4096,
+  });
+  expect(
+    parseProductCommand({ type: 'set-game-memory', maxMemoryMiB: 4096, initialMemoryMiB: 1024 }),
+  ).toEqual({ type: 'set-game-memory', maxMemoryMiB: 4096, initialMemoryMiB: 1024 });
+  expect(() => parseProductCommand({ type: 'set-game-memory', maxMemoryMiB: 512.5 })).toThrow(
+    'invalid-request',
+  );
 });

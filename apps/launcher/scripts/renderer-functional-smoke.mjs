@@ -126,12 +126,34 @@ try {
       document.querySelector('[data-testid="close-on-launch"]')?.getAttribute('aria-checked') ===
       'true',
   );
+  await page.getByTestId('max-memory').fill('0.5');
+  await page.getByTestId('initial-memory').fill('0.25');
+  await page.getByTestId('save-memory').click();
+  await page.waitForFunction(async () => {
+    const preferences = (await window.torchlauncher.getState()).preferences;
+    return preferences.maxMemoryMiB === 512 && preferences.initialMemoryMiB === 256;
+  });
   assert.deepEqual(
     JSON.parse(await readFile(resolve(temp, 'user-data/launcher-preferences.json'), 'utf8')),
-    { closeOnLaunch: true },
+    { closeOnLaunch: true, maxMemoryMiB: 512, initialMemoryMiB: 256 },
+  );
+  await page.getByTestId('max-memory').fill('1');
+  await rm(resolve(temp, 'user-data/launcher-preferences.json'));
+  await mkdir(resolve(temp, 'user-data/launcher-preferences.json'));
+  await page.getByTestId('save-memory').click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="save-memory"]')?.disabled === false,
+  );
+  assert.equal(await page.getByTestId('max-memory').inputValue(), '1');
+  assert.deepEqual(
+    await page.evaluate(async () => {
+      const preferences = (await window.torchlauncher.getState()).preferences;
+      return [preferences.maxMemoryMiB, preferences.initialMemoryMiB];
+    }),
+    [512, 256],
   );
   await mkdir(resolve('.cache/smoke'), { recursive: true });
-  await page.screenshot({ path: resolve('.cache/smoke/launcher-close-on-launch.png') });
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-game-memory.png') });
   const status = await page.evaluate(() => window.torchlauncher.command({ type: 'status' }));
   assert.equal(status.state.status.state, 'unavailable');
   assert.equal(status.ok, false);
@@ -153,7 +175,7 @@ try {
   await page.screenshot({ path: resolve('.cache/smoke/l2a-logs.png') });
   assert.deepEqual(pageErrors, []);
   console.log(
-    'Launcher: real mod/pack reads, persisted close-on-launch setting, usage and log tabs passed',
+    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage and log tabs passed',
   );
 } finally {
   await app?.close();

@@ -161,6 +161,14 @@ describe('settings page', () => {
     expect(settings(productState())).toContain('aria-checked="false"');
   });
 
+  it('renders GB memory fields, an optional initial value, and the next-launch note', () => {
+    const html = settings(productState());
+    expect(html).toContain('data-testid="max-memory"');
+    expect(html).toContain('data-testid="initial-memory"');
+    expect(html).toContain('최대 메모리 (Xmx)');
+    expect(html).toContain('저장한 값은 다음 실행부터 적용됩니다.');
+  });
+
   it('locks required packs and offers move buttons for user packs only', () => {
     const html = settings(
       productState({

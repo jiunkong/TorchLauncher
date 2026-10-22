@@ -34,6 +34,8 @@ export interface LaunchDeploymentOptions {
   onSynchronizationProgress?: SynchronizeDeploymentOptions['onProgress'];
   onSynchronizationActivity?: SynchronizeDeploymentOptions['onFileActivity'];
   launcherVersion?: string;
+  maxMemoryMiB?: number;
+  initialMemoryMiB?: number;
   expectedServerId: string;
   server: string;
   signal?: AbortSignal;
@@ -89,6 +91,10 @@ export async function launchDeployment(options: LaunchDeploymentOptions): Promis
     {
       auth,
       launcherVersion: options.launcherVersion ?? 'game-smoke',
+      ...(options.maxMemoryMiB === undefined ? {} : { maxMemoryMiB: options.maxMemoryMiB }),
+      ...(options.initialMemoryMiB === undefined
+        ? {}
+        : { initialMemoryMiB: options.initialMemoryMiB }),
       quickPlayServer: options.server,
     },
     {

@@ -4,6 +4,7 @@ import type { ProductState } from '../../shared/product';
 export function productState(overrides: Partial<ProductState> = {}): ProductState {
   return {
     preferences: { closeOnLaunch: false },
+    physicalMemoryMiB: 8192,
     server: { serverId: 'id', name: 'Fixture Server', address: 'play.example.invalid:25565' },
     configuration: 'ready',
     supported: true,

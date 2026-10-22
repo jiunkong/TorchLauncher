@@ -87,6 +87,31 @@ describe('Minecraft launch command', () => {
     expect(result.args).toContain('--quickPlayPath');
     expect(result.args.slice(-2)).toEqual(['--quickPlayMultiplayer', 'play.example:25565']);
   });
+  it('omits Xms unless requested and validates initial memory against the maximum', () => {
+    expect(command().args.some((arg) => arg.startsWith('-Xms'))).toBe(false);
+    expect(
+      command({
+        auth,
+        now: 1000,
+        launcherVersion: '0.1.0',
+        maxMemoryMiB: 512,
+        initialMemoryMiB: 256,
+      }).args,
+    ).toContain('-Xms256M');
+    expect(
+      command({
+        auth,
+        now: 1000,
+        launcherVersion: '0.1.0',
+        maxMemoryMiB: 65536,
+        initialMemoryMiB: 65536,
+      }).args,
+    ).toContain('-Xms65536M');
+    for (const initialMemoryMiB of [255, 513, 65537, 256.5, Number.NaN])
+      expect(() =>
+        command({ auth, now: 1000, launcherVersion: '0.1.0', maxMemoryMiB: 512, initialMemoryMiB }),
+      ).toThrow('initial memory');
+  });
   it('accepts missing optional xuid without inventing an Xbox identity', () => {
     const { xuid: _, ...withoutXuid } = auth;
     const result = command({ auth: withoutXuid, now: 1000, launcherVersion: '0.1.0' });
