@@ -1,3 +1,12 @@
+import {
+  BRANDING_ROLES,
+  type BrandingAssetMetadata,
+  isBrandingAssetMetadata,
+} from '../branding/index.js';
+import { validateDeploymentPath } from '../deployment/contracts/validation.js';
+
+export * from '../branding/index.js';
+
 export const SERVER_CONFIG_FILENAME = 'torchlauncher-server.json';
 
 export interface ServerConfig {
@@ -9,6 +18,70 @@ export interface ServerConfig {
   readonly sourceUrl: string;
   /** Optional hint so the launcher can show the game version before the deployment index is read. */
   readonly game?: ServerConfigGame;
+  readonly branding?: ServerConfigBranding;
+}
+
+export interface ServerConfigBrandingAsset extends BrandingAssetMetadata {
+  /** Portable relative path resolved against the actual server JSON directory, never the executable. */
+  readonly path: string;
+}
+
+export interface ServerConfigBranding {
+  /** Window title/menu only; never changes app identity, user data, or the home server name. */
+  readonly appName?: string;
+  readonly icon?: ServerConfigBrandingAsset;
+  readonly background?: ServerConfigBrandingAsset;
+}
+
+function parseBranding(input: unknown): ServerConfigBranding {
+  const fail = (): never => {
+    throw new Error('Invalid server configuration');
+  };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
+  const value = input as Record<string, unknown>;
+  if (Object.keys(value).some((key) => !['appName', ...BRANDING_ROLES].includes(key)))
+    return fail();
+  const result: {
+    appName?: string;
+    icon?: ServerConfigBrandingAsset;
+    background?: ServerConfigBrandingAsset;
+  } = {};
+  if (Object.hasOwn(value, 'appName')) {
+    const name = value.appName;
+    if (
+      typeof name !== 'string' ||
+      name.trim() !== name ||
+      [...name].length < 1 ||
+      [...name].length > 40 ||
+      /[\p{Cc}\p{Cf}\p{Cs}]/u.test(name)
+    )
+      return fail();
+    result.appName = name;
+  }
+  for (const role of BRANDING_ROLES) {
+    if (!Object.hasOwn(value, role)) continue;
+    const asset = value[role];
+    if (!asset || typeof asset !== 'object' || Array.isArray(asset)) return fail();
+    const entry = asset as ServerConfigBrandingAsset;
+    if (
+      Object.keys(entry).length !== 4 ||
+      ['path', 'sha256', 'length', 'mediaType'].some((key) => !Object.hasOwn(entry, key)) ||
+      !isBrandingAssetMetadata(role, entry)
+    )
+      return fail();
+    try {
+      validateDeploymentPath(entry.path);
+    } catch {
+      return fail();
+    }
+    result[role] = {
+      path: entry.path,
+      sha256: entry.sha256,
+      length: entry.length,
+      mediaType: entry.mediaType,
+    };
+  }
+  return result;
 }
 
 export interface ServerConfigGame {
@@ -54,8 +127,9 @@ export function parseServerConfig(input: unknown): ServerConfig {
   const value = input as Record<string, unknown>;
   const fields = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl'];
   const hasGame = Object.hasOwn(value, 'game');
+  const hasBranding = Object.hasOwn(value, 'branding');
   if (
-    Object.keys(value).length !== fields.length + (hasGame ? 1 : 0) ||
+    Object.keys(value).length !== fields.length + (hasGame ? 1 : 0) + (hasBranding ? 1 : 0) ||
     fields.some((key) => !Object.hasOwn(value, key))
   ) {
     return fail();
@@ -112,5 +186,6 @@ export function parseServerConfig(input: unknown): ServerConfig {
     address: value.address,
     sourceUrl: value.sourceUrl as string,
     ...(game ? { game } : {}),
+    ...(hasBranding ? { branding: parseBranding(value.branding) } : {}),
   };
 }

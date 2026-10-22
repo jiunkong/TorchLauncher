@@ -559,3 +559,96 @@ describe('deployment writer snapshots and rollback', () => {
     await verifyContainer(outputPath, [Buffer.alloc(size)]);
   });
 });
+
+describe('branding writer snapshots', () => {
+  it('publishes v1.1 role bytes after game payload, frozen at invocation before the first await', async () => {
+    const { tinyPng } = await import('../../branding/fixtures/images.js');
+    const { options, settings, outputPath } = await setup();
+    const original = tinyPng();
+    const bytes = Uint8Array.from(original);
+    const request = {
+      ...options,
+      branding: { icon: { bytes, mediaType: 'image/png' as const }, background: null },
+    };
+    const writing = writeDeployment(request);
+    bytes.fill(0);
+    request.branding.icon.mediaType = 'image/jpeg' as 'image/png';
+    const result = await writing;
+    const container = await readFile(outputPath);
+    const payloadStart = 64 + result.header.indexLength;
+    const asset = result.index.branding?.icon;
+    expect(asset).toBeTruthy();
+    if (!asset) throw new Error('Missing icon');
+    expect(container.readUInt16LE(10)).toBe(1);
+    expect(result.index.formatVersion).toEqual({ major: 1, minor: 1 });
+    expect(result.index.branding?.background).toBeNull();
+    expect(asset).toMatchObject({
+      offset: settings.length,
+      compression: 'none',
+      originalLength: original.length,
+      mediaType: 'image/png',
+      sha256: createHash('sha256').update(original).digest('hex'),
+    });
+    expect(container.subarray(payloadStart, payloadStart + settings.length)).toEqual(settings);
+    expect(container.subarray(payloadStart + asset.offset)).toEqual(original);
+    expect(result.index.files.map((entry) => entry.path)).toEqual(['config/options.txt']);
+  });
+  it('orders icon then background after files regardless of input property order and hashes raw index bytes', async () => {
+    const { tinyPng } = await import('../../branding/fixtures/images.js');
+    const { options, outputPath, settings } = await setup();
+    const image = tinyPng();
+    const result = await writeDeployment({
+      ...options,
+      branding: {
+        background: { bytes: image, mediaType: 'image/png' },
+        icon: { bytes: image, mediaType: 'image/png' },
+      },
+    });
+    const container = await readFile(outputPath);
+    const indexBytes = container.subarray(64, 64 + result.header.indexLength);
+    expect(createHash('sha256').update(indexBytes).digest()).toEqual(container.subarray(32, 64));
+    expect(JSON.parse(indexBytes.toString('utf8'))).toEqual(result.index);
+    expect(result.index.branding?.icon?.offset).toBe(settings.length);
+    expect(result.index.branding?.background?.offset).toBe(settings.length + image.length);
+    expect(container.subarray(64 + result.header.indexLength)).toEqual(
+      Buffer.concat([settings, image, image]),
+    );
+  });
+  it('emits v1.0 when absent and v1.1 for empty/update-removal metadata without payload', async () => {
+    const { options } = await setup();
+    expect((await writeDeployment(options)).header.formatVersion.minor).toBe(0);
+    for (const branding of [{}, { icon: null, background: null }]) {
+      const result = await writeDeployment({ ...options, files: [], branding });
+      expect(result.header.formatVersion.minor).toBe(1);
+      expect(result.header.totalLength).toBe(64 + result.header.indexLength);
+      expect(result.index.branding).toEqual(branding);
+    }
+  });
+  it('rejects oversized/malformed/unsupported images without replacing previous output', async () => {
+    const { tinyPng } = await import('../../branding/fixtures/images.js');
+    const { options, outputPath, root } = await setup();
+    await writeFile(outputPath, 'previous pack');
+    const wide = tinyPng();
+    wide.writeUInt32BE(513, 16);
+    const invalidInputs: unknown[] = [
+      { icon: { bytes: tinyPng(), mediaType: 'image/jpeg' } },
+      { icon: { bytes: wide, mediaType: 'image/png' } },
+      { icon: { bytes: new Uint8Array(1_048_577), mediaType: 'image/png' } },
+      { icon: { bytes: tinyPng(), mediaType: 'image/svg+xml' } },
+      { icon: { bytes: [1, 2], mediaType: 'image/png' } },
+      { icon: undefined },
+      { arbitrary: null },
+      null,
+    ];
+    for (const branding of invalidInputs) {
+      await expect(
+        writeDeployment({
+          ...options,
+          branding: branding as NonNullable<WriteDeploymentOptions['branding']>,
+        }),
+      ).rejects.toBeInstanceOf(DeploymentWriteError);
+      expect(await readFile(outputPath, 'utf8')).toBe('previous pack');
+    }
+    await expectNoStage(root);
+  });
+});

@@ -8,19 +8,24 @@ import {
   SourceRestartRequiredError,
 } from '../../download/source/index.js';
 import {
+  BRANDING_ROLES,
+  type BrandingRole,
   DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
-  type DeploymentFile,
+  type DeploymentByteRange,
   type DeploymentHeader,
   type DeploymentIndex,
+  type DeploymentPayload,
+  getDeploymentBrandingRange,
   getDeploymentFileRange,
   validateDeploymentHeader,
   validateDeploymentIndex,
 } from '../contracts/index.js';
 import { DeploymentReaderError } from './errors.js';
 import type {
-  DeploymentReader,
+  BrandingDeploymentReader,
   OpenDeploymentReaderOptions,
+  StagedBrandingAsset,
   StagedDeploymentFile,
 } from './types.js';
 
@@ -477,12 +482,11 @@ function sameCrc(expected: number, actual: number): boolean {
 
 async function stagePayload(
   pin: Pin,
-  file: DeploymentFile,
-  header: DeploymentHeader,
+  file: DeploymentPayload,
+  range: DeploymentByteRange | null,
   output: FileHandle,
   options: { chunkBytes: number; maxFileBytes: number; signal?: AbortSignal },
 ): Promise<{ length: number; sha256: string }> {
-  const range = getDeploymentFileRange(header, file);
   const digest = createHash('sha256');
   let originalLength = 0;
   let crc = 0;
@@ -587,7 +591,7 @@ async function stagePayload(
   return { length: originalLength, sha256: actualHash };
 }
 
-class DeploymentReaderImpl implements DeploymentReader {
+class DeploymentReaderImpl implements BrandingDeploymentReader {
   readonly header: DeploymentHeader;
   readonly index: DeploymentIndex;
   readonly sourceId: string;
@@ -621,6 +625,38 @@ class DeploymentReaderImpl implements DeploymentReader {
   ): Promise<StagedDeploymentFile> {
     const file = this.index.files.find((entry) => entry.path === path);
     if (!file) fail('file-not-found');
+    const result = await this.stageEntry(
+      file,
+      getDeploymentFileRange(this.header, file),
+      newScratchPath,
+      options,
+    );
+    return Object.freeze({ path: file.path, ...result });
+  }
+
+  async stageBrandingAsset(
+    role: BrandingRole,
+    newScratchPath: string,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<StagedBrandingAsset> {
+    if (!BRANDING_ROLES.includes(role)) fail('branding-not-found');
+    const asset = this.index.branding?.[role];
+    if (!asset) fail('branding-not-found');
+    const result = await this.stageEntry(
+      asset,
+      getDeploymentBrandingRange(this.header, role, asset),
+      newScratchPath,
+      options,
+    );
+    return Object.freeze({ role, ...result });
+  }
+
+  private async stageEntry(
+    file: DeploymentPayload,
+    range: DeploymentByteRange | null,
+    newScratchPath: string,
+    options: { signal?: AbortSignal },
+  ): Promise<{ outputPath: string; length: number; sha256: string }> {
     if (file.originalLength > this.maxFileBytes) fail('limit-exceeded');
     if (file.storedLength > this.maxStoredFileBytes) fail('limit-exceeded');
     this.assertCurrent();
@@ -630,7 +666,7 @@ class DeploymentReaderImpl implements DeploymentReader {
     try {
       handle = await open(newScratchPath, 'wx', 0o600);
       created = true;
-      const result = await stagePayload(this.pin, file, this.header, handle, {
+      const result = await stagePayload(this.pin, file, range, handle, {
         chunkBytes: this.chunkBytes,
         maxFileBytes: this.maxFileBytes,
         ...(options.signal ? { signal: options.signal } : {}),
@@ -640,7 +676,7 @@ class DeploymentReaderImpl implements DeploymentReader {
       await handle.sync();
       await handle.close();
       handle = undefined;
-      return Object.freeze({ path: file.path, outputPath: newScratchPath, ...result });
+      return Object.freeze({ outputPath: newScratchPath, ...result });
     } catch (error) {
       if (handle) {
         await handle.close().catch(() => undefined);
@@ -657,7 +693,7 @@ class DeploymentReaderImpl implements DeploymentReader {
 export async function openDeploymentReader(
   source: DownloadSource,
   options: OpenDeploymentReaderOptions,
-): Promise<DeploymentReader> {
+): Promise<BrandingDeploymentReader> {
   options.signal?.throwIfAborted();
   validateFileBudget(options.maxFileBytes);
   validateStoredFileBudget(options.maxStoredFileBytes);

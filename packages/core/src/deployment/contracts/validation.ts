@@ -1,12 +1,18 @@
 import {
-  DEPLOYMENT_FORMAT_VERSION,
+  BRANDING_ROLES,
+  type BrandingRole,
+  isBrandingAssetMetadata,
+} from '../../branding/index.js';
+import {
   DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
   DEPLOYMENT_MAGIC,
+  type DeploymentBrandingAsset,
   type DeploymentByteRange,
   type DeploymentFile,
   type DeploymentHeader,
   type DeploymentIndex,
+  type DeploymentPayload,
   type DeploymentValidationContext,
   EMPTY_FILE_SHA256,
 } from './types.js';
@@ -61,10 +67,7 @@ function integer(value: unknown, maximum: number, field: string, minimum = 0): n
 
 function version(value: unknown, field: string): void {
   const entry = object(value, ['major', 'minor'], field);
-  if (
-    entry.major !== DEPLOYMENT_FORMAT_VERSION.major ||
-    entry.minor !== DEPLOYMENT_FORMAT_VERSION.minor
-  ) {
+  if (entry.major !== 1 || (entry.minor !== 0 && entry.minor !== 1)) {
     fail('unsupported-version', field);
   }
 }
@@ -104,7 +107,7 @@ function pathCollisionKey(value: string): string {
   return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
 }
 
-function path(value: unknown, field: string): void {
+export function validateDeploymentPath(value: unknown, field = 'path'): void {
   if (
     typeof value !== 'string' ||
     value.length < 1 ||
@@ -133,13 +136,7 @@ function path(value: unknown, field: string): void {
   if (normalized.startsWith('.torchlauncher')) fail('invalid-path', field);
 }
 
-function file(value: unknown, field: string): DeploymentFile {
-  const entry = object(
-    value,
-    ['path', 'sha256', 'offset', 'storedLength', 'originalLength', 'compression', 'policy'],
-    field,
-  );
-  path(entry.path, `${field}.path`);
+function payload(entry: Record<string, unknown>, field: string): void {
   hash(entry.sha256, `${field}.sha256`);
   integer(entry.offset, DEPLOYMENT_LIMITS.containerLength, `${field}.offset`);
   const stored = integer(entry.storedLength, DEPLOYMENT_LIMITS.fileLength, `${field}.storedLength`);
@@ -151,9 +148,6 @@ function file(value: unknown, field: string): DeploymentFile {
   if (entry.compression !== 'none' && entry.compression !== 'gzip') {
     fail('invalid-value', `${field}.compression`);
   }
-  if (entry.policy !== 'initial-only' && entry.policy !== 'always') {
-    fail('invalid-value', `${field}.policy`);
-  }
   if (entry.compression === 'none' && stored !== original) fail('invalid-layout', field);
   if (
     entry.compression === 'gzip' &&
@@ -162,6 +156,39 @@ function file(value: unknown, field: string): DeploymentFile {
     fail('invalid-layout', field);
   }
   if (original === 0 && entry.sha256 !== EMPTY_FILE_SHA256) fail('invalid-hash', `${field}.sha256`);
+}
+
+function brandingAsset(value: unknown, role: BrandingRole, field: string): DeploymentBrandingAsset {
+  const entry = object(
+    value,
+    ['sha256', 'offset', 'storedLength', 'originalLength', 'compression', 'mediaType'],
+    field,
+  );
+  payload(entry, field);
+  if (
+    !isBrandingAssetMetadata(role, {
+      sha256: entry.sha256 as string,
+      length: entry.originalLength as number,
+      mediaType: entry.mediaType as DeploymentBrandingAsset['mediaType'],
+    })
+  )
+    fail('invalid-value', field);
+  // Encoded PNG/JPEG payloads are already compressed; v1.1 uses only raw encoded bytes.
+  if (entry.compression !== 'none') fail('invalid-value', `${field}.compression`);
+  return value as DeploymentBrandingAsset;
+}
+
+function file(value: unknown, field: string): DeploymentFile {
+  const entry = object(
+    value,
+    ['path', 'sha256', 'offset', 'storedLength', 'originalLength', 'compression', 'policy'],
+    field,
+  );
+  validateDeploymentPath(entry.path, `${field}.path`);
+  payload(entry, field);
+  if (entry.policy !== 'initial-only' && entry.policy !== 'always') {
+    fail('invalid-value', `${field}.policy`);
+  }
   return value as DeploymentFile;
 }
 
@@ -201,10 +228,20 @@ export function validateDeploymentIndex(
   id(context.expectedServerId, 'context.expectedServerId');
   const entry = object(
     value,
-    ['formatVersion', 'serverId', 'deploymentId', 'game', 'files'],
+    [
+      'formatVersion',
+      'serverId',
+      'deploymentId',
+      'game',
+      'files',
+      ...(header.formatVersion.minor === 1 ? ['branding'] : []),
+    ],
     'index',
   );
   version(entry.formatVersion, 'index.formatVersion');
+  if ((entry.formatVersion as { minor: number }).minor !== header.formatVersion.minor) {
+    fail('unsupported-version', 'index.formatVersion');
+  }
   id(entry.serverId, 'index.serverId');
   id(entry.deploymentId, 'index.deploymentId');
   if (entry.serverId !== context.expectedServerId) fail('server-mismatch', 'index.serverId');
@@ -244,6 +281,28 @@ export function validateDeploymentIndex(
       fail('limit-exceeded', 'index.files.originalLength');
     }
   }
+  if (header.formatVersion.minor === 1) {
+    const branding = entry.branding;
+    if (branding === null || typeof branding !== 'object' || Array.isArray(branding))
+      fail('invalid-shape', 'index.branding');
+    const roles = Object.keys(branding);
+    object(branding, roles, 'index.branding');
+    if (roles.some((role) => role !== 'icon' && role !== 'background'))
+      fail('invalid-shape', 'index.branding');
+    for (const role of BRANDING_ROLES) {
+      if (!Object.hasOwn(branding, role)) continue;
+      const candidate = (branding as Record<string, unknown>)[role];
+      if (candidate === null) continue;
+      const field = `index.branding.${role}`;
+      const current = brandingAsset(candidate, role, field);
+      if (current.offset !== cursor) fail('invalid-layout', `${field}.offset`);
+      cursor += current.storedLength;
+      if (cursor > payloadLength) fail('invalid-layout', `${field}.storedLength`);
+      totalOriginalLength += current.originalLength;
+      if (totalOriginalLength > DEPLOYMENT_LIMITS.totalOriginalLength)
+        fail('limit-exceeded', field);
+    }
+  }
   if (cursor !== payloadLength) fail('invalid-layout', 'index.files');
   return value as DeploymentIndex;
 }
@@ -258,4 +317,24 @@ export function getDeploymentFileRange(
   const start = DEPLOYMENT_HEADER_LENGTH + header.indexLength + entry.offset;
   if (start + entry.storedLength > header.totalLength) fail('invalid-layout', 'file.storedLength');
   return entry.storedLength === 0 ? null : { start, endInclusive: start + entry.storedLength - 1 };
+}
+
+/** Call only with an entry from the validated index. */
+export function getDeploymentBrandingRange(
+  header: DeploymentHeader,
+  role: BrandingRole,
+  entry: DeploymentBrandingAsset,
+): DeploymentByteRange {
+  validateDeploymentHeader(header);
+  if (header.formatVersion.minor !== 1) fail('unsupported-version', 'header.formatVersion');
+  if (!BRANDING_ROLES.includes(role)) fail('invalid-value', 'role');
+  brandingAsset(entry, role, 'branding');
+  return getPayloadRange(header, entry);
+}
+
+function getPayloadRange(header: DeploymentHeader, entry: DeploymentPayload): DeploymentByteRange {
+  const start = DEPLOYMENT_HEADER_LENGTH + header.indexLength + entry.offset;
+  if (start + entry.storedLength > header.totalLength)
+    fail('invalid-layout', 'payload.storedLength');
+  return { start, endInclusive: start + entry.storedLength - 1 };
 }

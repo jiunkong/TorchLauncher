@@ -1,4 +1,5 @@
 import type {
+  BrandingMediaType,
   DeploymentCompression,
   DeploymentFilePolicy,
   DeploymentGame,
@@ -16,6 +17,18 @@ export interface DeploymentInputFile {
   readonly compression: DeploymentCompression;
 }
 
+export interface DeploymentBrandingInput {
+  /** Bounded encoded bytes, synchronously copied before writeDeployment first awaits. */
+  readonly bytes: Uint8Array;
+  readonly mediaType: BrandingMediaType;
+}
+
+export interface DeploymentBrandingInputs {
+  /** Omitted role retains remote display; null explicitly selects the default. */
+  readonly icon?: DeploymentBrandingInput | null;
+  readonly background?: DeploymentBrandingInput | null;
+}
+
 export interface DeploymentWriteProgress {
   readonly phase: 'reading' | 'assembling';
   readonly processedBytes: number;
@@ -30,6 +43,8 @@ export interface WriteDeploymentOptions {
   readonly deploymentId: string;
   readonly game: DeploymentGame;
   readonly files: readonly DeploymentInputFile[];
+  /** When present (even {}), emits v1.1. Omit for byte-compatible v1.0 output. */
+  readonly branding?: DeploymentBrandingInputs;
   readonly signal?: AbortSignal;
   /** Awaited to provide backpressure; callback failure cancels the operation before commit. */
   readonly onProgress?: (progress: DeploymentWriteProgress) => void | Promise<void>;

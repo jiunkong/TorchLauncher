@@ -6,14 +6,22 @@ import { PassThrough, Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGzip } from 'node:zlib';
 import {
+  BRANDING_LIMITS,
+  BRANDING_ROLES,
+  type BrandingRole,
+  DEPLOYMENT_BRANDING_FORMAT_VERSION,
   DEPLOYMENT_FORMAT_VERSION,
   DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
   DEPLOYMENT_MAGIC,
+  type DeploymentBranding,
+  type DeploymentBrandingAsset,
   type DeploymentFile,
+  type DeploymentFormatVersion,
   type DeploymentHeader,
   type DeploymentIndex,
   EMPTY_FILE_SHA256,
+  inspectBrandingImage,
   validateDeploymentHeader,
   validateDeploymentIndex,
 } from '../contracts/index.js';
@@ -169,10 +177,14 @@ function encodeIndex(index: DeploymentIndex): Buffer {
   return Buffer.concat(chunks);
 }
 
-function makeHeader(indexBytes: Buffer, payloadLength: number): DeploymentHeader {
+function makeHeader(
+  indexBytes: Buffer,
+  payloadLength: number,
+  formatVersion: DeploymentFormatVersion = DEPLOYMENT_FORMAT_VERSION,
+): DeploymentHeader {
   return validateDeploymentHeader({
     magic: DEPLOYMENT_MAGIC,
-    formatVersion: DEPLOYMENT_FORMAT_VERSION,
+    formatVersion,
     flags: 0,
     indexLength: indexBytes.byteLength,
     totalLength: DEPLOYMENT_HEADER_LENGTH + indexBytes.byteLength + payloadLength,
@@ -268,6 +280,70 @@ async function stageFile(
   }
 }
 
+interface BrandingSnapshot {
+  readonly bytes: Uint8Array;
+  readonly asset: DeploymentBrandingAsset;
+}
+
+function snapshotBranding(options: WriteDeploymentOptions): {
+  branding?: DeploymentBranding;
+  snapshots: Partial<Record<BrandingRole, BrandingSnapshot>>;
+  length: number;
+} {
+  if (options.branding === undefined) return { snapshots: {}, length: 0 };
+  const input = options.branding;
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    Array.isArray(input) ||
+    Object.keys(input).some((role) => role !== 'icon' && role !== 'background')
+  )
+    fail('invalid-input');
+  const branding: {
+    icon?: DeploymentBrandingAsset | null;
+    background?: DeploymentBrandingAsset | null;
+  } = {};
+  const snapshots: Partial<Record<BrandingRole, BrandingSnapshot>> = {};
+  let length = 0;
+  for (const role of BRANDING_ROLES) {
+    if (!Object.hasOwn(input, role)) continue;
+    const image = input[role];
+    if (image === null) {
+      branding[role] = null;
+      continue;
+    }
+    if (
+      !image ||
+      typeof image !== 'object' ||
+      Object.keys(image).length !== 2 ||
+      !Object.hasOwn(image, 'bytes') ||
+      !Object.hasOwn(image, 'mediaType') ||
+      !(image.bytes instanceof Uint8Array)
+    )
+      fail('invalid-input');
+    if (image.bytes.byteLength < 1 || image.bytes.byteLength > BRANDING_LIMITS[role].length)
+      fail('limit-exceeded');
+    const bytes = Uint8Array.from(image.bytes);
+    try {
+      inspectBrandingImage(role, image.mediaType, bytes);
+    } catch {
+      fail('invalid-input');
+    }
+    const asset: DeploymentBrandingAsset = {
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      offset: length,
+      storedLength: bytes.byteLength,
+      originalLength: bytes.byteLength,
+      compression: 'none',
+      mediaType: image.mediaType,
+    };
+    snapshots[role] = { bytes, asset };
+    branding[role] = asset;
+    length += bytes.byteLength;
+  }
+  return { branding, snapshots, length };
+}
+
 /** Atomically publish a validated snapshot; no existing output is opened for writing. */
 export async function writeDeployment(
   options: WriteDeploymentOptions,
@@ -276,6 +352,10 @@ export async function writeDeployment(
   if (!Array.isArray(options.files) || options.files.length > DEPLOYMENT_LIMITS.fileCount)
     fail('invalid-input');
   // Snapshot caller-owned metadata before awaiting filesystem operations.
+  const brandingSnapshot = snapshotBranding(options);
+  const formatVersion = brandingSnapshot.branding
+    ? DEPLOYMENT_BRANDING_FORMAT_VERSION
+    : DEPLOYMENT_FORMAT_VERSION;
   const inputs = options.files.map((entry) => ({ ...entry }));
   const placeholders = inputs.map((input): DeploymentFile => {
     if (
@@ -295,13 +375,14 @@ export async function writeDeployment(
     };
   });
   const initialIndex: DeploymentIndex = {
-    formatVersion: DEPLOYMENT_FORMAT_VERSION,
+    formatVersion,
     serverId: options.serverId,
     deploymentId: options.deploymentId,
     game: structuredClone(options.game),
     files: placeholders,
+    ...(brandingSnapshot.branding ? { branding: brandingSnapshot.branding } : {}),
   };
-  const initialHeader = makeHeader(Buffer.from('{}'), 0);
+  const initialHeader = makeHeader(Buffer.from('{}'), brandingSnapshot.length, formatVersion);
   validateDeploymentIndex(initialIndex, initialHeader, { expectedServerId: initialIndex.serverId });
   encodeIndex(initialIndex);
 
@@ -317,7 +398,7 @@ export async function writeDeployment(
   const originalOutput = await maybeStat(outputPath);
   if (originalOutput && !originalOutput.isFile()) fail('unsafe-path');
   const sources: Snapshot[] = [];
-  let totalOriginal = 0n;
+  let totalOriginal = BigInt(brandingSnapshot.length);
   for (const input of inputs) {
     options.signal?.throwIfAborted();
     const source = await inspectSource(root, input, directories);
@@ -353,9 +434,36 @@ export async function writeDeployment(
         entries.push(entry);
         payloadLength += entry.storedLength;
       }
-      const index: DeploymentIndex = { ...initialIndex, files: entries };
+      const branding: {
+        icon?: DeploymentBrandingAsset | null;
+        background?: DeploymentBrandingAsset | null;
+      } = {};
+      if (brandingSnapshot.branding) {
+        for (const role of BRANDING_ROLES) {
+          if (!Object.hasOwn(brandingSnapshot.branding, role)) continue;
+          const snapshot = brandingSnapshot.snapshots[role];
+          if (!snapshot) {
+            branding[role] = null;
+            continue;
+          }
+          branding[role] = { ...snapshot.asset, offset: payloadLength };
+          options.signal?.throwIfAborted();
+          if (
+            payloadLength + snapshot.bytes.byteLength + DEPLOYMENT_HEADER_LENGTH >
+            DEPLOYMENT_LIMITS.containerLength
+          )
+            fail('limit-exceeded');
+          await writeAll(payload, snapshot.bytes);
+          payloadLength += snapshot.bytes.byteLength;
+        }
+      }
+      const index: DeploymentIndex = {
+        ...initialIndex,
+        files: entries,
+        ...(brandingSnapshot.branding ? { branding } : {}),
+      };
       const indexBytes = encodeIndex(index);
-      const header = makeHeader(indexBytes, payloadLength);
+      const header = makeHeader(indexBytes, payloadLength, formatVersion);
       validateDeploymentIndex(index, header, { expectedServerId: index.serverId });
       const candidatePath = join(staging, 'container');
       const candidate = await open(candidatePath, 'wx', 0o600);
