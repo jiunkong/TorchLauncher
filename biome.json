@@ -10,7 +10,8 @@
       "!!.codex",
       "!!.agents",
       "!!.testserver",
-      "!!.testfabricserver"
+      "!!.testfabricserver",
+      "!!docs/design"
     ]
   },
   "formatter": {
