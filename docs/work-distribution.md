@@ -496,3 +496,13 @@ lockfile, manifest)은 수정하지 않는다. 각 모듈의 `index.ts`까지만
   (symlink를 따르지 않는 상한 있는 순회, 취소 가능), 삭제 전 미리보기(대상 경로·용량·파일 수·실행 중 여부)와 실제 삭제.
   삭제는 maintenance 잠금을 얻어 실행 중이면 거부하고, 표식이 있는 정확한 서버 루트만 삭제하며 base/다른 서버/기존 `.minecraft`/인증 데이터 디렉터리/
   symlink·junction 대상은 절대 건드리지 않는다. 잠금 디렉터리 자체와 삭제 도중 중단 후 재시도를 처리한다.
+
+## 런처 UI 재작성 L1 착수 — 2026-10-22
+
+사용자 승인으로 런처 UI 재작성을 시작한다. 기준은 [런처 UI 명세](launcher-ui.md)와 [시안 소스](design/launcher/README.md). 한 번에 한 단계만 진행한다.
+
+| 작업 | 담당 / 브랜치 / worktree | 모델 | 독점 수정 범위 |
+| --- | --- | --- | --- |
+| L1 | #1 / `feat/launcher-ui-shell` / `agent-1` | Sonnet medium (막히면 #0이 상향) | `apps/launcher/src/renderer/**`, `apps/launcher/src/main/index.ts`의 창 설정(제목·아이콘·배경색만), `apps/launcher/scripts/renderer-functional-smoke.mjs`, 루트 `scripts/smoke.mjs`의 **런처 부분만**, 번들 글꼴 자산과 라이선스 고지, `docs/handoffs/LAUNCHER-UI-L1.md` |
+
+IPC 계약·preload·product service·core·Studio·package manifest·lockfile 변경이 필요하면 수정하지 말고 인계에 요청으로 적는다.

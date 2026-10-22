@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>내 모드</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="launcher.css">
+<link rel="stylesheet" href="home.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>body{margin:0;background:#0e0b0c}.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}.stack{display:flex;flex-direction:column;gap:16px}.muted .row strong{color:var(--text-2)}</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M8 1l6 5-6 9-6-9z" fill="#3aa8e0"/><path d="M8 1l6 5H2z" fill="#8fe0ff"/><path d="M8 6l6 0-6 9z" fill="#2478b8"/></svg>
+    <span>서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <nav class="rail" aria-label="런처 메뉴">
+      <a class="ri" href="HomeOpen.dc.html" aria-label="메뉴 열기" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></a>
+      <span class="sep"></span>
+      <a class="ri" href="Main.dc.html" aria-label="플레이"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></a>
+      <a class="ri active" href="Mods.dc.html" aria-label="내 모드" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></a>
+      <a class="ri" href="Settings.dc.html" aria-label="설정"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></a>
+      <a class="ri" href="Troubleshooting.dc.html" aria-label="로그"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg></a>
+      <span class="sp"></span>
+      <span class="avatar" title="jiun11_">J</span>
+    </nav>
+    <div class="main-col">
+      <main class="main">
+        <header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+          <div class="page-title">
+            <h1>내 모드</h1>
+            <p>직접 추가한 모드는 서버가 업데이트되어도 그대로 보존됩니다.</p>
+          </div>
+          <button class="btn primary" type="button"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>모드 추가 (.jar)</button>
+        </header>
+        <div class="cols">
+          <section class="card">
+            <div class="sec-title"><h2>내가 추가한 모드 (2)</h2></div>
+            <div class="list">
+              <div class="row">
+                <span class="fileicon"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>
+                <span class="grow"><strong>sodium-fabric-0.6.0.jar</strong><small>모드 ID sodium · 1.2 MB</small></span>
+                <button class="btn sm danger" type="button">삭제</button>
+              </div>
+              <div class="row">
+                <span class="fileicon"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>
+                <span class="grow"><strong>shader-helper.jar</strong><small>모드 ID를 읽지 못했습니다 · 중복 검사를 건너뛰었습니다</small></span>
+                <span class="badge warn">확인 필요</span>
+                <button class="btn sm danger" type="button">삭제</button>
+              </div>
+            </div>
+            <p class="hint" style="margin-top: 10px">서버 모드와 호환되지 않을 수 있습니다.</p>
+          </section>
+          <div class="stack">
+            <section class="card muted">
+              <div class="sec-title"><h2>서버가 관리하는 모드 (14)</h2><span class="badge lock">운영자 관리</span></div>
+              <div class="list">
+                <div class="row"><span class="grow"><strong>fabric-api-0.102.0.jar</strong></span></div>
+                <div class="row"><span class="grow"><strong>lithium-fabric-0.13.0.jar</strong></span></div>
+                <div class="row"><span class="grow"><strong>ferritecore-7.0.0.jar</strong></span></div>
+              </div>            </section>
+            <section class="card">
+              <div class="sec-title"><h2>등록되지 않은 파일 (1)</h2></div>
+              <div class="row">
+                <span class="fileicon"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></span>
+                <span class="grow"><strong>old-test.jar</strong><small>서버 목록에도 내 모드 목록에도 없습니다</small></span>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 8px">
+                <button class="btn sm" type="button">내 모드로 등록</button>
+                <button class="btn sm danger" type="button">삭제</button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+      <div class="foot"><span>TorchLauncher</span><span>v0.1.0 · win32</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1120,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

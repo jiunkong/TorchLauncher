@@ -1,0 +1,18 @@
+/* 홈 상태별 표현(진행 패널·버튼 상태) — launcher.css, home.css 와 함께 사용 */
+.panel { width: 520px; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: rgba(14,10,11,.78); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid var(--line-2); border-radius: 12px; }
+.panel .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+.panel .top strong { font-weight: 700; }
+.panel .top span { color: var(--text-2); }
+.panel.warn { background: rgba(38,27,10,.82); border-color: rgba(245,184,75,.5); }
+.panel p { margin: 0; font-size: 13px; color: var(--text-2); }
+.cs { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs span { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--text-3); background: rgba(255,255,255,.04); }
+.cs .done { color: var(--ok); border-color: rgba(91,214,160,.4); }
+.cs .now { color: #fff; border-color: var(--red); background: rgba(229,65,43,.2); }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn.stop { background: rgba(200,50,31,.16); border-color: #c8321f; color: #ffb9ac; }
+.btn.stop:hover { background: rgba(200,50,31,.26); }
+.btn.busy { background: var(--red-700); border-color: #c8321f; color: #fff; opacity: .85; }
+.hintline { font-size: 13px; color: var(--text-2); }
+.hintline a { color: var(--red-text); }
