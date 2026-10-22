@@ -5,17 +5,38 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## Active work: functional UI integration (2026-10-22, Codex #0)
+## Latest checkpoint: functional UI integrated (2026-10-22, Codex #0)
 
-The user authorized functional wiring before visual design, explicitly reaffirming delegation.
-#0 edits coordination documents/reviews/integrates only. Read `docs/ui-integration.md` for contracts.
-Two workers are active: #1 `connect_studio`, agent-1 branch `feat/ui-connect-studio`, Studio/project/writer/
-URL-check/export + shared `server-config` module; #4 `connect_launcher`, agent-4 branch
-`feat/ui-connect-launcher`, launcher/auth/status/game/user-data/IPC + narrowly assigned core hooks.
-Both use Sol medium. Shared server schema commits `987203c`/`2960fdb` are already merged into main;
-focused 9 schema tests passed. Workers must not merge main or modify progress. No live login was requested.
-Do not repeat old game smoke against current Drive without checking loader match. No additional uploads needed yet.
-UI-BASE below is completed history, not the current idle state.
+The user authorized functional wiring before design and explicitly reaffirmed #0 delegation-only.
+New subagents (not resumed historical #1/#4 TUI sessions) implemented in the existing worktrees:
+Studio `connect_studio` (Sol medium), launcher `connect_launcher` (Sol medium), root smoke
+`connect_smoke` (Luna medium). All are finished. Read `docs/ui-integration.md` and their handoffs.
+
+- Shared schema `987203c`/`2960fdb` integrated; Studio tip `27003a6` merged `e90b289`;
+  launcher tip `fc1dbfb` merged `c21c4c5`, fixed-profile wording `5712b7f` merged `824441e`;
+  smoke integrated `f99e7d4` with navigation/scrollbar followups through `d7452ec`.
+- Integrated `pnpm check` passed: **747 tests, 9 skips**, full TypeScript/Biome and both builds.
+  Root Electron smoke passed both apps at 760/1100px with IPC/isolation/navigation/real project save.
+  Studio functional smoke passed actual editing/save/file policies/writer/reopen. The last wording-only
+  change passed scoped Biome/renderer types and launcher rebuild; no redundant full test rerun.
+- Screenshots `.cache/smoke/{launcher,admin}-wide.png` were inspected. WSL keychain is unavailable;
+  launcher shows an explicit secure-storage error and never falls back to plaintext.
+- User invariant: launcher gets exactly one preprovided server profile. No server picker, profile creator,
+  address/URL editor or first-run server selection. Missing/invalid profile is an operator distribution error.
+- Studio now persists projects, edits server/game/loader/URL/files/policies, generates torchpacks,
+  checks remote identity and exports an operator-selected common binary + sidecar into an empty folder.
+  Images, convenient settings editing, single-file packaging/signing and actual exported package run remain.
+- Launcher wires account/cache restoration, bounded status ping, latest-only install/sync/policy/game launch,
+  bounded logs/cancel/stop, mods, packs, usage/deletion and recovery. New UI's native login/join is unverified.
+
+Next action is **user-led Windows UI validation**, not more UI design. User says either Fabric/NeoForge
+test server is available; choose Fabric 1.21.1/0.19.5 to match last known Drive pack. No upload requested.
+Read `docs/handoffs/UI-CONNECT-WINDOWS.md` for exact commands/checks. Ignored config already created:
+`.cache/game-smoke-validation/ui-server.json`, from the existing ignored `live-url.txt` (do not print/commit).
+The Windows clone was read-only checked clean on `verify/windows-reader-cancel`; switch main and pull
+without discarding any new user work. No login/test is currently waiting in an agent process.
+Record user-observed online counts, world entry, normal game exit and cached restore separately from tests.
+Older checkpoint sections below are historical; consult current status/log and progress first.
 
 ## UI-BASE (2026-10-22, Codex #0)
 
