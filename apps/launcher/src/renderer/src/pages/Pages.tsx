@@ -1,153 +1,112 @@
 import { useEffect, useState } from 'react';
 import type { ProductCommand, ProductState } from '../../../shared/product';
 import { Panel } from '../components/EmptyState';
+import { homePrimaryCommand, homePrimaryDisabled } from '../flow';
 
-export type PageId = 'home' | 'mods' | 'settings' | 'logs';
-type Props = { page: PageId; state: ProductState; command(request: ProductCommand): Promise<void> };
+export type PageId = 'home' | 'mods' | 'settings' | 'troubleshooting';
+type Props = {
+  page: PageId;
+  state: ProductState;
+  pending: boolean;
+  command(request: ProductCommand): Promise<boolean>;
+};
 const bytes = (value: number) => `${(value / 1024 / 1024).toFixed(1)} MB`;
-export function PageContent({ page, state, command }: Props) {
-  const busy = state.operation !== null;
+
+export function PageContent({ page, state, pending, command }: Props) {
+  const busy = state.operation !== null || pending;
   const ready = state.configuration === 'ready' && !busy;
-  const [packText, setPackText] = useState('');
-  const currentPacks = state.packs.map((pack) => pack.id).join('\n');
-  useEffect(() => setPackText(currentPacks), [currentPacks]);
+  const [packText, setPackText] = useState(() => state.packs.map((pack) => pack.id).join('\n'));
+  const [packDirty, setPackDirty] = useState(false);
+  const [modsLoad, setModsLoad] = useState<'unqueried' | 'loading' | 'loaded' | 'failed'>(
+    'unqueried',
+  );
+  const [packsLoad, setPacksLoad] = useState<'unqueried' | 'loading' | 'loaded' | 'failed'>(
+    'unqueried',
+  );
+  const [homeStatusAttempted, setHomeStatusAttempted] = useState(false);
   const run = (request: ProductCommand) => {
     void command(request);
   };
-  if (page === 'home')
+
+  useEffect(() => {
+    if (!ready) return;
+    if (
+      page === 'home' &&
+      !homeStatusAttempted &&
+      !state.error &&
+      !state.deletion?.confirmation &&
+      state.status.state === 'unknown'
+    ) {
+      setHomeStatusAttempted(true);
+      void command({ type: 'status' });
+    }
+    if (page === 'mods' && modsLoad === 'unqueried') {
+      setModsLoad('loading');
+      void command({ type: 'mods' }).then((ok) => setModsLoad(ok ? 'loaded' : 'failed'));
+    }
+    if (page === 'settings' && packsLoad === 'unqueried') {
+      setPacksLoad('loading');
+      void command({ type: 'packs' }).then((ok) => setPacksLoad(ok ? 'loaded' : 'failed'));
+    }
+  }, [page, ready, modsLoad, packsLoad, homeStatusAttempted, state, command]);
+
+  useEffect(() => {
+    if (page === 'settings' && !packDirty && packsLoad === 'loaded')
+      setPackText(state.packs.map((pack) => pack.id).join('\n'));
+  }, [page, packDirty, packsLoad, state.packs]);
+
+  if (page === 'home') {
+    const primary = homePrimaryCommand(state);
     return (
       <>
-        <section className="server-card">
-          <div className="server-art" aria-hidden="true">
-            <div className="pixel-sun" />
-            <div className="pixel-hill hill-back" />
-            <div className="pixel-hill hill-front" />
-            <span className="server-monogram">T</span>
-          </div>
-          <div className="server-details">
-            <span className="eyebrow">SERVER SPACE</span>
-            <h2>{state.server?.name ?? '서버 구성 없음'}</h2>
-            <p>
-              {state.server?.address ??
-                '서버 구성이 누락된 배포본입니다. 운영자에게 이 서버용 런처를 다시 받으세요.'}
-            </p>
-            <div className="server-meta">
-              <span>Minecraft 1.21.1 · Fabric / NeoForge</span>
-              <span>Windows / Linux x64</span>
-            </div>
-          </div>
-          <div className="play-area">
-            <span className="connection-state">
-              {state.status.state === 'online'
-                ? `온라인 · ${state.status.online}/${state.status.maximum}명 · ${state.status.latencyMs}ms`
-                : state.status.state === 'unavailable'
-                  ? '서버 상태 확인 실패'
-                  : '서버 상태 미확인'}
-            </span>
-            <button
-              className="button play-button"
-              type="button"
-              data-testid="launch-button"
-              disabled={!ready || !state.supported || !state.account}
-              onClick={() => run({ type: 'launch' })}
-            >
-              ▶ 플레이
-            </button>
-            <button
-              className="button"
-              disabled={!ready}
-              onClick={() => run({ type: 'status' })}
-              type="button"
-            >
-              서버 상태 새로고침
-            </button>
-          </div>
-        </section>
         <Panel>
-          <h2>Microsoft 계정</h2>
+          <h2>{state.server?.name ?? '서버 구성 없음'}</h2>
+          <p>
+            {state.server?.address ??
+              '서버 구성이 없습니다. 배포한 운영자에게 이 서버용 런처를 요청하세요.'}
+          </p>
+          <p>
+            {state.configuration === 'unavailable'
+              ? '서버 설정을 읽지 못했습니다. 이 런처의 배포 구성을 확인해 주세요.'
+              : state.supported
+                ? 'Minecraft 1.21.1 · Windows / Linux x64'
+                : '이 운영 체제 또는 CPU는 지원하지 않습니다.'}
+          </p>
+          <p>
+            {state.status.state === 'online'
+              ? `서버 응답 · ${state.status.online}/${state.status.maximum}명 · ${state.status.latencyMs}ms`
+              : state.status.state === 'unavailable'
+                ? '서버 상태를 확인할 수 없습니다. 게임 실행은 별도로 시도할 수 있습니다.'
+                : state.operation === 'status'
+                  ? '서버 상태 확인 중…'
+                  : '서버 상태는 아직 확인하지 않았습니다.'}
+          </p>
+          <h3>계정</h3>
           <p>
             {state.account
-              ? `${state.account.name} · 세션 만료 ${new Date(state.account.expiresAt).toLocaleString()}`
-              : '로그인하거나 저장된 세션을 갱신하세요.'}
+              ? `${state.account.name} · 만료 ${new Date(state.account.expiresAt).toLocaleString()}`
+              : 'Microsoft 계정 로그인이 필요합니다.'}
           </p>
-          <div className="action-row">
-            <button
-              className="button"
-              type="button"
-              disabled={busy}
-              onClick={() => run({ type: 'login' })}
-            >
-              로그인
-            </button>
-            <button
-              className="button"
-              type="button"
-              disabled={busy}
-              onClick={() => run({ type: 'refresh' })}
-            >
-              저장된 세션 갱신
-            </button>
-            <button
-              className="button"
-              type="button"
-              disabled={busy}
-              onClick={() => run({ type: 'logout' })}
-            >
-              로그아웃 · 저장된 인증 삭제
-            </button>
-          </div>
-          <p className="muted">
-            브라우저의 Microsoft 로그인 화면과 별도 코드 창을 사용합니다. 실행할 때 세션과 최신
-            배포를 다시 확인합니다.
-          </p>
+          <button
+            className="button play-button"
+            data-testid="launch-button"
+            type="button"
+            disabled={homePrimaryDisabled(primary, busy)}
+            onClick={() => primary && run(primary)}
+          >
+            {primary?.type === 'login' ? 'Microsoft 계정으로 로그인' : '플레이'}
+          </button>
         </Panel>
-        <Panel>
-          <h2>중단된 작업 복구</h2>
-          <p>
-            {state.recovery
-              ? `잠금: ${state.recovery.lock} · ${state.recovery.needed ? '복구 필요' : '복구할 작업 없음'}`
-              : '복구 상태를 확인하세요.'}
+        {!state.supported && (
+          <p className="error" role="status">
+            현재 기기에서는 게임을 실행할 수 없습니다.
           </p>
-          {state.recovery?.issues.map((issue) => (
-            <p key={issue}>{issue}</p>
-          ))}
-          <div className="action-row">
-            <button
-              className="button"
-              type="button"
-              disabled={!ready}
-              onClick={() => run({ type: 'inspect' })}
-            >
-              복구 상태 확인
-            </button>
-            <button
-              className="button"
-              type="button"
-              disabled={!ready || !state.recovery?.needed}
-              onClick={() => run({ type: 'recover', acceptUncertain: false })}
-            >
-              안전한 복구
-            </button>
-            {state.recovery?.confirmable && (
-              <button
-                className="button"
-                type="button"
-                disabled={!ready}
-                onClick={() => run({ type: 'recover', acceptUncertain: true })}
-              >
-                다른 게임 종료 확인 후 잠금 복구
-              </button>
-            )}
-          </div>
-        </Panel>
-        <div className="notice">
-          <p>
-            플레이는 Java 프로세스를 실행합니다. 실제 서버 접속 완료는 게임에서 확인하세요.{' '}
-            {!state.supported && '현재 운영 체제 또는 CPU는 지원하지 않습니다.'}
-          </p>
-        </div>
+        )}
+        <p className="muted">게임 실행 후 서버에 접속됐는지는 게임 화면에서 확인하세요.</p>
       </>
     );
+  }
+
   if (page === 'mods')
     return (
       <Panel>
@@ -156,7 +115,10 @@ export function PageContent({ page, state, command }: Props) {
             className="button"
             type="button"
             disabled={!ready}
-            onClick={() => run({ type: 'mods' })}
+            onClick={() => {
+              setModsLoad('loading');
+              void command({ type: 'mods' }).then((ok) => setModsLoad(ok ? 'loaded' : 'failed'));
+            }}
           >
             모드 새로고침
           </button>
@@ -166,20 +128,26 @@ export function PageContent({ page, state, command }: Props) {
             disabled={!ready}
             onClick={() => run({ type: 'add-mod' })}
           >
-            모드 추가…
+            개인 모드 추가…
           </button>
         </div>
-        <p>
-          운영자 모드는 수정할 수 없습니다. 개인 모드는 복사해서 등록하며 변경된 파일은 강제로
-          삭제하지 않습니다.
-        </p>
-        {state.modsRecovery && <p role="alert">중단된 모드 작업이 있습니다. 홈에서 복구하세요.</p>}
-        {state.mods.length === 0 ? (
-          <p className="muted">목록을 새로고침해 모드를 확인하세요.</p>
-        ) : (
+        <p>운영자 모드는 수정할 수 없습니다. 개인 모드 삭제 전 파일 상태를 확인하세요.</p>
+        {state.modsRecovery && (
+          <p role="alert">중단된 모드 작업이 있습니다. 문제 해결에서 상태를 확인하세요.</p>
+        )}
+        {modsLoad === 'loading' && <p role="status">모드 목록을 불러오는 중…</p>}
+        {modsLoad === 'failed' && (
+          <p className="error" role="alert">
+            모드 목록을 불러오지 못했습니다. 새로고침을 시도하세요.
+          </p>
+        )}
+        {modsLoad === 'loaded' && state.mods.length === 0 && (
+          <p className="muted">설치된 모드가 없습니다.</p>
+        )}
+        {modsLoad === 'loaded' && state.mods.length > 0 && (
           <ul className="data-list">
             {state.mods.map((mod) => (
-              <li key={mod.path}>
+              <li key={`${mod.source}:${mod.path}`}>
                 <div>
                   <strong>{mod.path}</strong>
                   <p>
@@ -196,7 +164,10 @@ export function PageContent({ page, state, command }: Props) {
                     className="button"
                     type="button"
                     disabled={!ready}
-                    onClick={() => run({ type: 'remove-mod', path: mod.path })}
+                    onClick={() => {
+                      if (window.confirm(`${mod.path} 개인 모드를 삭제할까요?`))
+                        run({ type: 'remove-mod', path: mod.path });
+                    }}
                   >
                     개인 모드 삭제
                   </button>
@@ -217,67 +188,93 @@ export function PageContent({ page, state, command }: Props) {
         )}
       </Panel>
     );
+
   if (page === 'settings')
     return (
       <>
         <Panel>
           <h2>활성 리소스팩 순서</h2>
-          <p>
-            한 줄에 하나의 팩 ID를 입력하세요 (예: vanilla, file/my-pack.zip). 필수 팩을 제거하거나
-            필수 팩끼리 순서를 바꿀 수 없습니다.
-          </p>
-          <button
-            className="button"
-            type="button"
-            disabled={!ready}
-            onClick={() => run({ type: 'packs' })}
-          >
-            현재 설정 불러오기
-          </button>
-          <label className="pack-label" htmlFor="resource-packs">
-            활성 팩 ID (위에서 아래 순서)
-          </label>
-          <textarea
-            id="resource-packs"
-            value={packText}
-            onChange={(event) => setPackText(event.target.value)}
-            disabled={busy}
-            rows={6}
-            maxLength={65792}
-          />
-          <p>
-            필수:{' '}
-            {state.packs
-              .filter((pack) => pack.required)
-              .map((pack) => pack.id)
-              .join(', ') || '없음 / 미확인'}
-          </p>
-          {state.missingPacks.length > 0 && (
-            <p>다음 실행 시 복구할 필수 팩: {state.missingPacks.join(', ')}</p>
+          <p>한 줄에 하나의 팩 ID를 입력하세요. 필수 팩의 포함과 순서는 유지해야 합니다.</p>
+          {packsLoad === 'loading' && <p role="status">설정을 불러오는 중…</p>}
+          {packsLoad === 'failed' && (
+            <p className="error" role="alert">
+              설정을 불러오지 못했습니다. 다시 불러오기를 선택하세요.
+            </p>
           )}
           <button
             className="button"
-            data-testid="save-button"
             type="button"
             disabled={!ready}
-            onClick={() =>
-              run({
-                type: 'set-packs',
-                packs: packText
-                  .split('\n')
-                  .map((id) => id.trim())
-                  .filter(Boolean),
-              })
-            }
+            onClick={() => {
+              if (
+                packDirty &&
+                !window.confirm('저장하지 않은 리소스팩 변경을 버리고 다시 불러올까요?')
+              )
+                return;
+              setPacksLoad('loading');
+              void command({ type: 'packs' }).then((ok) => {
+                setPacksLoad(ok ? 'loaded' : 'failed');
+                if (ok) {
+                  setPackText(state.packs.map((pack) => pack.id).join('\n'));
+                  setPackDirty(false);
+                }
+              });
+            }}
           >
-            리소스팩 설정 저장
+            현재 설정 다시 불러오기
           </button>
+          {packsLoad === 'loaded' && (
+            <>
+              <label className="pack-label" htmlFor="resource-packs">
+                활성 팩 ID (위에서 아래 순서)
+              </label>
+              <textarea
+                id="resource-packs"
+                value={packText}
+                onChange={(event) => {
+                  setPackText(event.target.value);
+                  setPackDirty(true);
+                }}
+                disabled={busy}
+                rows={6}
+                maxLength={65792}
+              />
+              <p>
+                필수:{' '}
+                {state.packs
+                  .filter((pack) => pack.required)
+                  .map((pack) => pack.id)
+                  .join(', ') || '없음'}
+              </p>
+              {state.missingPacks.length > 0 && (
+                <p>다음 실행 시 복구할 필수 팩: {state.missingPacks.join(', ')}</p>
+              )}
+              <button
+                className="button"
+                data-testid="save-button"
+                type="button"
+                disabled={!ready || !packDirty}
+                onClick={() => {
+                  void command({
+                    type: 'set-packs',
+                    packs: packText
+                      .split('\n')
+                      .map((id) => id.trim())
+                      .filter(Boolean),
+                  }).then((ok) => {
+                    if (ok) setPackDirty(false);
+                  });
+                }}
+              >
+                리소스팩 설정 저장
+              </button>
+            </>
+          )}
         </Panel>
         <Panel>
           <h2>서버 데이터</h2>
           <p>
-            이 서버의 게임, 모드, 저장 데이터와 개인 설정을 관리합니다. 인증 정보는 별도 위치에
-            보관됩니다.
+            이 서버의 게임과 개인 데이터를 확인하거나 삭제할 수 있습니다. 삭제는 되돌릴 수 없습니다.
           </p>
           <div className="action-row">
             <button
@@ -331,13 +328,108 @@ export function PageContent({ page, state, command }: Props) {
         </Panel>
       </>
     );
+
   return (
-    <Panel>
-      <h2>최근 게임 로그</h2>
-      <p>인증 정보와 URL을 가린 제한된 로그입니다. 게임 종료 결과: {state.outcome ?? '없음'}</p>
-      <pre className="game-log" aria-live="off">
-        {state.logs.join('\n') || '실행 로그가 없습니다.'}
-      </pre>
-    </Panel>
+    <>
+      <Panel>
+        <h2>서버 상태</h2>
+        <p>
+          {state.status.state === 'online'
+            ? `응답 있음 · ${state.status.online}/${state.status.maximum}명 · ${state.status.latencyMs}ms`
+            : state.status.state === 'unavailable'
+              ? '서버에 연결할 수 없습니다. 서버 주소와 네트워크를 확인하세요.'
+              : '서버 상태를 아직 확인하지 않았습니다.'}
+        </p>
+        <button
+          className="button"
+          type="button"
+          disabled={!ready}
+          onClick={() => run({ type: 'status' })}
+        >
+          서버 상태 확인
+        </button>
+      </Panel>
+      <Panel>
+        <h2>계정 세션</h2>
+        <p>
+          {state.account
+            ? `${state.account.name} · 만료 ${new Date(state.account.expiresAt).toLocaleString()}`
+            : '저장된 세션이 없습니다.'}
+        </p>
+        <div className="action-row">
+          <button
+            className="button"
+            type="button"
+            disabled={!ready || !state.account}
+            onClick={() => run({ type: 'refresh' })}
+          >
+            세션 갱신
+          </button>
+          <button
+            className="button"
+            type="button"
+            disabled={!ready || !state.account}
+            onClick={() => {
+              if (window.confirm('저장된 계정을 로그아웃할까요?')) run({ type: 'logout' });
+            }}
+          >
+            로그아웃
+          </button>
+        </div>
+        <p>
+          계정 복원은 런처 시작 시 자동으로 시도됩니다. 로그인 코드를 다시 입력해야 하면 홈의 로그인
+          동작을 사용하세요.
+        </p>
+      </Panel>
+      <Panel>
+        <h2>중단된 작업 복구</h2>
+        <p>
+          {state.recovery
+            ? `잠금: ${state.recovery.lock} · ${state.recovery.needed ? '복구 필요' : '복구할 작업 없음'}`
+            : '복구 상태를 아직 확인하지 않았습니다.'}
+        </p>
+        {state.recovery?.issues.map((issue) => (
+          <p key={issue}>{issue}</p>
+        ))}
+        <div className="action-row">
+          <button
+            className="button"
+            type="button"
+            disabled={!ready}
+            onClick={() => run({ type: 'inspect' })}
+          >
+            복구 상태 확인
+          </button>
+          <button
+            className="button"
+            type="button"
+            disabled={!ready || !state.recovery?.needed}
+            onClick={() => run({ type: 'recover', acceptUncertain: false })}
+          >
+            안전한 복구
+          </button>
+          {state.recovery?.confirmable && (
+            <button
+              className="button"
+              type="button"
+              disabled={!ready}
+              onClick={() => {
+                if (window.confirm('다른 게임 프로세스가 없음을 확인했나요?'))
+                  run({ type: 'recover', acceptUncertain: true });
+              }}
+            >
+              다른 게임 종료 확인 후 잠금 복구
+            </button>
+          )}
+        </div>
+      </Panel>
+      <Panel>
+        <h2>최근 진단 기록</h2>
+        <p>인증 정보와 URL을 가린 제한된 로그입니다. 게임 종료 결과: {state.outcome ?? '없음'}</p>
+        <pre className="game-log" aria-live="off">
+          {state.logs.join('\n') || '실행 로그가 없습니다.'}
+        </pre>
+      </Panel>
+    </>
   );
 }
