@@ -1,11 +1,17 @@
 # TorchLauncher 개발 진행 관리
 
-최종 갱신: 2026-10-22
+최종 갱신: 2026-10-23
 
 이 파일을 작업 상태·담당·머지 현황의 기준으로 사용한다. 제품 요구사항은
 [아키텍처](architecture.md), 단계의 목적과 완료 기준은 [구현 순서](implementation-plan.md)를 따른다.
 
 ## 현재 상태와 다음 작업
+
+MEM-01 사용자 배정안 승인·착수: #1 `mem_01`, Luna medium 한 명이 `feat/mem-01-game-memory`
+(agent-1, 제품 기준 `cdabfb2`)에서 Xmx/Xms 코어→개인 설정→서비스→설정 카드 연결을 소유한다.
+상세 범위/기본값/검증 규칙은 `docs/work-distribution.md` 맨 아래 MEM-01을 따른다.
+#0은 구현하지 않고 검토·통합·main 전체 검사 후 Windows 확인을 요청한다.
+L3와 L2a 후속은 MEM-01 통합 후 별도 배정안 승인까지 착수하지 않는다.
 
 BRAND-ICON-01 구현·통합: #1 `app_icon` Luna medium의 `35d4f90`를 #0이 `8b2e946`으로 병합했다.
 사용자 ICO를 공유 `assets/branding/`에 복사하고 내장 PNG를 무손실 추출했다. 두 앱 native 창 및

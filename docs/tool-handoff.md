@@ -7,6 +7,14 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+2026-10-23 Codex #0 update: user approved MEM-01 assignment, one worker #1 `mem_01`
+(`gpt-6-luna`, medium applied), agent-1 branch `feat/mem-01-game-memory`, baseline `cdabfb2`.
+Read the bottom of `docs/work-distribution.md` for exclusive scopes. Worker implementing core Xms,
+personal Xmx/Xms persistence and validated IPC/service/UI card; no process-lifetime changes or Studio work.
+#0 reviews, --no-ff merges, runs main pnpm check and requests Windows verification.
+L3 and L2a follow-ups remain pending separate user approval after MEM-01 integration. Other worktrees untouched.
+System Node v24.21.0 is available; `/tmp/torchlauncher-tools/node_modules/.bin` contains pnpm only.
+
 This section supersedes the older sections below where they conflict. Read `docs/launcher-ui.md` (spec, phases),
 `docs/release-policy.md` (updates, torchpack signing, no code signing), `docs/work-distribution.md` (L2a/L3 scopes),
 `docs/progress.md` (integration evidence) and `docs/design/launcher/README.md` (mockup sources).

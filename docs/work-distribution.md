@@ -523,9 +523,20 @@ L2b 통합(`e950189`, 로그 출처·복구 자동화·세션) 후 L2a(렌더러
 | --- | --- | --- | --- |
 | L2a | #1 / `feat/launcher-l2a-pages` / `agent-1` | Sonnet medium | `apps/launcher/src/renderer/**`, 복구 네이티브 확인 제거에 필요한 `apps/launcher/src/main/index.ts`·`main/product/service.ts`의 해당 호출부만, `apps/launcher/scripts/renderer-functional-smoke.mjs`, 루트 `scripts/smoke.mjs`의 런처 부분, `docs/handoffs/LAUNCHER-UI-L2A.md` |
 
-## MEM-01: 게임 메모리 설정 (Xmx/Xms) — 배정 대기 (2026-10-23, #0 Claude)
+## MEM-01: 게임 메모리 설정 (Xmx/Xms) — 진행 (2026-10-23, #0 Codex)
 사용자 결정: 플레이어 개인 설정으로 최대 메모리(Xmx)와 초기 메모리(Xms)를 설정할 수 있게 한다. 운영자 권장값은 Studio 단계로 미룬다.
 - 현재: 코어 `buildLaunchArguments`(`packages/core/src/minecraft/launch.ts`)는 `maxMemoryMiB`(기본 2048, 512~65536 검증)만 받아 `-Xmx`로 넘긴다. **`-Xms`는 없다**(코어 확장 필요). 런처 앱은 값을 넘기지 않고, 개인 설정·UI도 없다.
 - 범위: (1) 코어: `initialMemoryMiB` 옵션 추가(`-Xms`, Xmx 이하·최소 256 MiB 검증, 미지정이면 인자를 넣지 않음), (2) 개인 설정 스키마에 두 값 추가와 정규화(저장 형식은 기존 개인 설정 방식 유지), (3) 서비스가 launch에 값을 전달, (4) 설정 페이지 "게임 메모리" 카드: 최대/초기 입력(GB 단위, 0.5 GB 간격 권장), 초기 ≤ 최대, 물리 메모리(`os.totalmem`) 약 75% 초과 시 경고, 실행 중 변경은 "다음 실행부터 적용" 안내, (5) 문구는 i18n 사전, 테스트(코어 인자 생성, 설정 정규화, 서비스 전달, 렌더러 입력 검증).
 - 기본값: 최대 2048 MiB 유지(미설정), 초기 미설정. 상한은 코어 상한과 물리 메모리 중 작은 값.
 - 모델: Sonnet. 코어·공용 계약·IPC 변경이 있으므로 한 작업자가 코어 + 런처 설정 전체를 맡는다. L3보다 먼저 통합한다(렌더러 설정 페이지 공유).
+
+사용자 배정안 승인 후 작업자 한 명 착수: #1 `mem_01`, `gpt-6-luna` medium (도구 설정 적용),
+`feat/mem-01-game-memory` / `.agents/worktrees/agent-1`, 제품 기준 `cdabfb2`.
+독점: `packages/core/src/minecraft/launch.ts`·`launch.test.ts`,
+`packages/core/src/loaders/launch-gate.ts`·관련 테스트, 런처 `main/product/preferences.ts`·`service.ts`와
+관련 테스트/메모리 helper, `shared/product.ts`·해당 IPC 테스트, renderer `pages/Settings.tsx`·메모리
+입력 helper/관련 테스트·`i18n/catalog.ts`, 관련 smoke의 메모리 검증에 필요한 최소 변경,
+`docs/handoffs/MEM-01.md`. 현재 실행 인자는 시작 시 고정하며 이후 저장은 다음 실행에만 반영한다.
+실행 중 개인 설정 저장에 필요한 직렬화 변경은 최소 범위로 먼저 검토하며 프로세스 수명/잠금 동작은 변경하지 않는다.
+Studio·L3·L2a 후속·새 의존성·루트 설정·lockfile·추가 작업자 착수는 승인 범위 밖이다.
+#0은 검토·--no-ff 통합·main pnpm check·진행 기록 및 Windows 사용자 확인 요청을 담당한다.
