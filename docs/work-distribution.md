@@ -5,6 +5,8 @@
 I18N-01: #1 `i18n_foundation`, Luna medium, agent-1 `feat/i18n-foundation`, baseline `753e2ac`.
 [localization.md](localization.md)의 공통 번역 API·사전·저장 adapter·React hook만 준비한다.
 기존 UI 언어/화면 적용은 후속이며 이번에는 변경하지 않는다. 독점 범위는 상세 문서를 따른다.
+`f95faf9`·`5863dce` 통합, 작업자 종료·clean, #0 전체 검사 성공(832개/9 skip). 다음 UI 작업은 Claude에 인계하며
+`docs/ui-handoff.md`를 읽고 범위를 배정한 뒤 착수한다.
 
 2026-10-22 LAUNCH-EXIT-01: #3 `close_on_launch`, `feat/launcher-close-on-game-start`/agent-3,
 Sol·medium(프로세스 수명·설정 저장·잠금 경계). [close-on-launch.md](close-on-launch.md)가 상세 범위다.

@@ -5,14 +5,23 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## Active LAUNCH-EXIT-01: optional launcher exit after game starts
+## Current handoff: localization foundation, then Claude UI work
 
-New active task I18N-01: user requests Korean/English foundation only, future UI application.
-Read `docs/localization.md`. Worker #1 `i18n_foundation`, Luna medium (tool overrides applied),
-agent-1 `feat/i18n-foundation`, starts `a44224f` (product baseline `753e2ac`). Owns new pure core
-i18n module + core ./i18n export, new app renderer i18n adapters/hooks, own handoff only.
-No current App/pages/IPC/styles or existing preferences schema changes; no language picker or claim
-of fully translated UI. #0 coordinates/reviews/merges/tests only. Worker active, no external tests needed.
+User will hand UI improvement to Claude after I18N-01. Start with `docs/ui-handoff.md` for the
+UI-specific resume instructions, constraints, language wiring steps and Windows environment notes.
+`docs/localization.md` defines this task; `docs/handoffs/I18N-01.md` includes working import/use examples.
+Worker #1 `i18n_foundation`, Luna medium (tool overrides applied), agent-1 `feat/i18n-foundation`,
+started `a44224f`. #0 reviewed and integrated `f95faf9` + `5863dce` via `87e4268`.
+Worker finished, worktree clean. No background tests/processes remain from this task.
+Core `@torchlauncher/core/i18n` plus app-local renderer adapters/hooks/catalogs are ready. No existing
+App/pages/IPC/styles/preferences-schema changes. No language picker and only representative catalogs:
+existing screens remain Korean, full English UI is future work. Main `pnpm check` passed: 832 tests/9 skips,
+Biome, all types and both app builds. Environment-specific log `/tmp/torch-i18n-check.log`.
+Worker launcher whole-app check lacked an existing worktree dependency; main type/build passed without
+that error. No external login/server test was needed or performed for this foundation.
+#0 role persists in Claude; product implementation is delegated. Do not start extra UI work in this session.
+
+## Completed LAUNCH-EXIT-01: optional launcher exit after game starts
 
 User deferred UI changes and authorized this feature. Read `docs/close-on-launch.md`.
 One worker #3 `close_on_launch` (Sol medium), agent-3 branch `feat/launcher-close-on-game-start`,
