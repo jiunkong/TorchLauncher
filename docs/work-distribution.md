@@ -506,3 +506,11 @@ lockfile, manifest)은 수정하지 않는다. 각 모듈의 `index.ts`까지만
 | L1 | #1 / `feat/launcher-ui-shell` / `agent-1` | Sonnet medium (막히면 #0이 상향) | `apps/launcher/src/renderer/**`, `apps/launcher/src/main/index.ts`의 창 설정(제목·아이콘·배경색만), `apps/launcher/scripts/renderer-functional-smoke.mjs`, 루트 `scripts/smoke.mjs`의 **런처 부분만**, 번들 글꼴 자산과 라이선스 고지, `docs/handoffs/LAUNCHER-UI-L1.md` |
 
 IPC 계약·preload·product service·core·Studio·package manifest·lockfile 변경이 필요하면 수정하지 말고 인계에 요청으로 적는다.
+
+## 런처 UI L2b 착수 — 2026-10-22
+
+L2를 둘로 나눈다. L2b(메인 프로세스·상태 계약)를 먼저 통합한 뒤 L2a(렌더러 페이지)를 시작한다. 기준은 [런처 UI 명세](launcher-ui.md)의 "동작 변경"과 "설치·확인 진행 표시 결정".
+
+| 작업 | 담당 / 브랜치 / worktree | 모델 | 독점 수정 범위 |
+| --- | --- | --- | --- |
+| L2b | #3 / `feat/launcher-l2b-automation` / `agent-3` | Sonnet medium (안전 판단 문제가 생기면 #0이 상향) | `apps/launcher/src/main/product/**`, `apps/launcher/src/shared/product.ts`, 상태 형태 변경에 따른 렌더러의 **컴파일 유지용 최소 수정**, `docs/handoffs/LAUNCHER-L2B.md` |
