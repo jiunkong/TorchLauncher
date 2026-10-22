@@ -7,6 +7,11 @@
 
 ## 현재 상태와 다음 작업
 
+- 2026-10-22 사용자 승인: UI-BASE(Studio·런처 UI 기반)를 #1에 배정했다.
+  `feat/ui-base-shells`, `.agents/worktrees/agent-1`에서 두 앱 renderer와
+  `scripts/smoke.mjs`, `docs/handoffs/UI-BASE.md`만 수정한다. 앱별 탐색·화면 분리,
+  스타일 토큰·기본 컴포넌트·빈 상태를 구현하며 실제 인증/동기화/저장/실행 연결은 제외한다.
+  모델 Luna·effort medium(확정된 React 기반 구현). UI-01/UI-02·STUDIO 작업 완료로 계산하지 않는다.
 - 다음 사용자 승인 범위는 GAME-02/03: 1.21.1 NeoForge를 먼저, Fabric을 이어서 실제 설치·실행·직접 접속한다.
   #3에 단독 배정하며 [실행 기준](game-launch.md)에 따라 접속 직전 최신 동기화 실패 시 실행을 차단한다.
   서버·직접 계정 테스트가 필요하면 #0이 준비된 명령과 함께 사용자에게 요청한다.
@@ -152,6 +157,7 @@
 | MOD-01 | NeoForge 연결 해제 시 종료 보조 모드 — 사용자 결정으로 제외 | — | 취소 |
 | MOD-02 | Fabric 연결 해제 시 종료 보조 모드 — 사용자 결정으로 제외 | — | 취소 |
 | UI-01 | 서버 온라인·응답 실패·접속 인원·지연시간 조회와 표시 | BASE-02 | 준비 |
+| UI-BASE | Studio·런처 renderer 화면 구조·탐색·스타일·기본 컴포넌트 | BASE-02 | 진행 — #1, `feat/ui-base-shells` |
 | UI-02 | 사용자 런처에 인증·동기화·접속·설정·추가 모드·오류·로그 기능 연결 | AUTH-03, SYNC-01, GAME-02, GAME-03, USER-01, USER-02, USER-03, UI-01 | 대기 |
 | STUDIO-01 | 서버 프로젝트 저장, 버전·로더·주소·이미지·기본 설정 구성 | FMT-01 | 준비 |
 | STUDIO-02 | 배포 파일 선택·생성, 공개 URL 등록·부분 다운로드 검사, 업데이트 흐름 | STUDIO-01, FMT-02, DL-01, DL-02 | 대기 |
