@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProductCommand, ProductState } from '../../../shared/product';
-import { ChevronDownIcon, ChevronUpIcon, TrashIcon } from '../components/Icons';
+import { ChevronDownIcon, ChevronUpIcon, CopyIcon, TrashIcon } from '../components/Icons';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatBytes } from '../format';
 import { useT } from '../hooks/useTranslator';
@@ -20,12 +20,14 @@ export function SettingsPage({
   pending,
   command,
   onDelete,
+  notify,
 }: {
   active: boolean;
   state: ProductState;
   pending: boolean;
   command(request: ProductCommand): Promise<boolean>;
   onDelete(): void;
+  notify?(kind: 'success' | 'error', text: string): void;
 }) {
   const t = useT();
   const busy = state.operation !== null || pending;
@@ -35,21 +37,21 @@ export function SettingsPage({
   // The user's unsaved pack order; null means "no draft". Progress events never touch it.
   const [draft, setDraft] = useState<string[] | null>(null);
   const [saved, setSaved] = useState(false);
-  const [pathCopy, setPathCopy] = useState<{
-    path: string;
-    status: 'copying' | 'copied' | 'failed';
-  } | null>(null);
-  const pathCopyStatus = pathCopy?.path === state.serverDataRoot ? pathCopy.status : null;
+  const [copying, setCopying] = useState(false);
   const copyPath = async () => {
-    const path = state.serverDataRoot;
-    if (!path) return;
-    setPathCopy({ path, status: 'copying' });
+    if (!state.serverDataRoot || copying) return;
+    setCopying(true);
+    let copied = false;
     try {
-      const copied = await window.torchlauncher.copyServerDataPath?.();
-      setPathCopy({ path, status: copied === true ? 'copied' : 'failed' });
+      copied = (await window.torchlauncher.copyServerDataPath?.()) === true;
     } catch {
-      setPathCopy({ path, status: 'failed' });
+      copied = false;
     }
+    setCopying(false);
+    notify?.(
+      copied ? 'success' : 'error',
+      t(copied ? 'settings.pathCopied' : 'settings.pathCopyFailed'),
+    );
   };
   const maxMemoryMiB = state.preferences.maxMemoryMiB ?? defaultMaxMemoryMiB;
   const initialMemoryMiB = state.preferences.initialMemoryMiB;
@@ -214,24 +216,17 @@ export function SettingsPage({
                 {state.serverDataRoot}
               </span>
               <button
-                className="btn sm ghost"
+                className="btn sm ghost copy-path"
                 type="button"
                 data-testid="copy-data-path"
-                disabled={pathCopyStatus === 'copying'}
+                aria-label={t('settings.copyPath')}
+                title={t('settings.copyPath')}
+                disabled={copying}
                 onClick={() => void copyPath()}
               >
-                {t(pathCopyStatus === 'copying' ? 'settings.copyingPath' : 'settings.copyPath')}
+                <CopyIcon />
               </button>
             </div>
-          )}
-          {(pathCopyStatus === 'copied' || pathCopyStatus === 'failed') && (
-            <p
-              className="hint"
-              role={pathCopyStatus === 'failed' ? 'alert' : 'status'}
-              data-testid="copy-data-path-result"
-            >
-              {t(pathCopyStatus === 'copied' ? 'settings.pathCopied' : 'settings.pathCopyFailed')}
-            </p>
           )}
           <div className="kv">
             <span>{t('settings.usage')}</span>

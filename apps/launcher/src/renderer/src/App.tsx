@@ -6,6 +6,7 @@ import { RecoveryDialog } from './components/RecoveryDialog';
 import { RemoveUnregisteredDialog } from './components/RemoveUnregisteredDialog';
 import { Splash } from './components/Splash';
 import { StopDialog } from './components/StopDialog';
+import { Toast, useToast } from './components/Toast';
 import { homePrimaryCommand } from './flow';
 import { runningElapsed } from './home';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
@@ -23,6 +24,7 @@ import { appReady } from './splash';
 
 export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const t = useT();
+  const { toast, notify } = useToast();
   const branding = useBranding();
   const { info, error } = useApplicationInfo();
   const { state, error: productError, pending, command } = useProduct();
@@ -217,6 +219,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
                 pending={pending}
                 command={command}
                 onDelete={openDelete}
+                notify={notify}
               />
             )}
           </PageFrame>
@@ -228,6 +231,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
           />
         </div>
       </main>
+      <Toast toast={toast} />
       {removeFile && (
         <RemoveUnregisteredDialog
           path={removeFile}
