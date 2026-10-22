@@ -7,8 +7,12 @@
 
 ## 현재 상태와 다음 작업
 
-BRAND-ICON-01 착수: 사용자 제공 루트 `icon.ico`를 두 앱의 native 창/패키지 아이콘에 적용한다.
-#1 `app_icon` Luna medium, agent-1 `feat/app-icon`. 원본 보존, UI/테마 변경 없음.
+BRAND-ICON-01 구현·통합: #1 `app_icon` Luna medium의 `35d4f90`를 #0이 `8b2e946`으로 병합했다.
+사용자 ICO를 공유 `assets/branding/`에 복사하고 내장 PNG를 무손실 추출했다. 두 앱 native 창 및
+Windows/Linux 패키징 설정에 적용했다. 원본 루트 icon.ico는 그대로 보존했다. UI/테마 변경 없음.
+작업자 Studio Linux package:dir 리소스 포함 확인 성공. main 전체 타입/두 앱 빌드와 런처 Linux
+package:dir 성공. 런처 패키지 `resources/branding/icon.png`와 원본 PNG의 SHA-256 일치 확인.
+Windows 실행 파일 빌드·표시 결과는 미검증. [인계](handoffs/BRAND-ICON-01.md).
 
 I18N-01 구현·통합: #1 Luna medium의 `f95faf9`·`5863dce`를 #0이 검토·병합했다.
 공통 typed 번역/보간·한국어/영어 locale 판별·명시 선택/자동 모드·앱별 저장·React provider/hook을 준비했다.
@@ -252,7 +256,7 @@ macOS는 보류, Linux ARM64와 연결 해제 시 종료 보조 모드는 지원
 | GAME-ACTIVITY-01 | 작업 종류·단계·파일/개수/활성 작업 정보를 UI까지 전달할 계약 | GAME-PERF-01, UI-CONNECT-L | 완료 — 구조화 상태/IPC 전달, renderer 표현은 후속 UI 작업 |
 | LAUNCH-EXIT-01 | 게임 시작 후 런처 자동 종료 개인 옵션·게임 프로세스 분리·잠금 유지/회수 | UI-CONNECT-L, GAME-05 | 구현·통합 검사 완료 — Windows 실게임 미검증 |
 | I18N-01 | 한국어·영어 공통 번역 및 renderer 연결 기반 | UI-BASE | 기반 구현·통합 검사 완료 — 전체 UI 적용은 후속 |
-| BRAND-ICON-01 | 사용자 레드스톤 토치 ICO를 두 앱 native 아이콘으로 적용 | UI-BASE | 진행 — #1 |
+| BRAND-ICON-01 | 사용자 레드스톤 토치 ICO를 두 앱 native 아이콘으로 적용 | UI-BASE | 적용·타입/빌드/Linux 패키지 확인 완료 — Windows 표시 미검증 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |

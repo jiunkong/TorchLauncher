@@ -7,10 +7,14 @@ session IDs are not needed.
 
 ## Current handoff: localization foundation, then Claude UI work
 
-Active follow-up BRAND-ICON-01: user supplied root `icon.ico` (untracked, preserve original).
+Follow-up BRAND-ICON-01: user supplied root `icon.ico` (untracked, preserve original).
 Worker #1 `app_icon`, Luna medium, agent-1 `feat/app-icon`, baseline `12263e9`.
 Scope shared assets/branding ICO+lossless extracted PNG, shared builder config, both main-window icons,
-own handoff only. No renderer/theme changes. #0 reviews/integrates/tests. Native Windows proof separate.
+own handoff only. No renderer/theme changes. `35d4f90` integrated by #0 via `8b2e946`, worker finished/clean.
+Studio Linux package:dir confirmed resources. Main all types/both builds/launcher Linux package:dir passed;
+packaged branding PNG SHA-256 matches source. No task process remains running. Log `/tmp/torch-icon-verify.log`.
+Read `docs/handoffs/BRAND-ICON-01.md`. Native Windows executable/display proof is still unverified.
+Shared assets live in `assets/branding/`; renderer logo replacement is future UI work (see UI handoff).
 
 User will hand UI improvement to Claude after I18N-01. Start with `docs/ui-handoff.md` for the
 UI-specific resume instructions, constraints, language wiring steps and Windows environment notes.
