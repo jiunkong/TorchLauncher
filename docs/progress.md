@@ -8,8 +8,13 @@
 ## 현재 상태와 다음 작업
 
 사용자가 최신 Windows 빌드가 잘 작동한다고 보고했다. 개별 기능/네이티브 junction 테스트 내역은 제공되지 않았다.
-추가 피드백 PATH-01: 설정 데이터 경로 여러 줄 줄바꿈을 한 줄 말줄임+전체 경로 툴팁으로 수정한다.
-#1 `settings_path`, Luna low 요청, agent-1 `fix/settings-path-ellipsis`에 배정. 기존 선택 복사·경로 값 유지.
+추가 피드백 PATH-01 구현·통합: #1 `settings_path`, Luna low 요청, `e842492`를 #0이 `36bbf7d`로 병합했다.
+설정 데이터 위치는 한 줄 말줄임+전체 경로 title, 기존 선택 가능 문자열·값을 유지한다.
+삭제 확인 창 경로 스타일은 유지했다. 작업자 renderer 21개·타입/빌드와 Electron 긴 Windows 경로
+760/1100px 한 줄·clipping·title·카드/창 overflow 검사 성공.
+main `pnpm check` 성공(978개 통과·9 skip, 전체 타입·두 앱 빌드·Biome 기존 CSS 경고 8개).
+agent-1 main detached·병합 브랜치 삭제. 새 Windows 표시 확인은 사용자 검증 대기다.
+[인계](handoffs/PATH-01.md).
 
 사용자 피드백으로 메모리 좌우 드래그 제거 완료: #1 `memory_no_drag`, Luna low의 `4179715` 통합.
 main 전체 검사 성공(912개 통과·9 skip, 전체 타입·두 앱 빌드·Biome 기존 CSS 경고 8개).

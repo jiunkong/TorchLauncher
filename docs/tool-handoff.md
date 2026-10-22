@@ -8,9 +8,13 @@ session IDs are not needed.
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
 New user feedback: latest Windows build 'works well'; no per-feature/junction test details supplied.
-PATH-01 active: #1 `settings_path`, Luna low requested, agent-1 `fix/settings-path-ellipsis`, baseline2725d1d.
-Settings path must be one-line ellipsis with full title/unchanged selectable DOM text. Narrow renderer/CSS only,
-no clipboard button or IPC. Shared deletion-dialog path wrapping remains unchanged. Check 760/1100px widths.
+PATH-01 #1 `settings_path`, Luna low requested, baseline2725d1d, `e842492` integrated via `36bbf7d`.
+Settings path now one-line ellipsis with full title/unchanged selectable DOM text. Narrow renderer/CSS only,
+no clipboard button/IPC, deletion-dialog wrapping preserved. Worker 21 tests/types/build+Electron synthetic
+Windows long-path 760/1100px clipping/single-line/no-overflow/fulltitle tests passed. Main pnpm check passed:
+978 tests/9 skips, all types, both builds, Biome (8 existing CSS warnings). Log `/tmp/torch-path-01-check.log`.
+Worker finished/clean; agent-1 detached, branch deleted, no task processes remain.
+Actual Windows display check for this small fix pending. Other feature Windows success report remains recorded.
 
 LATEST override: user approved parallel L2a followups and L3 player skin only (operator branding excluded).
 Read `docs/launcher-parallel-followups.md`. Worker #2 `launcher_followups`, Astra medium requested,
