@@ -7,6 +7,12 @@
 
 ## 현재 상태와 다음 작업
 
+UI-FEEDBACK-01 검토 추가: 배경 자식 z-index가 부모 밖으로 빠져 홈 내용을 덮는 원인 재현.
+브라우저 clipboard-write는 production deny 정책에서 denied 확인. #0이 좁은 범위 추가 승인:
+launcher main/product/ipc(+test), main/index, preload, shared API 및 공통 scripts/smoke.mjs 목록 정렬.
+인자 없는 copyServerDataPath IPC가 신뢰 main-frame과 정확한 인자를 검사하고 현재 서버 루트만 복사한다.
+임의 문자열/경로 입력이나 전역 clipboard 권한 허용은 하지 않는다. 게임/서비스/잠금 변경은 제외한다.
+
 UI-FEEDBACK-01 사용자 보고: 플레이에서 서버 이름/버튼까지 전부 보이지 않음, 설정 경로 복사 버튼 요청.
 #1 기존 작업자 `branding_contracts`, agent-1 `fix/launcher-play-path-feedback`, 기준 `a0a4bda`.
 배타적 launcher renderer 및 앱 로컬 smoke/fixture·해당 인계만. main/IPC/core/admin/루트 scripts 제외.
