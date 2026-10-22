@@ -684,3 +684,8 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 메인 `pnpm check` 통과(1124 테스트). 명세는 [배포 서명 명세](deployment-signing.md).
 - 알려진 설계 한계: 잘못된 서명과 잘못된 키는 구분되지 않음(`signature-invalid`, 키 ID 없음). 페이로드 바이트는 직접 서명하지 않고 서명된 인덱스의 파일 해시가 보호한다.
 - 후속: SIGN-STUDIO-01(Studio 비UI), SIGN-LAUNCHER-01(런처 메인) 배정. 런처는 `verification`을 필수로 조이고 구성에 `signing`이 있으면 항상 키를 전달해야 한다.
+
+## SIGN-LAUNCHER-01 통합 (2026-10-23, #0 Claude)
+- `3947668`(Sonnet 작업자) 병합: 서버 구성에 `signing`이 있으면 모든 reader에 공개 키를 전달하고 `verified`가 아니면 파일 준비·적용 전에 중단. 롤백 판정(`decideRollback`)은 적용 전에 읽기 전용으로 수행, 상태는 동기화 성공 뒤에만 `<userData>/servers/<serverId>/.torchlauncher-deployment-state.json`에 원자적으로 기록(서버 데이터 삭제 시 함께 삭제, 손상·초과·형식 오류는 fail-closed). 브랜딩 갱신 reader는 검증·판정만 하고 상태를 올리지 않음. `signing` 없는 구성은 기존 동작.
+- 새 실패 코드 8종을 한국어 메시지로 연결. 메인 `pnpm check` 통과.
+- 한계: 코어의 `verification`이 선택 필드라 런처는 구체 반환 타입에서 읽고 누락을 비신뢰로 처리(조이려면 코어 변경 필요). `docs/deployment-signing.md`에 저장 위치·브랜딩 규칙은 핸드오프 문서에만 기록됨. 실제 서명된 배포로의 종단 검증은 Studio 통합(SIGN-STUDIO-01) 이후.
