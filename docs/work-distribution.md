@@ -553,3 +553,15 @@ UI에서 더 낮은 유효값 저장을 안내하고 실행은 설치 전에 메
 911개 통과·9 skip·전체 타입/두 앱 빌드/Biome(기존 CSS 경고 8개). 작업자 관련 79개와 Electron
 기능 smoke도 성공. agent-1은 통합 main에 detached, 작업 브랜치 삭제, 다른 worktree 미변경.
 실계정·게임·Windows 검증은 하지 않았으며 사용자 확인을 요청한다. L3/L2a 후속 배정 승인 전 대기한다.
+
+### MEM-01 입력 후속 — 사용자 승인 (2026-10-23)
+
+#1 `memory_scrub`, Luna medium, agent-1 `feat/mem-01-scrub-input`, baseline `f1b3286`.
+사용자 요청: 0.5GB 단위 권장 문구 제거, 숫자 input 스피너 제거, 좌우 드래그로 메모리 조절,
+메모리 저장 성공의 ‘저장했습니다’ 문구 제거. 직접 입력·유효성 검사·명시 저장·실패 안내는 유지한다.
+독점: renderer `pages/Settings.tsx`, 새 메모리 입력 component/helper/관련 테스트,
+`pages/memory.ts`·테스트, `styles.css` 해당 입력만, `i18n/catalog.ts` 관련 문구,
+`pages.test.ts`, `apps/launcher/scripts/renderer-functional-smoke.mjs` 메모리 부분,
+`docs/handoffs/MEM-01-INPUT.md`. main/core/IPC/다른 페이지·L3 작업은 제외한다.
+전역 텍스트 선택·끌기 차단은 유지하며 입력의 pointer 조절만 한정 허용한다. click/keyboard 직접 입력,
+좌우 조절·범위·disabled·pointer cancel/unmount 정리·저장 전 반영 안 됨을 실제 화면 검사한다.
