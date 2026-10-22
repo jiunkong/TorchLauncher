@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   StudioCommand,
   StudioError,
@@ -8,10 +8,10 @@ import type {
 
 const messages: Record<StudioError, string> = {
   INVALID:
-    '입력을 확인하세요. 서버 이름·주소·버전·HTTPS URL, 파일 경로와 비어 있는 출력 폴더가 필요합니다.',
+    '입력값이나 선택한 경로를 확인하세요. 문제가 있는 필드와 작업 안내를 수정한 뒤 다시 시도할 수 있습니다.',
   BUSY: '다른 작업이 진행 중입니다.',
   CANCELLED: '작업을 취소했습니다.',
-  IO: '작업에 실패했습니다. 파일 접근 권한과 공개 배포 링크, 네트워크 상태를 확인하세요.',
+  IO: '작업에 실패했습니다. 파일 접근 권한, 선택한 경로 또는 네트워크 상태를 확인하세요.',
   MISMATCH: '배포 파일의 서버 ID, Minecraft 또는 로더가 현재 프로젝트와 다릅니다.',
   NO_PROJECT: '프로젝트를 먼저 만들거나 여세요.',
   UNTRUSTED: '요청을 허용하지 않았습니다. 앱을 다시 실행하세요.',
@@ -21,6 +21,11 @@ export function useStudio() {
   const [draft, setDraft] = useState<StudioProject | null>(null);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
+  const actionLock = useRef(false);
+  const [operation, setOperation] = useState<Exclude<
+    StudioCommand['action'],
+    'update' | 'touch' | 'state' | 'cancel'
+  > | null>(null);
   useEffect(() => {
     let active = true;
     void window.torchlauncher
@@ -50,6 +55,7 @@ export function useStudio() {
   const edit = (project: StudioProject) => {
     setDraft(project);
     setMessage('');
+    setState((current) => (current ? { ...current, result: null } : current));
     void window.torchlauncher
       .request({ action: 'touch' })
       .then((reply) => {
@@ -59,10 +65,17 @@ export function useStudio() {
   };
   const run = async (action: Exclude<StudioCommand['action'], 'update' | 'touch' | 'state'>) => {
     if (action === 'cancel') {
-      await window.torchlauncher.request({ action });
+      try {
+        await window.torchlauncher.request({ action });
+      } catch {
+        setMessage(messages.IO);
+      }
       return;
     }
+    if (actionLock.current) return;
+    actionLock.current = true;
     setPending(true);
+    setOperation(action);
     setMessage('');
     try {
       if (draft && !['new', 'open'].includes(action)) {
@@ -82,9 +95,46 @@ export function useStudio() {
     } catch {
       setMessage(messages.IO);
     } finally {
+      actionLock.current = false;
       setPending(false);
+      setOperation(null);
     }
   };
-  return { state, draft, edit, run, message, busy: pending || !!state?.busy };
+  const serviceBusy = state?.busy ?? null;
+  const effectiveOperation = operation ?? serviceBusy;
+  const operationLabel = (
+    {
+      new: '새 프로젝트를 준비하는 중…',
+      open: '프로젝트를 여는 중…',
+      save: '프로젝트를 저장하는 중…',
+      saveAs: '프로젝트를 저장하는 중…',
+      source: '소스 폴더를 선택하는 중…',
+      files: '파일을 추가하는 중…',
+      build: 'torchpack을 생성하는 중…',
+      check: '배포 URL을 확인하는 중…',
+      export: '런처 폴더를 내보내는 중…',
+      saving: '프로젝트를 저장하는 중…',
+      opening: '프로젝트를 여는 중…',
+      choosing: '선택을 기다리는 중…',
+      building: 'torchpack을 생성하는 중…',
+      checking: '배포 URL을 확인하는 중…',
+      exporting: '런처 폴더를 내보내는 중…',
+    } as const
+  )[effectiveOperation ?? 'new'];
+  return {
+    state,
+    draft,
+    edit,
+    run,
+    message,
+    operationLabel,
+    showByteProgress:
+      effectiveOperation === 'build' ||
+      effectiveOperation === 'building' ||
+      effectiveOperation === 'export' ||
+      effectiveOperation === 'exporting',
+    canCancel: pending || !!serviceBusy,
+    busy: pending || !!serviceBusy,
+  };
 }
 export type StudioController = ReturnType<typeof useStudio>;

@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { _electron as electron } from 'playwright';
 
 const temp = await mkdtemp(resolve(tmpdir(), 'torchlauncher-smoke-'));
+const statusFixture = createServer((socket) => socket.end());
+const serverAddress = await new Promise((resolveAddress, reject) => {
+  statusFixture.once('error', reject);
+  statusFixture.listen(0, '127.0.0.1', () => {
+    const address = statusFixture.address();
+    if (!address || typeof address === 'string') {
+      reject(new Error('Could not determine local status fixture address'));
+      return;
+    }
+    resolveAddress(`127.0.0.1:${address.port}`);
+  });
+});
 const screenshots = resolve('.cache/smoke');
 await mkdir(screenshots, { recursive: true });
 const env = { ...process.env };
@@ -18,7 +31,7 @@ await writeFile(
     version: 1,
     serverId,
     name: 'Smoke fixture',
-    address: 'localhost:25565',
+    address: serverAddress,
     sourceUrl: 'https://example.invalid/smoke.torchpack',
   })}\n`,
 );
@@ -30,7 +43,7 @@ const appCases = [
       ['홈 · 플레이', '서버에 접속할 준비를 합니다'],
       ['내 모드', '내 모드'],
       ['설정', '설정'],
-      ['로그', '로그'],
+      ['문제 해결', '설정 및 문제 해결'],
     ],
     expectedBridge: ['getApplicationInfo', 'getState', 'command', 'onState'],
     env: { ...env, TORCH_SERVER_CONFIG: configPath },
@@ -42,7 +55,7 @@ const appCases = [
       ['개요', '서버 프로젝트를 시작하세요'],
       ['서버 구성', '서버 구성'],
       ['배포', '배포 파일'],
-      ['브랜딩 · 내보내기', '브랜딩과 런처 내보내기'],
+      ['내보내기', '런처 내보내기'],
     ],
     expectedBridge: ['request', 'getApplicationInfo'],
     env,
@@ -63,6 +76,11 @@ try {
     });
 
     try {
+      if (directory === 'admin') {
+        await app.evaluate(({ dialog }) => {
+          dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+        });
+      }
       const page = await app.firstWindow();
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
@@ -89,10 +107,11 @@ try {
         assert.equal(state.configuration, 'ready');
         assert.equal(state.server.serverId, serverId);
         assert.equal(state.server.name, 'Smoke fixture');
-        assert.equal(state.server.address, 'localhost:25565');
+        assert.equal(state.server.address, serverAddress);
         assert.equal(state.account, null);
-        assert.equal(state.status.state, 'unknown');
-        assert.equal(await page.getByTestId('launch-button').isDisabled(), true);
+        assert.ok(['unknown', 'online', 'unavailable'].includes(state.status.state));
+        await page.locator('[data-testid="launch-button"]:not([disabled])').waitFor();
+        assert.equal(await page.getByTestId('launch-button').isEnabled(), true);
         const subscription = await page.evaluate(() => {
           const unsubscribe = window.torchlauncher.onState(() => {});
           const callable = typeof unsubscribe === 'function';
@@ -121,10 +140,17 @@ try {
         await page.getByRole('button', { name: '개요', exact: true }).click();
         await page.getByRole('button', { name: '새 프로젝트', exact: true }).first().click();
         await page.getByRole('heading', { level: 2, name: '새 서버', exact: true }).waitFor();
+        await page.locator('.workflow-row').first().getByRole('button').click();
+        assert.equal(await page.getByLabel('공개 torchpack HTTPS URL').count(), 0);
+        await page.getByRole('button', { name: '다음: 소스와 파일 선택' }).waitFor();
+        await page.getByRole('button', { name: '배포' }).click();
+        await page
+          .getByText('팩을 만들려면 먼저 소스 폴더를 선택하세요.', { exact: false })
+          .waitFor();
+        assert.equal(await page.getByRole('button', { name: 'torchpack 생성' }).isDisabled(), true);
         const projectPath = resolve(temp, 'saved-project.json');
         await app.evaluate(({ dialog }, target) => {
           dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
-          dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
         }, projectPath);
         await page.getByRole('button', { name: '저장', exact: true }).click();
         await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
@@ -169,5 +195,6 @@ try {
     }
   }
 } finally {
+  await new Promise((resolveClose) => statusFixture.close(resolveClose));
   await rm(temp, { recursive: true, force: true });
 }

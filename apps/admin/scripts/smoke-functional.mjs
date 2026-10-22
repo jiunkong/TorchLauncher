@@ -26,20 +26,28 @@ try {
   });
   await app.evaluate(
     ({ dialog }, paths) => {
-      dialog.showOpenDialog = async (_window, options) => ({
-        canceled: false,
-        filePaths:
-          options.title === '프로젝트 열기'
-            ? [paths.project]
-            : options.title === '배포 소스 폴더'
-              ? [paths.source]
-              : [paths.file],
-      });
+      dialog.showOpenDialog = async (_window, options) => {
+        const canceled = globalThis.__studioSmokeCancelNext === true;
+        globalThis.__studioSmokeCancelNext = false;
+        return {
+          canceled,
+          filePaths: canceled
+            ? []
+            : options.title === '프로젝트 열기'
+              ? [paths.project]
+              : options.title === '배포 소스 폴더'
+                ? [paths.source]
+                : [paths.file],
+        };
+      };
       dialog.showSaveDialog = async (_window, options) => ({
         canceled: false,
         filePath: options.title === '프로젝트 저장' ? paths.project : paths.pack,
       });
-      dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+      dialog.showMessageBox = async () => ({
+        response: globalThis.__studioSmokeKeepEdits === true ? 0 : 1,
+        checkboxChecked: false,
+      });
     },
     { source, file: join(source, 'custom.data'), project, pack },
   );
@@ -52,11 +60,39 @@ try {
     .getByRole('button', { name: '새 프로젝트', exact: true })
     .click();
   await page.getByRole('button', { name: '서버 구성', exact: true }).click();
+  await page.getByLabel('서버 접속 주소 (host:port)').fill('bad host');
+  assert.equal(
+    await page.getByLabel('서버 접속 주소 (host:port)').getAttribute('aria-invalid'),
+    'true',
+  );
+  await page.getByLabel('서버 접속 주소 (host:port)').fill('localhost:25565');
+  assert.equal(
+    await page.getByLabel('서버 접속 주소 (host:port)').getAttribute('aria-invalid'),
+    'false',
+  );
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke');
+  await app.evaluate(() => {
+    globalThis.__studioSmokeKeepEdits = true;
+  });
+  await page.locator('.project-toolbar').getByRole('button', { name: '열기', exact: true }).click();
+  await page.getByText('작업을 취소했습니다.', { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel('서버 이름', { exact: true }).inputValue(),
+    'Functional Studio smoke',
+  );
+  await app.evaluate(() => {
+    globalThis.__studioSmokeKeepEdits = false;
+  });
   await page.locator('.project-toolbar').getByRole('button', { name: '저장', exact: true }).click();
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
   assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Functional Studio smoke');
   await page.getByRole('button', { name: '배포', exact: true }).click();
+  await app.evaluate(() => {
+    globalThis.__studioSmokeCancelNext = true;
+  });
+  await page.getByRole('button', { name: '소스 폴더 선택', exact: true }).click();
+  await page.getByText('작업을 취소했습니다.', { exact: true }).waitFor();
+  assert.equal(await page.getByText('소스 폴더: 선택되지 않음', { exact: false }).count(), 1);
   await page.getByRole('button', { name: '소스 폴더 선택', exact: true }).click();
   await page.getByRole('button', { name: '파일 추가', exact: true }).click();
   await page.getByLabel('custom.data 적용 정책').selectOption('initial-only');
@@ -68,6 +104,17 @@ try {
     )
     .waitFor();
   assert.equal((await readFile(pack)).subarray(0, 8).toString(), 'TORCHDEP');
+  await page.getByRole('button', { name: '내보내기', exact: true }).click();
+  await page.getByLabel('공개 torchpack HTTPS URL').fill('http://example.org/server.torchpack');
+  assert.equal(
+    await page.getByRole('button', { name: '배포 URL 검사', exact: true }).isDisabled(),
+    true,
+  );
+  await page.getByLabel('공개 torchpack HTTPS URL').fill('https://example.org/server.torchpack');
+  assert.equal(
+    await page.getByRole('button', { name: '배포 URL 검사', exact: true }).isEnabled(),
+    true,
+  );
   await page.locator('.project-toolbar').getByRole('button', { name: '저장', exact: true }).click();
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
   assert.deepEqual(JSON.parse(await readFile(project, 'utf8')).files, [
