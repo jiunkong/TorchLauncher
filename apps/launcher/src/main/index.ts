@@ -64,7 +64,10 @@ function createWindow(): void {
   window.webContents.on('will-navigate', (event, url) => {
     if (!isTrustedRendererUrl(url, rendererUrl)) event.preventDefault();
   });
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => {
+    window.show();
+    void product?.restoreSession();
+  });
   window.on('close', (event) => {
     if (!shutdownFinished) {
       event.preventDefault();

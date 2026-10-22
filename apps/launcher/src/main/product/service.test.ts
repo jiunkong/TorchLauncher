@@ -192,3 +192,27 @@ it('enforces required resource packs through the real locked settings policy', a
   expect(service.snapshot().packs).toContainEqual({ id: 'file/required.zip', required: true });
   expect(await readFile(join(root, 'options.txt'), 'utf8')).toContain('file/user.zip');
 });
+
+it('restores cached sessions noninteractively and treats no saved session as clean idle', async () => {
+  const { service, host } = await setup();
+  vi.mocked(host.auth.refresh).mockRejectedValue(
+    Object.assign(new Error('no_session'), { code: 'no_session' }),
+  );
+  await service.restoreSession();
+  expect(service.snapshot().account).toBeNull();
+  expect(service.snapshot().error).toBeNull();
+  expect(service.snapshot().operation).toBeNull();
+  expect(JSON.stringify(vi.mocked(host.publish).mock.calls)).not.toContain('no_session');
+  expect(host.auth.login).not.toHaveBeenCalled();
+  vi.mocked(host.auth.refresh).mockResolvedValue({
+    accessToken: 'restore-secret',
+    expiresAt: Date.now() + 10000,
+    profile: { id: 'a'.repeat(32), name: 'RestoredUser' },
+    userType: 'msa',
+    clientId: 'fixture',
+  });
+  await service.restoreSession();
+  expect(service.snapshot().account?.name).toBe('RestoredUser');
+  expect(JSON.stringify(service.snapshot())).not.toContain('restore-secret');
+  expect(host.auth.login).not.toHaveBeenCalled();
+});

@@ -651,3 +651,62 @@ h1 {
     padding-left: 17px;
   }
 }
+
+.action-row,
+.operation-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-block: 16px;
+}
+.operation-status {
+  padding: 16px;
+  background: var(--surface-raised, #252a30);
+  border-radius: 12px;
+}
+.operation-status progress {
+  max-width: 100%;
+}
+.pack-label {
+  display: block;
+  margin-block: 16px 8px;
+}
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #141619;
+  color: #e8edf2;
+  border: 1px solid #49525c;
+  border-radius: 8px;
+  padding: 12px;
+  font: inherit;
+}
+.data-list {
+  padding: 0;
+  list-style: none;
+}
+.data-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 14px;
+  border-bottom: 1px solid #343a42;
+}
+.data-list strong,
+.deletion-preview code {
+  overflow-wrap: anywhere;
+}
+.game-log {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 480px;
+  overflow-y: auto;
+  background: #141619;
+  padding: 16px;
+}
+.danger {
+  border-color: #e58080;
+  color: #ffaaaa;
+}

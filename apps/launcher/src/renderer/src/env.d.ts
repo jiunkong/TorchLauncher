@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
-import type { DesktopApi } from '@torchlauncher/core/desktop';
+import type { LauncherApi } from '../../shared/product';
 
 declare global {
   interface Window {
-    torchlauncher: DesktopApi;
+    torchlauncher: LauncherApi;
   }
 }

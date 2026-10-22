@@ -166,7 +166,13 @@ export class ProductService {
       discardDeletionConfirmation(this.state.deletion.confirmation);
     this.state.deletion = null;
   }
-  async command(raw: unknown): Promise<ProductResult> {
+  async restoreSession(): Promise<void> {
+    await this.execute({ type: 'refresh' }, true);
+  }
+  command(raw: unknown): Promise<ProductResult> {
+    return this.execute(raw);
+  }
+  private async execute(raw: unknown, restoring = false): Promise<ProductResult> {
     let command: ReturnType<typeof parseProductCommand>;
     try {
       command = parseProductCommand(raw);
@@ -345,8 +351,9 @@ export class ProductService {
           }
         } catch (error) {
           if (command.type === 'login' || command.type === 'refresh') this.state.account = null;
-          this.state.error = safeProductError(error, signal.aborted);
-          throw new Error(this.state.error);
+          const code = safeProductError(error, signal.aborted);
+          this.state.error = restoring && code === 'no_session' ? null : code;
+          throw new Error(code);
         } finally {
           this.state.operation = null;
           this.state.progress = null;
@@ -479,10 +486,10 @@ export class ProductService {
     }
   }
   async close() {
-    this.operations.cancel();
+    const closing = this.operations.close();
     try {
       await this.game?.stop();
-      await this.operations.close();
+      await closing;
       this.invalidateDeletion();
     } catch (error) {
       this.state.error = 'shutdown-failed';

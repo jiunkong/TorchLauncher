@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
+import { useProduct } from './hooks/useProduct';
 import { PageContent, type PageId } from './pages/Pages';
 
 const pages: { id: PageId; label: string; icon: string; title: string; summary: string }[] = [
@@ -35,6 +36,7 @@ const pages: { id: PageId; label: string; icon: string; title: string; summary: 
 
 export function App() {
   const { info, error } = useApplicationInfo();
+  const { state, error: productError, command } = useProduct();
   const [currentPage, setCurrentPage] = useState<PageId>('home');
   const page = pages.find((item) => item.id === currentPage);
   if (!page) throw new Error(`Unknown ${currentPage} page`);
@@ -56,8 +58,8 @@ export function App() {
             T
           </span>
           <span>
-            <strong>서버 환경</strong>
-            <small>서버 정보 연결 전</small>
+            <strong>{state?.server?.name ?? '서버 환경'}</strong>
+            <small>{state?.server?.address ?? '서버 구성 없음'}</small>
           </span>
         </div>
         <div className="workspace-label">LIBRARY</div>
@@ -83,7 +85,7 @@ export function App() {
           </div>
           <div className="profile-copy">
             <strong>계정</strong>
-            <small>로그인 상태를 확인할 수 없습니다</small>
+            <small>{state?.account?.name ?? '로그인 필요'}</small>
           </div>
         </div>
       </aside>
@@ -107,7 +109,38 @@ export function App() {
               <p>{page.summary}</p>
             </div>
           </header>
-          <PageContent page={currentPage} />
+          {state?.operation && (
+            <div className="operation-status" role="status">
+              <strong>
+                {state.phase === 'game-running'
+                  ? '게임 실행 중 · 서버 접속은 게임에서 확인'
+                  : `진행 중: ${state.phase}`}
+              </strong>
+              {state.progress && (
+                <progress value={state.progress.completed} max={state.progress.total} />
+              )}
+              <button
+                className="button"
+                type="button"
+                onClick={() => {
+                  void command({ type: state.running ? 'stop' : 'cancel' });
+                }}
+              >
+                {state.running ? '게임 종료' : '작업 취소'}
+              </button>
+            </div>
+          )}
+          {(productError || state?.error) && (
+            <p className="error" role="alert">
+              작업 결과: {productError ?? state?.error}
+            </p>
+          )}
+          {state?.outcome && <p role="status">최근 결과: {state.outcome}</p>}
+          {state ? (
+            <PageContent page={currentPage} state={state} command={command} />
+          ) : (
+            <p role="status">런처 서비스 연결 중…</p>
+          )}
         </div>
         <footer className="footer">
           <span>TorchLauncher</span>
