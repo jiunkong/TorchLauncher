@@ -7,8 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
-사용자 피드백으로 메모리 좌우 드래그 제거 진행: #1 `memory_no_drag`, Luna low,
-`fix/memory-input-no-drag`/agent-1, baseline `fb5ca70`. 드래그만 제거하고 나머지 입력/표시 정책을 유지한다.
+사용자 피드백으로 메모리 좌우 드래그 제거 완료: #1 `memory_no_drag`, Luna low의 `4179715` 통합.
+main 전체 검사 성공(912개 통과·9 skip, 전체 타입·두 앱 빌드·Biome 기존 CSS 경고 8개).
+드래그만 제거하고 스피너/권장·저장 성공 문구/플레이 최근 결과 숨김 및 직접 입력·검증·저장은 유지한다.
+agent-1 detached·작업 브랜치 삭제, 작업자 renderer 23개와 Electron smoke도 통과했다.
+
+사용자 승인으로 **L2a 후속과 L3 스킨만 병렬 진행 중**이다. #2 `launcher_followups`(Astra medium 요청),
+#3 `player_skin`(Sol medium 요청), agent-2/3의 별도 브랜치에서 작업한다. 실제 effort UI 반영은 미확인이다.
+공용 서비스/IPC/상태/메뉴·페이지 연결은 #2 한 명, 스킨 모듈/아바타 component는 #3 한 명이 소유한다.
+[배정·계약](launcher-parallel-followups.md). 운영자 브랜딩/Studio는 미착수이며 추가 작업자는 만들지 않는다.
 
 MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
 권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
