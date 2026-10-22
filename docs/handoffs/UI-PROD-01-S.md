@@ -19,6 +19,6 @@ Validation in this worktree:
 - `git diff --check` — passed.
 - Electron functional smoke was attempted, but this worktree has no Electron executable; Playwright waited during runtime startup and the command was stopped. Run `node apps/admin/scripts/smoke-functional.mjs` and root `node scripts/smoke.mjs` with #0's available Electron executable during integrated validation.
 
-Follow-up smoke change for the launcher startup status query: root smoke uses the temporary local TCP fixture described above and accepts `unknown`, `online`, or `unavailable` while the one-shot query settles. No real server status is treated as verified.
+Follow-up smoke change for the launcher startup status query: root smoke uses the temporary local TCP fixture described above and accepts `unknown`, `online`, or `unavailable` while the one-shot query settles. It tracks accepted sockets and destroys any that remain in `finally` before closing the listener, so cleanup cannot wait for a peer to consume the half-closed connection. No real server status is treated as verified.
 
 Implemented and locally checked; not integrated. Windows native validation and integrated 760/1100px Electron smoke remain pending with #0. No server URL, account, or server connection was used.
