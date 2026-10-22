@@ -16,7 +16,17 @@ Shared files owned only by #2; module/components owned only by #3. Merge module 
 and completes production/menu wiring. #0 docs/review/noffmerge/maincheck only. No extra agents.
 Module #3 `4e2fea9` integrated via `986600b`. Worker finished/clean, 56 tests+types/build+native Electron
 decode/crop/transparency/fallback smoke passed. #2 notified to update branch and finish production wiring.
-Final main pnpm check/product smoke remains after #2 merge. No real account/Windows evidence yet.
+#2 `f35b8ed` + `fa856d5` integrated via `d357b0b`. Production factory/background auth skin lookup,
+account.skin App/Menu wiring and all 3 L2a followups now connected. Worker 200 tests/types/build + functional
+Electron temp-file cancel/delete/location/missing-logs/synthetic avatar smoke passed. Both workers finished/clean.
+Main pnpm check passed: 978 tests/9 skips, all types, both builds, Biome with 8 existing CSS warnings.
+Log `/tmp/torch-parallel-followups-check.log`. Agent-2/3 detached at integrated main, both merged branches deleted.
+No task processes/checks remain. No real account/Windows evidence yet; user verification requested.
+Native check: existing Windows clone commands below, then logged-in avatar, logout fallback, logs folder open
+(folder must exist; no implicit creation), settings root visible without delete preview, unregistered test-file
+cancel preserves bytes and confirm deletes only that fixture. Never use valuable user files as test targets.
+Memory remains numeric-only with no spinners/recommendation/save-success text/Home recent-result.
+Next unstarted item: operator branding requires asset-transport choices and user contract approval; no auto-start.
 
 Memory drag removal `4179715` integrated. Main pnpm check passed 912 tests/9 skips, all types/builds/Biome
 (8 existing CSS warnings); worker renderer 23 tests+Electron smoke passed. Agent-1 detached, branch deleted.

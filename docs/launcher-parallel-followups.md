@@ -71,3 +71,11 @@ import/메뉴 연결을 완료한다. 모듈 준비 전에도 #2는 host 주입�
 삭제 범위·잠금·악성 입력, 늦은 스킨 응답/로그아웃/캐시 만료/응답 상한, 64x32/64x64 얼굴·모자·fallback,
 서비스/IPC 연결과 화면 동작을 검증한다. #0이 통합 main에서 pnpm check 및 필요한 Electron smoke를 실행한다.
 Windows 사용자 확인과 실제 로그인은 준비된 결과 이후 필요한 범위만 요청한다.
+
+## 통합 결과
+
+#3 `4e2fea9` → main `986600b`, #2 `f35b8ed`/`fa856d5` → main `d357b0b`, 모두 #0 --no-ff 통합.
+main 전체 검사 성공: 978개 통과·9 skip, 전체 타입·두 앱 빌드/Biome(기존 CSS 경고 8개).
+작업자 Electron 모듈 픽셀/디코드 fixture 및 제품 연결/임시 파일 취소·삭제 smoke 성공.
+두 작업자 종료·worktree detached·브랜치 정리. Windows 실제 shell/junction·실계정 아바타는 확인 대기다.
+모델/effort는 위 요청값을 사용했지만 실제 UI 표시를 독립 확인한 것은 아니다.

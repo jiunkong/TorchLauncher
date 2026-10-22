@@ -12,14 +12,19 @@ main 전체 검사 성공(912개 통과·9 skip, 전체 타입·두 앱 빌드·
 드래그만 제거하고 스피너/권장·저장 성공 문구/플레이 최근 결과 숨김 및 직접 입력·검증·저장은 유지한다.
 agent-1 detached·작업 브랜치 삭제, 작업자 renderer 23개와 Electron smoke도 통과했다.
 
-사용자 승인으로 **L2a 후속과 L3 스킨만 병렬 진행 중**이다. #2 `launcher_followups`(Astra medium 요청),
+사용자 승인으로 **L2a 후속과 L3 스킨을 병렬 구현·통합**했다. #2 `launcher_followups`(Astra medium 요청),
 #3 `player_skin`(Sol medium 요청), agent-2/3의 별도 브랜치에서 작업한다. 실제 effort UI 반영은 미확인이다.
 공용 서비스/IPC/상태/메뉴·페이지 연결은 #2 한 명, 스킨 모듈/아바타 component는 #3 한 명이 소유한다.
 [배정·계약](launcher-parallel-followups.md). 운영자 브랜딩/Studio는 미착수이며 추가 작업자는 만들지 않는다.
 스킨 모듈 #3 `4e2fea9`를 #0이 `986600b`로 먼저 통합했다. 모듈 56개 테스트·타입/빌드와
 Electron 실제 PNG 디코드/64x32·64x64 얼굴·모자 위치/투명도/fallback fixture 검증 통과.
-현재는 모듈 통합 상태이며 실제 제품 연결·통합 전체 검사·Windows/실계정 검증 완료를 뜻하지 않는다.
-#2는 main을 자기 브랜치에 반영해 production factory/계정/메뉴 연결을 완료한다.
+#2 `f35b8ed`·`fa856d5`를 #0이 `d357b0b`로 통합해 production factory/계정/메뉴 연결까지 완료했다.
+인자 없는 `open-logs`(실행 중 가능), 삭제 미리보기와 독립된 데이터 위치, 앱 안 확인 후 미등록 파일 삭제를 추가했다.
+스킨은 백그라운드 조회·5분/32개 메모리 캐시·검증 PNG만 상태 전달하며 로그아웃/인증 실패/종료 시 비운다.
+작업자 통합 범위 200개 테스트·타입/빌드·Electron 임시 파일 취소/삭제·설정 위치·아바타 연결 smoke 통과.
+main 전체 `pnpm check` 성공: 978개 통과·9 skip, 전체 타입·두 앱 빌드·Biome(기존 CSS 경고 8개).
+agent-2/3을 통합 main에 detached로 정리하고 병합된 두 작업 브랜치를 삭제했다. 진행 중 검사/프로세스 없음.
+Windows 실제 shell/junction·실계정 스킨 조회는 미검증이며 사용자 확인을 요청한다.
 
 MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
 권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
@@ -293,6 +298,8 @@ macOS는 보류, Linux ARM64와 연결 해제 시 종료 보조 모드는 지원
 | LAUNCH-EXIT-01 | 게임 시작 후 런처 자동 종료 개인 옵션·게임 프로세스 분리·잠금 유지/회수 | UI-CONNECT-L, GAME-05 | 구현·통합 검사 완료 — Windows 실게임 미검증 |
 | I18N-01 | 한국어·영어 공통 번역 및 renderer 연결 기반 | UI-BASE | 기반 구현·통합 검사 완료 — 전체 UI 적용은 후속 |
 | MEM-01 | 개인 Xmx/Xms 설정·코어/서비스/설정 화면 연결 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows 확인 대기 |
+| LAUNCHER-L2A-FOLLOWUPS | 로그 폴더 열기·데이터 위치·미등록 파일 확인/삭제 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows 확인 대기 |
+| LAUNCHER-PLAYER-SKIN | 스킨 조회/검증/캐시·얼굴+모자 아바타·서비스 연결 | LAUNCHER-UI-L2A | 구현·통합 검사 완료 — Windows/실계정 확인 대기 |
 | BRAND-ICON-01 | 사용자 레드스톤 토치 ICO를 두 앱 native 아이콘으로 적용 | UI-BASE | 적용·타입/빌드/Linux 패키지 확인 완료 — Windows 표시 미검증 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
