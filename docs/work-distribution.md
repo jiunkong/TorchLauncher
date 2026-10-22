@@ -2,6 +2,11 @@
 
 ## 역할과 현재 배정
 
+2026-10-22 UI-PROD-01: [ui-production.md](ui-production.md)의 기능 우선 범위로 배정.
+#4 `ui_prod_launcher` / `feat/ui-prod-launcher-flow` / agent-4: launcher renderer·app-local smoke·해당 인계.
+#1 `ui_prod_studio` / `feat/ui-prod-studio-flow` / agent-1: `apps/admin/**`·공통 `scripts/smoke.mjs`·해당 인계.
+둘 다 Luna·medium으로 시작하며 필요 시 작업별 재선택한다. #0은 제품 코드 수정 없이 검토/통합한다.
+
 2026-10-22 GAME-ACTIVITY-01: #4(`install_activity`), `feat/install-activity`/agent-4,
 Sol·medium(동기화/설치 이벤트 의미와 실패 전파). 독점: `apps/launcher/src/shared/product.ts`,
 `apps/launcher/src/main/product/service.ts`와 대응 테스트/새 순수 activity helper,
