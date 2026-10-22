@@ -76,9 +76,10 @@ try {
   });
   await page.locator('.project-toolbar').getByRole('button', { name: '열기', exact: true }).click();
   await page.getByText('작업을 취소했습니다.', { exact: true }).waitFor();
-  await page
-    .getByRole('heading', { level: 2, name: 'Functional Studio smoke', exact: true })
-    .waitFor();
+  assert.equal(
+    await page.getByLabel('서버 이름', { exact: true }).inputValue(),
+    'Functional Studio smoke',
+  );
   await app.evaluate(() => {
     globalThis.__studioSmokeKeepEdits = false;
   });
