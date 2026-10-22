@@ -118,14 +118,13 @@ try {
   await page.evaluate(() => window.torchlauncher.command({ type: 'mods' }));
   await page.getByRole('button', { name: 'readme.txt 삭제', exact: true }).click();
   await page.getByTestId('remove-file-dialog').waitFor();
-  await page
-    .getByTestId('remove-file-dialog')
-    .locator('[data-autofocus]')
-    .click();
+  await page.getByTestId('remove-file-dialog').locator('[data-autofocus]').click();
   assert.equal(await readFile(unregistered, 'utf8'), 'smoke fixture only');
   await page.getByRole('button', { name: 'readme.txt 삭제', exact: true }).click();
   await page.getByTestId('remove-file-confirm').click();
-  await page.getByRole('button', { name: 'readme.txt 삭제', exact: true }).waitFor({ state: 'detached' });
+  await page
+    .getByRole('button', { name: 'readme.txt 삭제', exact: true })
+    .waitFor({ state: 'detached' });
   await assert.rejects(readFile(unregistered), { code: 'ENOENT' });
 
   await page.getByRole('button', { name: '설정', exact: true }).click();
@@ -202,9 +201,23 @@ try {
   await page.getByTestId('open-logs').click();
   await page.getByText('로그 폴더를 열지 못했습니다.', { exact: true }).waitFor();
   await page.screenshot({ path: resolve('.cache/smoke/l2a-logs.png') });
+  // Inject a local synthetic account state solely to verify App → Menu → PlayerAvatar wiring.
+  const avatarState = await page.evaluate(() => window.torchlauncher.getState());
+  await app.evaluate(({ BrowserWindow, nativeImage }, state) => {
+    const skin = nativeImage
+      .createFromBitmap(Buffer.alloc(64 * 64 * 4, 255), { width: 64, height: 64 })
+      .toDataURL();
+    BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', {
+      ...state,
+      account: { name: 'FixturePlayer', expiresAt: 1, skin },
+    });
+  }, avatarState);
+  await page.locator('.player-avatar-skin[data-ready="true"]').waitFor();
+  assert.equal(await page.locator('.player-avatar-face').count(), 1);
+  assert.equal(await page.locator('.player-avatar-hat').count(), 1);
   assert.deepEqual(pageErrors, []);
   console.log(
-    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage and log tabs passed',
+    'Launcher: mod/pack reads, persisted launcher/game memory settings, usage, unregistered-file confirmation/removal, log-folder failure and wired avatar passed',
   );
 } finally {
   await app?.close();

@@ -516,3 +516,35 @@ it('keeps cosmetic skin work off the authentication path and invalidates stale r
   await Promise.resolve();
   expect(service.snapshot().account?.skin).toBeUndefined();
 });
+
+it('keeps successful authentication when skin lookup fails', async () => {
+  const skins = {
+    get: vi.fn(async () => {
+      throw new Error('skin unavailable');
+    }),
+    clear: vi.fn(),
+  };
+  const { service } = await setup({ skins });
+  expect((await service.command({ type: 'login' })).ok).toBe(true);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(service.snapshot().account?.name).toBe('FixtureUser');
+  expect(service.snapshot().account?.skin).toBeUndefined();
+  expect(service.snapshot().error).toBeNull();
+});
+
+it.skipIf(process.platform === 'win32')(
+  'rejects unregistered removal through a linked mods directory and keeps the outside file',
+  async () => {
+    const { service, host, root } = await setup();
+    await ensureServerDataRoot(host.base, serverId);
+    const outside = join(host.base, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'readme.txt'), 'preserve fixture');
+    await symlink(outside, join(root, 'mods'), 'dir');
+    expect(
+      await service.command({ type: 'remove-unregistered', path: 'mods/readme.txt' }),
+    ).toMatchObject({ ok: false, error: 'unsafe-path' });
+    expect(await readFile(join(outside, 'readme.txt'), 'utf8')).toBe('preserve fixture');
+  },
+);

@@ -10,6 +10,7 @@ import {
   PlayIcon,
   SettingsIcon,
 } from './Icons';
+import { PlayerAvatar } from './PlayerAvatar';
 
 export type PageId = 'home' | 'mods' | 'settings' | 'troubleshooting';
 const items: {
@@ -30,16 +31,9 @@ export interface MenuProps {
   onNavigate(page: PageId): void;
   serverName: string | null;
   accountName: string | null;
+  accountSkin?: string;
   logoutDisabled: boolean;
   onLogout(): void;
-}
-
-function Avatar({ name, label }: { name: string | null; label: string }) {
-  return (
-    <span className={`avatar${name ? '' : ' empty'}`} role="img" aria-label={label} title={label}>
-      {name ? ([...name][0] ?? '?').toUpperCase() : '?'}
-    </span>
-  );
 }
 
 export function Menu(props: MenuProps) {
@@ -99,7 +93,11 @@ export function Menu(props: MenuProps) {
         </div>
       </nav>
       <div className="account">
-        <Avatar name={accountName} label={accountLabel} />
+        <PlayerAvatar
+          name={accountName}
+          label={accountLabel}
+          {...(props.accountSkin ? { skin: props.accountSkin } : {})}
+        />
         <strong className="account-name fade" inert={!open}>
           {accountLabel}
         </strong>

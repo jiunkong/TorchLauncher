@@ -136,6 +136,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
           onNavigate={navigate}
           serverName={state?.server?.name ?? null}
           accountName={state?.account?.name ?? null}
+          {...(state?.account?.skin ? { accountSkin: state.account.skin } : {})}
           logoutDisabled={busy}
           onLogout={logout}
         />
