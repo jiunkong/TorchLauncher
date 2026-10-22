@@ -5,7 +5,19 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## Latest update: UI-BASE (2026-10-22, Codex #0)
+## Active work: functional UI integration (2026-10-22, Codex #0)
+
+The user authorized functional wiring before visual design, explicitly reaffirming delegation.
+#0 edits coordination documents/reviews/integrates only. Read `docs/ui-integration.md` for contracts.
+Two workers are active: #1 `connect_studio`, agent-1 branch `feat/ui-connect-studio`, Studio/project/writer/
+URL-check/export + shared `server-config` module; #4 `connect_launcher`, agent-4 branch
+`feat/ui-connect-launcher`, launcher/auth/status/game/user-data/IPC + narrowly assigned core hooks.
+Both use Sol medium. Shared server schema commits `987203c`/`2960fdb` are already merged into main;
+focused 9 schema tests passed. Workers must not merge main or modify progress. No live login was requested.
+Do not repeat old game smoke against current Drive without checking loader match. No additional uploads needed yet.
+UI-BASE below is completed history, not the current idle state.
+
+## UI-BASE (2026-10-22, Codex #0)
 
 The user authorized renderer foundations for both apps. Worker #1 implemented `f4b89c7` and cleanup
 `af28d54`, integrated into main. Read `docs/handoffs/UI-BASE.md`. Each app now owns its local
