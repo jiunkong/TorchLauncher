@@ -5,10 +5,20 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, ipcMain, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { productStateChannel } from '../shared/product';
+import { createPublicJavaAuthenticator } from './auth/public-java-electron';
+import { readServerConfig, serverConfigPath } from './product/bootstrap';
+import { bindProductIpc } from './product/ipc';
+import { ProductService } from './product/service';
 
 const applicationName = applicationNames.launcher;
 app.setName(applicationName);
+
+let product: ProductService | undefined;
+let mainWindow: BrowserWindow | undefined;
+let shutdownFinished = false;
+let shutdown: Promise<void> | undefined;
 
 function createWindow(): void {
   const rendererFile = join(__dirname, '../renderer/index.html');
@@ -31,6 +41,8 @@ function createWindow(): void {
     },
   });
 
+  mainWindow = window;
+  const unbind = product ? bindProductIpc(ipcMain, window, rendererUrl, product) : () => {};
   ipcMain.removeHandler(applicationInfoChannel);
   ipcMain.handle(applicationInfoChannel, (event) => {
     if (
@@ -53,7 +65,17 @@ function createWindow(): void {
     if (!isTrustedRendererUrl(url, rendererUrl)) event.preventDefault();
   });
   window.once('ready-to-show', () => window.show());
-  window.once('closed', () => ipcMain.removeHandler(applicationInfoChannel));
+  window.on('close', (event) => {
+    if (!shutdownFinished) {
+      event.preventDefault();
+      app.quit();
+    }
+  });
+  window.once('closed', () => {
+    unbind();
+    ipcMain.removeHandler(applicationInfoChannel);
+    mainWindow = undefined;
+  });
 
   void window.loadURL(rendererUrl).catch((error: unknown) => {
     console.error('Could not load application window', error);
@@ -61,11 +83,82 @@ function createWindow(): void {
   });
 }
 
-void app.whenReady().then(() => {
+app.on('before-quit', (event) => {
+  if (shutdownFinished) return;
+  event.preventDefault();
+  shutdown ??= (async () => {
+    await product?.close();
+    shutdownFinished = true;
+    app.quit();
+  })();
+  void shutdown.catch(() => {
+    // Keep the host alive if child cleanup cannot be verified; allow a later close to retry.
+    shutdown = undefined;
+    void dialog.showMessageBox({
+      type: 'error',
+      message: '게임 종료를 확인하지 못했습니다. 잠시 후 런처를 다시 닫아 주세요.',
+      buttons: ['확인'],
+    });
+  });
+});
+
+void app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
     callback(false);
   });
   session.defaultSession.setPermissionCheckHandler(() => false);
+  const config = await readServerConfig(
+    serverConfigPath({
+      packaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      executable: process.execPath,
+      environment: process.env,
+    }),
+  ).catch(() => null);
+  const auth = await createPublicJavaAuthenticator({
+    cacheDirectory: join(app.getPath('userData'), 'authentication', 'public-java'),
+  });
+  product = new ProductService({
+    base: app.getPath('userData'),
+    version: app.getVersion(),
+    config,
+    auth,
+    chooseMod: async () => {
+      const result = await dialog.showOpenDialog({
+        title: '사용자 모드 추가',
+        properties: ['openFile'],
+        filters: [{ name: 'Minecraft mod', extensions: ['jar'] }],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    confirmDeletion: async (root) =>
+      (
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: '서버 데이터 영구 삭제',
+          message: '게임, 모드, 저장 데이터와 개인 설정을 모두 삭제합니다.',
+          detail: root,
+          buttons: ['취소', '영구 삭제'],
+          defaultId: 0,
+          cancelId: 0,
+        })
+      ).response === 1,
+    confirmRecovery: async () =>
+      (
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: '불확실한 잠금 복구',
+          message: '다른 런처와 게임이 모두 종료되었는지 확인하세요.',
+          buttons: ['취소', '모두 종료됨 · 복구'],
+          defaultId: 0,
+          cancelId: 0,
+        })
+      ).response === 1,
+    publish: (state) => {
+      if (mainWindow && !mainWindow.isDestroyed())
+        mainWindow.webContents.send(productStateChannel, state);
+    },
+  });
   createWindow();
 
   app.on('activate', () => {
@@ -73,6 +166,5 @@ void app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+// Authentication helper windows have no authority over application lifetime.
+app.on('window-all-closed', () => {});
