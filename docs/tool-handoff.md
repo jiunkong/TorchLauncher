@@ -7,6 +7,11 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+New user feedback: latest Windows build 'works well'; no per-feature/junction test details supplied.
+PATH-01 active: #1 `settings_path`, Luna low requested, agent-1 `fix/settings-path-ellipsis`, baseline2725d1d.
+Settings path must be one-line ellipsis with full title/unchanged selectable DOM text. Narrow renderer/CSS only,
+no clipboard button or IPC. Shared deletion-dialog path wrapping remains unchanged. Check 760/1100px widths.
+
 LATEST override: user approved parallel L2a followups and L3 player skin only (operator branding excluded).
 Read `docs/launcher-parallel-followups.md`. Worker #2 `launcher_followups`, Astra medium requested,
 agent-2 `feat/launcher-l2a-followups`; worker #3 `player_skin`, Sol medium requested,

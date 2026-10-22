@@ -2,6 +2,12 @@
 
 ## 역할과 현재 배정
 
+PATH-01 사용자 피드백: 설정 서버 데이터 경로가 여러 줄로 꺾임. #1 `settings_path`, Luna low 요청,
+agent-1 `fix/settings-path-ellipsis`, baseline `2725d1d`. 독점: Settings.tsx의 경로 한 줄 표시/title만,
+styles.css의 설정 경로 전용 레이아웃, 기존 관련 renderer 테스트/smoke의 최소 검증,
+`docs/handoffs/PATH-01.md`. 전체 경로 문자열/선택 복사를 보존하고 말줄임+툴팁, 760/1100px overflow 확인.
+새 복사 버튼/IPC/공유 경로 스타일·삭제 확인 창·백엔드 변경은 하지 않는다.
+
 2026-10-23 사용자 승인: L2a 후속과 L3 스킨만 병렬 진행. [배타적 범위와 계약](launcher-parallel-followups.md).
 #2 `launcher_followups` / agent-2 / `feat/launcher-l2a-followups`: Astra medium 요청(삭제 안전 경계).
 #3 `player_skin` / agent-3 / `feat/launcher-player-skin`: Sol medium 요청(외부 응답·캐시·아바타).
