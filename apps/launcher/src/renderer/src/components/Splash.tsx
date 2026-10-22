@@ -30,7 +30,7 @@ export function SplashView({ phase, minimumMs }: { phase: SplashPhase; minimumMs
     >
       <div className="torch-wrap">
         <div className="halo" />
-        <img className="torch-big" src={torchUrl} alt={t('splash.logoAlt')} />
+        <img className="torch-big" draggable={false} src={torchUrl} alt={t('splash.logoAlt')} />
         {sparks.map((spark) => (
           <span
             key={spark.delay}

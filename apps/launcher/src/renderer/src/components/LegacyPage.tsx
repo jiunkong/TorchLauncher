@@ -69,7 +69,7 @@ export function LegacyPage({
         </div>
       )}
       {error && (
-        <div className="error" role="alert">
+        <div className="error selectable" role="alert">
           <p>{t('error.result', { message: failureMessage(error) })}</p>
           {(error === 'no_session' || error === 'reauthentication_required') && (
             <button className="btn sm" type="button" onClick={() => onNavigate('home')}>

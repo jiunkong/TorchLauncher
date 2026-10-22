@@ -1,5 +1,12 @@
 /* TorchLauncher launcher styles. Tokens and component classes follow docs/design/launcher/*.css. */
 @font-face {
+  font-family: "Pretendard Variable";
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: swap;
+  src: url("./assets/fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+@font-face {
   font-family: "Pixelify Sans";
   font-style: normal;
   font-weight: 700;
@@ -26,7 +33,7 @@
   --ok: #5bd6a0;
   --warn: #f5b84b;
   --wood: #6b4a2b;
-  --font: "Segoe UI", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  --font: "Pretendard Variable", "Segoe UI", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   --font-pixel: "Pixelify Sans", "Segoe UI", "Malgun Gothic", "Noto Sans KR", monospace;
   --font-mono: Consolas, D2Coding, monospace;
   color-scheme: dark;
@@ -52,6 +59,26 @@ body {
   margin: 0;
   min-width: 720px;
   overflow: hidden;
+}
+/* Application chrome is not selectable or draggable; copyable content opts back in. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+code,
+pre,
+.game-log,
+.selectable,
+.selectable * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+img,
+a,
+svg {
+  -webkit-user-drag: none;
 }
 img {
   display: block;

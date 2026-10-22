@@ -69,7 +69,11 @@ export interface ProductState {
   phase: string;
   progress: { completed: number; total: number } | null;
   activity: ProductActivity | null;
+  /** From the verified deployment index once a launch has read it; never carries addresses. */
+  game?: { minecraftVersion: string; loader: 'fabric' | 'neoforge'; loaderVersion: string };
   running: boolean;
+  /** Epoch ms when the game process started; present only while `running`. */
+  runningSince?: number;
   outcome: string | null;
   error: string | null;
   mods: {

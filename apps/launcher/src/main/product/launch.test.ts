@@ -101,6 +101,8 @@ it('holds product ownership through game reaping and applies policy before handi
   await running;
   await vi.waitFor(() => expect(service.snapshot().running).toBe(true));
   expect(service.snapshot().operation).toBe('launch');
+  expect(service.snapshot().runningSince).toBeGreaterThan(0);
+  expect(service.snapshot().game).toBeUndefined();
   expect(JSON.stringify(service.snapshot())).not.toContain('secret-fixture');
   expect(service.snapshot()).not.toHaveProperty('authenticatedConnection');
   expect(await service.command({ type: 'preview-delete' })).toMatchObject({
@@ -118,6 +120,7 @@ it('holds product ownership through game reaping and applies policy before handi
   await launch;
   await close;
   expect(service.snapshot().running).toBe(false);
+  expect(service.snapshot().runningSince).toBeUndefined();
   expect(service.snapshot().operation).toBeNull();
   expect(stop).toHaveBeenCalled();
 });

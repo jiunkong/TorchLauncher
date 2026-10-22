@@ -5,6 +5,7 @@ import { Menu, type PageId } from './components/Menu';
 import { Splash } from './components/Splash';
 import { StopDialog } from './components/StopDialog';
 import { homePrimaryCommand } from './flow';
+import { runningElapsed } from './home';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
 import { useElapsed } from './hooks/useElapsed';
 import { useProduct } from './hooks/useProduct';
@@ -24,7 +25,14 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const [stopOpen, setStopOpen] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const finishSplash = useCallback(() => setSplashDone(true), []);
-  const elapsed = useElapsed(state?.running ?? false);
+  const observed = useElapsed(state?.running ?? false);
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (state?.runningSince === undefined) return;
+    const timer = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [state?.runningSince]);
+  const elapsed = state ? runningElapsed(state, observed, tick) : 0;
   const seenSteps = useSeenSteps(state);
   const statusAttempted = useRef(false);
 
