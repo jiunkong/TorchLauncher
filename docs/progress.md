@@ -7,6 +7,9 @@
 
 ## 현재 상태와 다음 작업
 
+I18N-01 착수: UI 변경 없이 한국어/영어 공통 번역·locale 설정·저장·React 연결 기반을 준비한다.
+#1 Luna medium 단독 배정. [범위](localization.md). 전체 UI 번역/언어 선택 화면 적용은 후속이다.
+
 LAUNCH-EXIT-01 구현·통합: #3 `close_on_launch`(Sol medium)의 `5a7e0c3`와 인계 `2cf254a`를
 #0이 검토·병합했다. 설정의 ‘게임 실행 후 런처 종료’는 기본 off이며 개인 설정으로 저장된다.
 활성화 시 실제 자식 식별자와 잠금 기록 검증 후 분리하고 런처 프로세스를 종료한다.
@@ -240,6 +243,7 @@ macOS는 보류, Linux ARM64와 연결 해제 시 종료 보조 모드는 지원
 | GAME-PERF-01 | 기본 게임/Java 파일 제한 병렬 처리, 실패·취소 drain과 회귀 검증 | GAME-01, GAME-05 | 완료 — 제한 병렬화/안전 정리 통합, 실제 속도·Windows 측정 별도 |
 | GAME-ACTIVITY-01 | 작업 종류·단계·파일/개수/활성 작업 정보를 UI까지 전달할 계약 | GAME-PERF-01, UI-CONNECT-L | 완료 — 구조화 상태/IPC 전달, renderer 표현은 후속 UI 작업 |
 | LAUNCH-EXIT-01 | 게임 시작 후 런처 자동 종료 개인 옵션·게임 프로세스 분리·잠금 유지/회수 | UI-CONNECT-L, GAME-05 | 구현·통합 검사 완료 — Windows 실게임 미검증 |
+| I18N-01 | 한국어·영어 공통 번역 및 renderer 연결 기반 | UI-BASE | 진행 — #1, UI 적용은 후속 |
 | GAME-04 | 전체 HTTPS 다운로드 연결·실제 Java/게임 설치 검증, 프로세스·로그·실행 잠금 관리 | GAME-01 | 완료 |
 | GAME-05 | 중단된 설치 잠금·저널 검증, 크래시 복구 API와 프로세스 강제 종료 검증 | GAME-01 | 코어 완료 — Windows 실프로세스 검증, UI 연결 완료·새 UI 네이티브 검증 대기 |
 | GAME-02 | 1.21.1 NeoForge 설치와 지정 서버 직접 접속 | GAME-01, GAME-04, AUTH-03, SYNC-01 | 완료 — Windows 11 NeoForge 21.1.264 실접속 성공(사용자 확인) |
