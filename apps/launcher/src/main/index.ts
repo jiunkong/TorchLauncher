@@ -14,6 +14,8 @@ import { ProductService } from './product/service';
 
 const applicationName = applicationNames.launcher;
 app.setName(applicationName);
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
 
 let product: ProductService | undefined;
 let mainWindow: BrowserWindow | undefined;
@@ -105,69 +107,77 @@ app.on('before-quit', (event) => {
   });
 });
 
-void app.whenReady().then(async () => {
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
-    callback(false);
-  });
-  session.defaultSession.setPermissionCheckHandler(() => false);
-  const config = await readServerConfig(
-    serverConfigPath({
-      packaged: app.isPackaged,
-      appPath: app.getAppPath(),
-      executable: process.execPath,
-      environment: process.env,
-    }),
-  ).catch(() => null);
-  const auth = await createPublicJavaAuthenticator({
-    cacheDirectory: join(app.getPath('userData'), 'authentication', 'public-java'),
-  });
-  product = new ProductService({
-    base: app.getPath('userData'),
-    version: app.getVersion(),
-    config,
-    auth,
-    chooseMod: async () => {
-      const result = await dialog.showOpenDialog({
-        title: '사용자 모드 추가',
-        properties: ['openFile'],
-        filters: [{ name: 'Minecraft mod', extensions: ['jar'] }],
-      });
-      return result.canceled ? null : (result.filePaths[0] ?? null);
-    },
-    confirmDeletion: async (root) =>
-      (
-        await dialog.showMessageBox({
-          type: 'warning',
-          title: '서버 데이터 영구 삭제',
-          message: '게임, 모드, 저장 데이터와 개인 설정을 모두 삭제합니다.',
-          detail: root,
-          buttons: ['취소', '영구 삭제'],
-          defaultId: 0,
-          cancelId: 0,
-        })
-      ).response === 1,
-    confirmRecovery: async () =>
-      (
-        await dialog.showMessageBox({
-          type: 'warning',
-          title: '불확실한 잠금 복구',
-          message: '다른 런처와 게임이 모두 종료되었는지 확인하세요.',
-          buttons: ['취소', '모두 종료됨 · 복구'],
-          defaultId: 0,
-          cancelId: 0,
-        })
-      ).response === 1,
-    publish: (state) => {
-      if (mainWindow && !mainWindow.isDestroyed())
-        mainWindow.webContents.send(productStateChannel, state);
-    },
-  });
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
 });
+
+if (primaryInstance)
+  void app.whenReady().then(async () => {
+    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
+      callback(false);
+    });
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    const config = await readServerConfig(
+      serverConfigPath({
+        packaged: app.isPackaged,
+        appPath: app.getAppPath(),
+        executable: process.execPath,
+        environment: process.env,
+      }),
+    ).catch(() => null);
+    const auth = await createPublicJavaAuthenticator({
+      cacheDirectory: join(app.getPath('userData'), 'authentication', 'public-java'),
+    });
+    product = new ProductService({
+      base: app.getPath('userData'),
+      version: app.getVersion(),
+      config,
+      auth,
+      chooseMod: async () => {
+        const result = await dialog.showOpenDialog({
+          title: '사용자 모드 추가',
+          properties: ['openFile'],
+          filters: [{ name: 'Minecraft mod', extensions: ['jar'] }],
+        });
+        return result.canceled ? null : (result.filePaths[0] ?? null);
+      },
+      confirmDeletion: async (root) =>
+        (
+          await dialog.showMessageBox({
+            type: 'warning',
+            title: '서버 데이터 영구 삭제',
+            message: '게임, 모드, 저장 데이터와 개인 설정을 모두 삭제합니다.',
+            detail: root,
+            buttons: ['취소', '영구 삭제'],
+            defaultId: 0,
+            cancelId: 0,
+          })
+        ).response === 1,
+      confirmRecovery: async () =>
+        (
+          await dialog.showMessageBox({
+            type: 'warning',
+            title: '불확실한 잠금 복구',
+            message: '다른 런처와 게임이 모두 종료되었는지 확인하세요.',
+            buttons: ['취소', '모두 종료됨 · 복구'],
+            defaultId: 0,
+            cancelId: 0,
+          })
+        ).response === 1,
+      publish: (state) => {
+        if (mainWindow && !mainWindow.isDestroyed())
+          mainWindow.webContents.send(productStateChannel, state);
+      },
+    });
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
 
 // Authentication helper windows have no authority over application lifetime.
 app.on('window-all-closed', () => {});

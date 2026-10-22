@@ -34,6 +34,28 @@ const pages: { id: PageId; label: string; icon: string; title: string; summary: 
   },
 ];
 
+function failureMessage(code: string): string {
+  const messages: Record<string, string> = {
+    secure_storage_unavailable:
+      '안전한 계정 저장소를 사용할 수 없습니다. Linux에서는 시스템 키체인 서비스를 확인하세요.',
+    no_session: '저장된 계정이 없습니다. Microsoft 로그인을 진행하세요.',
+    reauthentication_required: '계정 세션이 만료되었습니다. 다시 로그인하세요.',
+    cancelled: '작업을 취소했습니다.',
+    busy: '현재 작업이 끝난 뒤 다시 시도하세요.',
+    'recovery-required': '중단된 작업이 있습니다. 홈에서 복구 상태를 확인하세요.',
+    'deletion-incomplete':
+      '중단된 삭제가 있습니다. 설정에서 삭제 미리보기를 다시 열고 이어서 삭제하세요.',
+    'required-pack-removed': '운영자 필수 리소스팩을 포함해서 저장하세요.',
+    'required-pack-reordered': '운영자 필수 리소스팩의 순서를 유지하세요.',
+    'options-owned-by-sync':
+      '운영자가 options.txt 전체를 관리하고 있습니다. 운영자에게 설정 정책 구성을 요청하세요.',
+    'sync-not-initialized': '게임 동기화가 완료된 뒤 설정을 변경하세요.',
+    'configuration-unavailable':
+      '서버 구성을 읽지 못했습니다. Studio에서 내보낸 구성 파일을 확인하세요.',
+  };
+  return messages[code] ?? code;
+}
+
 export function App() {
   const { info, error } = useApplicationInfo();
   const { state, error: productError, command } = useProduct();
@@ -132,7 +154,7 @@ export function App() {
           )}
           {(productError || state?.error) && (
             <p className="error" role="alert">
-              작업 결과: {productError ?? state?.error}
+              작업 결과: {failureMessage(productError ?? state?.error ?? 'operation-failed')}
             </p>
           )}
           {state?.outcome && <p role="status">최근 결과: {state.outcome}</p>}

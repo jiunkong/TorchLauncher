@@ -710,3 +710,24 @@ textarea {
   border-color: #e58080;
   color: #ffaaaa;
 }
+
+.page-panel {
+  display: block;
+  min-height: 0;
+  margin-block: 16px;
+  padding: 20px;
+}
+.page-panel h2 {
+  margin: 0 0 14px;
+  font-size: 17px;
+}
+.page-panel p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.page-panel .button,
+.operation-status .button,
+.play-area > .button:not(.play-button) {
+  background: #30363c;
+  border-color: #49525c;
+}
