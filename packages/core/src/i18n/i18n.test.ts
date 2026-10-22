@@ -55,6 +55,15 @@ describe('translation catalogs', () => {
       }),
     ).toEqual(['en missing key: extra', 'ko missing key: other', 'placeholder mismatch: title']);
   });
+
+  it('allows a translated sentence to repeat a placeholder a different number of times', () => {
+    expect(
+      findCatalogMismatches({
+        en: { greeting: 'Hello, {name}! Welcome back, {name}.' },
+        ko: { greeting: '안녕하세요, {name}님!' },
+      }),
+    ).toEqual([]);
+  });
 });
 
 describe('locale preference storage', () => {
