@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
+import { useStudio } from './hooks/useStudio';
 import { PageContent, type PageId } from './pages/Pages';
 
 const pages: { id: PageId; label: string; icon: string; title: string; summary: string }[] = [
@@ -34,6 +35,7 @@ const pages: { id: PageId; label: string; icon: string; title: string; summary: 
 ];
 
 export function App() {
+  const studio = useStudio();
   const { info, error } = useApplicationInfo();
   const [currentPage, setCurrentPage] = useState<PageId>('overview');
   const page = pages.find((item) => item.id === currentPage);
@@ -70,7 +72,7 @@ export function App() {
         </nav>
         <div className="sidebar-bottom">
           <span className="status-dot" />
-          미리보기 모드
+          서버 프로젝트 편집
         </div>
       </aside>
       <section className="main-column">
@@ -82,7 +84,7 @@ export function App() {
           </div>
           <span className="preview-badge">
             <span className="status-dot" />
-            개발 프리뷰
+            {studio.state?.dirty ? '저장하지 않은 변경' : 'Studio'}
           </span>
         </header>
         <div className="page-content">
@@ -93,7 +95,56 @@ export function App() {
               <p>{page.summary}</p>
             </div>
           </header>
-          <PageContent page={currentPage} />
+          <div className="project-toolbar actions">
+            <button
+              className="button"
+              type="button"
+              disabled={studio.busy}
+              onClick={() => void studio.run('new')}
+            >
+              새 프로젝트
+            </button>
+            <button
+              className="button"
+              type="button"
+              disabled={studio.busy}
+              onClick={() => void studio.run('open')}
+            >
+              열기
+            </button>
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={studio.busy || !studio.draft}
+              onClick={() => void studio.run('save')}
+            >
+              저장
+            </button>
+            <button
+              className="button"
+              type="button"
+              disabled={studio.busy || !studio.draft}
+              onClick={() => void studio.run('saveAs')}
+            >
+              다른 이름으로 저장
+            </button>
+          </div>
+          {studio.message && (
+            <p className="notice" role="status">
+              {studio.message}
+            </p>
+          )}
+          {studio.busy && (
+            <div className="notice" role="status">
+              <span>
+                작업 중… {Math.round((studio.state?.progress ?? 0) / 1024).toLocaleString()} KiB
+              </span>
+              <button type="button" onClick={() => void studio.run('cancel')}>
+                취소
+              </button>
+            </div>
+          )}
+          <PageContent page={currentPage} studio={studio} />
         </div>
         <footer className="footer">
           <span>TorchLauncher Studio</span>
