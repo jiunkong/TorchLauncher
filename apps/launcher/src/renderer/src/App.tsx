@@ -52,7 +52,7 @@ export function App() {
           </span>
         </div>
         <div className="server-identity">
-          <span className="server-switcher-icon" aria-hidden="true">
+          <span className="server-identity-icon" aria-hidden="true">
             T
           </span>
           <span>
