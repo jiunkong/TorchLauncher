@@ -41,13 +41,7 @@ export function parseServerConfig(input: unknown): ServerConfig {
     /^(\[[0-9a-fA-F:]+\]|[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?):([0-9]{1,5})$/.exec(
       value.address,
     );
-  if (
-    !address ||
-    !address[1] ||
-    !address[2] ||
-    Number(address[2]) < 1 ||
-    Number(address[2]) > 65535
-  )
+  if (!address?.[1] || !address[2] || Number(address[2]) < 1 || Number(address[2]) > 65535)
     return fail();
   try {
     const host = address[1];
@@ -65,18 +59,7 @@ export function parseServerConfig(input: unknown): ServerConfig {
     )
       return fail();
     const url = new URL(value.sourceUrl);
-    const hostname = url.hostname.toLowerCase();
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.hash ||
-      !hostname.includes('.') ||
-      hostname.endsWith('.') ||
-      hostname.startsWith('[') ||
-      /^(?:\d+\.){3}\d+$/.test(hostname) ||
-      /(?:^|\.)(?:localhost|local|internal|test|invalid)$/.test(hostname)
-    )
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash || !url.hostname)
       return fail();
   } catch {
     return fail();

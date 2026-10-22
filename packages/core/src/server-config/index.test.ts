@@ -13,6 +13,8 @@ describe('server config', () => {
   it('parses a portable config including local game addresses', () => {
     expect(parseServerConfig(config)).toEqual(config);
     expect(parseServerConfig({ ...config, address: '[::1]:25565' }).address).toBe('[::1]:25565');
+    for (const sourceUrl of ['https://192.0.2.1/a', 'https://localhost/a', 'https://[::1]/a'])
+      expect(parseServerConfig({ ...config, sourceUrl }).sourceUrl).toBe(sourceUrl);
     expect(SERVER_CONFIG_FILENAME).toBe('torchlauncher-server.json');
   });
   it.each([
@@ -22,14 +24,10 @@ describe('server config', () => {
     { ...config, name: '\nname' },
     { ...config, address: 'localhost:0' },
     { ...config, address: '../file:12' },
-    ...[
-      'http://example.org/a',
-      'https://user:pass@example.org/a',
-      'https://127.0.0.1/a',
-      'https://localhost/a',
-      'https://x.local/a',
-      'https://[::1]/a',
-    ].map((sourceUrl) => ({ ...config, sourceUrl })),
+    ...['http://example.org/a', 'https://user:pass@example.org/a'].map((sourceUrl) => ({
+      ...config,
+      sourceUrl,
+    })),
   ])('rejects unsafe or malformed configs', (input) => {
     expect(() => parseServerConfig(input)).toThrow('Invalid server configuration');
   });
