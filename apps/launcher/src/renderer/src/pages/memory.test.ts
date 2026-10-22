@@ -1,10 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import {
   defaultMaxMemoryMiB,
   exceedsRecommendedPhysicalMemory,
   memoryLimitMiB,
   parseMemoryGiB,
-  scrubMemoryMiB,
   validGameMemory,
 } from './memory';
 
@@ -15,16 +14,6 @@ it('converts GB fields exactly and rejects empty, fractional-MiB, and non-finite
   expect(parseMemoryGiB('')).toBeNull();
   expect(parseMemoryGiB('0.0001')).toBeNull();
   expect(parseMemoryGiB('Infinity')).toBeNull();
-});
-
-describe('memory scrubbing', () => {
-  it('adjusts in MiB steps and clamps to the current legal bounds', () => {
-    expect(scrubMemoryMiB(1024, 40, 512, 8192)).toBe(1536);
-    expect(scrubMemoryMiB(1024, -40, 512, 8192)).toBe(512);
-    expect(scrubMemoryMiB(1024, -60, 512, 8192)).toBe(512);
-    expect(scrubMemoryMiB(2048, 2000, 512, 3072)).toBe(3072);
-    expect(scrubMemoryMiB(256, -100, 256, 1024)).toBe(256);
-  });
 });
 
 it('validates physical and JVM bounds, including the optional initial memory', () => {

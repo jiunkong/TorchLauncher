@@ -4,7 +4,6 @@ import { ChevronDownIcon, ChevronUpIcon, TrashIcon } from '../components/Icons';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatBytes } from '../format';
 import { useT } from '../hooks/useTranslator';
-import { MemoryScrubInput } from './MemoryScrubInput';
 import type { LoadState } from './Mods';
 import {
   defaultMaxMemoryMiB,
@@ -121,31 +120,39 @@ export function SettingsPage({
           <p className="hint">{t('settings.memoryInitialHint')}</p>
           <div className="field">
             <span>{t('settings.maxMemory')}</span>
-            <MemoryScrubInput
-              value={maxMemoryDraft}
-              label={t('settings.maxMemory')}
-              unit={t('settings.memoryUnit')}
-              testId="max-memory"
-              min={512}
-              max={memoryLimit}
-              step={256}
-              disabled={memorySaving}
-              onChange={setMaxMemoryDraft}
-            />
+            <span className="input-unit memory-input">
+              <input
+                type="number"
+                min={0.5}
+                max={memoryLimit / 1024}
+                step={0.25}
+                inputMode="decimal"
+                value={maxMemoryDraft}
+                aria-label={t('settings.maxMemory')}
+                data-testid="max-memory"
+                disabled={memorySaving}
+                onChange={(event) => setMaxMemoryDraft(event.target.value)}
+              />
+              <span>{t('settings.memoryUnit')}</span>
+            </span>
           </div>
           <div className="field">
             <span>{t('settings.initialMemory')}</span>
-            <MemoryScrubInput
-              value={initialMemoryDraft}
-              label={t('settings.initialMemory')}
-              unit={t('settings.memoryUnit')}
-              testId="initial-memory"
-              min={256}
-              max={maxDraftMiB === null ? 0 : Math.min(maxDraftMiB, memoryLimit)}
-              step={256}
-              disabled={memorySaving}
-              onChange={setInitialMemoryDraft}
-            />
+            <span className="input-unit memory-input">
+              <input
+                type="number"
+                min={0.25}
+                max={maxDraftMiB === null ? 0 : Math.min(maxDraftMiB, memoryLimit) / 1024}
+                step={0.25}
+                inputMode="decimal"
+                value={initialMemoryDraft}
+                aria-label={t('settings.initialMemory')}
+                data-testid="initial-memory"
+                disabled={memorySaving}
+                onChange={(event) => setInitialMemoryDraft(event.target.value)}
+              />
+              <span>{t('settings.memoryUnit')}</span>
+            </span>
           </div>
           {!memoryValid && (
             <p role="alert" className="hint">
