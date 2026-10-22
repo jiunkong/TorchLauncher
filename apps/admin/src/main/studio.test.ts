@@ -3,6 +3,7 @@ import {
   chmod,
   mkdir,
   mkdtemp,
+  open,
   readdir,
   readFile,
   rm,
@@ -251,6 +252,36 @@ describe('Studio project and trusted disk selections', () => {
     await checker.request({ action: 'open' });
     expect(await checker.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
   });
+  it('cancels the real writer during staged file reading and preserves previous output', async () => {
+    const root = await temp();
+    const source = join(root, 'source');
+    await mkdir(source);
+    const file = join(source, 'large.data');
+    const handle = await open(file, 'wx');
+    await handle.truncate(16 * 1024 * 1024);
+    await handle.close();
+    const { s, d } = await projectService();
+    d.open.mockResolvedValueOnce([source]);
+    await s.request({ action: 'source' });
+    d.open.mockResolvedValueOnce([file]);
+    await s.request({ action: 'files' });
+    const pack = join(root, 'server.torchpack');
+    await writeFile(pack, 'previous committed output');
+    d.save.mockResolvedValueOnce(pack);
+    const pending = s.request({ action: 'build' });
+    for (
+      let attempt = 0;
+      attempt < 10000 && s.snapshot().progress === 0 && s.snapshot().busy;
+      attempt++
+    )
+      await new Promise((resolve) => setImmediate(resolve));
+    expect(s.snapshot().progress).toBeGreaterThan(0);
+    expect(s.snapshot().busy).toBe('building');
+    await s.request({ action: 'cancel' });
+    expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
+    expect(await readFile(pack, 'utf8')).toBe('previous committed output');
+    expect((await readdir(root)).sort()).toEqual(['server.torchpack', 'source']);
+  });
   it('returns safe errors without exposing remote diagnostics', async () => {
     const root = await temp();
     const d = dialogs();
@@ -295,27 +326,28 @@ describe('operator-selected launcher folder export', () => {
     const root = await temp();
     const output = join(root, 'output');
     await mkdir(output);
-    const binary = join(root, 'Torch.AppImage');
+    const binaryName = process.platform === 'win32' ? 'Torch.exe' : 'Torch.AppImage';
+    const binary = join(root, binaryName);
     const bytes = Buffer.concat([
-      Buffer.from('7f454c46', 'hex'),
+      process.platform === 'win32' ? Buffer.from('MZ00') : Buffer.from('7f454c46', 'hex'),
       Buffer.alloc(2 * 1024 * 1024, 23),
     ]);
     await writeFile(binary, bytes);
     await chmod(binary, 0o755);
     const settings = config();
     await exportLauncher(binary, output, settings, new AbortController().signal, () => {});
-    expect((await readFile(join(output, 'Torch.AppImage'))).equals(bytes)).toBe(true);
+    expect((await readFile(join(output, binaryName))).equals(bytes)).toBe(true);
     expect(
       parseServerConfig(
         JSON.parse(await readFile(join(output, 'torchlauncher-server.json'), 'utf8')),
       ),
     ).toEqual(settings);
     if (process.platform !== 'win32')
-      expect((await stat(join(output, 'Torch.AppImage'))).mode & 0o777).toBe(0o755);
+      expect((await stat(join(output, binaryName))).mode & 0o777).toBe(0o755);
     await expect(
       exportLauncher(binary, output, settings, new AbortController().signal, () => {}),
     ).rejects.toThrow();
-    expect((await readFile(join(output, 'Torch.AppImage'))).equals(bytes)).toBe(true);
+    expect((await readFile(join(output, binaryName))).equals(bytes)).toBe(true);
   });
   it('cleans partial copies after abort and preserves foreign files on collision', async () => {
     const root = await temp();

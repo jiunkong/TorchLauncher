@@ -256,10 +256,10 @@ export class StudioService {
           address: project.address,
           sourceUrl: project.sourceUrl,
         });
-        await this.verify(signal);
         const binary = (await this.selected('binary'))[0];
         const output = (await this.selected('output'))[0];
         if (!binary || !output) throw new StudioFailure('CANCELLED');
+        await this.verify(signal);
         await exportLauncher(binary, output, config, signal, (bytes) => {
           this.state.progress = bytes;
         });

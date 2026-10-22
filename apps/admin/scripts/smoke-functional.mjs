@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron } from 'playwright';
 
 const cwd = fileURLToPath(new URL('../../..', import.meta.url));
-const root = await mkdtemp('/tmp/studio-ui-smoke-');
+const root = await mkdtemp(join(tmpdir(), 'studio-ui-smoke-'));
 const source = join(root, 'source');
 await mkdir(source);
 await writeFile(join(source, 'custom.data'), 'UI selected payload');
@@ -45,7 +46,7 @@ try {
   const page = await app.firstWindow();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.getByTestId('application-info').filter({ hasText: 'linux' }).waitFor();
+  await page.getByTestId('application-info').filter({ hasText: process.platform }).waitFor();
   await page
     .locator('.project-toolbar')
     .getByRole('button', { name: '새 프로젝트', exact: true })
