@@ -524,3 +524,5 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - `docs/design/`(시안 참고 소스)을 Biome 검사에서 제외했다(`8c7ed2a`). 메인 `pnpm check` 성공: 859개 테스트·opt-in 9개 skip·전체 TypeScript·Biome·두 앱 빌드.
   Linux/WSLg smoke와 스크린샷 비교만 확인했다. Windows 네이티브 실행·실제 로그인/서버/게임·한글 글꼴 렌더링은 미검증이다.
 - 후속(L1b, 계약 변경): `ProductState`에 게임 정보(버전·로더)와 게임 시작 시각 추가, Pixelify Sans OFL 고지를 패키지에 포함. L2: 내 모드·설정·로그 페이지, 확인 창, 세션·복구 자동화.
+- L1b(`2a7a6d9`)를 병합했다: 한글 글꼴 Pretendard Variable(2.06 MB) 번들, 텍스트 선택·끌기·드롭 차단, `ProductState`에 `game`·`runningSince` 추가, 글꼴 OFL 고지를 패키지에 포함.
+  메인 `pnpm check` 성공(862개 테스트·opt-in 9개 skip). `game`은 실행 준비 단계에서 채워져 시작 직후에는 로더가 비어 있을 수 있다(서버 구성 파일에 게임 필드 추가는 Studio 구현 때). Windows 네이티브 확인은 미실시.
