@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { _electron as electron } from 'playwright';
@@ -9,6 +9,19 @@ const screenshots = resolve('.cache/smoke');
 await mkdir(screenshots, { recursive: true });
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
+const serverId = '44444444-4444-4444-8444-444444444444';
+const configPath = resolve(temp, 'torchlauncher-server.json');
+await writeFile(
+  configPath,
+  `${JSON.stringify({
+    format: 'torchlauncher-server',
+    version: 1,
+    serverId,
+    name: 'Smoke fixture',
+    address: 'localhost:25565',
+    sourceUrl: 'https://example.invalid/smoke.torchpack',
+  })}\n`,
+);
 const appCases = [
   {
     directory: 'launcher',
@@ -19,7 +32,8 @@ const appCases = [
       ['설정', '설정'],
       ['로그', '로그'],
     ],
-    guardedActions: ['launch-button', 'save-button'],
+    expectedBridge: ['getApplicationInfo', 'getState', 'command', 'onState'],
+    env: { ...env, TORCH_SERVER_CONFIG: configPath },
   },
   {
     directory: 'admin',
@@ -30,7 +44,8 @@ const appCases = [
       ['배포', '배포 파일'],
       ['브랜딩 · 내보내기', '브랜딩과 런처 내보내기'],
     ],
-    guardedActions: [],
+    expectedBridge: ['request', 'getApplicationInfo'],
+    env,
   },
 ];
 
@@ -43,7 +58,7 @@ try {
     );
     const app = await electron.launch({
       args: [applicationDirectory, `--user-data-dir=${resolve(temp, directory)}`],
-      env,
+      env: appCase.env,
       timeout: 30_000,
     });
 
@@ -67,23 +82,56 @@ try {
       assert.equal(result.info.version, manifest.version);
       assert.equal(result.hasRequire, false);
       assert.equal(result.hasProcess, false);
-      assert.deepEqual(result.bridgeKeys, ['getApplicationInfo']);
+      assert.deepEqual(result.bridgeKeys, appCase.expectedBridge);
+
+      if (directory === 'launcher') {
+        const state = await page.evaluate(() => window.torchlauncher.getState());
+        assert.equal(state.configuration, 'ready');
+        assert.equal(state.server.serverId, serverId);
+        assert.equal(state.server.name, 'Smoke fixture');
+        assert.equal(state.server.address, 'localhost:25565');
+        assert.equal(state.account, null);
+        assert.equal(state.status.state, 'unknown');
+        assert.equal(await page.getByTestId('launch-button').isDisabled(), true);
+        const subscription = await page.evaluate(() => {
+          const unsubscribe = window.torchlauncher.onState(() => {});
+          const callable = typeof unsubscribe === 'function';
+          unsubscribe();
+          return callable;
+        });
+        assert.equal(subscription, true);
+      } else {
+        const state = await page.evaluate(() => window.torchlauncher.request({ action: 'state' }));
+        assert.equal(state.ok, true);
+        assert.equal(state.state.project, null);
+        const invalid = await page.evaluate(() =>
+          window.torchlauncher.request({ action: 'not-a-studio-action' }),
+        );
+        assert.deepEqual(invalid, { ok: false, code: 'INVALID' });
+      }
 
       for (const [label, heading] of appCase.pages) {
         const navButton = page.getByRole('button', { name: label, exact: true });
         await navButton.click();
         await page.getByRole('heading', { level: 1, name: heading, exact: true }).waitFor();
         assert.equal(await navButton.getAttribute('aria-current'), 'page');
-        const productActions = page.locator('button:not(.nav-item)');
-        for (const index of await productActions.evaluateAll((buttons) =>
-          buttons.map((button) => button.disabled),
-        )) {
-          assert.equal(index, true, 'product actions must remain unavailable');
-        }
-        for (const actionId of appCase.guardedActions) {
-          const action = page.getByTestId(actionId);
-          if (await action.count()) assert.equal(await action.isDisabled(), true);
-        }
+      }
+
+      if (directory === 'admin') {
+        await page.getByRole('button', { name: '새 프로젝트', exact: true }).first().click();
+        await page.getByRole('heading', { level: 2, name: '새 서버', exact: true }).waitFor();
+        const projectPath = resolve(temp, 'saved-project.json');
+        await app.evaluate(({ dialog }, target) => {
+          dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
+          dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+        }, projectPath);
+        await page.getByRole('button', { name: '저장', exact: true }).click();
+        await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
+        const savedProject = JSON.parse(await readFile(projectPath, 'utf8'));
+        assert.equal(savedProject.format, 'torchlauncher-project');
+        assert.equal(savedProject.version, 1);
+        assert.match(savedProject.serverId, /^[0-9a-f-]{36}$/i);
+        assert.equal(savedProject.game.minecraftVersion, '1.21.1');
       }
       assert.deepEqual(errors, []);
 
@@ -102,8 +150,17 @@ try {
 
       await page.getByRole('button', { name: appCase.pages[0][0], exact: true }).click();
       await page.screenshot({ path: resolve(screenshots, `${directory}.png`) });
+      await page.setViewportSize({ width: 1100, height: 760 });
+      await page.waitForTimeout(100);
+      const wideLayout = await page.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        content: document.documentElement.scrollWidth,
+      }));
+      assert.equal(wideLayout.viewport, 1100);
+      assert.ok(wideLayout.content <= wideLayout.viewport, `${directory} overflows at 1100px`);
+      await page.screenshot({ path: resolve(screenshots, `${directory}-wide.png`) });
       console.log(
-        `${name}: renderer, navigation, disabled actions, IPC, and sandbox checks passed`,
+        `${name}: renderer, navigation, IPC, isolation, and 760px/1100px layout checks passed`,
       );
     } finally {
       await app.close();
