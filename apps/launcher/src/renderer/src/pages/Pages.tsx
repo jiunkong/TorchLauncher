@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { ProductCommand, ProductState } from '../../../shared/product';
 import { Panel } from '../components/EmptyState';
-import { homePrimaryCommand, homePrimaryDisabled } from '../flow';
+import type { PageId } from '../components/Menu';
 
-export type PageId = 'home' | 'mods' | 'settings' | 'troubleshooting';
 type Props = {
-  page: PageId;
+  page: Exclude<PageId, 'home'>;
   state: ProductState;
   pending: boolean;
   command(request: ProductCommand): Promise<boolean>;
@@ -23,23 +22,12 @@ export function PageContent({ page, state, pending, command }: Props) {
   const [packsLoad, setPacksLoad] = useState<'unqueried' | 'loading' | 'loaded' | 'failed'>(
     'unqueried',
   );
-  const [homeStatusAttempted, setHomeStatusAttempted] = useState(false);
   const run = (request: ProductCommand) => {
     void command(request);
   };
 
   useEffect(() => {
     if (!ready) return;
-    if (
-      page === 'home' &&
-      !homeStatusAttempted &&
-      !state.error &&
-      !state.deletion?.confirmation &&
-      state.status.state === 'unknown'
-    ) {
-      setHomeStatusAttempted(true);
-      void command({ type: 'status' });
-    }
     if (page === 'mods' && modsLoad === 'unqueried') {
       setModsLoad('loading');
       void command({ type: 'mods' }).then((ok) => setModsLoad(ok ? 'loaded' : 'failed'));
@@ -48,64 +36,12 @@ export function PageContent({ page, state, pending, command }: Props) {
       setPacksLoad('loading');
       void command({ type: 'packs' }).then((ok) => setPacksLoad(ok ? 'loaded' : 'failed'));
     }
-  }, [page, ready, modsLoad, packsLoad, homeStatusAttempted, state, command]);
+  }, [page, ready, modsLoad, packsLoad, command]);
 
   useEffect(() => {
     if (page === 'settings' && !packDirty && packsLoad === 'loaded')
       setPackText(state.packs.map((pack) => pack.id).join('\n'));
   }, [page, packDirty, packsLoad, state.packs]);
-
-  if (page === 'home') {
-    const primary = homePrimaryCommand(state);
-    return (
-      <>
-        <Panel>
-          <h2>{state.server?.name ?? '서버 구성 없음'}</h2>
-          <p>
-            {state.server?.address ??
-              '서버 구성이 없습니다. 배포한 운영자에게 이 서버용 런처를 요청하세요.'}
-          </p>
-          <p>
-            {state.configuration === 'unavailable'
-              ? '서버 설정을 읽지 못했습니다. 이 런처의 배포 구성을 확인해 주세요.'
-              : state.supported
-                ? 'Minecraft 1.21.1 · Windows / Linux x64'
-                : '이 운영 체제 또는 CPU는 지원하지 않습니다.'}
-          </p>
-          <p>
-            {state.status.state === 'online'
-              ? `서버 응답 · ${state.status.online}/${state.status.maximum}명 · ${state.status.latencyMs}ms`
-              : state.status.state === 'unavailable'
-                ? '서버 상태를 확인할 수 없습니다. 게임 실행은 별도로 시도할 수 있습니다.'
-                : state.operation === 'status'
-                  ? '서버 상태 확인 중…'
-                  : '서버 상태는 아직 확인하지 않았습니다.'}
-          </p>
-          <h3>계정</h3>
-          <p>
-            {state.account
-              ? `${state.account.name} · 만료 ${new Date(state.account.expiresAt).toLocaleString()}`
-              : 'Microsoft 계정 로그인이 필요합니다.'}
-          </p>
-          <button
-            className="button play-button"
-            data-testid="launch-button"
-            type="button"
-            disabled={homePrimaryDisabled(primary, busy)}
-            onClick={() => primary && run(primary)}
-          >
-            {primary?.type === 'login' ? 'Microsoft 계정으로 로그인' : '플레이'}
-          </button>
-        </Panel>
-        {!state.supported && (
-          <p className="error" role="status">
-            현재 기기에서는 게임을 실행할 수 없습니다.
-          </p>
-        )}
-        <p className="muted">게임 실행 후 서버에 접속됐는지는 게임 화면에서 확인하세요.</p>
-      </>
-    );
-  }
 
   if (page === 'mods')
     return (

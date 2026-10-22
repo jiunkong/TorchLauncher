@@ -1,7 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { ProductActivity } from '../../shared/product';
-import { ActivityProgress, activityLabel, activityProgress } from './activity';
+import {
+  ActivityProgress,
+  activityKnown,
+  activityLabel,
+  activityProgress,
+  stepChips,
+  stepOf,
+} from './activity';
 
 describe('user-facing installation activity', () => {
   it('uses Korean component and phase names for each operation category', () => {
@@ -90,5 +97,29 @@ describe('user-facing installation activity', () => {
         total: 9,
       }),
     ).toBe('완료 4개 / 9개');
+  });
+});
+
+describe('installation step chips', () => {
+  it('marks only observed earlier steps as done and the current one as now', () => {
+    expect(stepOf('logging')).toBe('library');
+    expect(stepOf('resource-pack')).toBe('config');
+    const chips = stepChips(['java', 'game', 'library'], 'library');
+    expect(chips.map((chip) => chip.state)).toEqual([
+      'done',
+      'done',
+      'now',
+      'todo',
+      'todo',
+      'todo',
+      'todo',
+    ]);
+  });
+
+  it('reports a ratio only when both counts were measured', () => {
+    expect(activityKnown({ completed: 3, total: 8 })).toBe(true);
+    expect(activityKnown({ completed: 3, total: null })).toBe(false);
+    expect(activityKnown({ completed: null, total: 8 })).toBe(false);
+    expect(activityKnown({ completed: 0, total: 0 })).toBe(false);
   });
 });

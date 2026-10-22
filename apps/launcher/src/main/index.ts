@@ -36,7 +36,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 760,
     minHeight: 580,
-    backgroundColor: '#141619',
+    backgroundColor: '#0e0b0c',
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
