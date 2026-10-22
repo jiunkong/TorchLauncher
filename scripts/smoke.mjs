@@ -6,7 +6,12 @@ import { resolve } from 'node:path';
 import { _electron as electron } from 'playwright';
 
 const temp = await mkdtemp(resolve(tmpdir(), 'torchlauncher-smoke-'));
-const statusFixture = createServer((socket) => socket.end());
+const statusSockets = new Set();
+const statusFixture = createServer((socket) => {
+  statusSockets.add(socket);
+  socket.once('close', () => statusSockets.delete(socket));
+  socket.end();
+});
 const serverAddress = await new Promise((resolveAddress, reject) => {
   statusFixture.once('error', reject);
   statusFixture.listen(0, '127.0.0.1', () => {
@@ -195,6 +200,8 @@ try {
     }
   }
 } finally {
-  await new Promise((resolveClose) => statusFixture.close(resolveClose));
+  for (const socket of statusSockets) socket.destroy();
+  if (statusFixture.listening)
+    await new Promise((resolveClose) => statusFixture.close(resolveClose));
   await rm(temp, { recursive: true, force: true });
 }
