@@ -7,6 +7,9 @@
 
 ## 현재 상태와 다음 작업
 
+사용자 피드백으로 메모리 좌우 드래그 제거 진행: #1 `memory_no_drag`, Luna low,
+`fix/memory-input-no-drag`/agent-1, baseline `fb5ca70`. 드래그만 제거하고 나머지 입력/표시 정책을 유지한다.
+
 MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
 권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
 4px 임계값, 약 20px당 256MiB 조절, 범위 제한·취소 복원·직접 입력·명시 저장을 유지한다.

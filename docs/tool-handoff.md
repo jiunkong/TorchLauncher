@@ -7,6 +7,10 @@ session IDs are not needed.
 
 ## LATEST (2026-10-23, Claude #0 → GPT/Codex): launcher UI L1–L2a done, L3 next
 
+Active user correction: remove memory horizontal dragging only. Worker #1 `memory_no_drag`, Luna low,
+agent-1 `fix/memory-input-no-drag`, baseline `fb5ca70`. Plain numeric entry, hidden spinners, no recommendation
+or memory save-success text, no Home recent-result remain. Renderer-only cleanup; no backend/IPC changes.
+
 MEM-01 renderer follow-up: #1 `memory_scrub`, Luna medium, agent-1 `feat/mem-01-scrub-input`,
 baseline `f1b3286`, commit `717ae43` integrated by #0 via `cca1bf5`.
 Removed 0.5GB recommendation, number spinners, memory-save success text, and Play/Home recent-result hintline.

@@ -570,3 +570,12 @@ UI에서 더 낮은 유효값 저장을 안내하고 실행은 설치 전에 메
 결과: `717ae43` 및 문서 후속 `e7a207d` 통합. main 전체 검사 성공(913개/9 skip, 타입/Biome/두 앱 빌드).
 작업자 24개 renderer 테스트와 Electron 실제 pointer smoke 성공. agent-1 detached, 병합 브랜치 삭제.
 Windows 입력 사용감과 실제 게임 메모리 검증은 사용자 확인 대기다. L3/L2a 후속은 시작하지 않는다.
+
+### MEM-01 좌우 드래그 제거 — 사용자 요청 (2026-10-23)
+
+#1 `memory_no_drag`, Luna low, agent-1 `fix/memory-input-no-drag`, baseline `fb5ca70`.
+좌우 드래그 기능만 제거하고 일반 숫자 입력으로 복귀한다. 스피너 숨김·권장/저장 성공 문구 제거·
+플레이 최근 결과 제거·직접 입력/검증/명시 저장은 유지한다. 독점: renderer Settings 입력 component와
+메모리 helper/테스트, styles.css 해당 입력, 관련 pages.test 및 앱 renderer smoke,
+`docs/handoffs/MEM-01-NO-DRAG.md`. main/core/IPC/i18n 문구 변경·다른 기능은 제외한다.
+드래그 전용 코드/커서/이벤트 캡처/테스트는 정리하고 기존 직접 입력·저장/실패 검증을 유지한다.
