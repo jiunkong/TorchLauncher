@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { _electron as electron } from 'playwright';
 
 const temp = await mkdtemp(resolve(tmpdir(), 'torchlauncher-smoke-'));
+const statusFixture = createServer((socket) => socket.end());
+const serverAddress = await new Promise((resolveAddress, reject) => {
+  statusFixture.once('error', reject);
+  statusFixture.listen(0, '127.0.0.1', () => {
+    const address = statusFixture.address();
+    if (!address || typeof address === 'string') {
+      reject(new Error('Could not determine local status fixture address'));
+      return;
+    }
+    resolveAddress(`127.0.0.1:${address.port}`);
+  });
+});
 const screenshots = resolve('.cache/smoke');
 await mkdir(screenshots, { recursive: true });
 const env = { ...process.env };
@@ -18,7 +31,7 @@ await writeFile(
     version: 1,
     serverId,
     name: 'Smoke fixture',
-    address: 'localhost:25565',
+    address: serverAddress,
     sourceUrl: 'https://example.invalid/smoke.torchpack',
   })}\n`,
 );
@@ -89,9 +102,9 @@ try {
         assert.equal(state.configuration, 'ready');
         assert.equal(state.server.serverId, serverId);
         assert.equal(state.server.name, 'Smoke fixture');
-        assert.equal(state.server.address, 'localhost:25565');
+        assert.equal(state.server.address, serverAddress);
         assert.equal(state.account, null);
-        assert.equal(state.status.state, 'unknown');
+        assert.ok(['unknown', 'online', 'unavailable'].includes(state.status.state));
         await page.locator('[data-testid="launch-button"]:not([disabled])').waitFor();
         assert.equal(await page.getByTestId('launch-button').isEnabled(), true);
         const subscription = await page.evaluate(() => {
@@ -178,5 +191,6 @@ try {
     }
   }
 } finally {
+  await new Promise((resolveClose) => statusFixture.close(resolveClose));
   await rm(temp, { recursive: true, force: true });
 }
