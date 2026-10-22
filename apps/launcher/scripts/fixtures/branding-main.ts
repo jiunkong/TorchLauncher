@@ -3,20 +3,26 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { applicationInfoChannel } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, session } from 'electron';
 import type { BrandingDeploymentReader } from '../../../../packages/core/src/deployment/reader/index';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index';
 import { createBrandingService } from '../../src/main/branding';
 import { bindBrandingIpc } from '../../src/main/branding/ipc';
+import { bindProductIpc } from '../../src/main/product/ipc';
+import type { ProductService } from '../../src/main/product/service';
 import { productState } from '../../src/renderer/src/fixtures';
 import { brandingChangedChannel } from '../../src/shared/branding';
-import { productChannel, productStateChannel } from '../../src/shared/product';
+import { type ProductState, productStateChannel } from '../../src/shared/product';
 
 const root = process.env.BRANDING_FIXTURE_ROOT;
 if (!root) throw new Error('isolated fixture root required');
 app.setPath('userData', join(root, 'user-data'));
 app.setName('TorchLauncher');
 void app.whenReady().then(async () => {
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
+    callback(false),
+  );
+  session.defaultSession.setPermissionCheckHandler(() => false);
   const directory = join(root, 'actual-profile');
   await mkdir(directory, { recursive: true });
   await mkdir(app.getPath('userData'), { recursive: true });
@@ -85,12 +91,41 @@ void app.whenReady().then(async () => {
     account: null,
     status: { state: 'unavailable' },
   });
-  ipcMain.handle(productStateChannel, () => state);
-  ipcMain.handle(productChannel, () => ({ ok: true, state }));
+  const commands: string[] = [];
+  let copiedPath: string | null = null;
+  let copyFailure = false;
+  let copyAttempts = 0;
+  bindProductIpc(
+    ipcMain,
+    window,
+    rendererUrl,
+    {
+      snapshot: () => state,
+      command: (command: { type: string }) => {
+        commands.push(command.type);
+        return { ok: true, state };
+      },
+    } as unknown as ProductService,
+    (path) => {
+      copyAttempts++;
+      if (copyFailure) throw new Error('fixture clipboard unavailable');
+      copiedPath = path;
+    },
+  );
   Object.assign(globalThis, {
     brandingFixture: {
       service,
       window,
+      commands: () => commands,
+      copiedPath: () => copiedPath,
+      copyAttempts: () => copyAttempts,
+      failCopy: () => {
+        copyFailure = true;
+      },
+      setState(patch: Partial<ProductState> | null) {
+        if (patch) Object.assign(state, patch);
+        window.webContents.send(productStateChannel, patch === null ? null : state);
+      },
       downloads: () => downloads,
       async update(roles: Record<string, 'red' | 'green' | 'jpeg' | 'bad' | null>) {
         const indexRoles: Record<string, unknown> = {};

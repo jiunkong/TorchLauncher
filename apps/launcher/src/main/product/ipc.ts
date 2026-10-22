@@ -1,6 +1,10 @@
 import { isTrustedRendererUrl } from '@torchlauncher/core/desktop';
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
-import { productChannel, productStateChannel } from '../../shared/product';
+import {
+  copyServerDataPathChannel,
+  productChannel,
+  productStateChannel,
+} from '../../shared/product';
 import type { ProductService } from './service';
 
 export function trustedProductSender(
@@ -21,6 +25,7 @@ export function bindProductIpc(
   window: BrowserWindow,
   rendererUrl: string,
   service: ProductService,
+  copyText?: (text: string) => void | Promise<void>,
 ): () => void {
   const check = (event: IpcMainInvokeEvent) => {
     if (!trustedProductSender(event, window, rendererUrl))
@@ -35,8 +40,21 @@ export function bindProductIpc(
     if (args.length) throw new Error('Invalid state request');
     return service.snapshot();
   });
+  ipc.handle(copyServerDataPathChannel, async (event, ...args: unknown[]) => {
+    check(event);
+    if (args.length) throw new Error('Invalid path copy request');
+    try {
+      const path = service.snapshot().serverDataRoot;
+      if (!copyText || typeof path !== 'string' || !path) return false;
+      await copyText(path);
+      return true;
+    } catch {
+      return false;
+    }
+  });
   return () => {
     ipc.removeHandler(productChannel);
     ipc.removeHandler(productStateChannel);
+    ipc.removeHandler(copyServerDataPathChannel);
   };
 }

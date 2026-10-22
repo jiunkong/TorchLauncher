@@ -35,6 +35,22 @@ export function SettingsPage({
   // The user's unsaved pack order; null means "no draft". Progress events never touch it.
   const [draft, setDraft] = useState<string[] | null>(null);
   const [saved, setSaved] = useState(false);
+  const [pathCopy, setPathCopy] = useState<{
+    path: string;
+    status: 'copying' | 'copied' | 'failed';
+  } | null>(null);
+  const pathCopyStatus = pathCopy?.path === state.serverDataRoot ? pathCopy.status : null;
+  const copyPath = async () => {
+    const path = state.serverDataRoot;
+    if (!path) return;
+    setPathCopy({ path, status: 'copying' });
+    try {
+      const copied = await window.torchlauncher.copyServerDataPath?.();
+      setPathCopy({ path, status: copied === true ? 'copied' : 'failed' });
+    } catch {
+      setPathCopy({ path, status: 'failed' });
+    }
+  };
   const maxMemoryMiB = state.preferences.maxMemoryMiB ?? defaultMaxMemoryMiB;
   const initialMemoryMiB = state.preferences.initialMemoryMiB;
   const [maxMemoryDraft, setMaxMemoryDraft] = useState(String(maxMemoryMiB / 1024));
@@ -197,7 +213,25 @@ export function SettingsPage({
               <span className="mono selectable path" title={state.serverDataRoot}>
                 {state.serverDataRoot}
               </span>
+              <button
+                className="btn sm ghost"
+                type="button"
+                data-testid="copy-data-path"
+                disabled={pathCopyStatus === 'copying'}
+                onClick={() => void copyPath()}
+              >
+                {t(pathCopyStatus === 'copying' ? 'settings.copyingPath' : 'settings.copyPath')}
+              </button>
             </div>
+          )}
+          {(pathCopyStatus === 'copied' || pathCopyStatus === 'failed') && (
+            <p
+              className="hint"
+              role={pathCopyStatus === 'failed' ? 'alert' : 'status'}
+              data-testid="copy-data-path-result"
+            >
+              {t(pathCopyStatus === 'copied' ? 'settings.pathCopied' : 'settings.pathCopyFailed')}
+            </p>
           )}
           <div className="kv">
             <span>{t('settings.usage')}</span>
