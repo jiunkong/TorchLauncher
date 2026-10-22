@@ -332,3 +332,48 @@ describe('ownership', () => {
     expect((await applySettingsPolicy(dir, { ownership: ok })).status).toBe('applied');
   });
 });
+
+it('reads trusted ownership inside the maintenance lease and refuses absent or failed ownership', async () => {
+  const dir = await root();
+  await policy(dir, { ...base, required: { a: '1' } });
+  await writeFile(join(dir, 'options.txt'), 'a:0\n');
+  await applySettingsPolicy(dir, {
+    ownership: async () => {
+      await expect(acquireServerDataLock(dir, 'maintenance')).rejects.toThrow();
+      return ownership([]);
+    },
+  });
+  expect(await text(dir)).toBe('a:1\n');
+  await writeFile(join(dir, 'options.txt'), 'a:0\n');
+  expect(await code(applySettingsPolicy(dir, { ownership: async () => null }))).toBe(
+    'sync-not-initialized',
+  );
+  await expect(
+    applySettingsPolicy(dir, {
+      ownership: async () => {
+        throw new Error('ledger invalid');
+      },
+    }),
+  ).rejects.toThrow();
+  expect(await text(dir)).toBe('a:0\n');
+  const lease = await acquireServerDataLock(dir, 'maintenance');
+  await lease.release();
+});
+
+it('refuses resource pack writes when trusted locked ownership owns options.txt', async () => {
+  const dir = await root();
+  await writeFile(join(dir, 'options.txt'), 'resourcePacks:["vanilla"]\n');
+  const before = await text(dir);
+  expect(
+    await code(
+      setUserResourcePacks(dir, ['vanilla', 'file/user.zip'], {
+        minecraftVersion: '1.21.1',
+        ownership: async () => {
+          await expect(acquireServerDataLock(dir, 'maintenance')).rejects.toThrow();
+          return ownership([{ path: 'options.txt', policy: 'always', sha256: hash, length: 10 }]);
+        },
+      }),
+    ),
+  ).toBe('options-owned-by-sync');
+  expect(await text(dir)).toBe(before);
+});

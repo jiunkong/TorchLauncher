@@ -31,7 +31,19 @@ import {
 
 export interface ApplySettingsOptions extends SettingsOperationOptions {
   /** Injected sync ledger view; enables the options-owned-by-sync and initialized checks. */
-  ownership?: SyncOwnership;
+  ownership?: SyncOwnership | (() => Promise<SyncOwnership | null>);
+}
+
+async function checkOwnership(options: ApplySettingsOptions): Promise<void> {
+  const ownership =
+    typeof options.ownership === 'function' ? await options.ownership() : options.ownership;
+  if (ownership === null)
+    throw new SettingsError('sync-not-initialized', 'synchronization has not completed');
+  if (ownership) {
+    assertOptionsNotSyncOwned(ownership);
+    if (!ownership.initialized)
+      throw new SettingsError('sync-not-initialized', 'synchronization has not completed');
+  }
 }
 
 async function loadPolicy(root: string, signal?: AbortSignal): Promise<SettingsPolicy | null> {
@@ -73,12 +85,8 @@ export async function applySettingsPolicy(
   options: ApplySettingsOptions = {},
 ): Promise<ApplySettingsResult> {
   return withMaintenanceLock(root, async () => {
-    const { signal, ownership } = options;
-    if (ownership) {
-      assertOptionsNotSyncOwned(ownership);
-      if (!ownership.initialized)
-        throw new SettingsError('sync-not-initialized', 'synchronization has not completed');
-    }
+    const { signal } = options;
+    await checkOwnership(options);
     const policy = await loadPolicy(root, signal);
     const result: ApplySettingsResult = {
       status: 'no-policy',
@@ -209,7 +217,7 @@ export async function getResourcePacks(
 export async function setUserResourcePacks(
   root: string,
   packs: readonly string[],
-  options: SettingsOperationOptions = {},
+  options: ApplySettingsOptions = {},
 ): Promise<{ active: string[]; changed: boolean }> {
   if (
     !Array.isArray(packs) ||
@@ -219,6 +227,7 @@ export async function setUserResourcePacks(
   )
     throw new SettingsError('invalid-argument', 'invalid resource pack list');
   return withMaintenanceLock(root, async () => {
+    await checkOwnership(options);
     const policy = await loadPolicy(root, options.signal);
     const required = policy?.resourcePacks.required ?? [];
     const missing = required.filter((id) => !packs.includes(id));

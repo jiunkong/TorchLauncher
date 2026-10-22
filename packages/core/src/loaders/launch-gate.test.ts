@@ -102,3 +102,25 @@ it('blocks failed sync, changed final index and failed local guard', async () =>
   await expect(launchDeployment(options)).rejects.toThrow('ESYNCGUARD');
   expect(state.spawned).toBe(0);
 });
+
+it('runs settings after sync before acquiring the game lease; failure blocks spawn', async () => {
+  const options = setup();
+  const afterSynchronization = vi.fn(async () => {
+    expect(synchronizeDeployment).toHaveBeenCalledOnce();
+    expect(launchMinecraft).not.toHaveBeenCalled();
+  });
+  await launchDeployment({ ...options, afterSynchronization });
+  expect(afterSynchronization).toHaveBeenCalledOnce();
+  vi.clearAllMocks();
+  state.spawned = 0;
+  await expect(
+    launchDeployment({
+      ...setup(),
+      afterSynchronization: async () => {
+        throw new Error('policy conflict');
+      },
+    }),
+  ).rejects.toThrow('policy conflict');
+  expect(launchMinecraft).not.toHaveBeenCalled();
+  expect(state.spawned).toBe(0);
+});
