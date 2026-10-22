@@ -1,6 +1,7 @@
 import type { DeploymentReader } from '../deployment/reader/index.js';
 import { synchronizeDeployment } from '../instance/sync/index.js';
 import { assertSynchronizedForLaunch } from '../instance/sync/launch-guard.js';
+import type { SynchronizeDeploymentOptions } from '../instance/sync/types.js';
 import type { Installation } from '../minecraft/installer';
 import type { LaunchAuth } from '../minecraft/launch';
 import {
@@ -30,6 +31,8 @@ export interface LaunchDeploymentOptions {
       | 'final-guard'
       | 'spawn',
   ) => void;
+  onSynchronizationProgress?: SynchronizeDeploymentOptions['onProgress'];
+  onSynchronizationActivity?: SynchronizeDeploymentOptions['onFileActivity'];
   launcherVersion?: string;
   expectedServerId: string;
   server: string;
@@ -68,6 +71,10 @@ export async function launchDeployment(options: LaunchDeploymentOptions): Promis
   await synchronizeDeployment({
     root: options.root,
     reader: accepted,
+    ...(options.onSynchronizationProgress ? { onProgress: options.onSynchronizationProgress } : {}),
+    ...(options.onSynchronizationActivity
+      ? { onFileActivity: options.onSynchronizationActivity }
+      : {}),
     expectedServerId: options.expectedServerId,
     ...(options.signal ? { signal: options.signal } : {}),
   });

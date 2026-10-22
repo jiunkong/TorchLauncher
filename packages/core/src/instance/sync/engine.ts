@@ -318,6 +318,17 @@ async function progress(
   options.signal?.throwIfAborted();
 }
 
+async function fileActivity(
+  options: SynchronizeDeploymentOptions,
+  phase: 'staging' | 'applying',
+  state: 'started' | 'completed',
+  path: string,
+): Promise<void> {
+  options.signal?.throwIfAborted();
+  await options.onFileActivity?.({ phase, state, path });
+  options.signal?.throwIfAborted();
+}
+
 async function makePlan(context: Context, options: SynchronizeDeploymentOptions): Promise<Plan> {
   const previous = await readLedger(context.ledger, context.serverId);
   const header = structuredClone(options.reader.header);
@@ -414,12 +425,14 @@ async function applyPlan(
   try {
     for (const [position, operation] of journal.operations.entries()) {
       if (!operation.after) continue;
+      await fileActivity(options, 'staging', 'started', operation.path);
       await options.reader.stageFile(
         operation.path,
         stagePath(context, position),
         options.signal ? { signal: options.signal } : {},
       );
       await assertDigest(stagePath(context, position), operation.after);
+      await fileActivity(options, 'staging', 'completed', operation.path);
       await progress(options, plan.counts, 'staging', operation.path);
     }
     await writeNew(join(context.transaction, 'ledger.next'), journal.next, LEDGER_BYTE_LIMIT);
@@ -432,7 +445,7 @@ async function applyPlan(
     journal = { ...journal, phase: 'applying' };
     await writeJournal(context.journal, context.pending, journal);
     for (const [position, operation] of journal.operations.entries()) {
-      options.signal?.throwIfAborted();
+      await fileActivity(options, 'applying', 'started', operation.path);
       options.reader.assertCurrent();
       const target = await gamePath(context.root, operation.path, true);
       await assertDigest(target, operation.before);
@@ -443,6 +456,7 @@ async function applyPlan(
         await assertDigest(stagePath(context, position), operation.after);
         await rename(stagePath(context, position), target);
       }
+      await fileActivity(options, 'applying', 'completed', operation.path);
       await progress(options, plan.counts, 'applying', operation.path);
     }
     options.reader.assertCurrent();

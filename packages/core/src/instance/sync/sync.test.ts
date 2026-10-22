@@ -608,3 +608,88 @@ describe('synchronization transaction failures and recovery', () => {
     expect(await contents(root, 'unowned-personal')).toBe('personal');
   });
 });
+
+it('awaits file activity before staging and applying while preserving post-file progress', async () => {
+  const root = await temporary();
+  const { reader } = await readerFor(await bundle([{ path: 'mods/test.jar', data: 'fixture' }]));
+  const events: string[] = [];
+  const stageFile = reader.stageFile.bind(reader);
+  const observedReader = {
+    ...reader,
+    assertCurrent: reader.assertCurrent.bind(reader),
+    stageFile: async (...args: Parameters<typeof reader.stageFile>) => {
+      events.push('stage');
+      return stageFile(...args);
+    },
+  };
+  await synchronizeDeployment({
+    root,
+    expectedServerId: serverId,
+    reader: observedReader,
+    onFileActivity: async ({ phase, state, path }) => {
+      await Promise.resolve();
+      events.push(`${phase}:${state}:${path}`);
+      if (phase === 'applying' && state === 'completed')
+        expect(await readFile(join(root, path), 'utf8')).toBe('fixture');
+    },
+    onProgress: ({ phase, path }) => {
+      events.push(`${phase}:progress:${path ?? ''}`);
+    },
+  });
+  expect(events).toEqual([
+    'planning:progress:',
+    'staging:started:mods/test.jar',
+    'stage',
+    'staging:completed:mods/test.jar',
+    'staging:progress:mods/test.jar',
+    'applying:progress:',
+    'applying:started:mods/test.jar',
+    'applying:completed:mods/test.jar',
+    'applying:progress:mods/test.jar',
+  ]);
+});
+
+it.each(['staging:started', 'staging:completed', 'applying:started', 'applying:completed'])(
+  'rolls back when file activity fails at %s',
+  async (failure) => {
+    const root = await temporary();
+    const transport = await readerFor(await bundle([{ path: 'mods/test.jar', data: 'fixture' }]));
+    await expect(
+      synchronizeDeployment({
+        root,
+        expectedServerId: serverId,
+        reader: transport.reader,
+        onFileActivity: async ({ phase, state }) => {
+          if (`${phase}:${state}` === failure) throw new Error('activity-failure');
+        },
+      }),
+    ).rejects.toThrow('activity-failure');
+    expect(await readFile(join(root, 'mods/test.jar')).catch(() => null)).toBeNull();
+    expect(await recoverSynchronization({ root, expectedServerId: serverId })).toBe('none');
+    if (failure === 'staging:started') expect(transport.payloadRanges()).toHaveLength(0);
+    // A failed transaction did not initialize ownership; a fresh sync still succeeds.
+    expect(
+      (await sync(root, await bundle([{ path: 'mods/test.jar', data: 'fixture' }]))).result
+        .downloaded,
+    ).toBe(1);
+  },
+);
+
+it('checks cancellation after an awaited started callback before requesting file bytes', async () => {
+  const root = await temporary();
+  const transport = await readerFor(await bundle([{ path: 'mods/test.jar', data: 'fixture' }]));
+  const controller = new AbortController();
+  await expect(
+    synchronizeDeployment({
+      root,
+      expectedServerId: serverId,
+      reader: transport.reader,
+      signal: controller.signal,
+      onFileActivity: async () => {
+        controller.abort();
+      },
+    }),
+  ).rejects.toThrow();
+  expect(transport.payloadRanges()).toHaveLength(0);
+  expect(await recoverSynchronization({ root, expectedServerId: serverId })).toBe('none');
+});
