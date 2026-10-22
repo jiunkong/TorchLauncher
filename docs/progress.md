@@ -689,3 +689,9 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - `3947668`(Sonnet 작업자) 병합: 서버 구성에 `signing`이 있으면 모든 reader에 공개 키를 전달하고 `verified`가 아니면 파일 준비·적용 전에 중단. 롤백 판정(`decideRollback`)은 적용 전에 읽기 전용으로 수행, 상태는 동기화 성공 뒤에만 `<userData>/servers/<serverId>/.torchlauncher-deployment-state.json`에 원자적으로 기록(서버 데이터 삭제 시 함께 삭제, 손상·초과·형식 오류는 fail-closed). 브랜딩 갱신 reader는 검증·판정만 하고 상태를 올리지 않음. `signing` 없는 구성은 기존 동작.
 - 새 실패 코드 8종을 한국어 메시지로 연결. 메인 `pnpm check` 통과.
 - 한계: 코어의 `verification`이 선택 필드라 런처는 구체 반환 타입에서 읽고 누락을 비신뢰로 처리(조이려면 코어 변경 필요). `docs/deployment-signing.md`에 저장 위치·브랜딩 규칙은 핸드오프 문서에만 기록됨. 실제 서명된 배포로의 종단 검증은 Studio 통합(SIGN-STUDIO-01) 이후.
+
+## SIGN-STUDIO-01 통합 (2026-10-23, #0 Claude)
+- `cd5469f`(Sonnet 작업자) 병합: 프로젝트별 Ed25519 키(`<userData>/signing-keys/`, Electron `safeStorage` 암호화, 사용 불가 시 서명·생성 거부), 비밀번호 기반 백업/복원(scrypt N=2^17 + AES-256-GCM, 12자 이상), 배포마다 `sequence` 예약(실패한 빌드는 번호만 소모, 감소 없음), 형식 1.2로 서명한 torchpack 생성, 내보내기 구성 파일에 `signing` 기록. 좁은 IPC `keyStatus/keyCreate/keyExport/keyImport`, UI 화면 없음.
+- 메인 `pnpm check` 통과(1137 테스트 기준 워커 보고, 통합 후 재실행 통과). 키 파일·프로젝트·산출물에 개인 키 원문이 없음을 테스트로 확인.
+- 한계/후속: Studio `check` 명령은 아직 공개 키로 서명을 검증하지 않음(재배포 전 무서명 팩이 실패하게 되므로 UI 단계에서 결정). Linux `basic_text` 키링에서는 서명 불가. 내보내기가 실패해도 새로 만든 키는 남음. 실제 `safeStorage`·Windows·네이티브 백업 대화상자는 미검증. `useStudio.ts`에 새 오류 코드 문구만 추가(UI 재작성 때 정리).
+- 이로써 SIGN 코어·런처·Studio 함수가 모두 `main`에 통합됨. 종단 검증(Studio가 서명한 팩을 실제 호스팅에서 런처가 검증)과 Windows 확인은 미실시.
