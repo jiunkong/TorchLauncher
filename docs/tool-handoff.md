@@ -5,19 +5,26 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## Active follow-up: parallel install and activity metadata
+## Completed follow-up: parallel install and activity metadata
 
 User confirmed **server connection succeeded through the new UI**. Selected environment was Fabric
 1.21.1/0.19.5; server log and restart cached-session restoration remain unverified. Do not request another
 login/join merely to repeat this evidence. The user then pointed out slow sequential base installation and
 requested future UI metadata distinguishing game installation/server mod downloads/etc.
 
-#3 `install_parallel`, agent-3 `perf/game-install-parallel` owns installer + tests/helper (Sol medium):
-default bounded concurrency6, in-flight byte budget, abort siblings and drain before staging/lease cleanup,
-preserve hashes/publication/recovery. Also optional structured InstallActivity callback.
-#4 `install_activity`, agent-4 `feat/install-activity` owns ProductState/service + launch gate + optional
-sync file-activity callback and tests (Sol medium), no renderer redesign. See work-distribution scopes.
-Both workers active; coordinator only docs/review/merge. User's earlier running native install must not be altered.
+#3 `install_parallel` (Sol medium) delivered `ee4ef86`, merged `424b787`: default6/validated1–16
+bounded game+Java file pool, 128MiB expected-byte budget (oversized files alone), first-error/abort stops
+admission and drains siblings before staging/lease cleanup, stable publication order, unchanged hashes/cache/recovery.
+Also optional structured InstallActivity callback. No real download speedup/native Windows pool measurement.
+#4 `install_activity` (Sol medium) delivered `e34e376`, merged `0717835`: ProductState.activity + gate
+forwarding + optional awaited sync file started/completed callbacks. Metadata distinguishes game/Java/libs/assets/
+loader/server-mod/resource-pack/server-config/server-file; relative paths only, unknown counts null.
+Sync plan counts are not a completion percentage. Legacy progress callbacks keep their old timing.
+Renderer not changed; future UI can consume the activity state already delivered over existing IPC.
+Integrated `pnpm check` passed: **786 tests, 9 skips**, full types/Biome and both builds.
+Both workers finished; branches can be retired to detached worktrees after status checks. #0 performed only
+coordination/review/integration. User asked to be notified on completion. Do not automatically start UI redesign.
+User's earlier native install/game processes must not be altered. Restart cached-session restoration remains unverified.
 
 ## Functional UI integrated (2026-10-22, Codex #0)
 
