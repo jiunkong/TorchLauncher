@@ -7,6 +7,11 @@ session IDs are not needed.
 
 ## Current handoff: localization foundation, then Claude UI work
 
+Active follow-up BRAND-ICON-01: user supplied root `icon.ico` (untracked, preserve original).
+Worker #1 `app_icon`, Luna medium, agent-1 `feat/app-icon`, baseline `12263e9`.
+Scope shared assets/branding ICO+lossless extracted PNG, shared builder config, both main-window icons,
+own handoff only. No renderer/theme changes. #0 reviews/integrates/tests. Native Windows proof separate.
+
 User will hand UI improvement to Claude after I18N-01. Start with `docs/ui-handoff.md` for the
 UI-specific resume instructions, constraints, language wiring steps and Windows environment notes.
 `docs/localization.md` defines this task; `docs/handoffs/I18N-01.md` includes working import/use examples.

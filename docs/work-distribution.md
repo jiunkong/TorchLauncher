@@ -2,6 +2,12 @@
 
 ## 역할과 현재 배정
 
+BRAND-ICON-01: 사용자 제공 루트 `icon.ico`를 두 앱의 실행 파일·창 아이콘으로 적용한다.
+#1 `app_icon`, Luna medium, agent-1 `feat/app-icon`. 독점: 새 `assets/branding/**`,
+`electron-builder.base.cjs`, 두 앱 `src/main/index.ts`의 아이콘 설정만, 해당 인계.
+원본 icon.ico 보존, 기존 UI/테마/기능 변경 금지. 공유 PNG는 ICO의 기존 PNG entry를 무손실 추출한다.
+Windows portable 아이콘과 Linux 창/패키지 자산 경로를 구분하고 dev/build/packaged 경로를 검증한다.
+
 I18N-01: #1 `i18n_foundation`, Luna medium, agent-1 `feat/i18n-foundation`, baseline `753e2ac`.
 [localization.md](localization.md)의 공통 번역 API·사전·저장 adapter·React hook만 준비한다.
 기존 UI 언어/화면 적용은 후속이며 이번에는 변경하지 않는다. 독점 범위는 상세 문서를 따른다.
