@@ -510,3 +510,9 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
   Linux에서는 재현되지 않았다. 수정 후 Windows 30회 반복 통과.
 - 확인된 사실: Windows에서 일반 `spawn` 자식은 호스트(Node·Electron 모두) 강제 종료 시 함께 종료되고, `detached`는 생존한다. 제품의 Java 실행은 `detached`를 쓰지 않는다.
 - 미검증/남음: 개발자 모드에서의 symlink 테스트 14개, 서명·SmartScreen(RELEASE-01), writer의 Windows 소스 교체 감지 경로(테스트 skip), `fileParallelism` 조정 필요 여부.
+
+## 2026-10-22 배포·서명·업데이트 정책 결정
+
+- 사용자 결정: 런처 프로그램 업데이트는 앱이 확인하고 동의 후 교체, 배포 파일(torchpack)은 운영자 서명 검증과 롤백 방지, 공식 런처는 GitHub Releases에 배포한다.
+  Windows 코드 서명은 비용 문제로 **미결정**이다(제안: 지금은 서명하지 않고 출시 전에 재검토). 상세와 조사 결과는 [배포·서명·업데이트 정책](release-policy.md).
+- RELEASE-01/02와 별도 구현(배포 서명·롤백 방지, 런처 자동 업데이트, 서버 설정의 최소 런처 버전)의 선행 조건이다. 구현은 사용자 승인 후 배정한다.
