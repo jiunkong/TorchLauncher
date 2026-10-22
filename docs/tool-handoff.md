@@ -14,6 +14,9 @@ agent-3 `feat/launcher-player-skin`; both baseline `08244b2`. Actual runtime eff
 User reported earlier agents all displayed low; requested settings and actual UI observation are now recorded separately.
 Shared files owned only by #2; module/components owned only by #3. Merge module first then #2 updates baseline
 and completes production/menu wiring. #0 docs/review/noffmerge/maincheck only. No extra agents.
+Module #3 `4e2fea9` integrated via `986600b`. Worker finished/clean, 56 tests+types/build+native Electron
+decode/crop/transparency/fallback smoke passed. #2 notified to update branch and finish production wiring.
+Final main pnpm check/product smoke remains after #2 merge. No real account/Windows evidence yet.
 
 Memory drag removal `4179715` integrated. Main pnpm check passed 912 tests/9 skips, all types/builds/Biome
 (8 existing CSS warnings); worker renderer 23 tests+Electron smoke passed. Agent-1 detached, branch deleted.

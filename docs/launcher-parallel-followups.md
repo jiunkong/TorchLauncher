@@ -12,6 +12,8 @@
   `App.tsx`, `components/Menu.tsx`의 아바타 prop 전달만, 새 미등록 파일 확인 창,
   관련 renderer 테스트/fixtures/i18n 키/기본 스타일, `scripts/renderer-functional-smoke.mjs`,
   `docs/handoffs/LAUNCHER-L2A-FOLLOWUPS.md`.
+  검토 중 추가 승인: `hooks/useProduct.ts`의 open-logs 읽기 전용 독립 요청만. launch의 pending/inFlight와
+  응답 state를 건드리지 않아 실행 중에도 열 수 있게 하며 기존 memory-save 경로는 유지한다.
 - #3 `player_skin`, `feat/launcher-player-skin`, agent-3: GPT-6.1 Sol medium 요청.
   독점: 새 launcher `src/main/skins/**`, renderer 새 `components/PlayerAvatar.tsx`·전용 CSS·테스트·fixture,
   `docs/handoffs/LAUNCHER-PLAYER-SKIN.md`. 공용 서비스/상태/메뉴 연결은 #2가 맡는다.

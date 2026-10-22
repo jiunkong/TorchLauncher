@@ -16,6 +16,10 @@ agent-1 detached·작업 브랜치 삭제, 작업자 renderer 23개와 Electron 
 #3 `player_skin`(Sol medium 요청), agent-2/3의 별도 브랜치에서 작업한다. 실제 effort UI 반영은 미확인이다.
 공용 서비스/IPC/상태/메뉴·페이지 연결은 #2 한 명, 스킨 모듈/아바타 component는 #3 한 명이 소유한다.
 [배정·계약](launcher-parallel-followups.md). 운영자 브랜딩/Studio는 미착수이며 추가 작업자는 만들지 않는다.
+스킨 모듈 #3 `4e2fea9`를 #0이 `986600b`로 먼저 통합했다. 모듈 56개 테스트·타입/빌드와
+Electron 실제 PNG 디코드/64x32·64x64 얼굴·모자 위치/투명도/fallback fixture 검증 통과.
+현재는 모듈 통합 상태이며 실제 제품 연결·통합 전체 검사·Windows/실계정 검증 완료를 뜻하지 않는다.
+#2는 main을 자기 브랜치에 반영해 production factory/계정/메뉴 연결을 완료한다.
 
 MEM-01 입력 후속 통합: #1 `memory_scrub` Luna medium의 `717ae43`을 #0이 `cca1bf5`로 --no-ff 병합했다.
 권장 단위 문구·숫자 스피너·메모리 저장 성공 문구를 제거하고 두 입력의 좌우 드래그를 추가했다.
