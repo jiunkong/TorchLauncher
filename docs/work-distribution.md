@@ -4,7 +4,8 @@
 
 2026-10-22 LAUNCH-EXIT-01: #3 `close_on_launch`, `feat/launcher-close-on-game-start`/agent-3,
 Sol·medium(프로세스 수명·설정 저장·잠금 경계). [close-on-launch.md](close-on-launch.md)가 상세 범위다.
-launcher 앱과 Minecraft process/recovery 최소 변경을 한 작업자가 독점한다. 다른 기능/UI 개편은 착수하지 않는다.
+launcher 앱과 Minecraft process/recovery 최소 변경을 한 작업자가 독점했다. `5a7e0c3`와 인계 `2cf254a` 통합.
+작업자 종료·worktree clean. #0 전체 `pnpm check` 성공, Windows 실게임 검증은 남아 있다. 다른 기능/UI 개편은 착수하지 않는다.
 
 2026-10-22 UI-PROD-01: [ui-production.md](ui-production.md)의 기능 우선 범위로 배정.
 #4 `ui_prod_launcher` / `feat/ui-prod-launcher-flow` / agent-4: launcher renderer·app-local smoke·해당 인계.

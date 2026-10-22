@@ -14,8 +14,13 @@ baseline `2c1fcbe`, owns launcher app + narrow Minecraft process/recovery/gate s
 child identity recorded before handoff; preserve on-disk lock while child lives; service exits its operation
 before host.quit so ordinary cleanup cannot kill detached game. Default false, persisted personal setting.
 Restart can reclaim only exact verified-stale game lock with no unfinished transactions; no uncertain auto unlock.
-Failures/cancellation before handoff retain normal managed cleanup and no auto exit. Worker is implementing/tests.
-No user login/server/process has been touched or requested. Windows account-free survival validation will be needed.
+Failures/cancellation before handoff retain normal managed cleanup and no auto exit. Code `5a7e0c3` and
+handoff `2cf254a` integrated by #0. Worker finished, worktree clean, no running worker tests/processes.
+Linux real host normal exit/SIGKILL child survival + lease protection/reclaim and Electron preference IPC smoke passed.
+Main `pnpm check` passed (821 passed/9 skipped, Biome, all types and both app builds);
+log `/tmp/torch-launch-exit-check.log` is environment-specific.
+Read `docs/handoffs/LAUNCH-EXIT-01.md` for exact worker checks and native Windows account-free commands.
+No user login/server/process has been touched. Windows account-free/actual-game survival still unverified.
 
 ## Completed UI-PROD-01 functional workflow phase
 
