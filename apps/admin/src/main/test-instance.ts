@@ -213,6 +213,8 @@ export async function applyTestInstance(
   };
   let published = false;
   try {
+    // Reject an unrecoverable journal before staging or publishing any files.
+    if (Buffer.byteLength(JSON.stringify(journal)) > LIMIT) throw new StudioFailure('TOO_LARGE');
     for (const [i, op] of operations.entries()) {
       signal.throwIfAborted();
       validateDeploymentPath(op.path);

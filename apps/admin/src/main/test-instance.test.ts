@@ -41,6 +41,31 @@ it('applies a verified plan and ledger while preserving modified and unowned fil
   expect(await readFile(join(h.instanceRoot, 'b.txt'), 'utf8')).toBe('personal-initial');
   expect(await readFile(join(h.sourceRoot, 'a.txt'), 'utf8')).toBe('source-update');
 });
+
+it('streams files larger than a copy buffer without truncating or repeating bytes', async () => {
+  const h = await setup();
+  const bytes = Buffer.alloc(2 * 1024 * 1024 + 17);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = i % 251;
+  await writeFile(join(h.sourceRoot, 'a.txt'), bytes);
+  await applyTestInstance(h.instanceRoot, await h.plan(), new AbortController().signal);
+  expect((await readFile(join(h.instanceRoot, 'a.txt'))).equals(bytes)).toBe(true);
+});
+it('rejects an oversized rollback journal before attempting source reads or publication', async () => {
+  const h = await setup();
+  const plan = await h.plan();
+  const file = plan.copies[0];
+  if (!file) throw new Error('Missing planned copy');
+  plan.copies = Array.from({ length: 10000 }, (_, i) => ({
+    ...file,
+    path: `${i}-${'x'.repeat(1000)}`,
+  }));
+  await expect(
+    applyTestInstance(h.instanceRoot, plan, new AbortController().signal),
+  ).rejects.toMatchObject({ code: 'TOO_LARGE' });
+  await expect(
+    readFile(join(h.instanceRoot, testInstance.TEST_INSTANCE_LEDGER_PATH)),
+  ).rejects.toMatchObject({ code: 'ENOENT' });
+});
 it('rolls back all published files and ledger on cancellation at an application boundary', async () => {
   const h = await setup();
   const controller = new AbortController();
