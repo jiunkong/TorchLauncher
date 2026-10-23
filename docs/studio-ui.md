@@ -32,7 +32,7 @@
 - 새 의존성/루트 설정/lockfile 변경은 #0과 먼저 조정한다(ZIP 작성은 우선 Node 내장으로 구현 가능한지 검토하고, 불가하면 후보와 이유를 인계에 적어 #0에 요청).
 - 앱 경계: `apps/admin`이 `apps/launcher`를 import하지 않는다. 공유 로직은 `packages/core`.
 - **네이티브 확인창 금지**(사용자 결정 2026-10-23, 런처와 동일): 모든 확인은 앱 안 모달로 한다. `dialog.showMessageBox`·`window.confirm/alert/prompt` 금지. 파일 열기/저장 선택창만 네이티브를 쓴다. 기존 main `discard` 확인창은 STUDIO-MAIN-01이 렌더러 확정 명령 + 닫기 요청 이벤트로 대체한다.
-- 글꼴/색: 앱은 외부 네트워크로 글꼴을 받지 않는다. 토큰 이름/값은 `studio.css`를 따른다.
+- 글꼴/색: 런처와 같은 번들 글꼴을 쓴다(본문 Pretendard Variable, 워드마크 Pixelify Sans — 런처 renderer의 `assets/fonts`에서 파일과 OFL 고지를 복사하고 `--font`/`--font-pixel`/`--font-mono` 토큰도 동일하게). 앱은 외부 네트워크로 글꼴을 받지 않는다(시안의 Google Fonts·Noto Sans KR·Silkscreen은 쓰지 않는다). 토큰 이름/값은 `studio.css`를 따른다.
 - 모든 사용자 문구는 기존 Studio i18n 사전을 거친다. 신규 IPC는 좁고 검증된 인터페이스로 만들고 `smoke` 격리 목록을 갱신한다.
 - 파일 경로 검증과 해시 검증, 소유권 규칙은 AGENTS.md를 따른다. 설정 파일 읽기는 크기 제한을 두고 임의 경로 쓰기를 만들지 않는다.
 - 완료 보고: 브랜치, 커밋, 실행한 검증 명령과 결과(통과/실패/미실행), 한계를 `docs/handoffs/<ID>.md`에 쓴다. `docs/progress.md`와 main은 건드리지 않는다.
