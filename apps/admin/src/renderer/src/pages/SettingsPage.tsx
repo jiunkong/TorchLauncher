@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import type {
   PackKind,
   SettingPolicyChoice,
@@ -6,11 +6,11 @@ import type {
   StudioGameOption,
   StudioGameSettings,
   StudioPack,
+  StudioPresetPreview,
   StudioRequest,
   StudioShaderSettings,
 } from '../../../shared/studio.js';
 import {
-  CheckIcon,
   DownIcon,
   FolderIcon,
   GamepadIcon,
@@ -25,14 +25,21 @@ import { useStudioLocale } from '../i18n';
 import { matchesKey, optionLabel, type SettingsState, type SettingsTab } from '../settings/state';
 import type { PageProps } from './types';
 
-const tabs: SettingsTab[] = ['keys', 'options', 'config', 'packs', 'shaders'];
+const tabs: SettingsTab[] = ['keys', 'options'];
+type SettingsView = 'player' | 'config' | 'packs' | 'shaders';
 type Send = (request: StudioRequest) => void;
 type Labels = Record<Policy3, string>;
 
 const isKeybind = (option: StudioGameOption) =>
   option.kind === 'keybind' || option.kind === 'mod-keybind' || option.key.startsWith('key_');
 
-export function SettingsPage({ studio, draft, settings }: PageProps & { settings: SettingsState }) {
+export function SettingsPage({
+  studio,
+  draft,
+  settings,
+  view = 'player',
+  go,
+}: PageProps & { settings: SettingsState; view?: SettingsView }) {
   const { t } = useStudioLocale();
   const { state, busy } = studio;
   const [dialog, setDialog] = useState(false);
@@ -49,75 +56,24 @@ export function SettingsPage({ studio, draft, settings }: PageProps & { settings
   const tabLabel: Record<SettingsTab, string> = {
     keys: t('settings.tab.keys'),
     options: t('settings.tab.options'),
-    config: t('settings.tab.config'),
-    packs: t('settings.tab.packs'),
-    shaders: t('settings.tab.shaders'),
   };
-  const keyCount = game?.options.filter(isKeybind).length ?? 0;
-  const files = ['options.txt', ...(preset?.importedConfigs ?? [])];
+  // biome-ignore lint/correctness/useExhaustiveDependencies: execute once when entering the mod settings route.
+  useEffect(() => {
+    if (view === 'config') void studio.command({ action: 'settingsTestConfigs' });
+  }, [view]);
 
   return (
     <>
       <PageHeader
-        eyebrow={t('settings.eyebrow')}
-        title={t('settings.title')}
-        lead={t('settings.lead')}
+        eyebrow={view === 'player' ? t('player.eyebrow') : t(`settings.${view}.eyebrow`)}
+        title={view === 'player' ? t('player.title') : t(`settings.${view}.title`)}
+        {...(view === 'player' ? { lead: t('player.lead') } : {})}
       />
-      <div className="preset" data-testid="settings-preset" data-loaded={loaded}>
-        {loaded ? (
-          <>
-            <span className="ic2">
-              <CheckIcon />
-            </span>
-            <div className="presetbody">
-              <div className="fine">
-                {t('settings.preset.loaded', {
-                  options: game?.options.length ?? 0,
-                  keys: keyCount,
-                })}
-                {preset &&
-                  preset.ignored > 0 &&
-                  ` · ${t('settings.preset.ignored', { count: preset.ignored })}`}
-              </div>
-              <div className="mono">{files.join(', ')}</div>
-              <div className="fine">{t('settings.preset.reloadHint')}</div>
-            </div>
-            <button
-              type="button"
-              className="btn sm"
-              disabled={busy}
-              onClick={() => setDialog(true)}
-            >
-              <RefreshIcon />
-              {t('settings.preset.reload')}
-            </button>
-            <button
-              type="button"
-              className="btn sm"
-              disabled={busy}
-              onClick={() => setDialog(true)}
-            >
-              {t('settings.preset.other')}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="presetbody">
-              <div className="fine">{t('settings.preset.label')}</div>
-              <div className="dim">{t('settings.preset.none')}</div>
-            </div>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy}
-              onClick={() => setDialog(true)}
-            >
-              {t('settings.preset.load')}
-            </button>
-          </>
-        )}
-      </div>
-      {game && policy && (
+      {view === 'player' && !loaded && <PlayerImportEmpty studio={studio} go={go} />}
+      {view === 'player' && loaded && (
+        <PlayerImportLoaded studio={studio} preset={preset?.source ?? 'file'} busy={busy} />
+      )}
+      {view !== 'player' && game && policy && (
         <div className="usage" data-testid="settings-policy">
           <Chip tone={policy.error ? 'warn' : undefined}>
             {t('settings.usage', {
@@ -130,61 +86,32 @@ export function SettingsPage({ studio, draft, settings }: PageProps & { settings
           </span>
         </div>
       )}
-      {policy?.error && (
+      {view !== 'player' && policy?.error && (
         <Note tone="warn" testId="settings-policy-error">
           <b>{t('settings.usage.error')}</b> {policy.error.message}
         </Note>
       )}
-      {preset && preset.skippedConfigs.length > 0 && (
-        <Note>{t('settings.preset.skipped', { count: preset.skippedConfigs.length })}</Note>
+      {view === 'player' && (
+        <div className="tabs" role="tablist" aria-label={t('settings.tabs')}>
+          {tabs.map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={settings.tab === item}
+              className={`tab${settings.tab === item ? ' on' : ''}`}
+              onClick={() => {
+                settings.setSelected(new Set());
+                settings.setTab(item);
+              }}
+            >
+              {tabLabel[item]}
+            </button>
+          ))}
+        </div>
       )}
-      <div className="tabs" role="tablist" aria-label={t('settings.tabs')}>
-        {tabs.map((item) => (
-          <button
-            key={item}
-            type="button"
-            // biome-ignore lint/a11y/useSemanticElements: tab buttons
-            role="tab"
-            aria-selected={settings.tab === item}
-            className={`tab${settings.tab === item ? ' on' : ''}`}
-            onClick={() => {
-              settings.setSelected(new Set());
-              settings.setTab(item);
-            }}
-          >
-            {tabLabel[item]}
-          </button>
-        ))}
-      </div>
-      {!loaded && settings.tab !== 'packs' && settings.tab !== 'shaders' ? (
-        <section className="empty" data-testid="settings-empty">
-          <span className="ic">
-            <GamepadIcon />
-          </span>
-          <h2>{t('settings.empty.title')}</h2>
-          <ol className="ol">
-            <li>
-              <b>1</b>
-              <span>
-                {t('settings.empty.1a')} <strong>{t('settings.empty.1b')}</strong>
-                {t('settings.empty.1c')}
-              </span>
-            </li>
-            <li>
-              <b>2</b>
-              <span>{t('settings.empty.2')}</span>
-            </li>
-          </ol>
-          <button
-            type="button"
-            className="btn primary lg"
-            disabled={busy}
-            onClick={() => setDialog(true)}
-          >
-            {t('settings.preset.load')}
-          </button>
-        </section>
-      ) : settings.tab === 'keys' || settings.tab === 'options' ? (
+      {view === 'player' && !loaded ? null : view === 'player' &&
+        (settings.tab === 'keys' || settings.tab === 'options') ? (
         <OptionsTab
           kind={settings.tab}
           options={game?.options ?? []}
@@ -193,9 +120,16 @@ export function SettingsPage({ studio, draft, settings }: PageProps & { settings
           send={send}
           busy={busy}
         />
-      ) : settings.tab === 'config' ? (
-        <ConfigTab game={game} labels={labels} send={send} busy={busy} />
-      ) : settings.tab === 'packs' ? (
+      ) : view === 'config' ? (
+        <ConfigTab
+          game={game}
+          candidates={state?.testRun.configFiles ?? []}
+          unsupported={state?.testRun.configPreview?.skippedConfigs ?? []}
+          labels={labels}
+          send={send}
+          busy={busy}
+        />
+      ) : view === 'packs' ? (
         <PackTab
           kind="resourcepack"
           packs={game?.resourcePacks ?? []}
@@ -204,7 +138,7 @@ export function SettingsPage({ studio, draft, settings }: PageProps & { settings
           busy={busy}
           sourceReady={!!state?.sourceName}
         />
-      ) : (
+      ) : view === 'shaders' ? (
         <ShadersTab
           game={game}
           labels={labels}
@@ -212,8 +146,13 @@ export function SettingsPage({ studio, draft, settings }: PageProps & { settings
           busy={busy}
           sourceReady={!!state?.sourceName}
         />
+      ) : null}
+      {view !== 'player' && (view === 'config' || view === 'shaders') && (
+        <button className="btn sm" type="button" disabled={busy} onClick={() => setDialog(true)}>
+          {t('settings.dialog.folderAction')}
+        </button>
       )}
-      {dialog && (
+      {dialog && view !== 'player' && (
         <PresetDialog
           busy={busy}
           onCancel={() => setDialog(false)}
@@ -222,6 +161,154 @@ export function SettingsPage({ studio, draft, settings }: PageProps & { settings
             if (ok) setDialog(false);
           }}
         />
+      )}
+    </>
+  );
+}
+
+function PlayerImportEmpty({ studio, go }: { studio: PageProps['studio']; go: PageProps['go'] }) {
+  const { t } = useStudioLocale();
+  const [error, setError] = useState<string | null>(null);
+  const busy = studio.busy;
+  useEffect(() => {
+    if (
+      studio.lastRun?.action === 'settingsImportOptions' &&
+      !studio.lastRun.ok &&
+      studio.lastRun.code !== 'CANCELLED'
+    ) {
+      const code = studio.lastRun.detailCode;
+      setError(
+        code === 'TEST_OPTIONS_MISSING'
+          ? 'settings.import.error.TEST_OPTIONS_MISSING'
+          : code === 'NO_TEST_RESULT'
+            ? 'settings.import.error.NO_TEST_RESULT'
+            : 'error.INVALID',
+      );
+    }
+  }, [studio.lastRun]);
+  const importFromTest = async () => {
+    setError(null);
+    await studio.command({ action: 'settingsImportOptions', source: 'test' });
+  };
+  const importFromFile = async () => {
+    setError(null);
+    await studio.command({ action: 'settingsImportOptions', source: 'file' });
+  };
+  return (
+    <>
+      <div className="src2" data-testid="settings-empty">
+        <section className="card srcc">
+          <span className="ic">
+            <GamepadIcon />
+          </span>
+          <h2>{t('settings.import.test.title')}</h2>
+          <p>{t('settings.import.test.help')}</p>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={busy || !studio.state?.testRun.extracted}
+            onClick={() => void importFromTest()}
+          >
+            {t('settings.import.load')}
+          </button>
+          {!studio.state?.testRun.extracted && (
+            <button type="button" className="textlink" onClick={() => go('test')}>
+              {t('settings.import.test.go')}
+            </button>
+          )}
+        </section>
+        <section className="card srcc">
+          <span className="ic">
+            <FolderIcon />
+          </span>
+          <h2>{t('settings.import.file.title')}</h2>
+          <p>{t('settings.import.file.help')}</p>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => void importFromFile()}
+          >
+            {t('settings.import.file.choose')}
+          </button>
+        </section>
+      </div>
+      {error && (
+        <Note tone="warn">
+          {error === 'settings.import.error.NO_TEST_RESULT'
+            ? t('settings.import.error.NO_TEST_RESULT')
+            : error === 'settings.import.error.TEST_OPTIONS_MISSING'
+              ? t('settings.import.error.TEST_OPTIONS_MISSING')
+              : t('error.INVALID')}
+        </Note>
+      )}
+    </>
+  );
+}
+
+function PlayerImportLoaded({
+  studio,
+  preset,
+  busy,
+}: {
+  studio: PageProps['studio'];
+  preset: 'test' | 'file' | 'folder';
+  busy: boolean;
+}) {
+  const { t } = useStudioLocale();
+  const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<'test' | 'file'>(preset === 'test' ? 'test' : 'file');
+  useEffect(() => {
+    if (
+      studio.lastRun?.action === 'settingsImportOptions' &&
+      !studio.lastRun.ok &&
+      studio.lastRun.code !== 'CANCELLED'
+    ) {
+      const code = studio.lastRun.detailCode;
+      setError(
+        code === 'TEST_OPTIONS_MISSING'
+          ? 'settings.import.error.TEST_OPTIONS_MISSING'
+          : code === 'NO_TEST_RESULT'
+            ? 'settings.import.error.NO_TEST_RESULT'
+            : 'error.INVALID',
+      );
+    }
+  }, [studio.lastRun]);
+  const reload = async () => {
+    setError(null);
+    await studio.command({ action: 'settingsImportOptions', source });
+  };
+  return (
+    <>
+      <section className="card" data-testid="settings-imported">
+        <h2>{t('settings.import.sourceTitle')}</h2>
+        <div className="tabs" role="tablist" aria-label={t('settings.import.sourceTitle')}>
+          {(['test', 'file'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              className={`tab${source === value ? ' on' : ''}`}
+              aria-selected={source === value}
+              onClick={() => setSource(value)}
+            >
+              {t(`settings.import.source.${value}`)}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="btn primary" disabled={busy} onClick={() => void reload()}>
+          <RefreshIcon />
+          {t('settings.import.reload')}
+        </button>
+      </section>
+      {error && (
+        <Note tone="warn">
+          {error === 'settings.import.error.NO_TEST_RESULT'
+            ? t('settings.import.error.NO_TEST_RESULT')
+            : error === 'settings.import.error.TEST_OPTIONS_MISSING'
+              ? t('settings.import.error.TEST_OPTIONS_MISSING')
+              : t('error.INVALID')}
+        </Note>
       )}
     </>
   );
@@ -417,22 +504,35 @@ function ItemRows({
 
 function ConfigTab({
   game,
+  candidates,
+  unsupported,
   labels,
   send,
   busy,
 }: {
   game: StudioGameSettings | undefined;
+  candidates: StudioGameSettings['configFiles'];
+  unsupported: StudioPresetPreview['skippedConfigs'];
   labels: Labels;
   send: Send;
   busy: boolean;
 }) {
   const { t } = useStudioLocale();
-  const files = game?.configFiles ?? [];
+  const filesByPath = new Map((game?.configFiles ?? []).map((file) => [file.path, file]));
+  for (const candidate of candidates ?? [])
+    if (!filesByPath.has(candidate.path)) filesByPath.set(candidate.path, candidate);
+  const files = [...filesByPath.values()];
   return (
     <section className="card" data-testid="settings-config">
-      <h2>{t('settings.config.title')}</h2>
+      <h2>{t('settings.config.listTitle')}</h2>
       <p className="sub">{t('settings.config.sub')}</p>
       {files.length === 0 && <p className="empty-row">{t('settings.config.none')}</p>}
+      {unsupported.map((file) => (
+        <div className="grp" key={file.path}>
+          <span className="mono">{file.path}</span>
+          <Chip>{t('settings.config.unsupported')}</Chip>
+        </div>
+      ))}
       {files.map((file) => (
         <div key={file.path}>
           <div className="grp">

@@ -1,5 +1,7 @@
 import type { Insights } from '../adapters/insights';
+import { PageHeader } from '../components/ui';
 import type { StudioController } from '../hooks/useStudio';
+import { useStudioLocale } from '../i18n';
 import type { SettingsState } from '../settings/state';
 import { BrandPage } from './BrandPage';
 import { DeployPage } from './DeployPage';
@@ -38,11 +40,28 @@ export function PageContent({
       return <BrandPage {...props} />;
     case 'files':
       return <FilesPage {...props} />;
-    case 'settings':
-      return <SettingsPage {...props} settings={settings} />;
+    case 'mods':
+      return <SettingsPage {...props} settings={settings} view="config" />;
+    case 'packs':
+      return <SettingsPage {...props} settings={settings} view="packs" />;
+    case 'shaders':
+      return <SettingsPage {...props} settings={settings} view="shaders" />;
+    case 'playerSettings':
+      return <SettingsPage {...props} settings={settings} view="player" />;
+    case 'test':
+      return <TestPlaceholder />;
     case 'deploy':
       return <DeployPage {...props} />;
     case 'export':
       return <ExportPage {...props} />;
   }
+}
+
+function TestPlaceholder() {
+  const { t } = useStudioLocale();
+  return (
+    <div data-testid="test-placeholder">
+      <PageHeader eyebrow={t('nav.group.test')} title={t('nav.test')} />
+    </div>
+  );
 }

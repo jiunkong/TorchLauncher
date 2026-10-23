@@ -16,6 +16,7 @@ export interface StudioRun {
   action: StudioRequest['action'];
   ok: boolean;
   code: StudioError | null;
+  detailCode: string | null;
 }
 
 export function useStudio() {
@@ -81,6 +82,7 @@ export function useStudio() {
     setMessage('');
     let ok = false;
     let code: StudioError | null = null;
+    let detailCode: string | null = null;
     try {
       if (draft && syncDraft) {
         const updated = await window.torchlauncher.request({ action: 'update', project: draft });
@@ -99,7 +101,12 @@ export function useStudio() {
         setMessage(reply.state.result ?? '');
       } else {
         code = reply.code;
-        setMessage(errorMessage(reply.code));
+        detailCode = reply.detail?.code ?? null;
+        setMessage(
+          detailCode === 'NO_TEST_RESULT' || detailCode === 'TEST_OPTIONS_MISSING'
+            ? t(`settings.import.error.${detailCode}`)
+            : errorMessage(reply.code),
+        );
       }
     } catch {
       code = 'IO';
@@ -115,6 +122,7 @@ export function useStudio() {
           action: request.action,
           ok,
           code,
+          detailCode,
         });
     }
     return ok;

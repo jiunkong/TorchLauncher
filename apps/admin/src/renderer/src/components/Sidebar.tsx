@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import type { Insights } from '../adapters/insights';
 import torchUrl from '../assets/torch.png';
 import { loaderLabel } from '../format';
@@ -12,6 +12,7 @@ import {
   GamepadIcon,
   OverviewIcon,
   PackageIcon,
+  PlayIcon,
   ServerIcon,
   UploadIcon,
 } from './Icons';
@@ -20,10 +21,25 @@ const icons: Record<PageId, ReactNode> = {
   overview: <OverviewIcon />,
   server: <ServerIcon />,
   brand: <BrandIcon />,
+  mods: <GamepadIcon />,
+  packs: <PackageIcon />,
+  shaders: <BrandIcon />,
   files: <FolderIcon />,
-  settings: <GamepadIcon />,
+  test: <PlayIcon />,
+  playerSettings: <GamepadIcon />,
   deploy: <UploadIcon />,
   export: <PackageIcon />,
+};
+type GroupTranslationKey =
+  | 'nav.group.game'
+  | 'nav.group.test'
+  | 'nav.group.player'
+  | 'nav.group.deploy';
+const groupLabels: Partial<Record<PageId, GroupTranslationKey>> = {
+  mods: 'nav.group.game',
+  test: 'nav.group.test',
+  playerSettings: 'nav.group.player',
+  deploy: 'nav.group.deploy',
 };
 
 export function Sidebar({
@@ -69,19 +85,22 @@ export function Sidebar({
       </div>
       <nav className="menu" aria-label={t('nav.sections')}>
         {pageIds.map((id) => {
+          const group = groupLabels[id];
           const tag = tags[id];
           return (
-            <button
-              key={id}
-              type="button"
-              className={`mi${page === id ? ' active' : ''}`}
-              aria-current={page === id ? 'page' : undefined}
-              onClick={() => onNavigate(id)}
-            >
-              {icons[id]}
-              <span className="mi-label">{t(`nav.${id}`)}</span>
-              {tag && <span className={`tag ${tag.tone}`}>{tag.text}</span>}
-            </button>
+            <Fragment key={id}>
+              {group && <div className="mg">{t(group)}</div>}
+              <button
+                type="button"
+                className={`mi${page === id ? ' active' : ''}`}
+                aria-current={page === id ? 'page' : undefined}
+                onClick={() => onNavigate(id)}
+              >
+                {icons[id]}
+                <span className="mi-label">{t(`nav.${id}`)}</span>
+                {tag && <span className={`tag ${tag.tone}`}>{tag.text}</span>}
+              </button>
+            </Fragment>
           );
         })}
       </nav>

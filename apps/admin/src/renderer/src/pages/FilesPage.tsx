@@ -192,7 +192,19 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                   <td className="c-chg">{changeChip(entry)}</td>
                   <td className="c-pol">
                     {entry.policy === 'managed' ? (
-                      <button type="button" className="chip link" onClick={() => go('settings')}>
+                      <button
+                        type="button"
+                        className="chip link"
+                        onClick={() =>
+                          go(
+                            entry.path.toLowerCase().startsWith('resourcepacks/')
+                              ? 'packs'
+                              : entry.path.toLowerCase().startsWith('shaderpacks/')
+                                ? 'shaders'
+                                : 'playerSettings',
+                          )
+                        }
+                      >
                         {t('files.managed')}
                       </button>
                     ) : (
@@ -242,8 +254,16 @@ export function FilesPage({ studio, insights, go }: PageProps) {
       </section>
       <Note>
         <b>{t('files.managedNote.title')}</b> {t('files.managedNote.body')}{' '}
-        <button type="button" className="textlink" onClick={() => go('settings')}>
-          {t('nav.settings')}
+        <button type="button" className="textlink" onClick={() => go('playerSettings')}>
+          {t('nav.playerSettings')}
+        </button>
+        {' · '}
+        <button type="button" className="textlink" onClick={() => go('packs')}>
+          {t('nav.packs')}
+        </button>
+        {' · '}
+        <button type="button" className="textlink" onClick={() => go('shaders')}>
+          {t('nav.shaders')}
         </button>
       </Note>
     </>
