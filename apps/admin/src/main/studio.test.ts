@@ -18,6 +18,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import { exportLauncher, safeRead } from './filesystem.js';
+import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
@@ -34,7 +35,6 @@ function dialogs() {
   return {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
-    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
   };
 }
 function memorySource(bytes: Buffer): DownloadSource {
@@ -65,7 +65,7 @@ function memorySource(bytes: Buffer): DownloadSource {
 async function projectService() {
   const d = dialogs();
   const s = new StudioService(d);
-  await s.request({ action: 'new' });
+  await s.request({ action: 'new', discard: true });
   return { d, s };
 }
 function config() {
@@ -97,11 +97,12 @@ describe('Studio project and trusted disk selections', () => {
     d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'source' });
     d.open.mockResolvedValueOnce([path]);
-    expect((await s.request({ action: 'open' })).ok).toBe(true);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot()).toMatchObject({ dirty: false, sourceName: null, project });
     await s.request({ action: 'touch' });
-    d.discard.mockResolvedValueOnce(false);
-    expect(await s.request({ action: 'new' })).toEqual({ ok: false, code: 'CANCELLED' });
+    expect(await s.request({ action: 'new' })).toEqual({ ok: false, code: 'UNSAVED' });
+    d.open.mockResolvedValueOnce([path]);
+    expect(await s.request({ action: 'open' })).toEqual({ ok: false, code: 'UNSAVED' });
     expect(s.snapshot().project).toEqual(project);
     expect((await readdir(root)).sort()).toEqual(['project.json']);
   });
@@ -123,7 +124,7 @@ describe('Studio project and trusted disk selections', () => {
     const path = join(root, 'bad.json');
     await writeFile(path, '{bad');
     d.open.mockResolvedValueOnce([path]);
-    expect((await s.request({ action: 'open' })).ok).toBe(false);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
     expect(s.snapshot().project).toEqual(before);
     expect(() =>
       parseProject({ ...before, files: [{ path: '../escape', policy: 'always' }] }),
@@ -155,10 +156,10 @@ describe('Studio project and trusted disk selections', () => {
     const { s, d } = await projectService();
     await s.close();
     expect(await s.request({ action: 'save' })).toEqual({ ok: false, code: 'BUSY' });
-    expect(await s.request({ action: 'new' })).toEqual({ ok: false, code: 'BUSY' });
+    expect(await s.request({ action: 'new', discard: true })).toEqual({ ok: false, code: 'BUSY' });
     expect(d.save).not.toHaveBeenCalled();
     s.resume();
-    expect((await s.request({ action: 'new' })).ok).toBe(true);
+    expect((await s.request({ action: 'new', discard: true })).ok).toBe(true);
   });
   it('cancels source and new selection before modifying state after dialog', async () => {
     const root = await temp();
@@ -176,17 +177,6 @@ describe('Studio project and trusted disk selections', () => {
     finish([root]);
     expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
     expect(s.snapshot().sourceName).toBeNull();
-    let discard!: (value: boolean) => void;
-    d.discard.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          discard = resolve;
-        }),
-    );
-    const fresh = s.request({ action: 'new' });
-    await s.request({ action: 'cancel' });
-    discard(true);
-    expect(await fresh).toEqual({ ok: false, code: 'CANCELLED' });
     expect(s.snapshot().project).toEqual(original);
   });
   it('builds arbitrary nested files with both policies using real writer and reads verified payloads', async () => {
@@ -224,33 +214,36 @@ describe('Studio project and trusted disk selections', () => {
     const checkerDialogs = dialogs();
     const checker = new StudioService(checkerDialogs, () => memorySource(bytes));
     const projectPath = join(root, 'project.json');
-    project.sourceUrl = 'https://example.org/pack';
-    await writeFile(projectPath, JSON.stringify(project));
+    const built = parseProject(s.snapshot().project);
+    built.sourceUrl = 'https://example.org/pack';
+    project.sourceUrl = built.sourceUrl;
+    await writeFile(projectPath, JSON.stringify(built));
     checkerDialogs.open.mockResolvedValueOnce([projectPath]);
-    await checker.request({ action: 'open' });
+    await checker.request({ action: 'open', discard: true });
     expect((await checker.request({ action: 'check' })).ok).toBe(true);
-    const output = join(root, 'export');
-    await mkdir(output);
+    const zipPath = join(root, 'export.zip');
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, 'MZ portable launcher fixture');
-    checkerDialogs.open.mockResolvedValueOnce([binary]).mockResolvedValueOnce([output]);
+    checkerDialogs.open.mockResolvedValueOnce([binary]);
+    checkerDialogs.save.mockResolvedValueOnce(zipPath);
     expect((await checker.request({ action: 'export' })).ok).toBe(true);
-    expect(await readFile(join(output, 'Torch.exe'), 'utf8')).toBe('MZ portable launcher fixture');
+    const zip = readZip(await readFile(zipPath));
+    expect(zip.get('Torch.exe')?.data.toString('utf8')).toBe('MZ portable launcher fixture');
     expect(
-      JSON.parse(await readFile(join(output, 'torchlauncher-server.json'), 'utf8')).serverId,
+      JSON.parse(zip.get('torchlauncher-server.json')?.data.toString('utf8') ?? '').serverId,
     ).toBe(project.serverId);
 
     await checker.request({
       action: 'update',
-      project: { ...project, game: { ...project.game, minecraftVersion: '1.21.2' } },
+      project: { ...built, game: { ...built.game, minecraftVersion: '1.21.2' } },
     });
     expect(await checker.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
     await writeFile(
       projectPath,
-      JSON.stringify({ ...project, serverId: '11111111-1111-4111-8111-111111111111' }),
+      JSON.stringify({ ...built, serverId: '11111111-1111-4111-8111-111111111111' }),
     );
     checkerDialogs.open.mockResolvedValueOnce([projectPath]);
-    await checker.request({ action: 'open' });
+    await checker.request({ action: 'open', discard: true });
     expect(await checker.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
   });
   it('cancels the real writer during staged file reading and preserves previous output', async () => {
@@ -293,7 +286,7 @@ describe('Studio project and trusted disk selections', () => {
     const path = join(root, 'project.json');
     await writeFile(path, JSON.stringify(p));
     d.open.mockResolvedValueOnce([path]);
-    await s.request({ action: 'open' });
+    await s.request({ action: 'open', discard: true });
     expect(await s.request({ action: 'check' })).toEqual({ ok: false, code: 'IO' });
     expect(s.snapshot().result).toBeNull();
   });

@@ -5,7 +5,7 @@ import { StudioService } from './studio.js';
 
 describe('Studio IPC trust boundary', () => {
   it('rejects other windows, subframes and navigated renderers before native dialogs', async () => {
-    const dialogs = { open: vi.fn(), save: vi.fn(), discard: vi.fn() };
+    const dialogs = { open: vi.fn(), save: vi.fn() };
     const service = new StudioService(dialogs);
     const frame = { url: 'file:///studio/index.html' };
     const contents = { mainFrame: frame } as unknown as WebContents;

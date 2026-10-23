@@ -9,6 +9,9 @@ import {
 } from '../../../../packages/core/src/server-config/index.js';
 import type { BrandingSnapshots } from './branding.js';
 import { StudioFailure } from './project.js';
+import { writeZip, type ZipEntry } from './zip.js';
+
+export const LAUNCHER_LIMIT = 2 * 1024 ** 3;
 
 export async function noLinks(path: string): Promise<{ path: string; dev: number; ino: number }[]> {
   const identities: { path: string; dev: number; ino: number }[] = [];
@@ -95,15 +98,11 @@ export async function saveProject(path: string, content: string): Promise<void> 
     await rm(temporary, { force: true });
   }
 }
-export async function exportLauncher(
-  binary: string,
-  output: string,
+/** Copies the snapshots a config references after checking path, length and hash against the config. */
+export function verifiedBrandingAssets(
   config: ServerConfig,
-  signal: AbortSignal,
-  progress: (bytes: number) => void,
-  snapshots: BrandingSnapshots = {},
-): Promise<void> {
-  signal.throwIfAborted();
+  snapshots: BrandingSnapshots,
+): BrandingSnapshots {
   const assets: BrandingSnapshots = {};
   for (const role of BRANDING_ROLES) {
     const asset = config.branding?.[role];
@@ -119,6 +118,18 @@ export async function exportLauncher(
       throw new StudioFailure('INVALID');
     assets[role] = Buffer.from(bytes);
   }
+  return assets;
+}
+export async function exportLauncher(
+  binary: string,
+  output: string,
+  config: ServerConfig,
+  signal: AbortSignal,
+  progress: (bytes: number) => void,
+  snapshots: BrandingSnapshots = {},
+): Promise<void> {
+  signal.throwIfAborted();
+  const assets = verifiedBrandingAssets(config, snapshots);
   await noLinks(binary);
   await noLinks(output);
   const outputStat = await lstat(output);
@@ -267,4 +278,53 @@ export async function exportLauncher(
   } finally {
     await source.close();
   }
+}
+/**
+ * Writes the common launcher file and the server configuration (plus branding assets) into ONE
+ * ZIP file. The binary is checked like in `exportLauncher`; the ZIP is built beside its final
+ * name and renamed into place, so an interrupted export leaves nothing behind.
+ */
+export async function exportLauncherZip(
+  binary: string,
+  destination: string,
+  config: ServerConfig,
+  signal: AbortSignal,
+  progress: (bytes: number) => void,
+  snapshots: BrandingSnapshots = {},
+): Promise<number> {
+  signal.throwIfAborted();
+  const assets = verifiedBrandingAssets(config, snapshots);
+  await noLinks(binary);
+  if (!/\.(?:exe|AppImage)$/i.test(binary)) throw new StudioFailure('INVALID');
+  const appImage = /\.AppImage$/i.test(binary);
+  const handle = await open(binary, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.nlink !== 1 || stat.size < 4) throw new StudioFailure('INVALID');
+    if (stat.size > LAUNCHER_LIMIT) throw new StudioFailure('TOO_LARGE');
+    const header = Buffer.alloc(4);
+    await handle.read(header, 0, 4, 0);
+    if (
+      appImage
+        ? header.toString('hex') !== '7f454c46' || (stat.mode & 0o111) === 0
+        : header.subarray(0, 2).toString() !== 'MZ'
+    )
+      throw new StudioFailure('INVALID');
+  } finally {
+    await handle.close();
+  }
+  const entries: ZipEntry[] = [
+    { name: basename(binary), mode: 0o755, path: binary, maxSize: LAUNCHER_LIMIT },
+    {
+      name: SERVER_CONFIG_FILENAME,
+      mode: 0o644,
+      data: Buffer.from(`${JSON.stringify(config, null, 2)}\n`),
+    },
+  ];
+  for (const role of BRANDING_ROLES) {
+    const asset = config.branding?.[role];
+    const bytes = assets[role];
+    if (asset && bytes) entries.push({ name: asset.path, mode: 0o644, data: bytes });
+  }
+  return writeZip(destination, entries, signal, progress);
 }

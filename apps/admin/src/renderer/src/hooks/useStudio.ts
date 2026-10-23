@@ -25,6 +25,9 @@ const messages: Record<StudioError, string> = {
   BACKUP_INVALID: '서명 키 백업 파일이 올바르지 않습니다.',
   BACKUP_UNSUPPORTED: '지원하지 않는 서명 키 백업 버전입니다.',
   BACKUP_AUTH: '패스프레이즈가 틀렸거나 백업 파일이 손상되었습니다.',
+  UNSAVED: '저장하지 않은 변경 사항이 있습니다.',
+  BLOCKED: '내보내기 전 확인을 통과하지 못했습니다.',
+  TOO_LARGE: '선택한 파일이 허용 크기를 넘습니다.',
 };
 export function useStudio() {
   const [state, setState] = useState<StudioState | null>(null);

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { decodeProject, encodeProject, validateImage } from './branding.js';
+import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
@@ -28,7 +29,6 @@ function dialogs() {
   return {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
-    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
   };
 }
 function source(bytes: Buffer): DownloadSource {
@@ -59,7 +59,7 @@ async function service() {
   const d = dialogs();
   let pack: Buffer = Buffer.alloc(0);
   const s = new StudioService(d, () => source(pack), decode);
-  await s.request({ action: 'new' });
+  await s.request({ action: 'new', discard: true });
   return {
     d,
     s,
@@ -90,7 +90,7 @@ describe('Studio durable branding', () => {
       png.toString('base64'),
     );
     d.open.mockResolvedValueOnce([projectPath]);
-    expect((await s.request({ action: 'open' })).ok).toBe(true);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().project).toEqual(summary);
     d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'source' });
@@ -113,16 +113,17 @@ describe('Studio durable branding', () => {
     expect((await s.request({ action: 'check' })).ok).toBe(true);
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, 'MZ unchanged binary');
-    const output = join(root, 'output');
-    await mkdir(output);
-    d.open.mockResolvedValueOnce([binary]).mockResolvedValueOnce([output]);
+    const zipPath = join(root, 'output.zip');
+    d.open.mockResolvedValueOnce([binary]);
+    d.save.mockResolvedValueOnce(zipPath);
     expect((await s.request({ action: 'export' })).ok).toBe(true);
-    const config = JSON.parse(await readFile(join(output, 'torchlauncher-server.json'), 'utf8'));
+    const zip = readZip(await readFile(zipPath));
+    const config = JSON.parse(zip.get('torchlauncher-server.json')?.data.toString('utf8') ?? '');
     expect(config.branding.appName).toBe('Custom launcher');
     expect(config.branding.icon.sha256).toBe(createHash('sha256').update(png).digest('hex'));
     expect(config.branding.background).toBeUndefined();
-    expect(await readFile(join(output, config.branding.icon.path))).toEqual(png);
-    expect(await readFile(join(output, 'Torch.exe'), 'utf8')).toBe('MZ unchanged binary');
+    expect(zip.get(config.branding.icon.path)?.data).toEqual(png);
+    expect(zip.get('Torch.exe')?.data.toString('utf8')).toBe('MZ unchanged binary');
     await s.request({ action: 'brandingRemove', role: 'icon' });
     expect(await s.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
   });
@@ -272,7 +273,7 @@ describe('Studio durable branding', () => {
       }),
     );
     d.open.mockResolvedValueOnce([bad]);
-    expect((await s.request({ action: 'open' })).ok).toBe(false);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
     expect(s.snapshot().project).toEqual(original);
   });
   it('validates fixed sidecars before output and cleans all own files on late abort', async () => {

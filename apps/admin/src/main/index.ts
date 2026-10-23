@@ -5,8 +5,8 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session } from 'electron';
-import { brandingDialogText, studioChannel } from '../shared/studio.js';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import { brandingDialogText, studioChannel, studioCloseChannel } from '../shared/studio.js';
 import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
 import { SigningKeyStore } from './signing.js';
@@ -43,7 +43,7 @@ function createWindow(): void {
   const service = new StudioService(
     {
       open: async (kind, root) => {
-        const directory = kind === 'source' || kind === 'output';
+        const directory = kind === 'source' || kind === 'output' || kind === 'gamefolder';
         const result = await dialog.showOpenDialog(window, {
           title: {
             project: '프로젝트 열기',
@@ -54,6 +54,10 @@ function createWindow(): void {
             icon: brandingDialogText.icon,
             background: brandingDialogText.background,
             keybackup: '서명 키 백업 파일 선택',
+            optionsfile: 'options.txt 선택',
+            gamefolder: '게임을 한 번 실행한 폴더 선택',
+            resourcepack: '리소스팩(.zip) 선택',
+            shaderpack: '셰이더팩(.zip) 선택',
           }[kind],
           ...(root ? { defaultPath: root } : {}),
           properties: directory
@@ -75,7 +79,11 @@ function createWindow(): void {
                       ? [{ name: '공통 런처', extensions: ['exe', 'AppImage'] }]
                       : kind === 'keybackup'
                         ? [{ name: '서명 키 백업', extensions: ['tlkey'] }]
-                        : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
+                        : kind === 'optionsfile'
+                          ? [{ name: 'options.txt', extensions: ['txt'] }]
+                          : kind === 'resourcepack' || kind === 'shaderpack'
+                            ? [{ name: 'ZIP', extensions: ['zip'] }]
+                            : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
               }
             : {}),
         });
@@ -87,33 +95,31 @@ function createWindow(): void {
             project: '프로젝트 저장',
             pack: 'torchpack 생성',
             keybackup: '서명 키 백업 저장',
+            zip: '런처 내보내기 ZIP 저장',
           }[kind],
           defaultPath: {
             project: 'server-project.json',
             pack: 'server.torchpack',
             keybackup: 'signing-key.tlkey',
+            zip: 'launcher.zip',
           }[kind],
           filters: [
             {
-              name: { project: 'Studio 프로젝트', pack: '배포 파일', keybackup: '서명 키 백업' }[
-                kind
+              name: {
+                project: 'Studio 프로젝트',
+                pack: '배포 파일',
+                keybackup: '서명 키 백업',
+                zip: 'ZIP',
+              }[kind],
+              extensions: [
+                { project: 'json', pack: 'torchpack', keybackup: 'tlkey', zip: 'zip' }[kind],
               ],
-              extensions: [{ project: 'json', pack: 'torchpack', keybackup: 'tlkey' }[kind]],
             },
           ],
         });
         return result.canceled ? null : (result.filePath ?? null);
       },
-      discard: async () =>
-        (
-          await dialog.showMessageBox(window, {
-            type: 'warning',
-            message: '저장하지 않은 프로젝트 변경을 버리시겠습니까?',
-            buttons: ['돌아가기', '변경 버리기'],
-            defaultId: 0,
-            cancelId: 0,
-          })
-        ).response === 1,
+      reveal: (path) => shell.showItemInFolder(path),
     },
     undefined,
     decodeNativeImage,
@@ -147,21 +153,40 @@ function createWindow(): void {
   });
   window.once('ready-to-show', () => window.show());
   let closing = false;
+  let closeTimer: NodeJS.Timeout | null = null;
+  const settle = () => {
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = null;
+  };
+  service.onCloseAnswer({
+    confirm: () => {
+      settle();
+      window.destroy();
+    },
+    cancel: () => {
+      settle();
+      service.resume();
+      closing = false;
+    },
+  });
   window.on('close', (event) => {
     event.preventDefault();
     if (closing) return;
     closing = true;
     void service
       .close()
-      .then(() => service.canDiscard())
-      .then((discard) => {
-        if (discard) window.destroy();
-        else {
-          service.resume();
-          closing = false;
+      .then(() => {
+        if (service.beginClose()) {
+          window.destroy();
+          return;
         }
+        // The renderer shows its own confirmation. No answer in time keeps the window open:
+        // unsaved work is never discarded on a timeout.
+        window.webContents.send(studioCloseChannel);
+        closeTimer = setTimeout(() => service.abandonClose(), 60_000);
       })
       .catch(() => {
+        service.abandonClose();
         service.resume();
         closing = false;
       });

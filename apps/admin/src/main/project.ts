@@ -4,8 +4,9 @@ import {
   validateDeploymentIndex,
 } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
-import type { StudioProject } from '../shared/studio.js';
+import type { StudioLastBuild, StudioProject } from '../shared/studio.js';
 import { parseBranding } from './branding.js';
+import { parseGameSettings } from './game-settings.js';
 
 export class StudioFailure extends Error {
   constructor(readonly code: import('../shared/studio.js').StudioError) {
@@ -18,10 +19,14 @@ export function parseProject(input: unknown): StudioProject {
   const p = input as Record<string, unknown>;
   const keys = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl', 'game', 'files'];
   if (
-    Object.keys(p).some((k) => ![...keys, 'branding', 'sequence'].includes(k)) ||
+    Object.keys(p).some(
+      (k) => ![...keys, 'branding', 'sequence', 'lastBuild', 'gameSettings'].includes(k),
+    ) ||
     keys.some((k) => !Object.hasOwn(p, k)) ||
     p.format !== 'torchlauncher-project' ||
-    p.version !== 1 ||
+    (p.version !== 1 && p.version !== 2) ||
+    // Schema 1 predates these fields: a file that has them must say it is schema 2.
+    (p.version === 1 && (Object.hasOwn(p, 'lastBuild') || Object.hasOwn(p, 'gameSettings'))) ||
     !Array.isArray(p.files) ||
     p.files.length > 10000 ||
     typeof p.sourceUrl !== 'string'
@@ -36,6 +41,8 @@ export function parseProject(input: unknown): StudioProject {
         (p.sequence as number) >= Number.MAX_SAFE_INTEGER)
     )
       throw new StudioFailure('INVALID');
+    if (Object.hasOwn(p, 'lastBuild')) parseLastBuild(p.lastBuild);
+    if (Object.hasOwn(p, 'gameSettings')) parseGameSettings(p.gameSettings);
     parseServerConfig({
       format: 'torchlauncher-server',
       version: 1,
@@ -82,6 +89,59 @@ export function parseProject(input: unknown): StudioProject {
     throw new StudioFailure('INVALID');
   }
   return structuredClone(input) as StudioProject;
+}
+const SHA = /^[0-9a-f]{64}$/;
+export function parseLastBuild(input: unknown): StudioLastBuild {
+  const fail = (): never => {
+    throw new StudioFailure('INVALID');
+  };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
+  const b = input as Record<string, unknown>;
+  const game = b.game as Record<string, unknown> | undefined;
+  const loader = game?.loader as Record<string, unknown> | undefined;
+  if (
+    Object.keys(b).sort().join(',') !==
+      'brandingKey,builtAt,deploymentId,fileName,files,game,sequence,totalLength' ||
+    typeof b.deploymentId !== 'string' ||
+    b.deploymentId.length < 1 ||
+    b.deploymentId.length > 64 ||
+    !Number.isSafeInteger(b.builtAt) ||
+    typeof b.fileName !== 'string' ||
+    !b.fileName ||
+    b.fileName.length > 255 ||
+    /[\\/]/.test(b.fileName) ||
+    !Number.isSafeInteger(b.totalLength) ||
+    (b.totalLength as number) < 0 ||
+    (b.sequence !== null && (!Number.isSafeInteger(b.sequence) || (b.sequence as number) < 1)) ||
+    typeof b.brandingKey !== 'string' ||
+    !SHA.test(b.brandingKey) ||
+    !game ||
+    typeof game.minecraftVersion !== 'string' ||
+    !loader ||
+    typeof loader.kind !== 'string' ||
+    typeof loader.version !== 'string' ||
+    !Array.isArray(b.files) ||
+    b.files.length > 10300
+  )
+    return fail();
+  for (const f of b.files as unknown[]) {
+    const e = f as Record<string, unknown>;
+    if (
+      !e ||
+      typeof e !== 'object' ||
+      Object.keys(e).sort().join(',') !== 'length,path,policy,sha256' ||
+      typeof e.path !== 'string' ||
+      !e.path ||
+      e.path.length > 1024 ||
+      (e.policy !== 'always' && e.policy !== 'initial-only') ||
+      typeof e.sha256 !== 'string' ||
+      !SHA.test(e.sha256) ||
+      !Number.isSafeInteger(e.length) ||
+      (e.length as number) < 0
+    )
+      return fail();
+  }
+  return b as unknown as StudioLastBuild;
 }
 export function newProject(): StudioProject {
   return {
