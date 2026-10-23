@@ -48,7 +48,7 @@ Use these module boundaries; applications must not import each other:
 - `apps/admin/`: server configuration, branding assets, deployment generation, and portable launcher export.
 - `apps/launcher/`: authentication, synchronization, server status, game launch, and user mod management.
 - `packages/core/`: shared installation, deployment format, download, and integrity logic.
-- `mods/`: planned Fabric and NeoForge companions; no Java build exists yet.
+- `mods/`: contains only a notice that the Fabric and NeoForge companion mod plan was withdrawn (2026-10-21); no Java build exists or is scheduled.
 - `docs/`: architecture and deployment specifications.
 
 Keep tests beside their modules as `*.test.ts`; place reusable fixtures in dedicated `fixtures/` directories. Store bundled images with their owning application.
