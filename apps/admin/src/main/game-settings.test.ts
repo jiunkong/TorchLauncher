@@ -299,10 +299,9 @@ async function harness() {
   const d = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
-    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
   };
   const s = new StudioService(d);
-  await s.request({ action: 'new' });
+  await s.request({ action: 'new', discard: true });
   d.open.mockResolvedValueOnce([source]);
   await s.request({ action: 'source' });
   const game = join(root, 'game');
@@ -318,7 +317,7 @@ async function harness() {
     const path = join(root, 'legacy.json');
     await writeFile(path, JSON.stringify(project));
     d.open.mockResolvedValueOnce([path]);
-    await s.request({ action: 'open' });
+    await s.request({ action: 'open', discard: true });
     d.open.mockResolvedValueOnce([source]);
     await s.request({ action: 'source' });
   };
@@ -586,7 +585,7 @@ describe('service: game settings preset', () => {
     await h.s.request({ action: 'save' });
     const before = h.s.snapshot().project;
     h.d.open.mockResolvedValueOnce([saved]);
-    await h.s.request({ action: 'open' });
+    await h.s.request({ action: 'open', discard: true });
     expect(h.s.snapshot().project).toEqual(before);
     expect(before?.version).toBe(2);
   });

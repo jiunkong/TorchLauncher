@@ -71,7 +71,7 @@ const appCases = [
       ['배포', '배포 파일'],
       ['내보내기', '런처 내보내기'],
     ],
-    expectedBridge: ['request', 'getApplicationInfo'],
+    expectedBridge: ['request', 'onCloseRequest', 'getApplicationInfo'],
     env,
   },
 ];

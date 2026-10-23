@@ -6,7 +6,7 @@ import {
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
-import { brandingDialogText, studioChannel } from '../shared/studio.js';
+import { brandingDialogText, studioChannel, studioCloseChannel } from '../shared/studio.js';
 import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
 import { SigningKeyStore } from './signing.js';
@@ -120,16 +120,6 @@ function createWindow(): void {
         return result.canceled ? null : (result.filePath ?? null);
       },
       reveal: (path) => shell.showItemInFolder(path),
-      discard: async () =>
-        (
-          await dialog.showMessageBox(window, {
-            type: 'warning',
-            message: '저장하지 않은 프로젝트 변경을 버리시겠습니까?',
-            buttons: ['돌아가기', '변경 버리기'],
-            defaultId: 0,
-            cancelId: 0,
-          })
-        ).response === 1,
     },
     undefined,
     decodeNativeImage,
@@ -163,21 +153,40 @@ function createWindow(): void {
   });
   window.once('ready-to-show', () => window.show());
   let closing = false;
+  let closeTimer: NodeJS.Timeout | null = null;
+  const settle = () => {
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = null;
+  };
+  service.onCloseAnswer({
+    confirm: () => {
+      settle();
+      window.destroy();
+    },
+    cancel: () => {
+      settle();
+      service.resume();
+      closing = false;
+    },
+  });
   window.on('close', (event) => {
     event.preventDefault();
     if (closing) return;
     closing = true;
     void service
       .close()
-      .then(() => service.canDiscard())
-      .then((discard) => {
-        if (discard) window.destroy();
-        else {
-          service.resume();
-          closing = false;
+      .then(() => {
+        if (service.beginClose()) {
+          window.destroy();
+          return;
         }
+        // The renderer shows its own confirmation. No answer in time keeps the window open:
+        // unsaved work is never discarded on a timeout.
+        window.webContents.send(studioCloseChannel);
+        closeTimer = setTimeout(() => service.abandonClose(), 60_000);
       })
       .catch(() => {
+        service.abandonClose();
         service.resume();
         closing = false;
       });

@@ -76,7 +76,6 @@ export interface StudioDialogs {
     root?: string,
   ): Promise<string[] | null>;
   save(kind: 'project' | 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
-  discard(): Promise<boolean>;
   /** Shows a file in the OS file manager. Optional so tests can omit it. */
   reveal?(path: string): void;
 }
@@ -199,8 +198,22 @@ export class StudioService {
     this.controller?.abort();
     await this.pending;
   }
-  async canDiscard(): Promise<boolean> {
-    return !this.state.dirty || this.dialogs.discard();
+  private closeAsked = false;
+  private closeHandlers: { confirm(): void; cancel(): void } | null = null;
+  /** The window shell registers what happens on the renderer's answer to a close request. */
+  onCloseAnswer(handlers: { confirm(): void; cancel(): void }): void {
+    this.closeHandlers = handlers;
+  }
+  /** True when the window may close at once; false when the renderer must be asked first. */
+  beginClose(): boolean {
+    if (!this.state.dirty) return true;
+    this.closeAsked = true;
+    return false;
+  }
+  abandonClose(): void {
+    if (!this.closeAsked) return;
+    this.closeAsked = false;
+    this.closeHandlers?.cancel();
   }
   request(input: unknown): Promise<StudioReply> {
     if (!input || typeof input !== 'object' || Array.isArray(input))
@@ -223,6 +236,8 @@ export class StudioService {
       'exportCheck',
       'revealPack',
       'revealExport',
+      'closeConfirm',
+      'closeCancel',
     ];
     const extra =
       value.action === 'update'
@@ -253,13 +268,23 @@ export class StudioService {
       typeof value.action !== 'string' ||
       (!actions.includes(value.action) &&
         !['update', 'brandingSelect', 'brandingRemove', 'brandingName'].includes(value.action)) ||
-      Object.keys(value).length !== (extra ? 2 : 1) ||
+      Object.keys(value).length !==
+        (extra ? 2 : 1) + (['new', 'open'].includes(value.action) && 'discard' in value ? 1 : 0) ||
+      ('discard' in value && typeof value.discard !== 'boolean') ||
       (extra && !Object.hasOwn(value, extra)) ||
       (extra === 'role' && value.role !== 'icon' && value.role !== 'background') ||
       (extra === 'appName' && value.appName !== null && typeof value.appName !== 'string')
     )
       return Promise.resolve({ ok: false, code: 'INVALID' });
     if (value.action === 'state') return Promise.resolve({ ok: true, state: this.snapshot() });
+    if (value.action === 'closeConfirm' || value.action === 'closeCancel') {
+      // Valid only as the answer to a close request main itself sent to the trusted renderer.
+      if (!this.closeAsked) return Promise.resolve({ ok: false, code: 'INVALID' });
+      this.closeAsked = false;
+      if (value.action === 'closeConfirm') this.closeHandlers?.confirm();
+      else this.closeHandlers?.cancel();
+      return Promise.resolve({ ok: true, state: this.snapshot() });
+    }
     if (value.action === 'cancel') {
       this.controller?.abort();
       return Promise.resolve({ ok: true, state: this.snapshot() });
@@ -537,7 +562,7 @@ export class StudioService {
         return;
       case 'new':
       case 'open': {
-        if (!(await this.canDiscard())) throw new StudioFailure('CANCELLED');
+        if (this.state.dirty && !command.discard) throw new StudioFailure('UNSAVED');
         signal.throwIfAborted();
         let path: string | null = null;
         let project: StudioProject;

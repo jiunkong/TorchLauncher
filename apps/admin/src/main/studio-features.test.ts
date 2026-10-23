@@ -65,7 +65,6 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
   const d = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
-    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
     reveal: vi.fn<NonNullable<StudioDialogs['reveal']>>(),
   };
   const remote: { value: Remote } = { value: null };
@@ -81,7 +80,7 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
     }
     return memorySource(remote.value ?? Buffer.alloc(0));
   });
-  await s.request({ action: 'new' });
+  await s.request({ action: 'new', discard: true });
   d.open.mockResolvedValueOnce([source]);
   await s.request({ action: 'source' });
   const include = async (paths: string[], policy: 'always' | 'initial-only' | 'excluded') =>
@@ -202,7 +201,7 @@ describe('files diff against the last build', () => {
     h.d.save.mockResolvedValueOnce(projectPath);
     await h.s.request({ action: 'save' });
     h.d.open.mockResolvedValueOnce([projectPath]);
-    await h.s.request({ action: 'open' });
+    await h.s.request({ action: 'open', discard: true });
     expect(h.s.snapshot().files).toBeNull();
     expect(h.s.snapshot().deploy).toMatchObject({ status: 'unknown', lastBuild: { fileCount: 1 } });
     h.d.open.mockResolvedValueOnce([h.source]);
@@ -455,5 +454,46 @@ describe('zip writer', () => {
     ).rejects.toBeDefined();
     expect((await readdir(root)).sort()).toEqual(['f.bin', 'o.zip']);
     expect(await readFile(join(root, 'o.zip'), 'utf8')).toBe('old');
+  });
+});
+
+describe('in-app discard confirmation', () => {
+  it('requires an explicit discard flag only for dirty projects and validates its shape', async () => {
+    const h = await harness();
+    expect(await h.s.request({ action: 'new' })).toEqual({ ok: false, code: 'UNSAVED' });
+    expect(await h.s.request({ action: 'new', discard: 'yes' })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect(await h.s.request({ action: 'new', discard: true, x: 1 })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect((await h.s.request({ action: 'new', discard: true })).ok).toBe(true);
+    const saved = join(h.root, 'p.json');
+    h.d.save.mockResolvedValueOnce(saved);
+    await h.s.request({ action: 'save' });
+    expect(h.s.snapshot().dirty).toBe(false);
+    expect((await h.s.request({ action: 'new' })).ok).toBe(true);
+  });
+  it('answers a close request only when main asked, and never closes on its own for dirty projects', async () => {
+    const h = await harness();
+    const confirm = vi.fn();
+    const cancel = vi.fn();
+    h.s.onCloseAnswer({ confirm, cancel });
+    expect(await h.s.request({ action: 'closeConfirm' })).toEqual({ ok: false, code: 'INVALID' });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(h.s.beginClose()).toBe(false);
+    expect((await h.s.request({ action: 'closeCancel' })).ok).toBe(true);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(await h.s.request({ action: 'closeConfirm' })).toEqual({ ok: false, code: 'INVALID' });
+    expect(h.s.beginClose()).toBe(false);
+    h.s.abandonClose();
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(h.s.beginClose()).toBe(false);
+    expect((await h.s.request({ action: 'closeConfirm' })).ok).toBe(true);
+    expect(confirm).toHaveBeenCalledOnce();
+    const clean = new StudioService({ open: vi.fn(), save: vi.fn() });
+    expect(clean.beginClose()).toBe(true);
   });
 });

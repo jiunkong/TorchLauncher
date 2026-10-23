@@ -3,15 +3,15 @@
 Worker `agent-3` (STUDIO-MAIN-01), branch `feat/studio-main-features`, worktree `.agents/worktrees/agent-3`, base main `c5035df`.
 Commits: `git log --oneline c5035df..feat/studio-main-features` (feature commit `b5dc955`, tests/handoff commit follows it). Not merged.
 
-Scope touched: `apps/admin/src/main/**`, `apps/admin/src/shared/studio.ts`, this file, and ONE line pair in
-`apps/admin/src/renderer/src/hooks/useStudio.ts` (see Deviations). `packages/core`, root config, lockfile, `scripts/smoke.mjs` are untouched.
+Scope touched: `apps/admin/src/main/**`, `apps/admin/src/shared/studio.ts`, this file, and two message entries (`BLOCKED`, `TOO_LARGE`, `UNSAVED`) in
+`apps/admin/src/renderer/src/hooks/useStudio.ts` (needed to keep `Record<StudioError,string>` compiling; drop-in safe for UI-01). `packages/core`, root config and lockfile are untouched; `scripts/smoke.mjs` has one line changed (Studio `expectedBridge`).
 SET-CORE-01 had no usable commit when this was written (no `feat/settings-core-shaders` ref visible), so part B is built on the existing v1 policy API.
 
 ## Transport (unchanged)
-Preload still exposes only `request(command)` and `getApplicationInfo()`; every new feature is a new `StudioRequest` action on the same
+Preload exposes `request(command)`, `onCloseRequest(listener)` (see below) and `getApplicationInfo()`; every new feature is a new `StudioRequest` action on the same
 channel. Sender validation, strict field validation (exact keys, types, limits) happen in `StudioService.request`. Paths never come from the
 renderer: they come from native dialogs (`StudioDialogs`) or are source-relative strings validated against the scanned source folder.
-`scripts/smoke.mjs` needed no edit (bridge keys unchanged).
+`scripts/smoke.mjs`: one edit, see the close-request contract below (new bridge key `onCloseRequest`).
 
 ## State additions (`StudioState`)
 `files: StudioFiles | null`, `deploy: StudioDeploy | null`, `urlCheck: StudioUrlCheck | null`, `export: StudioExport | null`, `preset: StudioPresetPreview | null`
@@ -76,6 +76,22 @@ Core use is isolated in `game-settings.ts` (`parseOptionsText`, `generatePolicy`
 source opened without links, CRC computed in a first pass and re-checked while copying, written to a temp file next to the target and renamed; abort/error removes the temp
 and keeps an existing target. The old directory exporter `exportLauncher` is still in `filesystem.ts` (its helper is shared) but the service no longer calls it.
 
+## No native confirmation dialogs (user rule, relayed by #0)
+Studio must not use native confirmation/message boxes (same as the launcher). Native file open/save pickers stay. `dialog.showMessageBox` and
+`StudioDialogs.discard` / `StudioService.canDiscard` are removed; main no longer decides about discarding. Exact contract:
+- `{action:'new'|'open', discard?: boolean}`: if the current project has unsaved changes (`state.dirty`) and `discard !== true`, main replies
+  `{ok:false, code:'UNSAVED'}` before showing any picker. The renderer shows its own modal, and on "discard" repeats the command with `discard:true`.
+  `discard` must be a boolean (other values/extra keys -> `INVALID`); it is harmless when the project is clean. Note: a freshly created project is dirty.
+  The currently shipped renderer sends no flag, so replacing a dirty project now fails with `UNSAVED` until STUDIO-UI-01/02 sends it.
+- Window close with unsaved changes: main aborts running work, then, if dirty, sends the event `studio:close-request` (`studioCloseChannel`) to the
+  trusted window only and keeps the window open. Preload exposes `onCloseRequest(listener): () => void` (new bridge key; `scripts/smoke.mjs` Studio
+  `expectedBridge` is now `['request','onCloseRequest','getApplicationInfo']` - the only edit to that file). The renderer shows its modal (save / discard / stay) and answers
+  through `request`: `{action:'closeConfirm'}` (discard and close the window) or `{action:'closeCancel'}` (stay). To save first, send `save`/`saveAs`
+  and then `closeConfirm`. Both answers are accepted only while a close request is outstanding (otherwise `INVALID`), after the usual trusted-frame check.
+- Safe fallback: if the renderer does not answer within 60 s, or main fails while closing, the request is abandoned and the window stays open
+  (never closes with unsaved data without an explicit `closeConfirm`). A clean project closes immediately.
+- New error code `UNSAVED` (one message entry added to `useStudio.ts`). Tests: `studio-features.test.ts` "in-app discard confirmation", `studio.test.ts`, `ipc.test.ts`.
+
 ## Behaviour changes that UI-02/#0 should know
 1. Export now requires a deployment built by this project (`lastBuild`). Projects built before this change have none: rebuild once, then export.
 2. Export saves a ZIP via `save('zip')` instead of picking an output folder; the `output` dialog kind is no longer used by the service.
@@ -84,7 +100,7 @@ and keeps an existing target. The old directory exporter `exportLauncher` is sti
 ## Validation (WSL2 Linux, this worktree)
 - `pnpm lint` exit 0 (8 warnings, all pre-existing CSS specificity in the renderer stylesheet; none in main/shared).
 - `pnpm typecheck` passed (core, studio, launcher).
-- `pnpm exec vitest run` (whole repo): 82 files passed, 4 skipped; 1199 tests passed, 9 skipped. Studio: 61 tests; new: `studio-features.test.ts` (17), `game-settings.test.ts` (22);
+- `pnpm exec vitest run` (whole repo): 82 files passed, 4 skipped; 1201 tests passed, 9 skipped. Studio: 77 tests; new: `studio-features.test.ts` (17), `game-settings.test.ts` (22);
   three existing tests (`branding`, `studio`, `signing`) were updated for ZIP export and the last-build requirement.
 - `pnpm --filter @torchlauncher/studio build` passed; `pnpm build` passed.
 - `node scripts/smoke.mjs` passed for launcher and Studio (display `:0` available; the first run failed only because the launcher `out/` was stale, fixed by `pnpm build`).

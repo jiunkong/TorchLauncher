@@ -29,7 +29,6 @@ function dialogs() {
   return {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
-    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
   };
 }
 function source(bytes: Buffer): DownloadSource {
@@ -60,7 +59,7 @@ async function service() {
   const d = dialogs();
   let pack: Buffer = Buffer.alloc(0);
   const s = new StudioService(d, () => source(pack), decode);
-  await s.request({ action: 'new' });
+  await s.request({ action: 'new', discard: true });
   return {
     d,
     s,
@@ -91,7 +90,7 @@ describe('Studio durable branding', () => {
       png.toString('base64'),
     );
     d.open.mockResolvedValueOnce([projectPath]);
-    expect((await s.request({ action: 'open' })).ok).toBe(true);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().project).toEqual(summary);
     d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'source' });
@@ -274,7 +273,7 @@ describe('Studio durable branding', () => {
       }),
     );
     d.open.mockResolvedValueOnce([bad]);
-    expect((await s.request({ action: 'open' })).ok).toBe(false);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
     expect(s.snapshot().project).toEqual(original);
   });
   it('validates fixed sidecars before output and cleans all own files on late abort', async () => {

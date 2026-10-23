@@ -51,7 +51,6 @@ function dialogs() {
   return {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
-    discard: vi.fn<StudioDialogs['discard']>().mockResolvedValue(true),
   };
 }
 function memorySource(bytes: Buffer): DownloadSource {
@@ -82,7 +81,7 @@ async function setup(storage = fakeStorage()) {
   const source = join(root, 'source');
   await mkdir(source);
   await writeFile(join(source, 'a.txt'), 'payload');
-  await s.request({ action: 'new' });
+  await s.request({ action: 'new', discard: true });
   d.open.mockResolvedValueOnce([source]);
   await s.request({ action: 'source' });
   d.open.mockResolvedValueOnce([join(source, 'a.txt')]);
@@ -368,7 +367,7 @@ describe('Studio signing integration', () => {
     const fd = dialogs();
     const f2 = new StudioService(fd, undefined, undefined, ctx.store);
     fd.open.mockResolvedValueOnce([path]);
-    await f2.request({ action: 'open' });
+    await f2.request({ action: 'open', discard: true });
     fd.open.mockResolvedValueOnce([ctx.source]);
     await f2.request({ action: 'source' });
     const d = join(ctx.root, 'd.torchpack');
@@ -379,7 +378,7 @@ describe('Studio signing integration', () => {
     const high = { ...project, sequence: 500 };
     await writeFile(path, JSON.stringify(high));
     fd.open.mockResolvedValueOnce([path]);
-    await f2.request({ action: 'open' });
+    await f2.request({ action: 'open', discard: true });
     fd.open.mockResolvedValueOnce([ctx.source]);
     await f2.request({ action: 'source' });
     const e = join(ctx.root, 'e.torchpack');
@@ -438,7 +437,7 @@ describe('Studio signing integration', () => {
     await writeFile(join(root, 'proj.json'), JSON.stringify(project));
     d0.open.mockReset();
     d0.open.mockResolvedValueOnce([join(root, 'proj.json')]);
-    await legacy.request({ action: 'open' });
+    await legacy.request({ action: 'open', discard: true });
     d0.open.mockResolvedValueOnce([sourceDir]);
     await legacy.request({ action: 'source' });
     const oldPack = join(root, 'old.torchpack');
@@ -456,7 +455,7 @@ describe('Studio signing integration', () => {
     let remote = oldBytes;
     const s = new StudioService(d, () => memorySource(remote), undefined, store);
     d.open.mockResolvedValueOnce([join(root, 'proj.json')]);
-    expect((await s.request({ action: 'open' })).ok).toBe(true);
+    expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().signing).toMatchObject({ keyExists: false, publicKey: null });
     const out = join(root, 'out.zip');
     const bin = join(root, 'Torch.exe');
@@ -531,7 +530,7 @@ describe('Studio signing integration', () => {
     const projectFile = join(ctx.root, 'proj.json');
     await writeFile(projectFile, JSON.stringify(project));
     d2.open.mockResolvedValueOnce([projectFile]);
-    await s2.request({ action: 'open' });
+    await s2.request({ action: 'open', discard: true });
     d2.open.mockResolvedValueOnce([backup]);
     expect(
       await s2.request({ action: 'keyImport', passphrase: 'wrong passphrase!!', replace: false }),
@@ -543,8 +542,8 @@ describe('Studio signing integration', () => {
     const s3 = new StudioService(dialogs(), undefined, undefined, store2);
     const d3 = dialogs();
     const s4 = new StudioService(d3, undefined, undefined, store2);
-    await s3.request({ action: 'new' });
-    await s4.request({ action: 'new' });
+    await s3.request({ action: 'new', discard: true });
+    await s4.request({ action: 'new', discard: true });
     d3.open.mockResolvedValueOnce([backup]);
     expect(await s4.request({ action: 'keyImport', passphrase: PASS, replace: false })).toEqual({
       ok: false,

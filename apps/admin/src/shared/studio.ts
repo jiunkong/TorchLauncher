@@ -4,6 +4,8 @@ import type {
   DeploymentGame,
 } from '../../../../packages/core/src/deployment/contracts/index.js';
 export const studioChannel = 'studio:request';
+/** Main -> renderer event: the window is closing with unsaved changes; the renderer must answer with `closeConfirm` or `closeCancel`. */
+export const studioCloseChannel = 'studio:close-request';
 export const brandingDialogText = {
   icon: '앱 아이콘 선택',
   background: '홈 배경 선택',
@@ -192,8 +194,6 @@ export type StudioCommand =
       action:
         | 'state'
         | 'touch'
-        | 'new'
-        | 'open'
         | 'save'
         | 'saveAs'
         | 'source'
@@ -202,6 +202,11 @@ export type StudioCommand =
         | 'check'
         | 'export'
         | 'cancel';
+    }
+  | {
+      action: 'new' | 'open';
+      /** Must be true when the current project has unsaved changes, sent only after the renderer's own confirmation. */
+      discard?: boolean;
     }
   | { action: 'update'; project: StudioProject };
 /** Source folder, deploy and export commands added by STUDIO-MAIN-01. */
@@ -214,7 +219,11 @@ export type StudioWorkCommand =
         /** Show the last built pack in the OS file manager. */
         | 'revealPack'
         /** Show the last exported ZIP in the OS file manager. */
-        | 'revealExport';
+        | 'revealExport'
+        /** Answer to a close request: discard unsaved changes and close the window. Only valid after `onCloseRequest` fired. */
+        | 'closeConfirm'
+        /** Answer to a close request: keep the window open. */
+        | 'closeCancel';
     }
   | {
       action: 'filesPolicy';
@@ -263,6 +272,8 @@ export type StudioError =
   | 'BACKUP_INVALID'
   | 'BACKUP_UNSUPPORTED'
   | 'BACKUP_AUTH'
+  /** Unsaved changes would be lost: ask in the app, then repeat with `discard: true`. */
+  | 'UNSAVED'
   /** Export refused: read `state.export.checks`. */
   | 'BLOCKED'
   /** A chosen file or pack is larger than the limit. */
@@ -270,4 +281,6 @@ export type StudioError =
 export type StudioReply = { ok: true; state: StudioState } | { ok: false; code: StudioError };
 export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;
+  /** Subscribes to window-close requests while the project has unsaved changes. Returns an unsubscribe function. */
+  onCloseRequest(listener: () => void): () => void;
 }
