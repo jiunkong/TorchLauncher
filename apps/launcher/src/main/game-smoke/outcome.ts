@@ -1,8 +1,8 @@
 import { AuthenticationError } from '@torchlauncher/core/auth';
+import { HostAuthenticationError } from '@torchlauncher/desktop-auth';
 import { SynchronizationError } from '../../../../../packages/core/src/instance/sync/types';
 import { ServerDataLockedError } from '../../../../../packages/core/src/minecraft/lock';
 import { type GameExit, GameStartError } from '../../../../../packages/core/src/minecraft/process';
-import { HostAuthenticationError } from '../auth/errors';
 
 const gameCodes = new Set([
   'EINSTALLRECOVERY',

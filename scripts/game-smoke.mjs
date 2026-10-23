@@ -140,7 +140,7 @@ async function main() {
             'game-smoke': join(repository, 'apps/launcher/src/main/game-smoke/entry.ts'),
             'public-java-worker': join(
               repository,
-              'apps/launcher/src/main/auth/public-java-worker.ts',
+              'packages/desktop-auth/src/public-java-worker.ts',
             ),
           },
           external: ['electron'],
