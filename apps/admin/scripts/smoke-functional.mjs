@@ -346,7 +346,7 @@ try {
   assert.deepEqual(isolation, {
     require: false,
     process: false,
-    keys: ['getApplicationInfo', 'request'],
+    keys: ['getApplicationInfo', 'onCloseRequest', 'request'],
   });
   assert.deepEqual(errors, []);
   console.log(
