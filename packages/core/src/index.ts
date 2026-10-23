@@ -2,3 +2,6 @@
 export const supportedLoaders = ['fabric', 'neoforge'] as const;
 
 export type LoaderKind = (typeof supportedLoaders)[number];
+
+export * as diagnostics from './diagnostics/index.js';
+export * as testInstance from './instance/test-instance/index.js';

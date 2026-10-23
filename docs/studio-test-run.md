@@ -30,6 +30,25 @@
 - 결과 항목: 심각도(오류/경고/정보), 분류, 관련 모드 ID/파일, 요약 문장, 근거 로그 줄 번호. 알 수 없는 오류는 "분류되지 않음"으로 원문 일부와 함께 표시한다. 정상 종료 + 오류 없음은 "문제를 찾지 못했습니다"로만 표현하고 호환을 보증하지 않는다.
 - 모드 목록(파일명, 모드 ID, 버전, 로더)은 jar의 메타데이터(`fabric.mod.json`, `META-INF/neoforge.mods.toml`)에서 읽을 수 있으면 보여 준다(크기 제한·ZIP 항목 이름 검증).
 
+### 코어 분석 계약 (TESTRUN-CORE-01)
+
+- 공개 진입점은 `@torchlauncher/core`의 `diagnostics`와 `testInstance` 네임스페이스다. Electron 의존성과 새 외부 의존성은 없다.
+- `diagnostics.analyzeGameLog({ loader, minecraftVersion, text? 또는 lines?, exit?, crashReport?, mods?, secretsToHide? })`는 동기 순수 함수다. `text`와 `lines`를 동시에 주면 거부한다. 로그와 크래시 리포트를 합해 4 MiB, 줄당 8 KiB, 65,536줄, 결과 200개까지 분석한다. 초과하면 `truncated`를 세우며, 과대 줄은 부분 원문을 노출하지 않고 버린다(텍스트 입력은 그 지점에서 분석 중단). 줄 번호는 원본 기준 1부터 시작하고 `evidence.source`로 로그/크래시 리포트를 구분한다. 근거 문장은 최대 400 UTF-16 코드 단위다.
+- 요약은 `{ code, parameters }`이고 표시 문장은 UI i18n이 만든다. `status`는 알려진 문제 발견 시 `problems`, 잘림·시작 신호 부재·유효 줄 2개 미만·종료 미확인 시 `incomplete`, 시작 신호와 정상 종료가 있고 알려진 문제를 못 찾았을 때만 `no-problems-found`다. **`no-problems-found`는 호환 보증이 아니다.** 로그에 드러나지 않은 문제와 직접 플레이 결과는 별도다.
+- 정화는 기존 `GameLogs`를 재사용한다. 제어 문자 제거 뒤 토큰 필드, 명령줄 사용자명/토큰, 홈 경로 사용자명을 가리며 `Setting user:`에서 발견한 이름은 이후 줄에서도 가린다. 호출자는 인증에서 아는 사용자명·토큰을 `secretsToHide`에 전달해야 한다(최대 256개, 각 8,192자). 로그보다 먼저 알려진 이름을 주어야 앞쪽 로그도 가릴 수 있다. `mods`의 파일명/ID는 정화한 근거와 일치할 때만 결과에 연결한다.
+- `diagnostics.readModMetadata(bytes 또는 AsyncIterable<Uint8Array>)`는 비동기이며 `{ loader, mods: [{ id, version, dependencies, environment? }], file? }`를 반환한다. 한 jar의 복수 NeoForge 모드를 지원한다. `file`은 호출자가 안전한 파일명으로 덧붙인다. 입력 jar 64 MiB, ZIP 항목 10,000개, 디렉터리 8 MiB, 메타데이터 항목별 압축 해제 1 MiB가 상한이다. ZIP64·암호화·지원 외 압축·악성 경로·중복 항목·로컬/중앙 이름 불일치·CRC 불일치는 코드가 있는 `ModMetadataError`로 거부한다. 중첩 jar는 읽지 않는다. 두 로더의 메타데이터가 함께 있으면 모호하므로 거부한다.
+- TOML은 `[[mods]]`와 `[[dependencies.<id>]]`의 따옴표 문자열 필드만 해석한다. 설명용 여러 줄 문자열과 무관한 필드는 건너뛰고, 읽어야 하는 필드의 지원 외 문법은 `unsupported-toml`로 거부한다. 버전 범위와 `${file.jarVersion}` 같은 값은 평가하지 않고 그대로 반환한다. 의존성을 해결하거나 버전 호환을 판정하는 API가 아니다.
+
+### 테스트 인스턴스 계획 계약 (TESTRUN-CORE-01)
+
+`testInstance.planTestInstance({ candidateFiles: [{ path, policy }], sourceRoot, instanceRoot })`는 비동기 읽기 전용 계획 API다. `policy`는 `always | initial-only | exclude`다. 호출자는 배포 정책 및 설정 정책의 options/팩 제외를 적용한 후보를 넘긴다. 루트는 정규화된 절대 경로이며 서로 포함할 수 없다. 소스는 기존 폴더이고 인스턴스는 아직 없어도 된다. 상대 파일 경로·대소문자 충돌·파일/부모 충돌·예약 경로를 검증하고 루트 조상과 각 파일 경로의 링크를 거부한다. 파일 hardlink도 거부한다.
+
+반환은 `{ copies, removals, skipped, nextLedger }`다. 복사에는 절대 source/destination, 기존 파일의 `before` 해시/길이(없으면 null), 복사 후 `after` 소유 기록이 있다. 기존 비소유 파일은 내용이 같아도 편입하거나 덮어쓰지 않는다. 소유 파일도 현재 내용이 달라졌으면 보존한다. `initial-only`로 기록한 파일은 수정·삭제되어도 재복사하지 않는다. 삭제 후보는 이전 원장에 있고 후보에서 빠진, 해시/길이가 여전히 일치하는 `always` 파일뿐이다. `options.txt`, `optionsof.txt`, `servers.dat`, `config/**`, `saves/**`, `logs/**`, `crash-reports/**`, `screenshots/**`, `shaderpacks/*.txt`는 삭제하지 않는다. 더 이상 관리하지 않는 보존 파일의 소유권은 내려놓는다.
+
+원장은 `.torchlauncher-test/ledger.json`의 `{ version: 1, files: [{ path, policy, sha256, length }] }`다. `JSON.stringify` 결과(마지막 줄바꿈 하나는 허용)로 저장하며 1 MiB/10,000항목 제한, 엄격한 필드·경로·해시 검증을 한다. 손상·중복 키·지원 외 버전은 안전하게 거부하고 빈 원장으로 대체하지 않는다. `parseTestInstanceLedger`를 별도로 사용할 수 있다. 계획 함수는 폴더 생성·복사·삭제·원장 저장을 하지 않는다.
+
+후속 메인 실행자는 게임 실행과 준비를 직렬화하고 인스턴스 잠금을 유지해야 한다. 계획은 파일 시스템 스냅샷이므로 실제 적용 직전에 경로의 링크/파일 정체성과 `before`/소스 해시를 다시 검증한다. 전체 적용 성공을 확인한 뒤에만 `nextLedger`를 원자적으로 저장한다. 중단 복구·적용 트랜잭션은 메인 실행자 범위이며 이 계획 API가 보장하지 않는다.
+
 ## 작업 분해
 
 | ID | 내용 | 독점 범위 | 의존 |
