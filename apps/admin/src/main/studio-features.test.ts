@@ -128,7 +128,7 @@ describe('files diff against the last build', () => {
     await h.include(['a.txt', 'b.txt', 'd.txt'], 'always');
     await h.build();
     expect(h.s.snapshot().deploy).toMatchObject({ status: 'upToDate', reasons: [] });
-    expect(h.s.snapshot().project?.version).toBe(2);
+    expect(h.s.snapshot().project?.version).toBe(1);
     // same size, different bytes -> modified; touching without changing bytes -> unchanged
     await writeFile(join(h.source, 'a.txt'), 'AAAA');
     await writeFile(join(h.source, 'b.txt'), 'bbbb');
@@ -495,5 +495,20 @@ describe('in-app discard confirmation', () => {
     expect(confirm).toHaveBeenCalledOnce();
     const clean = new StudioService({ open: vi.fn(), save: vi.fn() });
     expect(clean.beginClose()).toBe(true);
+  });
+  it('accepts save and the close answers while a close request is outstanding', async () => {
+    const h = await harness();
+    const confirm = vi.fn();
+    h.s.onCloseAnswer({ confirm, cancel: vi.fn() });
+    await h.s.close();
+    expect(await h.s.request({ action: 'save' })).toEqual({ ok: false, code: 'BUSY' });
+    h.s.resume();
+    await h.s.close();
+    expect(h.s.beginClose()).toBe(false);
+    h.d.save.mockResolvedValueOnce(join(h.root, 'p.json'));
+    expect((await h.s.request({ action: 'save' })).ok).toBe(true);
+    expect(h.s.snapshot().dirty).toBe(false);
+    expect((await h.s.request({ action: 'closeConfirm' })).ok).toBe(true);
+    expect(confirm).toHaveBeenCalledOnce();
   });
 });

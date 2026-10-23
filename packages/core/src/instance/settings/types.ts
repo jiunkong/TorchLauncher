@@ -52,7 +52,7 @@ export const OPTIONS_PATH = 'options.txt';
 
 /**
  * Per-file key/value policy for a plain `key=value` file under `config/` or `shaderpacks/`
- * (policy version 2). Shader settings are expressed with these (Iris `config/iris.properties`,
+ * Shader settings are expressed with these (Iris `config/iris.properties`,
  * per-pack `shaderpacks/<pack>.txt`).
  */
 export interface ConfigFilePolicy {
@@ -63,8 +63,7 @@ export interface ConfigFilePolicy {
 }
 
 export interface SettingsPolicy {
-  /** 1: options.txt only. 2: adds `configFiles` (version 1 launchers reject it instead of ignoring it). */
-  readonly version: 1 | 2;
+  readonly version: 1;
   readonly file: 'options.txt';
   /** Ordered key/value pairs enforced on every application. */
   readonly required: readonly (readonly [string, string])[];
@@ -74,7 +73,7 @@ export interface SettingsPolicy {
     readonly required: readonly string[];
     readonly initial: readonly string[];
   };
-  /** Always empty for version 1. */
+  /** Optional `key=value` files below `config/` and `shaderpacks/`; empty when none. */
   readonly configFiles: readonly ConfigFilePolicy[];
 }
 

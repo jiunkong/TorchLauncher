@@ -1,4 +1,3 @@
-import { writeFileSync } from 'node:fs';
 import {
   chmod,
   mkdir,
@@ -7,7 +6,6 @@ import {
   readdir,
   readFile,
   rm,
-  stat,
   symlink,
   writeFile,
 } from 'node:fs/promises';
@@ -17,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
-import { exportLauncher, safeRead } from './filesystem.js';
+import { exportLauncherZip, safeRead } from './filesystem.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { type StudioDialogs, StudioService } from './studio.js';
@@ -315,11 +313,9 @@ describe('Studio project and trusted disk selections', () => {
   });
 });
 
-describe('operator-selected launcher folder export', () => {
-  it('copies actual bytes and strict config with execute bits preserved, refuses overwrite', async () => {
+describe('operator-selected launcher ZIP export', () => {
+  it('stores actual bytes and strict config with execute bits, replaces only a regular file', async () => {
     const root = await temp();
-    const output = join(root, 'output');
-    await mkdir(output);
     const binaryName = process.platform === 'win32' ? 'Torch.exe' : 'Torch.AppImage';
     const binary = join(root, binaryName);
     const bytes = Buffer.concat([
@@ -329,71 +325,58 @@ describe('operator-selected launcher folder export', () => {
     await writeFile(binary, bytes);
     await chmod(binary, 0o755);
     const settings = config();
-    await exportLauncher(binary, output, settings, new AbortController().signal, () => {});
-    expect((await readFile(join(output, binaryName))).equals(bytes)).toBe(true);
+    const zipPath = join(root, 'out.zip');
+    await exportLauncherZip(binary, zipPath, settings, new AbortController().signal, () => {});
+    const zip = readZip(await readFile(zipPath));
+    expect(zip.get(binaryName)?.data.equals(bytes)).toBe(true);
+    expect(zip.get(binaryName)?.mode).toBe(0o755);
     expect(
-      parseServerConfig(
-        JSON.parse(await readFile(join(output, 'torchlauncher-server.json'), 'utf8')),
-      ),
+      parseServerConfig(JSON.parse(zip.get('torchlauncher-server.json')?.data.toString() ?? '')),
     ).toEqual(settings);
-    if (process.platform !== 'win32')
-      expect((await stat(join(output, binaryName))).mode & 0o777).toBe(0o755);
+    await exportLauncherZip(binary, zipPath, settings, new AbortController().signal, () => {});
+    await rm(zipPath);
+    await mkdir(zipPath);
     await expect(
-      exportLauncher(binary, output, settings, new AbortController().signal, () => {}),
+      exportLauncherZip(binary, zipPath, settings, new AbortController().signal, () => {}),
     ).rejects.toThrow();
-    expect((await readFile(join(output, binaryName))).equals(bytes)).toBe(true);
+    expect((await readdir(root)).filter((n) => n.startsWith('.torchstudio-'))).toEqual([]);
   });
-  it('cleans partial copies after abort and preserves foreign files on collision', async () => {
+  it('cleans the partial ZIP after abort and keeps a previous export', async () => {
     const root = await temp();
-    const output = join(root, 'output');
-    await mkdir(output);
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, Buffer.concat([Buffer.from('MZ00'), Buffer.alloc(3 * 1024 * 1024)]));
+    const zipPath = join(root, 'out.zip');
+    await writeFile(zipPath, 'previous');
     const controller = new AbortController();
-    let copied = 0;
     await expect(
-      exportLauncher(binary, output, config(), controller.signal, (bytes) => {
-        copied = bytes;
-        controller.abort();
-      }),
+      exportLauncherZip(binary, zipPath, config(), controller.signal, () => controller.abort()),
     ).rejects.toThrow();
-    expect(copied).toBe(1024 * 1024);
-    expect(await readdir(output)).toEqual([]);
-    await exportLauncher(binary, output, config(), new AbortController().signal, () => {});
-    expect((await stat(join(output, 'Torch.exe'))).size).toBe(3 * 1024 * 1024 + 4);
-  });
-  it('never overwrites a foreign config that appears during the bounded copy', async () => {
-    const root = await temp();
-    const output = join(root, 'output');
-    await mkdir(output);
-    const binary = join(root, 'Torch.exe');
-    await writeFile(binary, Buffer.concat([Buffer.from('MZ00'), Buffer.alloc(1024)]));
-    const target = join(output, 'torchlauncher-server.json');
-    await expect(
-      exportLauncher(binary, output, config(), new AbortController().signal, () => {
-        writeFileSync(target, 'foreign', { flag: 'wx' });
-      }),
-    ).rejects.toThrow();
-    expect(await readdir(output)).toEqual(['torchlauncher-server.json']);
-    expect(await readFile(target, 'utf8')).toBe('foreign');
+    expect(await readdir(root)).toEqual(['Torch.exe', 'out.zip']);
+    expect(await readFile(zipPath, 'utf8')).toBe('previous');
   });
   it('rejects mislabeled binaries, absent executable permission, links and oversized reads', async () => {
     const root = await temp();
-    const output = join(root, 'output');
-    await mkdir(output);
+    const zipPath = join(root, 'out.zip');
     const binary = join(root, 'Fake.exe');
     await writeFile(binary, 'not a binary');
     await expect(
-      exportLauncher(binary, output, config(), new AbortController().signal, () => {}),
+      exportLauncherZip(binary, zipPath, config(), new AbortController().signal, () => {}),
     ).rejects.toThrow();
     await expect(safeRead(binary, 1)).rejects.toThrow();
     if (process.platform !== 'win32') {
       const appImage = join(root, 'Fake.AppImage');
       await writeFile(appImage, Buffer.from('7f454c46', 'hex'), { mode: 0o600 });
       await expect(
-        exportLauncher(appImage, output, config(), new AbortController().signal, () => {}),
+        exportLauncherZip(appImage, zipPath, config(), new AbortController().signal, () => {}),
+      ).rejects.toThrow();
+      const real = join(root, 'Real.exe');
+      await writeFile(real, 'MZ00');
+      const link = join(root, 'Link.exe');
+      await symlink(real, link);
+      await expect(
+        exportLauncherZip(link, zipPath, config(), new AbortController().signal, () => {}),
       ).rejects.toThrow();
     }
-    expect(await readdir(output)).toEqual([]);
+    expect(await readdir(root)).not.toContain('out.zip');
   });
 });

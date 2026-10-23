@@ -33,9 +33,7 @@ export function parseProject(input: unknown): StudioProject {
     ) ||
     keys.some((k) => !Object.hasOwn(p, k)) ||
     p.format !== 'torchlauncher-project' ||
-    (p.version !== 1 && p.version !== 2) ||
-    // Schema 1 predates these fields: a file that has them must say it is schema 2.
-    (p.version === 1 && (Object.hasOwn(p, 'lastBuild') || Object.hasOwn(p, 'gameSettings'))) ||
+    p.version !== 1 ||
     !Array.isArray(p.files) ||
     p.files.length > 10000 ||
     typeof p.sourceUrl !== 'string'

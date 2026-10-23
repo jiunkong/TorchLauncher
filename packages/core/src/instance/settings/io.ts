@@ -138,14 +138,13 @@ export async function atomicWrite(
 }
 
 export interface SettingsState {
-  /** 1: options.txt only. 2: also records first configuration per config file. */
-  version: 1 | 2;
+  version: 1;
   /** null until the first configuration has completed. */
   initial: {
     keys: string[];
     resourcePacks: boolean;
-    /** Config file path -> initial keys already handled (version 2 only). */
-    files?: Record<string, string[]>;
+    /** Config file path -> initial keys already handled. */
+    files: Record<string, string[]>;
   } | null;
 }
 
@@ -172,13 +171,10 @@ export function parseState(bytes: Uint8Array): SettingsState {
   };
   if (!value || typeof value !== 'object' || Array.isArray(value)) return invalid();
   const version = (value as Record<string, unknown>).version;
-  if (version !== 1 && version !== 2) return invalid();
+  if (version !== 1) return invalid();
   const top = record(value, ['version', 'initial']);
-  if (top.initial === null) return { version, initial: null };
-  const initial = record(
-    top.initial,
-    version === 2 ? ['keys', 'resourcePacks', 'files'] : ['keys', 'resourcePacks'],
-  );
+  if (top.initial === null) return { version: 1, initial: null };
+  const initial = record(top.initial, ['keys', 'resourcePacks', 'files']);
   const keys = initial.keys;
   if (
     !Array.isArray(keys) ||
@@ -189,10 +185,10 @@ export function parseState(bytes: Uint8Array): SettingsState {
   )
     return invalid();
   const result: SettingsState = {
-    version,
-    initial: { keys: keys as string[], resourcePacks: initial.resourcePacks },
+    version: 1,
+    initial: { keys: keys as string[], resourcePacks: initial.resourcePacks, files: {} },
   };
-  if (version === 2) {
+  {
     const raw = initial.files;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return invalid();
     const entries = Object.entries(raw as Record<string, unknown>);
@@ -209,7 +205,7 @@ export function parseState(bytes: Uint8Array): SettingsState {
         return invalid();
       files[path] = list as string[];
     }
-    (result.initial as { files?: Record<string, string[]> }).files = files;
+    (result.initial as { files: Record<string, string[]> }).files = files;
   }
   return result;
 }

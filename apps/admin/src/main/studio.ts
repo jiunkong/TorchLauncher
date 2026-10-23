@@ -75,7 +75,6 @@ export interface StudioDialogs {
       | 'source'
       | 'files'
       | 'binary'
-      | 'output'
       | 'icon'
       | 'background'
       | 'keybackup'
@@ -269,6 +268,8 @@ export class StudioService {
   beginClose(): boolean {
     if (!this.state.dirty) return true;
     this.closeAsked = true;
+    // The renderer may save (or abandon) while it asks; commands must not be answered BUSY.
+    this.closing = false;
     return false;
   }
   abandonClose(): void {
@@ -516,7 +517,7 @@ export class StudioService {
       throw error;
     }
     this.policyRejected = null;
-    this.state.project = { ...project, version: 2, gameSettings: settings };
+    this.state.project = { ...project, gameSettings: settings };
     this.state.dirty = true;
   }
   private policyRejected: { code: string; message: string } | null = null;
@@ -524,7 +525,8 @@ export class StudioService {
     if (!project.gameSettings) return null;
     const plan = buildPlan(project);
     return {
-      version: plan.policy?.version ?? null,
+      generated: plan.policy !== null,
+      configFiles: plan.policy?.configFiles ?? 0,
       bytes: plan.policy?.bytes ?? 0,
       limit: SETTINGS_LIMITS.policyBytes,
       error: plan.policyError
@@ -966,7 +968,6 @@ export class StudioService {
         const built = this.state.project ?? project;
         this.state.project = {
           ...built,
-          version: 2,
           lastBuild: {
             deploymentId,
             builtAt: Date.now(),

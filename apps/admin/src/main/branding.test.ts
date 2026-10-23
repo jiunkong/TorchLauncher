@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -276,11 +275,9 @@ describe('Studio durable branding', () => {
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
     expect(s.snapshot().project).toEqual(original);
   });
-  it('validates fixed sidecars before output and cleans all own files on late abort', async () => {
-    const { exportLauncher } = await import('./filesystem.js');
+  it('validates fixed sidecars before the ZIP is written', async () => {
+    const { exportLauncherZip } = await import('./filesystem.js');
     const root = await temp();
-    const output = join(root, 'out');
-    await mkdir(output);
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, 'MZ fake');
     const metadata = validateImage('icon', png, decode);
@@ -297,48 +294,17 @@ describe('Studio durable branding', () => {
       sourceUrl: 'https://example.org/pack',
       branding: { icon: { ...metadata, path: 'branding/icon.png' } },
     });
-    await expect(
-      exportLauncher(binary, output, config, new AbortController().signal, () => {}, {
-        icon: Buffer.from('wrong'),
-      }),
-    ).rejects.toThrow();
-    expect(await readdir(output)).toEqual([]);
+    const target = join(root, 'out.zip');
+    const run = (cfg: typeof config, icon: Buffer) =>
+      exportLauncherZip(binary, target, cfg, new AbortController().signal, () => {}, { icon });
+    await expect(run(config, Buffer.from('wrong'))).rejects.toThrow();
     const badConfig = {
       ...config,
       branding: { icon: { ...metadata, path: 'branding/other.png' } },
     };
-    await expect(
-      exportLauncher(binary, output, badConfig, new AbortController().signal, () => {}, {
-        icon: png,
-      }),
-    ).rejects.toThrow();
-    expect(await readdir(output)).toEqual([]);
-    // Fail after sidecars and JSON were created: cleanup removes only this export's entries.
-    const controller = new AbortController();
-    let checkpoints = 0;
-    vi.spyOn(controller.signal, 'throwIfAborted').mockImplementation(() => {
-      if (++checkpoints === 5) throw new Error('late abort');
-    });
-    await expect(
-      exportLauncher(binary, output, config, controller.signal, () => {}, {
-        icon: png,
-      }),
-    ).rejects.toThrow();
-    expect(await readdir(output)).toEqual([]);
-    const replaced = new AbortController();
-    let secondCheckpoints = 0;
-    vi.spyOn(replaced.signal, 'throwIfAborted').mockImplementation(() => {
-      if (++secondCheckpoints !== 5) return;
-      renameSync(join(output, 'branding'), join(root, 'displaced-branding'));
-      mkdirSync(join(output, 'branding'));
-      writeFileSync(join(output, 'branding', 'icon.png'), 'foreign');
-      throw new Error('directory replaced');
-    });
-    await expect(
-      exportLauncher(binary, output, config, replaced.signal, () => {}, { icon: png }),
-    ).rejects.toThrow();
-    expect(await readdir(output)).toEqual(['branding']);
-    expect(await readFile(join(output, 'branding', 'icon.png'), 'utf8')).toBe('foreign');
-    expect(await readFile(join(root, 'displaced-branding', 'icon.png'))).toEqual(png);
+    await expect(run(badConfig, png)).rejects.toThrow();
+    expect(await readdir(root)).toEqual(['Torch.exe']);
+    await run(config, png);
+    expect(readZip(await readFile(target)).get('branding/icon.png')?.data).toEqual(png);
   });
 });

@@ -113,7 +113,7 @@ describe('policy building', () => {
     resourcePacks: { required: ['file/b.zip', 'file/a.zip'], initial: ['vanilla'] },
   };
 
-  it('builds a version 1 policy deterministically, independent of input order', () => {
+  it('builds a policy deterministically, independent of input order', () => {
     const built = buildSettingsPolicy(selection);
     expect(built.policy.version).toBe(1);
     expect(built.json).toBe(`{
@@ -151,7 +151,7 @@ describe('policy building', () => {
     expect(buildSettingsPolicy({}).json).toBe('{\n  "version": 1,\n  "file": "options.txt"\n}\n');
   });
 
-  it('emits version 2 for shader settings and round-trips to selections', () => {
+  it('emits shader settings as config files and round-trips to selections', () => {
     const configFiles = shaderSelectionToConfigFiles({
       enabled: { state: 'required', value: true },
       pack: { state: 'initial', value: 'BSL_v8.zip' },
@@ -167,7 +167,7 @@ describe('policy building', () => {
       ],
     });
     const built = buildSettingsPolicy({ ...selection, configFiles });
-    expect(built.policy.version).toBe(2);
+    expect(built.policy.version).toBe(1);
     expect(JSON.parse(built.json).configFiles).toEqual({
       'config/iris.properties': {
         required: { enableShaders: 'true' },
@@ -179,7 +179,7 @@ describe('policy building', () => {
     expect(buildSettingsPolicy(back).json).toBe(built.json);
   });
 
-  it('drops unset-only config files and falls back to version 1', () => {
+  it('drops unset-only config files', () => {
     const built = buildSettingsPolicy({
       configFiles: [
         { path: 'config/iris.properties', items: [{ key: 'a', state: 'unset', value: '' }] },

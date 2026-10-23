@@ -1,6 +1,6 @@
-# 설정 정책 v1/v2 (`torchlauncher/settings-policy.json`)
+# 설정 정책 (`torchlauncher/settings-policy.json`)
 
-USER-02 코어 명세(v1)와 SET-CORE-01 확장(v2, 아래 "v2: 설정 파일 항목과 셰이더"). 구현: `packages/core/src/instance/settings/`. UI/IPC 연결은 아직 없다.
+USER-02 코어 명세와 SET-CORE-01 확장(아래 "설정 파일 항목과 셰이더"). 형식은 하나(`version: 1`)이며 정식 출시 전에는 이전 형식을 읽지 않는다(AGENTS.md "Development-Phase Compatibility"). 구현: `packages/core/src/instance/settings/`.
 
 ## 개요
 
@@ -27,7 +27,8 @@ USER-02 코어 명세(v1)와 SET-CORE-01 확장(v2, 아래 "v2: 설정 파일 �
 | 필드 | 필수 | 의미 |
 | --- | --- | --- |
 | `version` | 예 | 정수 `1` |
-| `file` | 예 | v1은 `"options.txt"`만 |
+| `file` | 예 | `"options.txt"`만 |
+| `configFiles` | 아니오 | 아래 "설정 파일 항목과 셰이더" |
 | `required` | 아니오 | 키 -> 문자열 값. 매 적용마다 강제 |
 | `initial` | 아니오 | 키 -> 문자열 값. 최초 구성에서만 설정 |
 | `resourcePacks.required` | 아니오 | 항상 활성화할 팩 ID 목록(순서 = 운영자 지정 상대 순서) |
@@ -53,7 +54,7 @@ USER-02 코어 명세(v1)와 SET-CORE-01 확장(v2, 아래 "v2: 설정 파일 �
 
 ### 최초 구성과 `initial-skipped`
 
-`.torchlauncher-user/settings.json`: `{"version":1,"initial":null | {"keys":[정렬된 처리 완료 키],"resourcePacks":bool}}`
+`.torchlauncher-user/settings.json`: `{"version":1,"initial":null | {"keys":[정렬된 처리 완료 키],"resourcePacks":bool,"files":{...}}}` (`files`는 아래 설정 파일 항목 절)
 (64 KiB 상한, 정확한 필드만 허용, 위반 시 `invalid-state`). 정책이 있는 첫 적용이 "최초 구성"이며 이때 `initial`이 `null`에서 채워진다.
 이후 정책에 새 `initial` 키가 추가되어도 자동 적용하지 않고 `initialSkipped: [{key, reason:'already-configured'}]`로 보고한다.
 이유: 사용자가 이미 같은 설정을 바꾸었거나 의도적으로 지웠을 수 있어, 기존 사용자 데이터 보존을 우선한다. 운영자가 값을 사용자에게 넣어야 하면
@@ -117,19 +118,18 @@ USER-02 코어 명세(v1)와 SET-CORE-01 확장(v2, 아래 "v2: 설정 파일 �
 미지원/미확인: 3955 이후의 팩 ID 표기(`vanilla`, `file/`, 모드·서버 내장 팩 ID)는 위키에 서술이 없어 확인 못함(프로파일은 기존처럼 잘못된 `file/` ID만 거부). 26.3 이후 릴리스(26.4 등)는 확인 불가라 범위에서 제외. 26.3-snapshot4 이전 `scancode.###` 값의 의미는 확인 못함.
 
 
-## v2: 설정 파일 항목과 셰이더 (SET-CORE-01)
+## 설정 파일 항목과 셰이더 (SET-CORE-01)
 
-### 버전 결정
+### 형식
 
-`options.txt` 외의 `key=value` 파일(셰이더 설정, 단순 모드 설정)을 항목별로 다루기 위해 **정책 `version: 2`**를 추가했다. 선택지는 (a) v1에 선택 필드 추가, (b) 새 버전이었다.
-v1 파서는 알 수 없는 필드를 거부(`invalid-policy`)하므로 (a)는 새 정책을 받은 구버전 런처가 `configFiles`를 **조용히 무시하고 필수 설정을 적용하지 않는** 위험이 있다. (b)는 구버전 런처가 명확히 거부한다.
-따라서 v2를 쓰고, v1 파일은 파서·동작 모두 그대로 유효하다(v1에서 `configFiles`는 여전히 알 수 없는 필드). 도구가 만드는 정책은 설정 파일 항목이 있을 때만 `version: 2`, 없으면 `version: 1`을 출력한다(`serializeSettingsPolicy`).
+`options.txt` 외의 `key=value` 파일(셰이더 설정, 단순 모드 설정)은 같은 정책의 선택 필드 `configFiles`로 항목별 처리한다. 정책 버전은 하나(`version: 1`)다.
+`configFiles`가 없거나 비어 있어도 유효하다. 이전 개발용 형식(`version: 2`)은 읽지 않는다(`invalid-policy`).
 
-### 스키마 추가분
+### 스키마 (`configFiles`)
 
 ```json
 {
-  "version": 2,
+  "version": 1,
   "file": "options.txt",
   "required": { "renderDistance": "12" },
   "configFiles": {
@@ -164,7 +164,7 @@ options.txt와 같은 방식의 줄 보존 모델이다: `#`/`!` 주석, 빈 줄
 4. `required`는 매번 강제, `initial`은 아래 규칙. 사용자가 이미 가진 값은 `initial`로 절대 덮어쓰지 않는다(`user-value-present`).
 5. 결과 `ApplySettingsResult.configFiles[]`: `{path, created, changed, enforcedKeys, initialApplied, initialSkipped}`.
 
-`initial`의 "최초 구성"은 **파일 단위**다. 상태 파일 `.torchlauncher-user/settings.json`은 설정 파일 항목이 기록될 때 `{"version":2,"initial":{"keys":[...],"resourcePacks":bool,"files":{"<경로>":[처리된 키]}}}`가 되고(`initial`이 있는 파일만 기록, 키 정렬, 보존 한도 64개 파일 — 초과 시 정책에 없는 경로부터 삭제), 설정 파일 항목이 없으면 v1 형식 그대로 쓴다. 상태 v1은 계속 읽힌다.
+`initial`의 "최초 구성"은 **파일 단위**다. 상태 파일 `.torchlauncher-user/settings.json`은 하나의 형식 `{"version":1,"initial":null | {"keys":[...],"resourcePacks":bool,"files":{"<경로>":[처리된 키]}}}`다(`files`는 `initial`이 있는 파일만 기록, 키 정렬, 보존 한도 64개 파일 — 초과 시 정책에 없는 경로부터 삭제). 이전 형식은 읽지 않고 `invalid-state`로 거부한다.
 - 상태에 기록되지 않은 파일(처음 정책에 등장)은 options.txt의 최초 구성 여부와 무관하게 그 파일의 최초 구성이다: 없는 키만 설정하고 있는 키는 건너뛴다. 이유: 운영자가 나중에 셰이더 기본값을 추가하는 것이 주된 사용 사례이고, 값이 이미 있으면 어차피 덮어쓰지 않아 사용자 데이터는 안전하다.
 - 이미 기록된 파일에 나중에 추가된 `initial` 키는 options.txt와 같이 자동 적용하지 않고 `initialSkipped: already-configured`로 보고한다. 한 번 처리된 키는 사용자가 바꾸거나 지워도 복구하지 않는다.
 - 중단 안전성: 설정 파일을 쓰고 상태 기록 전에 중단되면 다음 실행에서 이미 쓴 initial 값이 `user-value-present`로 읽혀 건너뛸 뿐이다.
@@ -180,7 +180,7 @@ options.txt와 같은 방식의 줄 보존 모델이다: `#`/`!` 주석, 빈 줄
 ### Studio용 순수 API (`packages/core/src/instance/settings/index`)
 
 - 파싱: `parseOptionsEntries(bytes|string)`, `parsePropertiesEntries(bytes|string)` -> `SettingEntry[]` (`key`, `value`, `kind: 'keybind'|'mod-keybind'|'other'`, `group`, `valueType`, `reserved`), `classifyOptionKey`, `sortSettingEntries`. 런처와 같은 엄격 규칙. 바닐라 단축키는 1.21.1 `key_key.*` 목록(이동/게임플레이/인벤토리/멀티플레이/기타/크리에이티브)으로 구분하고, 그 밖의 `key_*`는 모드 단축키로 번역 키 첫 세그먼트를 그룹으로 삼는다(예: `key_iris.keybind.reload` -> `iris`). `version`/`resourcePacks`/`incompatibleResourcePacks`는 `reserved`.
-- 작성: `buildSettingsPolicy({options, resourcePacks, configFiles, minecraftVersion?})` — 항목당 `state: 'unset'|'initial'|'required'`와 `value`. 키 정렬, 빈 섹션 생략, 설정 파일이 없으면 v1. 결과를 런처의 엄격 파서로 다시 파싱하고 형식 프로파일 검사까지 통과해야만 `{policy, json, bytes}`를 돌려준다(위반은 `SettingsError`). `serializeSettingsPolicy(policy)`는 같은 직렬화(2칸 들여쓰기, 끝 개행). `selectionFromPolicy(policy)`는 저장된 정책을 Studio 선택 상태로 되돌린다.
+- 작성: `buildSettingsPolicy({options, resourcePacks, configFiles, minecraftVersion?})` — 항목당 `state: 'unset'|'initial'|'required'`와 `value`. 키 정렬, 빈 섹션 생략(설정 파일 항목이 없으면 `configFiles` 생략). 결과를 런처의 엄격 파서로 다시 파싱하고 형식 프로파일 검사까지 통과해야만 `{policy, json, bytes}`를 돌려준다(위반은 `SettingsError`). `serializeSettingsPolicy(policy)`는 같은 직렬화(2칸 들여쓰기, 끝 개행). `selectionFromPolicy(policy)`는 저장된 정책을 Studio 선택 상태로 되돌린다.
 - 셰이더 도우미: `shaderSelectionToConfigFiles({configPath?, enabled, pack, packOptions})`, `shaderPackOptionsPath`, 상수 `IRIS_CONFIG_PATH`, `OCULUS_CONFIG_PATH`.
 - 그 밖: `validConfigPath`, `assertConfigFilesNotSyncOwned`, `describeManagedSettings(policy).configFiles`.
 

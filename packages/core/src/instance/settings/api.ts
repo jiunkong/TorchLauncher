@@ -256,15 +256,12 @@ export async function applySettingsPolicy(
       processed.length !== doneKeys.size ||
       resourcePacksDone !== (state.initial?.resourcePacks ?? false)
     ) {
-      const hasFiles = Object.keys(recordedFiles).length > 0;
       await writeState(
         root,
-        hasFiles
-          ? {
-              version: 2,
-              initial: { keys: processed, resourcePacks: resourcePacksDone, files: recordedFiles },
-            }
-          : { version: 1, initial: { keys: processed, resourcePacks: resourcePacksDone } },
+        {
+          version: 1,
+          initial: { keys: processed, resourcePacks: resourcePacksDone, files: recordedFiles },
+        },
         stateFile,
         options,
       );

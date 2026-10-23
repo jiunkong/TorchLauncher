@@ -141,7 +141,7 @@ const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 const CONFIG_VALUE = /^[\x20-\x7e]*$/;
 
 /**
- * Game-directory-relative files a version 2 policy may edit: `config/**` (up to 5 segments) or
+ * Game-directory-relative files a policy may edit: `config/**` (up to 5 segments) or
  * `shaderpacks/<name>` (direct child), always `.properties` or `.txt`.
  */
 export function validConfigPath(path: unknown): path is string {
@@ -264,14 +264,10 @@ export function parseSettingsPolicy(bytes: Uint8Array): SettingsPolicy {
     throw new SettingsError('invalid-policy', 'settings policy is not UTF-8', { cause });
   }
   const root = expectMap(parseStrictJson(text), 'policy');
-  const version = root.get('version');
-  if (version !== 1 && version !== 2) bad('unsupported version');
-  // Version 1 stays exactly as before: `configFiles` is an unknown field there.
+  if (root.get('version') !== 1) bad('unsupported version');
   exactKeys(
     root,
-    version === 2
-      ? ['version', 'file', 'required', 'initial', 'resourcePacks', 'configFiles']
-      : ['version', 'file', 'required', 'initial', 'resourcePacks'],
+    ['version', 'file', 'required', 'initial', 'resourcePacks', 'configFiles'],
     'policy',
   );
   if (root.get('file') !== 'options.txt') bad('file must be "options.txt"');
@@ -289,7 +285,7 @@ export function parseSettingsPolicy(bytes: Uint8Array): SettingsPolicy {
     };
   }
   return {
-    version,
+    version: 1,
     file: 'options.txt',
     required,
     initial,
