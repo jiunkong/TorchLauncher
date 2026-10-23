@@ -4,7 +4,8 @@
 - 작업 ID: AUTH-SHARE-01.
 - 브랜치/worktree: `feat/auth-share`, `/mnt/d/Projects/mclauncher/.agents/worktrees/agent-2`.
 - 기준 커밋: `9d8f03b` (시작 당시 main, 사용자 승인). 시작 전 coordinator/worker checkout 모두 clean 확인.
-- 구현 커밋: `cda8ee30f7cf97a8513bc248750cee191a383616`. main 미통합, 전체 검사 실패/추가 범위 승인 대기 상태.
+- 최초 추출 커밋: `cda8ee30f7cf97a8513bc248750cee191a383616`.
+- 최종 구현 커밋: `960dfe8c57ab5da11c8ce2e3baff7bbf90787494` (승인된 게임 검증 도구 참조 수정 포함). main 미통합.
 - 최종 인계 커밋은 자기 참조를 피하기 위해 최종 응답과 `git log -1 -- docs/handoffs/AUTH-SHARE-01.md`로 식별.
 - 진행/작업 배정 문서와 main은 수정하지 않음. 통합/완료 판정은 #0 소유.
 
@@ -16,10 +17,9 @@ package.json/tsconfig, launcher manifest와 lockfile 변경을 승인했다. `pa
 `prismarine-auth@3.1.1`의 소유권만 옮겼다. lockfile은 importer/link만 변경했다.
 `scripts/auth-smoke.mjs`의 worker 입력 경로 변경은 별도 사용자 승인을 받았다.
 
-타입 검사/전체 참조 검색에서 범위 밖 참조 2곳을 추가 발견했다. 현재 사용자에게
+타입 검사/전체 참조 검색에서 범위 밖 참조 2곳을 추가 발견해, 사용자에게 각각 승인받은 뒤
 `apps/launcher/src/main/game-smoke/outcome.ts`의 오류 클래스 import 한 줄과
-`scripts/game-smoke.mjs`의 worker 입력 경로 변경 승인을 요청한 상태다.
-승인 전에는 두 파일을 수정하지 않는다.
+`scripts/game-smoke.mjs`의 worker 입력 경로만 추가 수정했다. 검증 도구 동작 변경은 없다.
 
 ## 구현 및 다음 작업자 계약
 
@@ -75,8 +75,9 @@ Electron 바이너리는 `ELECTRON_OVERRIDE_DIST_PATH=/mnt/d/Projects/mclauncher
 - `pnpm exec vitest run packages/desktop-auth packages/core/src/auth`: 최종 **8 파일 / 167 통과 / 0 실패 / 0 skip**.
   최초 실행은 166 통과/1 실패(새 저장소 격리 테스트가 이전 worker를 기다리던 timeout).
   새 worker 개수까지 기다리도록 테스트를 수정해 단독 1/1과 인증 전체 167/167을 재검증했다.
-- `pnpm typecheck`: 실패. 공유 패키지/core/Studio는 통과했으나 launcher game-smoke/outcome.ts의
-  이동된 errors 참조 때문에 TS2307 및 파생 TS18046 2건. 위 범위 추가 승인 대기.
+- 최초 `pnpm typecheck`: 실패. 공유 패키지/core/Studio는 통과했으나 launcher game-smoke/outcome.ts의
+  이동된 errors 참조 때문에 TS2307 및 파생 TS18046 2건. 승인 후 import 수정으로 해결했고,
+  최종 pnpm check의 전체 TypeScript 단계는 통과했다.
 - `pnpm lint`: 성공, 358 파일, 기존 37 warnings / 3 infos. 범위 내 Biome 별도 성공.
 - `pnpm build`: 두 앱 성공. launcher main index/worker와 prismarine-auth 및 protocol/metadata 청크,
   기존 dependency notice가 함께 출력됨.
@@ -85,16 +86,26 @@ Electron 바이너리는 `ELECTRON_OVERRIDE_DIST_PATH=/mnt/d/Projects/mclauncher
 - `ELECTRON_OVERRIDE_DIST_PATH=... node scripts/auth-smoke.mjs worker-check --data-dir /tmp/torchlauncher-auth-share-smoke`:
   성공, libraryVersion 3.1.1, liveAuthentication false/not-asserted.
 - `node --check scripts/auth-smoke.mjs`, `git diff --check`: 성공.
-- `pnpm check` (`PATH=/tmp/auth-share-tools/node_modules/.bin:$PATH`, 로그 `/tmp/auth-share-check.log`):
+- 최초 `pnpm check` (`PATH=/tmp/auth-share-tools/node_modules/.bin:$PATH`, 로그 `/tmp/auth-share-check.log`):
   **실패(exit 2)**. Biome 통과 후 launcher 타입 검사에서 위 TS2307 1건 + 파생 TS18046 2건으로
   중단. 따라서 이 명령의 전체 test/build 단계는 미실행이며 별도로 실행한 인증 테스트/두 앱
-  빌드 성공과 구분한다. 추가 범위 승인 후 수정/재검증 필요.
+  빌드 성공과 구분한다. 사용자 승인 후 원인 import를 수정했다. 최종 재검증 결과는 아래에 기록한다.
 - `DISPLAY=:0 ELECTRON_OVERRIDE_DIST_PATH=... node scripts/auth-smoke.mjs reject-basic --data-dir /tmp/torchlauncher-auth-share-smoke`:
   성공, 실제 Electron/Linux `plaintextRejected: true`, liveAuthentication false.
 - `ELECTRON_RUN_AS_NODE=1 /mnt/d/Projects/mclauncher/node_modules/electron/dist/electron /tmp/auth-share-worker-check.mjs /mnt/d/Projects/mclauncher/.agents/worktrees/agent-2/apps/launcher/out/main`:
   성공, productionWorker/standalone true, Electron 44.9.1, libraryVersion 3.1.1,
   liveAuthentication false. `/tmp` 검증 스크립트는 빌드된 main 디렉터리를 node_modules 없는
   새 디렉터리로 복사하고 self-check IPC만 실행한 뒤 자식을 kill/reap하고 임시 복사본을 삭제했다.
+
+- 최종 `PATH=/tmp/auth-share-tools/node_modules/.bin:$PATH pnpm check`:
+  **성공(exit 0)**. Biome 358 파일(기존 37 warnings / 3 infos), 전체 TypeScript,
+  Vitest **91 파일 통과 / 4 파일 skip, 1300 테스트 통과 / 9 skip / 0 실패**, 두 앱 빌드 성공.
+  skip은 기존 live opt-in/플랫폼 조건 테스트이며 이번 인증 테스트는 전부 실행했다.
+  로그 `/tmp/auth-share-check-final.log`. 사용자 범위 승인 이후 최종 구현 상태에서 실행했다.
+- `node --check scripts/game-smoke.mjs`, 변경 2개 파일 Biome, `git diff --check`: 성공.
+- Vite 임시 game-smoke 번들 검사: 실제 `apps/launcher/src/main/game-smoke/entry.ts`와
+  이동된 worker 입력을 기존 smoke와 같은 SSR/noExternal/Electron external/CJS 설정으로
+  번들, **2 진입점 출력 확인 / 실패 0**. 임시 출력은 제거했다. 실제 게임은 실행하지 않았다.
 
 ## 미실행/한계/실계정 수동 확인
 
@@ -119,28 +130,27 @@ assert-empty를 실행한다. 출력 공유는 정화된 성공/오류 코드만
 Studio 연결 후 각 앱에서 별도로 로그인하고, 한 앱 logout이 다른 앱 세션을 삭제하지 않는지
 직접 확인한다. 장치 코드/토큰/계정 정보/비공개 URL은 인계나 로그에 기록하지 않는다.
 
-## 범위 확인과 재개 지점
+## 범위 확인과 다음 작업
 
-구현 커밋에서 `git diff --stat 9d8f03b...HEAD`는 **30 files changed, 379 insertions(+),
-22 deletions(-)**. 기존 파일 15개는 100% rename이고, shared package 신설·launcher 어댑터/
-manifest/worker build·lockfile importer·승인된 auth-smoke 경로만 바뀌었다. 이 인계 문서 추가
-커밋 후에는 문서 1개가 더 포함된다. 정확한 최종 범위는 같은 명령으로 다시 확인한다.
+`git diff --stat 9d8f03b...HEAD`로 확인하는 최종 범위는 **33개 파일**이다.
+기존 auth 15개는 100% rename(내용 동일), 새 package 파일 8개, launcher의 기존 어댑터 3개와
+manifest/worker build 설정, game-smoke 오류 import, auth/game smoke worker 경로, lockfile
+importer, 이 인계 문서다. core/Studio 제품/main/진행/배정 문서와 루트 설정은 수정하지 않았다.
+최종 인계 커밋 후 위 명령을 다시 실행해 확인하고 최종 응답에 통계와 커밋을 기록한다.
 
-요청한 두 import/worker 경로 범위 승인을 기다린다. 승인 전에는 아래 파일을 수정하지 않았다.
-필요한 변경은 정확히 다음과 같다.
+범위 추가 승인을 받은 뒤 아래 두 참조를 수정했고, 별도 구문/Biome/게임 검증 도구 번들 검사를
+통과했다.
 
 1. `apps/launcher/src/main/game-smoke/outcome.ts`:
-   `import { HostAuthenticationError } from '../auth/errors';`를
-   `import { HostAuthenticationError } from '@torchlauncher/desktop-auth';`로 바꾸고 import 정렬.
-2. `scripts/game-smoke.mjs`의 rollup input `public-java-worker`:
-   `apps/launcher/src/main/auth/public-java-worker.ts`를
-   `packages/desktop-auth/src/public-java-worker.ts`로 바꾼다.
+   `HostAuthenticationError`를 `@torchlauncher/desktop-auth`에서 가져온다.
+2. `scripts/game-smoke.mjs`의 `public-java-worker` 입력:
+   `packages/desktop-auth/src/public-java-worker.ts`로 바꿨다.
 
-승인 후 두 곳만 수정하고 `PATH=/tmp/auth-share-tools/node_modules/.bin:$PATH pnpm check`를
-실행한다. game-smoke의 동작은 바꾸지 않고 source 경로만 변경하므로 최소 구문/번들 확인도
-필요하다. 실제 계정 로그인은 계속 미실행으로 둔다. main 통합은 하지 않는다.
+#0은 이 브랜치를 검토하고 통합 후 통합 기준에서 필요한 검증을 실행한다.
+TESTRUN-MAIN-01은 위 API/번들 설명에 따라 Studio에 연결한다. 실제 계정 검증과 Windows 확인은
+별도 사용자 수동 확인 범위다. main 통합/진행 문서 수정/완료 판정은 이 작업자가 하지 않았다.
 
 이 인계 시점에 모든 검증 명령은 종료됐고 남겨 둔 worker/Electron/개발 서버는 없다.
 인증 smoke 디렉터리는 `/tmp/torchlauncher-auth-share-smoke`이며 worker-check/reject-basic만
 실행했으므로 실제 계정 자료는 없다. 임시 도구/검증 로그는 환경별 자료이므로 재개 시 존재와
-버전을 확인한다. 제품 구현이 끝났거나 전체 검사가 통과했다고 판정하지 않는다.
+버전을 확인한다. 전체 작업의 통합/완료 판단은 #0이 한다.
