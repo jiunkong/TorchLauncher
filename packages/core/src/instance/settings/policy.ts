@@ -1,4 +1,10 @@
-import { SETTINGS_LIMITS, SettingsError, type SettingsPolicy } from './types.js';
+import { collisionKey } from '../sync/safety.js';
+import {
+  type ConfigFilePolicy,
+  SETTINGS_LIMITS,
+  SettingsError,
+  type SettingsPolicy,
+} from './types.js';
 
 type Json = string | number | boolean | null | Json[] | Map<string, Json>;
 
@@ -127,6 +133,58 @@ export function validPackId(id: unknown): id is string {
   );
 }
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the purpose.
+const CONFIG_SEGMENT_FORBIDDEN = /[\u0000-\u001f\u007f\\:*?"<>|]/;
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+// Printable ASCII only: java.util.Properties readers decode ISO-8859-1, so other characters would be
+// corrupted. Backslash starts escapes, and padding is trimmed by the reader.
+const CONFIG_VALUE = /^[\x20-\x7e]*$/;
+
+/**
+ * Game-directory-relative files a version 2 policy may edit: `config/**` (up to 5 segments) or
+ * `shaderpacks/<name>` (direct child), always `.properties` or `.txt`.
+ */
+export function validConfigPath(path: unknown): path is string {
+  if (typeof path !== 'string' || path.length === 0) return false;
+  if (path.length > SETTINGS_LIMITS.configPathLength || path !== path.normalize('NFC'))
+    return false;
+  const parts = path.split('/');
+  const root = parts[0];
+  if (root === 'config') {
+    if (parts.length < 2 || parts.length > SETTINGS_LIMITS.configPathSegments) return false;
+  } else if (root === 'shaderpacks') {
+    if (parts.length !== 2) return false;
+  } else return false;
+  for (const part of parts) {
+    if (
+      part.length === 0 ||
+      part.length > SETTINGS_LIMITS.configSegmentLength ||
+      CONFIG_SEGMENT_FORBIDDEN.test(part) ||
+      part === '.' ||
+      part === '..' ||
+      part.startsWith('.') ||
+      part !== part.trim() ||
+      part.endsWith('.') ||
+      WINDOWS_RESERVED.test(part)
+    )
+      return false;
+  }
+  const name = parts[parts.length - 1] as string;
+  return (name.endsWith('.properties') || name.endsWith('.txt')) && name.length > 4;
+}
+
+export function validConfigKey(key: string): boolean {
+  return validOptionKey(key);
+}
+export function validConfigValue(value: string): boolean {
+  return (
+    value.length <= SETTINGS_LIMITS.valueLength &&
+    CONFIG_VALUE.test(value) &&
+    !value.includes('\\') &&
+    value === value.trim()
+  );
+}
+
 function expectMap(value: Json | undefined, name: string): Map<string, Json> {
   if (!(value instanceof Map)) bad(`${name} must be an object`);
   return value;
@@ -144,6 +202,42 @@ function pairs(value: Json | undefined, name: string): [string, string][] {
     if (key === 'resourcePacks') bad(`${name}.resourcePacks must use the resourcePacks section`);
     if (typeof v !== 'string' || !validOptionValue(v)) bad(`invalid value for ${name}.${key}`);
     out.push([key, v]);
+  }
+  return out;
+}
+function configPairs(value: Json | undefined, name: string): [string, string][] {
+  if (value === undefined) return [];
+  const map = expectMap(value, name);
+  if (map.size > SETTINGS_LIMITS.keysPerMap) bad(`${name} has too many keys`);
+  const out: [string, string][] = [];
+  for (const [key, v] of map) {
+    if (!validConfigKey(key)) bad(`invalid key in ${name}: ${key}`);
+    if (typeof v !== 'string' || !validConfigValue(v)) bad(`invalid value for ${name}.${key}`);
+    out.push([key, v]);
+  }
+  return out;
+}
+function configFiles(value: Json | undefined): ConfigFilePolicy[] {
+  if (value === undefined) return [];
+  const map = expectMap(value, 'configFiles');
+  if (map.size > SETTINGS_LIMITS.configFiles) bad('configFiles has too many files');
+  const seen = new Set<string>();
+  const out: ConfigFilePolicy[] = [];
+  for (const [path, entry] of map) {
+    if (!validConfigPath(path)) bad(`invalid config file path: ${path}`);
+    const folded = collisionKey(path);
+    if (seen.has(folded)) bad(`config file path collision: ${path}`);
+    seen.add(folded);
+    const name = `configFiles[${path}]`;
+    const fields = expectMap(entry, name);
+    exactKeys(fields, ['format', 'required', 'initial'], name);
+    if (fields.has('format') && fields.get('format') !== 'properties')
+      bad(`${name}.format must be "properties"`);
+    const required = configPairs(fields.get('required'), `${name}.required`);
+    const initial = configPairs(fields.get('initial'), `${name}.initial`);
+    const requiredKeys = new Set(required.map(([key]) => key));
+    for (const [key] of initial) if (requiredKeys.has(key)) bad(`key conflict in ${name}: ${key}`);
+    out.push({ path, required, initial });
   }
   return out;
 }
@@ -170,8 +264,16 @@ export function parseSettingsPolicy(bytes: Uint8Array): SettingsPolicy {
     throw new SettingsError('invalid-policy', 'settings policy is not UTF-8', { cause });
   }
   const root = expectMap(parseStrictJson(text), 'policy');
-  exactKeys(root, ['version', 'file', 'required', 'initial', 'resourcePacks'], 'policy');
-  if (root.get('version') !== 1) bad('unsupported version');
+  const version = root.get('version');
+  if (version !== 1 && version !== 2) bad('unsupported version');
+  // Version 1 stays exactly as before: `configFiles` is an unknown field there.
+  exactKeys(
+    root,
+    version === 2
+      ? ['version', 'file', 'required', 'initial', 'resourcePacks', 'configFiles']
+      : ['version', 'file', 'required', 'initial', 'resourcePacks'],
+    'policy',
+  );
   if (root.get('file') !== 'options.txt') bad('file must be "options.txt"');
   const required = pairs(root.get('required'), 'required');
   const initial = pairs(root.get('initial'), 'initial');
@@ -186,5 +288,12 @@ export function parseSettingsPolicy(bytes: Uint8Array): SettingsPolicy {
       initial: packs(map.get('initial'), 'resourcePacks.initial'),
     };
   }
-  return { version: 1, file: 'options.txt', required, initial, resourcePacks: rp };
+  return {
+    version,
+    file: 'options.txt',
+    required,
+    initial,
+    resourcePacks: rp,
+    configFiles: configFiles(root.get('configFiles')),
+  };
 }

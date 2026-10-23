@@ -58,6 +58,14 @@ export class OptionsDocument {
     return line?.key === undefined ? undefined : line.text.slice(key.length + 1);
   }
 
+  /** Key/value pairs in file order. */
+  entries(): [string, string][] {
+    const out: [string, string][] = [];
+    for (const line of this.lines)
+      if (line.key !== undefined) out.push([line.key, line.text.slice(line.key.length + 1)]);
+    return out;
+  }
+
   /** Returns true when the document changed. */
   set(key: string, value: string): boolean {
     const line = this.lines.find((l) => l.key === key);

@@ -1,7 +1,9 @@
 export type SettingsErrorCode =
   | 'aborted'
   | 'file-changed'
+  | 'config-owned-by-sync'
   | 'invalid-argument'
+  | 'invalid-config'
   | 'invalid-options'
   | 'invalid-policy'
   | 'invalid-state'
@@ -29,7 +31,13 @@ export class SettingsError extends Error {
 export const SETTINGS_LIMITS = {
   policyBytes: 64 * 1024,
   optionsBytes: 1024 * 1024,
-  stateBytes: 64 * 1024,
+  stateBytes: 256 * 1024,
+  configBytes: 1024 * 1024,
+  configFiles: 32,
+  configPathLength: 256,
+  configPathSegments: 5,
+  configSegmentLength: 128,
+  stateFiles: 64,
   keysPerMap: 512,
   keyLength: 128,
   valueLength: 2048,
@@ -42,8 +50,21 @@ export const SETTINGS_POLICY_PATH = 'torchlauncher/settings-policy.json';
 export const SETTINGS_STATE_PATH = '.torchlauncher-user/settings.json';
 export const OPTIONS_PATH = 'options.txt';
 
+/**
+ * Per-file key/value policy for a plain `key=value` file under `config/` or `shaderpacks/`
+ * (policy version 2). Shader settings are expressed with these (Iris `config/iris.properties`,
+ * per-pack `shaderpacks/<pack>.txt`).
+ */
+export interface ConfigFilePolicy {
+  /** Game-directory-relative path with `/` separators. */
+  readonly path: string;
+  readonly required: readonly (readonly [string, string])[];
+  readonly initial: readonly (readonly [string, string])[];
+}
+
 export interface SettingsPolicy {
-  readonly version: 1;
+  /** 1: options.txt only. 2: adds `configFiles` (version 1 launchers reject it instead of ignoring it). */
+  readonly version: 1 | 2;
   readonly file: 'options.txt';
   /** Ordered key/value pairs enforced on every application. */
   readonly required: readonly (readonly [string, string])[];
@@ -53,6 +74,8 @@ export interface SettingsPolicy {
     readonly required: readonly string[];
     readonly initial: readonly string[];
   };
+  /** Always empty for version 1. */
+  readonly configFiles: readonly ConfigFilePolicy[];
 }
 
 /** Injected view of the synchronization ledger (USER-01 provides the real reader). */
@@ -86,6 +109,15 @@ export interface InitialSkip {
   reason: 'already-configured' | 'user-value-present';
 }
 
+export interface ConfigFileResult {
+  path: string;
+  created: boolean;
+  changed: boolean;
+  enforcedKeys: string[];
+  initialApplied: string[];
+  initialSkipped: InitialSkip[];
+}
+
 export interface ApplySettingsResult {
   status: 'no-policy' | 'applied' | 'unchanged';
   firstConfiguration: boolean;
@@ -96,6 +128,8 @@ export interface ApplySettingsResult {
   initialApplied: string[];
   initialSkipped: InitialSkip[];
   resourcePacks: { added: string[]; reordered: boolean; active: string[] };
+  /** One entry per policy `configFiles` item, in path order. */
+  configFiles: ConfigFileResult[];
   /** Format profile id used (absent for `no-policy`). */
   formatProfile?: string;
   warnings: string[];

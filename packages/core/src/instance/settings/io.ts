@@ -5,7 +5,7 @@ import { basename, dirname, join } from 'node:path';
 import { acquireServerDataLock } from '../../minecraft/lock.js';
 import { checkedDirectory, gamePath, maybeStat, sameStat, writeAll } from '../sync/safety.js';
 import { SynchronizationError } from '../sync/types.js';
-import { validOptionKey } from './policy.js';
+import { validConfigKey, validConfigPath, validOptionKey } from './policy.js';
 import {
   SETTINGS_LIMITS,
   SETTINGS_STATE_PATH,
@@ -138,9 +138,15 @@ export async function atomicWrite(
 }
 
 export interface SettingsState {
-  version: 1;
+  /** 1: options.txt only. 2: also records first configuration per config file. */
+  version: 1 | 2;
   /** null until the first configuration has completed. */
-  initial: { keys: string[]; resourcePacks: boolean } | null;
+  initial: {
+    keys: string[];
+    resourcePacks: boolean;
+    /** Config file path -> initial keys already handled (version 2 only). */
+    files?: Record<string, string[]>;
+  } | null;
 }
 
 export const EMPTY_STATE: SettingsState = { version: 1, initial: null };
@@ -164,10 +170,15 @@ export function parseState(bytes: Uint8Array): SettingsState {
       return invalid();
     return r;
   };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return invalid();
+  const version = (value as Record<string, unknown>).version;
+  if (version !== 1 && version !== 2) return invalid();
   const top = record(value, ['version', 'initial']);
-  if (top.version !== 1) return invalid();
-  if (top.initial === null) return { version: 1, initial: null };
-  const initial = record(top.initial, ['keys', 'resourcePacks']);
+  if (top.initial === null) return { version, initial: null };
+  const initial = record(
+    top.initial,
+    version === 2 ? ['keys', 'resourcePacks', 'files'] : ['keys', 'resourcePacks'],
+  );
   const keys = initial.keys;
   if (
     !Array.isArray(keys) ||
@@ -177,7 +188,30 @@ export function parseState(bytes: Uint8Array): SettingsState {
     typeof initial.resourcePacks !== 'boolean'
   )
     return invalid();
-  return { version: 1, initial: { keys: keys as string[], resourcePacks: initial.resourcePacks } };
+  const result: SettingsState = {
+    version,
+    initial: { keys: keys as string[], resourcePacks: initial.resourcePacks },
+  };
+  if (version === 2) {
+    const raw = initial.files;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return invalid();
+    const entries = Object.entries(raw as Record<string, unknown>);
+    if (entries.length > SETTINGS_LIMITS.stateFiles) return invalid();
+    const files: Record<string, string[]> = Object.create(null);
+    for (const [path, list] of entries) {
+      if (
+        !validConfigPath(path) ||
+        !Array.isArray(list) ||
+        list.length > SETTINGS_LIMITS.keysPerMap ||
+        list.some((k) => typeof k !== 'string' || !validConfigKey(k)) ||
+        new Set(list).size !== list.length
+      )
+        return invalid();
+      files[path] = list as string[];
+    }
+    (result.initial as { files?: Record<string, string[]> }).files = files;
+  }
+  return result;
 }
 
 export async function readState(
@@ -196,8 +230,24 @@ export async function writeState(
   options: SettingsOperationOptions,
 ): Promise<void> {
   const path = await resolveGamePath(root, SETTINGS_STATE_PATH, true);
-  const sorted = state.initial
-    ? { ...state, initial: { ...state.initial, keys: [...state.initial.keys].sort() } }
+  const files = state.initial?.files;
+  const sorted: SettingsState = state.initial
+    ? {
+        ...state,
+        initial: {
+          ...state.initial,
+          keys: [...state.initial.keys].sort(),
+          ...(files
+            ? {
+                files: Object.fromEntries(
+                  Object.keys(files)
+                    .sort()
+                    .map((path) => [path, [...(files[path] ?? [])].sort()]),
+                ),
+              }
+            : {}),
+        },
+      }
     : state;
   // The state commit must not reuse the options.txt failure seam.
   await atomicWrite(

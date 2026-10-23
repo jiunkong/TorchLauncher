@@ -9,16 +9,14 @@ import {
   writeState,
 } from './io.js';
 import { mergeRequiredPacks, OptionsDocument, readPackList, writePackList } from './options.js';
-import { assertOptionsNotSyncOwned } from './ownership.js';
+import { assertConfigFilesNotSyncOwned, assertOptionsNotSyncOwned } from './ownership.js';
 import { parseSettingsPolicy, validPackId } from './policy.js';
-import {
-  type OptionsFormatProfile,
-  profileAcceptsKeyValue,
-  profileAcceptsPackId,
-  selectProfile,
-} from './profiles.js';
+import { checkPolicyAgainstProfile, profileAcceptsPackId, selectProfile } from './profiles.js';
+import { PropertiesDocument } from './properties.js';
 import {
   type ApplySettingsResult,
+  type ConfigFilePolicy,
+  type ConfigFileResult,
   OPTIONS_PATH,
   type ResourcePackList,
   SETTINGS_LIMITS,
@@ -34,7 +32,7 @@ export interface ApplySettingsOptions extends SettingsOperationOptions {
   ownership?: SyncOwnership | (() => Promise<SyncOwnership | null>);
 }
 
-async function checkOwnership(options: ApplySettingsOptions): Promise<void> {
+async function checkOwnership(options: ApplySettingsOptions): Promise<SyncOwnership | undefined> {
   const ownership =
     typeof options.ownership === 'function' ? await options.ownership() : options.ownership;
   if (ownership === null)
@@ -44,6 +42,66 @@ async function checkOwnership(options: ApplySettingsOptions): Promise<void> {
     if (!ownership.initialized)
       throw new SettingsError('sync-not-initialized', 'synchronization has not completed');
   }
+  return ownership;
+}
+
+interface PlannedConfigFile {
+  policy: ConfigFilePolicy;
+  path: string;
+  file: ReadFile | null;
+  doc: PropertiesDocument;
+  result: ConfigFileResult;
+  /** Initial keys handled for this file, to record in the state (undefined = nothing to record). */
+  processed?: string[];
+}
+
+/** Edit every policy config file in memory; nothing is written here. */
+async function planConfigFiles(
+  root: string,
+  policy: SettingsPolicy,
+  files: Record<string, string[]>,
+  signal?: AbortSignal,
+): Promise<PlannedConfigFile[]> {
+  const planned: PlannedConfigFile[] = [];
+  const sorted = [...policy.configFiles].sort((a, b) =>
+    a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+  );
+  for (const entry of sorted) {
+    const path = await resolveGamePath(root, entry.path);
+    const file = await readBounded(path, SETTINGS_LIMITS.configBytes, signal);
+    const doc = file ? PropertiesDocument.parse(file.bytes) : PropertiesDocument.empty();
+    const result: ConfigFileResult = {
+      path: entry.path,
+      created: false,
+      changed: false,
+      enforcedKeys: [],
+      initialApplied: [],
+      initialSkipped: [],
+    };
+    for (const [key, value] of entry.required)
+      if (doc.set(key, value)) result.enforcedKeys.push(key);
+    const recorded = files[entry.path];
+    const first = recorded === undefined;
+    const done = new Set(recorded ?? []);
+    const processed = [...done];
+    for (const [key, value] of entry.initial) {
+      if (done.has(key)) continue;
+      if (!first) result.initialSkipped.push({ key, reason: 'already-configured' });
+      else if (doc.get(key) !== undefined) {
+        result.initialSkipped.push({ key, reason: 'user-value-present' });
+        processed.push(key);
+      } else {
+        doc.set(key, value);
+        result.initialApplied.push(key);
+        processed.push(key);
+      }
+    }
+    const item: PlannedConfigFile = { policy: entry, path, file, doc, result };
+    if (entry.initial.length > 0 && (first || processed.length !== done.size))
+      item.processed = processed;
+    planned.push(item);
+  }
+  return planned;
 }
 
 async function loadPolicy(root: string, signal?: AbortSignal): Promise<SettingsPolicy | null> {
@@ -61,21 +119,6 @@ async function loadOptions(
   return { path, file, doc: file ? OptionsDocument.parse(file.bytes) : OptionsDocument.empty() };
 }
 
-function checkPolicyAgainstProfile(policy: SettingsPolicy, profile: OptionsFormatProfile): void {
-  for (const [key, value] of [...policy.required, ...policy.initial]) {
-    if (key === 'version')
-      throw new SettingsError('invalid-policy', 'the version: line is owned by the game');
-    if (!profileAcceptsKeyValue(profile, key, value))
-      throw new SettingsError(
-        'invalid-policy',
-        `${key}: legacy numeric key code is not valid for ${profile.id}`,
-      );
-  }
-  const ids = [...policy.resourcePacks.required, ...policy.resourcePacks.initial];
-  if (ids.some((id) => !profileAcceptsPackId(profile, id)))
-    throw new SettingsError('invalid-policy', 'malformed resource pack id');
-}
-
 /**
  * Apply the operator's settings policy to options.txt item by item under the maintenance lock.
  * Call after synchronization finished and before launching the game.
@@ -86,7 +129,7 @@ export async function applySettingsPolicy(
 ): Promise<ApplySettingsResult> {
   return withMaintenanceLock(root, async () => {
     const { signal } = options;
-    await checkOwnership(options);
+    const syncOwnership = await checkOwnership(options);
     const policy = await loadPolicy(root, signal);
     const result: ApplySettingsResult = {
       status: 'no-policy',
@@ -97,9 +140,11 @@ export async function applySettingsPolicy(
       initialApplied: [],
       initialSkipped: [],
       resourcePacks: { added: [], reordered: false, active: [] },
+      configFiles: [],
       warnings: [],
     };
     if (!policy) return result;
+    if (syncOwnership) assertConfigFilesNotSyncOwned(policy, syncOwnership);
 
     const { state, file: stateFile } = await readState(root, signal);
     const options_ = await loadOptions(root, signal);
@@ -162,6 +207,9 @@ export async function applySettingsPolicy(
           (merged.added.length > 0 || result.initialApplied.includes('resourcePacks'));
     if (wantPacks) writePackList(doc, merged.packs);
 
+    const stateFiles = state.initial?.files ?? {};
+    const plannedFiles = await planConfigFiles(root, policy, stateFiles, signal);
+
     const bytes = doc.serialize();
     const changed =
       options_.file === null
@@ -172,19 +220,56 @@ export async function applySettingsPolicy(
       result.optionsCreated = options_.file === null;
       result.optionsChanged = true;
     }
-    // Options first: a crash in between only skips initial keys (user data is never lost).
+    // Options first, then config files, then the state: a crash in between only skips initial
+    // keys (user data is never lost, applied initial keys read as user values on the next run).
+    let configChanged = false;
+    for (const item of plannedFiles) {
+      const next = item.doc.serialize();
+      const differs =
+        item.file === null
+          ? next.byteLength > 0
+          : Buffer.compare(Buffer.from(next), Buffer.from(item.file.bytes)) !== 0;
+      if (differs) {
+        const target = item.file ? item.path : await resolveGamePath(root, item.policy.path, true);
+        await atomicWrite(target, next, item.file?.stat, options);
+        item.result.created = item.file === null;
+        item.result.changed = true;
+        configChanged = true;
+      }
+      result.configFiles.push(item.result);
+    }
+    const recordedFiles: Record<string, string[]> = { ...stateFiles };
+    let filesDirty = false;
+    for (const item of plannedFiles)
+      if (item.processed) {
+        recordedFiles[item.policy.path] = item.processed;
+        filesDirty = true;
+      }
+    const inPolicy = new Set(policy.configFiles.map((f) => f.path));
+    for (const path of Object.keys(recordedFiles).sort().reverse()) {
+      if (Object.keys(recordedFiles).length <= SETTINGS_LIMITS.stateFiles) break;
+      if (!inPolicy.has(path)) delete recordedFiles[path];
+    }
     if (
       first ||
+      filesDirty ||
       processed.length !== doneKeys.size ||
       resourcePacksDone !== (state.initial?.resourcePacks ?? false)
-    )
+    ) {
+      const hasFiles = Object.keys(recordedFiles).length > 0;
       await writeState(
         root,
-        { version: 1, initial: { keys: processed, resourcePacks: resourcePacksDone } },
+        hasFiles
+          ? {
+              version: 2,
+              initial: { keys: processed, resourcePacks: resourcePacksDone, files: recordedFiles },
+            }
+          : { version: 1, initial: { keys: processed, resourcePacks: resourcePacksDone } },
         stateFile,
         options,
       );
-    result.status = changed || first ? 'applied' : 'unchanged';
+    }
+    result.status = changed || configChanged || first ? 'applied' : 'unchanged';
     return result;
   });
 }

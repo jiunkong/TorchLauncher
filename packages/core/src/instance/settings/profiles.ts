@@ -1,5 +1,5 @@
 import type { OptionsDocument } from './options.js';
-import { SettingsError } from './types.js';
+import { SettingsError, type SettingsPolicy } from './types.js';
 
 /**
  * Options.txt format profiles. A profile is chosen from the file's `version:` line (the world/data
@@ -179,4 +179,23 @@ export function profileAcceptsKeyValue(
 ): boolean {
   if (profile.namedKeyCodes && key.startsWith('key_')) return !/^-?[0-9]+$/.test(value);
   return true;
+}
+
+/** Rejects policy items the format profile cannot represent (throws `invalid-policy`). */
+export function checkPolicyAgainstProfile(
+  policy: SettingsPolicy,
+  profile: OptionsFormatProfile,
+): void {
+  for (const [key, value] of [...policy.required, ...policy.initial]) {
+    if (key === 'version')
+      throw new SettingsError('invalid-policy', 'the version: line is owned by the game');
+    if (!profileAcceptsKeyValue(profile, key, value))
+      throw new SettingsError(
+        'invalid-policy',
+        `${key}: legacy numeric key code is not valid for ${profile.id}`,
+      );
+  }
+  const ids = [...policy.resourcePacks.required, ...policy.resourcePacks.initial];
+  if (ids.some((id) => !profileAcceptsPackId(profile, id)))
+    throw new SettingsError('invalid-policy', 'malformed resource pack id');
 }
