@@ -5,7 +5,8 @@
 - Worktree: `/mnt/d/Projects/mclauncher/.agents/worktrees/agent-2`.
 - Baseline: `57c6fcd` (main after AUTH-SHARE-01 merge `5c85c12`, TESTRUN-CORE-01 merge `88107e4`).
   Coordinator and both candidate worker checkouts were clean/detached before selecting agent-2.
-- Initial implementation commit: `37023d8`; final implementation commit recorded after final validation.
+- Initial implementation commit: `37023d8`.
+- Final implementation commit: `be9213b2db32244cacc5d031ee76248f256b61d7` (bounded recovery journal + large-file checks).
 - Final documentation commit: resolve with `git log -1 -- docs/handoffs/TESTRUN-MAIN-01.md`;
   also reported in the final response to avoid a self-referential hash.
 - Not integrated into main. No progress/distribution/coordinator documentation, renderer or core edits.
@@ -155,12 +156,21 @@ worktree's Electron package has no downloaded executable. Coordinator dependenci
 - First `PATH=/tmp/auth-share-tools/node_modules/.bin:$PATH pnpm check`: passed; 372 Biome files,
   existing 37 warnings / 3 infos, all workspace TypeScript, 96 files passed / 4 skipped,
   1385 tests passed / 9 skipped / 0 failed, both app builds. Log `/tmp/testrun-main-check.log`.
-- Final pnpm check after the bounded-journal guard and large-file test: pending at this checkpoint.
+- Final `PATH=/tmp/auth-share-tools/node_modules/.bin:$PATH pnpm check`: **passed (exit 0)**,
+  after the bounded-journal guard and two additional tests. Biome 372 files / existing 37 warnings +
+  3 infos, all TypeScript, **96 files passed / 4 skipped; 1387 tests passed / 9 skipped / 0 failed**,
+  both app builds. Log `/tmp/testrun-main-check-final.log`. Existing live/platform skips were not
+  activated. All 22 new test-run/transaction tests were executed and passed.
+- Standalone Studio production worker: `ELECTRON_RUN_AS_NODE=1 /mnt/d/Projects/mclauncher/node_modules/electron/dist/electron /tmp/auth-share-worker-check.mjs /mnt/d/Projects/mclauncher/.agents/worktrees/agent-2/apps/admin/out/main`:
+  passed, Electron 44.9.1 / prismarine-auth 3.1.1 / liveAuthentication:false. Copies all built main
+  chunks to a standalone temporary directory, self-checks the actual worker, reaps it and removes
+  the temporary copy. No account or network used.
 - `DISPLAY=:0 ELECTRON_OVERRIDE_DIST_PATH=... node scripts/smoke.mjs`: passed, both apps,
   renderer/navigation/IPC/isolation/760px+1100px checks. Log `/tmp/testrun-main-smoke.log`.
 - `DISPLAY=:0 ELECTRON_OVERRIDE_DIST_PATH=... node apps/admin/scripts/smoke-functional.mjs`:
   passed, existing Studio shell/splash/in-app close confirmation/pages/persistence/layout/isolation.
-  Log `/tmp/testrun-main-functional.log`. These scripts do not prove real account/game execution.
+  Log `/tmp/testrun-main-functional.log`. These smoke runs preceded the final journal-size guard;
+  that change was covered by the final full check. These scripts do not prove real account/game execution.
 - Scoped Biome and git diff --check passed. Root smoke bridge list needed no edit.
 
 ## Real Linux installation attempts (separate from automated successes)
@@ -226,7 +236,18 @@ Manual verification after TESTRUN-UI-01 wiring (or controlled trusted-frame serv
 
 ## Resume/integration checkpoint
 
-Final validation/implementation commit and git diff --stat 57c6fcd...HEAD will be recorded before handoff.
-No user approval remains pending. Both smoke commands and the real installation probe have exited.
-The only active command at this checkpoint is final pnpm check (session 91183), log
-`/tmp/testrun-main-check-final.log`. Do not start duplicate checks until it settles.
+`git diff --stat 57c6fcd...be9213b` verified **13 implementation files, 1673 insertions(+),
+66 deletions(-)**: admin authentication worker config/manifest; main game-settings/index/studio;
+new main test-auth/test-instance/test-run and their tests; shared studio/test-auth-text; lockfile link.
+The final handoff adds this document, for **14 changed files**. Repeat
+`git diff --stat 57c6fcd...HEAD` on the final branch for exact final totals.
+
+No user approval remains pending. All validation commands, both smoke processes, production worker
+and the real installation probe have exited. No dev server/game/auth worker is left running.
+Only ignored/local /tmp tools, receipts, logs and the failed public-game installation root remain.
+The installation root contains no account data and must not be treated as a successful installation.
+
+#0 should review this branch, integrate it in the designated integration checkout and perform its
+integration checks. Do not merge from this worker worktree. TESTRUN-UI-01 can consume the contract
+above after its design prerequisite; no renderer changes were made here. Real account, direct game
+play, Windows and successful loader installation evidence remain separate follow-up validation.
