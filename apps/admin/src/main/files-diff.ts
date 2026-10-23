@@ -10,10 +10,13 @@ import type {
   StudioProject,
 } from '../shared/studio.js';
 import {
+  type GeneratedPolicy,
   generatePolicy,
   isPlanReserved,
   isReservedPath,
   PACK_DIRECTORY,
+  PolicyFailure,
+  policyConfigPaths,
   SETTINGS_POLICY_PATH,
 } from './game-settings.js';
 import type { ScanResult } from './scan.js';
@@ -31,11 +34,18 @@ export interface BuildPlan {
   items: PlanItem[];
   /** Content of the generated settings policy (written to the source folder before the build). */
   policyText: string | null;
+  policy: GeneratedPolicy | null;
+  /** Why the policy cannot be built; a build must refuse to run. */
+  policyError: PolicyFailure | null;
+  /** Paths whose items the policy manages. */
+  policyPaths: string[];
 }
 export function buildPlan(project: StudioProject): BuildPlan {
   const settings = project.gameSettings;
   const managed: PlanItem[] = [];
-  let policyText: string | null = null;
+  let policy: GeneratedPolicy | null = null;
+  let policyError: PolicyFailure | null = null;
+  const policyPaths = settings ? policyConfigPaths(settings) : [];
   if (settings) {
     for (const [kind, list] of [
       ['resourcepack', settings.resourcePacks],
@@ -51,9 +61,14 @@ export function buildPlan(project: StudioProject): BuildPlan {
           sha256: pack.sha256,
         });
       }
-    policyText = generatePolicy(settings);
-    if (policyText) {
-      const bytes = Buffer.from(policyText);
+    try {
+      policy = generatePolicy(settings, project.game.minecraftVersion);
+    } catch (error) {
+      if (!(error instanceof PolicyFailure)) throw error;
+      policyError = error;
+    }
+    if (policy) {
+      const bytes = Buffer.from(policy.text);
       managed.push({
         path: SETTINGS_POLICY_PATH,
         policy: 'always',
@@ -75,7 +90,20 @@ export function buildPlan(project: StudioProject): BuildPlan {
       length: null,
       sha256: null,
     }));
-  return { items: [...plain, ...managed], policyText };
+  // A plain `always` file that the policy also edits would be overwritten by every sync.
+  const conflict = plain.find((f) => f.policy === 'always' && policyPaths.includes(f.path));
+  if (conflict && !policyError)
+    policyError = new PolicyFailure(
+      'config-owned-by-sync',
+      `${conflict.path} is deployed as "always" and also managed by the settings policy`,
+    );
+  return {
+    items: [...plain, ...managed],
+    policyText: policy?.text ?? null,
+    policy,
+    policyError,
+    policyPaths,
+  };
 }
 export function brandingKey(project: StudioProject): string {
   const part = (role: 'icon' | 'background') => {
@@ -134,7 +162,7 @@ export async function computeFiles(
   for (const file of scan.files) {
     present.add(file.path);
     const item = planned.get(file.path);
-    const managed = isReservedPath(file.path);
+    const managed = isReservedPath(file.path) || plan.policyPaths.includes(file.path);
     const change = await changeOf(file.path, item, file.size);
     note(change, managed);
     entries.push({

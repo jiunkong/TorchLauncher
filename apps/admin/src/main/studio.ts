@@ -15,6 +15,7 @@ import type {
   StudioExport,
   StudioExportCheck,
   StudioPack,
+  StudioPolicyStatus,
   StudioProject,
   StudioReply,
   StudioRequest,
@@ -23,6 +24,7 @@ import type {
   StudioUrlCheck,
   UrlCheckState,
 } from '../shared/studio.js';
+import { shaderConfigPaths } from '../shared/studio.js';
 import {
   type BrandingSnapshots,
   decodeProject,
@@ -44,14 +46,22 @@ import {
 import { exportLauncherZip, noLinks, safeRead, saveProject } from './filesystem.js';
 import {
   addPack,
+  applyConfigChanges,
+  defaultShader,
   emptySettings,
+  generatePolicy,
   isReservedPath,
+  MAX_CONFIG_FILES,
   MAX_PACKS,
   mergeOptions,
   PACK_LIMIT,
+  PolicyFailure,
   parseGameSettings,
+  policyConfigPaths,
   readPreset,
   validatePackName,
+  validGenericConfigPath,
+  validPackOptionsName,
   writeGeneratedPolicy,
 } from './game-settings.js';
 import { newProject, parseProject, StudioFailure } from './project.js';
@@ -94,12 +104,54 @@ const SPECIAL_FIELDS: Record<string, string[]> = {
   filesPolicy: ['paths', 'policy'],
   settingsImport: ['source'],
   settingsOptions: ['changes'],
+  settingsShader: [],
+  settingsConfigItems: ['path', 'changes'],
+  settingsConfigRemove: ['path'],
+  settingsShaderOptions: ['pack', 'changes'],
+  settingsShaderOptionsRemove: ['pack'],
   settingsPackAdd: ['kind'],
   settingsPackPolicy: ['kind', 'name', 'policy'],
   settingsPackMove: ['kind', 'name', 'index'],
   settingsPackRemove: ['kind', 'name'],
 };
+const validChanges = (changes: unknown): boolean =>
+  Array.isArray(changes) &&
+  changes.length > 0 &&
+  changes.length <= SETTINGS_LIMITS.keysPerMap &&
+  changes.every((c) => {
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
+    return (
+      Object.keys(c).every((k) => ['key', 'policy', 'value'].includes(k)) &&
+      typeof c.key === 'string' &&
+      POLICY_CHOICES.includes(c.policy) &&
+      (c.value === undefined || typeof c.value === 'string')
+    );
+  });
+const isChoicePair = (v: unknown, type: 'boolean' | 'string'): boolean => {
+  const o = v as Record<string, unknown>;
+  return (
+    !!o &&
+    typeof o === 'object' &&
+    !Array.isArray(o) &&
+    Object.keys(o).sort().join(',') === 'policy,value' &&
+    POLICY_CHOICES.includes(o.policy as string) &&
+    typeof o.value === type &&
+    (type === 'boolean' || (o.value as string).length <= SETTINGS_LIMITS.valueLength)
+  );
+};
 function validSpecial(value: Record<string, unknown>): boolean {
+  if (value.action === 'settingsShader') {
+    const optional = ['configPath', 'enabled', 'pack'];
+    const keys = Object.keys(value).filter((k) => k !== 'action');
+    return (
+      keys.length > 0 &&
+      keys.every((k) => optional.includes(k)) &&
+      (value.configPath === undefined ||
+        (shaderConfigPaths as readonly unknown[]).includes(value.configPath)) &&
+      (value.enabled === undefined || isChoicePair(value.enabled, 'boolean')) &&
+      (value.pack === undefined || isChoicePair(value.pack, 'string'))
+    );
+  }
   const fields = SPECIAL_FIELDS[value.action as string] ?? [];
   if (
     Object.keys(value).length !== fields.length + 1 ||
@@ -134,6 +186,14 @@ function validSpecial(value: Record<string, unknown>): boolean {
           );
         })
       );
+    case 'settingsConfigItems':
+      return typeof value.path === 'string' && validChanges(value.changes);
+    case 'settingsConfigRemove':
+      return typeof value.path === 'string';
+    case 'settingsShaderOptions':
+      return typeof value.pack === 'string' && validChanges(value.changes);
+    case 'settingsShaderOptionsRemove':
+      return typeof value.pack === 'string';
     case 'settingsPackAdd':
       return isKind(value.kind);
     case 'settingsPackPolicy':
@@ -166,6 +226,7 @@ export class StudioService {
     urlCheck: null,
     export: null,
     preset: null,
+    policy: null,
   };
   private lastScan: ScanResult | null = null;
   private hashes = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
@@ -383,6 +444,7 @@ export class StudioService {
     this.state.deploy = computeDeploy(project, diff, diff?.files ?? null);
     if (this.state.urlCheck) this.state.urlCheck.stale = this.urlKey !== this.fingerprint(project);
     this.state.export = this.exportState(project);
+    this.state.policy = this.policyStatus(project);
   }
   private fingerprint(project: StudioProject): string {
     return JSON.stringify([
@@ -443,8 +505,32 @@ export class StudioService {
     if (!project.gameSettings && !create) throw new StudioFailure('INVALID');
     const next = structuredClone(project.gameSettings ?? emptySettings());
     mutate(next);
-    this.state.project = { ...project, version: 2, gameSettings: parseGameSettings(next) };
+    const settings = parseGameSettings(next);
+    try {
+      // Refuse a change the policy cannot express (limits, bad values) instead of saving it.
+      generatePolicy(settings, project.game.minecraftVersion);
+    } catch (error) {
+      if (error instanceof PolicyFailure)
+        this.policyRejected = { code: error.settingsCode, message: error.detail };
+      this.state.policy = this.policyStatus(project);
+      throw error;
+    }
+    this.policyRejected = null;
+    this.state.project = { ...project, version: 2, gameSettings: settings };
     this.state.dirty = true;
+  }
+  private policyRejected: { code: string; message: string } | null = null;
+  private policyStatus(project: StudioProject): StudioPolicyStatus | null {
+    if (!project.gameSettings) return null;
+    const plan = buildPlan(project);
+    return {
+      version: plan.policy?.version ?? null,
+      bytes: plan.policy?.bytes ?? 0,
+      limit: SETTINGS_LIMITS.policyBytes,
+      error: plan.policyError
+        ? { code: plan.policyError.settingsCode, message: plan.policyError.detail }
+        : this.policyRejected,
+    };
   }
   private async execute(command: StudioRequest, signal: AbortSignal): Promise<void> {
     switch (command.action) {
@@ -468,8 +554,11 @@ export class StudioService {
         const scan = await scanSource(root, signal);
         const onDisk = new Set(scan.files.map((f) => f.path));
         const files = new Map(project.files.map((f) => [f.path, f]));
+        const policyPaths = new Set(
+          project.gameSettings ? policyConfigPaths(project.gameSettings) : [],
+        );
         for (const path of new Set(command.paths)) {
-          if (isReservedPath(path)) throw new StudioFailure('INVALID');
+          if (isReservedPath(path) || policyPaths.has(path)) throw new StudioFailure('INVALID');
           if (command.policy === 'excluded') {
             if (!files.has(path) && !onDisk.has(path)) throw new StudioFailure('INVALID');
             files.delete(path);
@@ -490,12 +579,96 @@ export class StudioService {
           await this.selected(command.source === 'folder' ? 'gamefolder' : 'optionsfile')
         )[0];
         if (!picked) throw new StudioFailure('CANCELLED');
-        const { entries, preview } = await readPreset(picked, command.source);
+        const { entries, preview, configFiles, shader } = await readPreset(picked, command.source);
         signal.throwIfAborted();
         this.updateSettings((g) => {
           g.options = mergeOptions(g.options, entries);
+          if (configFiles.length) {
+            const files = g.configFiles ?? [];
+            for (const file of configFiles) {
+              const old = files.find((f) => f.path === file.path);
+              if (old) old.items = mergeOptions(old.items, file.items);
+              else files.push(file);
+            }
+            g.configFiles = files;
+          }
+          if (shader) {
+            const current = g.shader ?? defaultShader();
+            if (g.shader === undefined || shader.enabled !== null) {
+              if (current.enabled.policy === 'none' && shader.enabled !== null)
+                current.enabled.value = shader.enabled;
+            }
+            if (current.pack.policy === 'none' && shader.pack !== null)
+              current.pack.value = shader.pack;
+            current.configPath = shader.configPath;
+            for (const file of shader.packOptions) {
+              const old = current.packOptions.find((f) => f.pack === file.pack);
+              if (old) old.items = mergeOptions(old.items, file.items);
+              else current.packOptions.push(file);
+            }
+            g.shader = current;
+          }
         }, true);
         this.state.preset = preview;
+        return;
+      }
+      case 'settingsConfigItems': {
+        if (!validGenericConfigPath(command.path)) throw new StudioFailure('INVALID');
+        this.updateSettings((g) => {
+          const files = g.configFiles ?? [];
+          let file = files.find((f) => f.path === command.path);
+          if (!file) {
+            if (files.length >= MAX_CONFIG_FILES) throw new StudioFailure('TOO_LARGE');
+            file = { path: command.path, items: [] };
+            files.push(file);
+          }
+          applyConfigChanges(file.items, command.changes);
+          g.configFiles = files;
+        }, true);
+        return;
+      }
+      case 'settingsConfigRemove': {
+        this.updateSettings((g) => {
+          const files = g.configFiles ?? [];
+          const index = files.findIndex((f) => f.path === command.path);
+          if (index < 0) throw new StudioFailure('INVALID');
+          files.splice(index, 1);
+          g.configFiles = files;
+        });
+        return;
+      }
+      case 'settingsShader': {
+        this.updateSettings((g) => {
+          const shader = g.shader ?? defaultShader();
+          if (command.configPath) shader.configPath = command.configPath;
+          if (command.enabled) shader.enabled = { ...command.enabled };
+          if (command.pack) shader.pack = { ...command.pack };
+          g.shader = shader;
+        }, true);
+        return;
+      }
+      case 'settingsShaderOptions': {
+        if (!validPackOptionsName(command.pack)) throw new StudioFailure('INVALID');
+        this.updateSettings((g) => {
+          const shader = g.shader ?? defaultShader();
+          let file = shader.packOptions.find((f) => f.pack === command.pack);
+          if (!file) {
+            if (shader.packOptions.length >= MAX_CONFIG_FILES) throw new StudioFailure('TOO_LARGE');
+            file = { pack: command.pack, items: [] };
+            shader.packOptions.push(file);
+          }
+          applyConfigChanges(file.items, command.changes);
+          g.shader = shader;
+        }, true);
+        return;
+      }
+      case 'settingsShaderOptionsRemove': {
+        this.updateSettings((g) => {
+          const options = g.shader?.packOptions;
+          const index = options?.findIndex((f) => f.pack === command.pack) ?? -1;
+          if (!options || index < 0) throw new StudioFailure('INVALID');
+          options.splice(index, 1);
+        });
         return;
       }
       case 'settingsOptions': {
@@ -591,6 +764,8 @@ export class StudioService {
         this.state.urlCheck = null;
         this.state.export = null;
         this.state.preset = null;
+        this.state.policy = null;
+        this.policyRejected = null;
         this.lastScan = null;
         this.hashes.clear();
         this.urlKey = null;
@@ -744,6 +919,7 @@ export class StudioService {
         const project = this.project();
         if (!this.sourceRoot) throw new StudioFailure('INVALID');
         const plan = buildPlan(project);
+        if (plan.policyError) throw plan.policyError;
         const path = await this.dialogs.save('pack');
         if (!path) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
