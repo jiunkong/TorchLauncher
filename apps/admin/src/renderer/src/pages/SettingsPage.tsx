@@ -1,7 +1,18 @@
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
+import type {
+  PackKind,
+  SettingPolicyChoice,
+  StudioConfigItem,
+  StudioGameOption,
+  StudioGameSettings,
+  StudioPack,
+  StudioRequest,
+  StudioShaderSettings,
+} from '../../../shared/studio.js';
 import {
   CheckIcon,
   DownIcon,
+  FolderIcon,
   GamepadIcon,
   PlusIcon,
   RefreshIcon,
@@ -9,24 +20,28 @@ import {
 } from '../components/Icons';
 import { Modal } from '../components/Modal';
 import { Checkbox, Chip, Note, PageHeader, type Policy3, PolicyControl } from '../components/ui';
+import { formatBytes } from '../format';
 import { useStudioLocale } from '../i18n';
-import {
-  type KeyEntry,
-  sampleKeys,
-  sampleOptions,
-  samplePacks,
-  samplePresetSource,
-  sampleShaderOptionCount,
-  sampleShaders,
-} from '../settings/fixtures';
-import { matchesKey, type SettingsState, type SettingsTab } from '../settings/state';
+import { matchesKey, optionLabel, type SettingsState, type SettingsTab } from '../settings/state';
+import type { PageProps } from './types';
 
-const tabs: SettingsTab[] = ['keys', 'options', 'packs', 'shaders'];
+const tabs: SettingsTab[] = ['keys', 'options', 'config', 'packs', 'shaders'];
+type Send = (request: StudioRequest) => void;
+type Labels = Record<Policy3, string>;
 
-export function SettingsPage({ settings }: { settings: SettingsState }) {
+const isKeybind = (option: StudioGameOption) =>
+  option.kind === 'keybind' || option.kind === 'mod-keybind' || option.key.startsWith('key_');
+
+export function SettingsPage({ studio, draft, settings }: PageProps & { settings: SettingsState }) {
   const { t } = useStudioLocale();
+  const { state, busy } = studio;
   const [dialog, setDialog] = useState(false);
-  const labels: Record<Policy3, string> = {
+  const send: Send = (request) => void studio.command(request);
+  const game: StudioGameSettings | undefined = draft.gameSettings;
+  const loaded = !!game && (game.options.length > 0 || !!state?.preset);
+  const preset = state?.preset ?? null;
+  const policy = state?.policy ?? null;
+  const labels: Labels = {
     none: t('settings.policy.none'),
     initial: t('settings.policy.initial'),
     required: t('settings.policy.required'),
@@ -34,17 +49,12 @@ export function SettingsPage({ settings }: { settings: SettingsState }) {
   const tabLabel: Record<SettingsTab, string> = {
     keys: t('settings.tab.keys'),
     options: t('settings.tab.options'),
+    config: t('settings.tab.config'),
     packs: t('settings.tab.packs'),
     shaders: t('settings.tab.shaders'),
   };
-  const policy = (id: string, name: string) => (
-    <PolicyControl
-      value={settings.policyOf(id)}
-      onChange={(value) => settings.setPolicy([id], value)}
-      labels={labels}
-      groupLabel={t('settings.policyOf', { name })}
-    />
-  );
+  const keyCount = game?.options.filter(isKeybind).length ?? 0;
+  const files = ['options.txt', ...(preset?.importedConfigs ?? [])];
 
   return (
     <>
@@ -53,8 +63,8 @@ export function SettingsPage({ settings }: { settings: SettingsState }) {
         title={t('settings.title')}
         lead={t('settings.lead')}
       />
-      <div className="preset" data-testid="settings-preset" data-loaded={settings.loaded}>
-        {settings.loaded ? (
+      <div className="preset" data-testid="settings-preset" data-loaded={loaded}>
+        {loaded ? (
           <>
             <span className="ic2">
               <CheckIcon />
@@ -62,18 +72,31 @@ export function SettingsPage({ settings }: { settings: SettingsState }) {
             <div className="presetbody">
               <div className="fine">
                 {t('settings.preset.loaded', {
-                  keys: samplePresetSource.keyCount,
-                  mods: samplePresetSource.modKeyCount,
+                  options: game?.options.length ?? 0,
+                  keys: keyCount,
                 })}
+                {preset &&
+                  preset.ignored > 0 &&
+                  ` · ${t('settings.preset.ignored', { count: preset.ignored })}`}
               </div>
-              <div className="mono">{samplePresetSource.files.join(', ')}</div>
+              <div className="mono">{files.join(', ')}</div>
+              <div className="fine">{t('settings.preset.reloadHint')}</div>
             </div>
-            <Chip>{t('settings.sample')}</Chip>
-            <button type="button" className="btn sm" onClick={() => setDialog(true)}>
+            <button
+              type="button"
+              className="btn sm"
+              disabled={busy}
+              onClick={() => setDialog(true)}
+            >
               <RefreshIcon />
               {t('settings.preset.reload')}
             </button>
-            <button type="button" className="btn sm" onClick={() => setDialog(true)}>
+            <button
+              type="button"
+              className="btn sm"
+              disabled={busy}
+              onClick={() => setDialog(true)}
+            >
               {t('settings.preset.other')}
             </button>
           </>
@@ -83,20 +106,57 @@ export function SettingsPage({ settings }: { settings: SettingsState }) {
               <div className="fine">{t('settings.preset.label')}</div>
               <div className="dim">{t('settings.preset.none')}</div>
             </div>
-            <button type="button" className="btn primary" onClick={() => setDialog(true)}>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={busy}
+              onClick={() => setDialog(true)}
+            >
               {t('settings.preset.load')}
             </button>
           </>
         )}
       </div>
-      <TabBar
-        tabs={tabs}
-        labels={tabLabel}
-        value={settings.tab}
-        onChange={settings.setTab}
-        label={t('settings.tabs')}
-      />
-      {!settings.loaded ? (
+      {game && policy && (
+        <div className="usage" data-testid="settings-policy">
+          <Chip tone={policy.error ? 'warn' : undefined}>
+            {t('settings.usage', {
+              bytes: formatBytes(policy.bytes),
+              limit: formatBytes(policy.limit),
+            })}
+          </Chip>
+          <span className="meter" aria-hidden="true">
+            <i style={{ width: `${Math.min(100, (policy.bytes / policy.limit) * 100)}%` }} />
+          </span>
+        </div>
+      )}
+      {policy?.error && (
+        <Note tone="warn" testId="settings-policy-error">
+          <b>{t('settings.usage.error')}</b> {policy.error.message}
+        </Note>
+      )}
+      {preset && preset.skippedConfigs.length > 0 && (
+        <Note>{t('settings.preset.skipped', { count: preset.skippedConfigs.length })}</Note>
+      )}
+      <div className="tabs" role="tablist" aria-label={t('settings.tabs')}>
+        {tabs.map((item) => (
+          <button
+            key={item}
+            type="button"
+            // biome-ignore lint/a11y/useSemanticElements: tab buttons
+            role="tab"
+            aria-selected={settings.tab === item}
+            className={`tab${settings.tab === item ? ' on' : ''}`}
+            onClick={() => {
+              settings.setSelected(new Set());
+              settings.setTab(item);
+            }}
+          >
+            {tabLabel[item]}
+          </button>
+        ))}
+      </div>
+      {!loaded && settings.tab !== 'packs' && settings.tab !== 'shaders' ? (
         <section className="empty" data-testid="settings-empty">
           <span className="ic">
             <GamepadIcon />
@@ -115,90 +175,51 @@ export function SettingsPage({ settings }: { settings: SettingsState }) {
               <span>{t('settings.empty.2')}</span>
             </li>
           </ol>
-          <button type="button" className="btn primary lg" onClick={() => setDialog(true)}>
+          <button
+            type="button"
+            className="btn primary lg"
+            disabled={busy}
+            onClick={() => setDialog(true)}
+          >
             {t('settings.preset.load')}
           </button>
         </section>
-      ) : settings.tab === 'keys' ? (
-        <KeysTab settings={settings} labels={labels} />
-      ) : settings.tab === 'options' ? (
-        <section className="card">
-          <h2>{t('settings.options.title')}</h2>
-          <p className="sub">{t('settings.options.sub')}</p>
-          <div className="optlist">
-            {sampleOptions.map((option) => (
-              <div className="kr" key={option.id}>
-                <span className="n">
-                  <strong>{option.name}</strong>
-                  <small>{option.id}</small>
-                </span>
-                <span className="key">{option.value}</span>
-                {policy(option.id, option.name)}
-              </div>
-            ))}
-          </div>
-        </section>
+      ) : settings.tab === 'keys' || settings.tab === 'options' ? (
+        <OptionsTab
+          kind={settings.tab}
+          options={game?.options ?? []}
+          settings={settings}
+          labels={labels}
+          send={send}
+          busy={busy}
+        />
+      ) : settings.tab === 'config' ? (
+        <ConfigTab game={game} labels={labels} send={send} busy={busy} />
       ) : settings.tab === 'packs' ? (
-        <section className="card">
-          <div className="sechead">
-            <div>
-              <h2>{t('settings.packs.title')}</h2>
-              <p className="sub tight">{t('settings.packs.sub')}</p>
-            </div>
-            <button type="button" className="btn sm" disabled title={t('settings.unavailable')}>
-              <PlusIcon />
-              {t('settings.packs.add')}
-            </button>
-          </div>
-          <div className="packlist">
-            {settings.packOrder.map((id, index) => {
-              const pack = samplePacks.find((item) => item.id === id);
-              if (!pack) return null;
-              return (
-                <div className="pk" key={id}>
-                  <span className="ord">
-                    <button
-                      type="button"
-                      aria-label={t('settings.packs.up', { name: pack.file })}
-                      disabled={index === 0}
-                      onClick={() => settings.movePack(id, -1)}
-                    >
-                      <UpIcon />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t('settings.packs.down', { name: pack.file })}
-                      disabled={index === settings.packOrder.length - 1}
-                      onClick={() => settings.movePack(id, 1)}
-                    >
-                      <DownIcon />
-                    </button>
-                  </span>
-                  <span className="pic" style={{ background: pack.color }} aria-hidden="true">
-                    {pack.initial}
-                  </span>
-                  <span className="n">
-                    <strong>{pack.file}</strong>
-                    <small>
-                      {pack.note} · {pack.size}
-                    </small>
-                  </span>
-                  {policy(`resourcepack:${id}`, pack.file)}
-                </div>
-              );
-            })}
-          </div>
-          <p className="fine">{t('settings.packs.hint')}</p>
-        </section>
+        <PackTab
+          kind="resourcepack"
+          packs={game?.resourcePacks ?? []}
+          labels={labels}
+          send={send}
+          busy={busy}
+          sourceReady={!!state?.sourceName}
+        />
       ) : (
-        <ShadersTab settings={settings} labels={labels} />
+        <ShadersTab
+          game={game}
+          labels={labels}
+          send={send}
+          busy={busy}
+          sourceReady={!!state?.sourceName}
+        />
       )}
       {dialog && (
         <PresetDialog
+          busy={busy}
           onCancel={() => setDialog(false)}
-          onLoad={() => {
-            settings.load();
-            setDialog(false);
+          onImport={async (source) => {
+            const ok = await studio.command({ action: 'settingsImport', source });
+            if (ok) setDialog(false);
           }}
         />
       )}
@@ -206,62 +227,49 @@ export function SettingsPage({ settings }: { settings: SettingsState }) {
   );
 }
 
-function TabBar({
-  tabs: items,
-  labels,
-  value,
-  onChange,
-  label,
-}: {
-  tabs: SettingsTab[];
-  labels: Record<SettingsTab, string>;
-  value: SettingsTab;
-  onChange(tab: SettingsTab): void;
-  label: string;
-}) {
-  return (
-    <div className="tabs" role="tablist" aria-label={label}>
-      {items.map((item) => (
-        <button
-          key={item}
-          type="button"
-          role="tab"
-          aria-selected={value === item}
-          className={`tab${value === item ? ' on' : ''}`}
-          onClick={() => onChange(item)}
-        >
-          {labels[item]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function KeysTab({
+function OptionsTab({
+  kind,
+  options,
   settings,
   labels,
+  send,
+  busy,
 }: {
+  kind: 'keys' | 'options';
+  options: StudioGameOption[];
   settings: SettingsState;
-  labels: Record<Policy3, string>;
+  labels: Labels;
+  send: Send;
+  busy: boolean;
 }) {
   const { t } = useStudioLocale();
   const searchId = useId();
   const { search, filter, selected } = settings;
-  const visible = sampleKeys.filter((entry) =>
-    matchesKey(entry, search, filter, settings.policyOf(entry.id)),
+  const own = options.filter((option) => (kind === 'keys') === isKeybind(option));
+  const visible = own.filter((option) =>
+    matchesKey(
+      { id: option.key, mod: option.kind === 'mod-keybind' },
+      search,
+      kind === 'keys' ? filter : 'all',
+      option.policy,
+    ),
   );
-  const groups = [...new Set(visible.map((entry) => entry.group))];
-  const chosen = visible.filter((entry) => selected.has(entry.id)).map((entry) => entry.id);
-  const chosenPolicies = new Set(chosen.map((id) => settings.policyOf(id)));
+  const groups = [...new Set(visible.map((option) => option.group ?? ''))];
+  const chosen = visible.filter((option) => selected.has(option.key)).map((option) => option.key);
+  const chosenPolicies = new Set(
+    visible.filter((option) => selected.has(option.key)).map((option) => option.policy),
+  );
   const common = chosenPolicies.size === 1 ? ([...chosenPolicies][0] ?? null) : null;
-  const count = (predicate: (entry: KeyEntry) => boolean) => sampleKeys.filter(predicate).length;
+  const change = (keys: string[], policy: SettingPolicyChoice) =>
+    send({ action: 'settingsOptions', changes: keys.map((key) => ({ key, policy })) });
+  const modCount = own.filter((option) => option.kind === 'mod-keybind').length;
   const chips = [
-    ['all', t('settings.keys.all', { count: sampleKeys.length })],
-    ['base', t('settings.keys.base', { count: count((entry) => !entry.mod) })],
-    ['mod', t('settings.keys.mod', { count: count((entry) => entry.mod) })],
+    ['all', t('settings.keys.all', { count: own.length })],
+    ['base', t('settings.keys.base', { count: own.length - modCount })],
+    ['mod', t('settings.keys.mod', { count: modCount })],
     [
       'set',
-      t('settings.keys.set', { count: count((entry) => settings.policyOf(entry.id) !== 'none') }),
+      t('settings.keys.set', { count: own.filter((option) => option.policy !== 'none').length }),
     ],
   ] as const;
   return (
@@ -274,7 +282,10 @@ function KeysTab({
           </span>
           <PolicyControl
             value={common}
-            onChange={(value) => settings.setPolicy(chosen, value)}
+            onChange={(value) => {
+              change(chosen, value);
+              settings.setSelected(new Set());
+            }}
             labels={labels}
             groupLabel={t('settings.keys.bulk')}
           />
@@ -299,59 +310,64 @@ function KeysTab({
           placeholder={t('settings.keys.search')}
           onChange={(event) => settings.setSearch(event.target.value)}
         />
-        {chips.map(([id, text]) => (
-          <button
-            key={id}
-            type="button"
-            className={`chip pick${filter === id ? ' on' : ''}`}
-            aria-pressed={filter === id}
-            onClick={() => settings.setFilter(id)}
-          >
-            {text}
-          </button>
-        ))}
+        {kind === 'keys' &&
+          chips.map(([id, text]) => (
+            <button
+              key={id}
+              type="button"
+              className={`chip pick${filter === id ? ' on' : ''}`}
+              aria-pressed={filter === id}
+              onClick={() => settings.setFilter(id)}
+            >
+              {text}
+            </button>
+          ))}
         <span className="grow" />
         <button
           type="button"
           className="btn sm"
           disabled={visible.length === 0}
-          onClick={() => settings.setSelected(new Set(visible.map((entry) => entry.id)))}
+          onClick={() => settings.setSelected(new Set(visible.map((option) => option.key)))}
         >
           {t('settings.keys.selectVisible')}
         </button>
       </div>
-      <div className="keylist" data-testid="settings-keys">
+      <div className="keylist" data-testid={kind === 'keys' ? 'settings-keys' : 'settings-options'}>
         {visible.length === 0 && <p className="empty-row">{t('settings.keys.noMatch')}</p>}
         {groups.map((group) => {
-          const rows = visible.filter((entry) => entry.group === group);
-          const modGroup = rows.some((entry) => entry.mod);
+          const rows = visible.filter((option) => (option.group ?? '') === group);
           return (
             <div key={group || 'other'}>
-              <div className="grp">
-                {group || t('settings.keys.otherMods')}
-                {modGroup && <Chip>{t('settings.keys.modChip')}</Chip>}
-              </div>
-              {rows.map((entry) => {
-                const name = entry.name ?? entry.id;
+              {(kind === 'keys' || group) && (
+                <div className="grp">
+                  {group || t('settings.keys.otherGroup')}
+                  {rows.some((option) => option.kind === 'mod-keybind') && (
+                    <Chip>{t('settings.keys.modChip')}</Chip>
+                  )}
+                </div>
+              )}
+              {rows.map((option) => {
+                const name = optionLabel(option.key);
                 return (
                   <div
-                    className={`kr${selected.has(entry.id) ? ' sel' : ''}`}
-                    key={entry.id}
+                    className={`kr${selected.has(option.key) ? ' sel' : ''}`}
+                    key={option.key}
                     data-testid="settings-key-row"
                   >
                     <Checkbox
-                      checked={selected.has(entry.id)}
+                      checked={selected.has(option.key)}
                       label={t('settings.keys.select', { name })}
-                      onChange={(on) => settings.toggle(entry.id, on)}
+                      onChange={(on) => settings.toggle(option.key, on)}
                     />
                     <span className="n">
                       <strong>{name}</strong>
-                      <small>{entry.name ? entry.id : t('settings.keys.unknownName')}</small>
+                      <small>{option.key}</small>
                     </span>
-                    <span className="key">{entry.value}</span>
+                    <span className="key">{option.value}</span>
                     <PolicyControl
-                      value={settings.policyOf(entry.id)}
-                      onChange={(value) => settings.setPolicy([entry.id], value)}
+                      value={option.policy}
+                      disabled={busy}
+                      onChange={(value) => change([option.key], value)}
                       labels={labels}
                       groupLabel={t('settings.policyOf', { name })}
                     />
@@ -366,99 +382,425 @@ function KeysTab({
   );
 }
 
-function ShadersTab({
-  settings,
+function ItemRows({
+  items,
   labels,
+  busy,
+  onChange,
 }: {
-  settings: SettingsState;
-  labels: Record<Policy3, string>;
+  items: StudioConfigItem[];
+  labels: Labels;
+  busy: boolean;
+  onChange(key: string, policy: SettingPolicyChoice): void;
 }) {
   const { t } = useStudioLocale();
-  const selected = sampleShaders.find((item) => item.id === settings.shader);
-  const row = (id: string, title: string, help: string, extra?: React.ReactNode) => (
+  return (
+    <>
+      {items.map((item) => (
+        <div className="kr" key={item.key}>
+          <span className="n">
+            <strong>{item.key}</strong>
+          </span>
+          <span className="key">{item.value}</span>
+          <PolicyControl
+            value={item.policy}
+            disabled={busy}
+            onChange={(value) => onChange(item.key, value)}
+            labels={labels}
+            groupLabel={t('settings.policyOf', { name: item.key })}
+          />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ConfigTab({
+  game,
+  labels,
+  send,
+  busy,
+}: {
+  game: StudioGameSettings | undefined;
+  labels: Labels;
+  send: Send;
+  busy: boolean;
+}) {
+  const { t } = useStudioLocale();
+  const files = game?.configFiles ?? [];
+  return (
+    <section className="card" data-testid="settings-config">
+      <h2>{t('settings.config.title')}</h2>
+      <p className="sub">{t('settings.config.sub')}</p>
+      {files.length === 0 && <p className="empty-row">{t('settings.config.none')}</p>}
+      {files.map((file) => (
+        <div key={file.path}>
+          <div className="grp">
+            <span className="mono">{file.path}</span>
+            <span className="grow" />
+            <button
+              type="button"
+              className="btn sm ghost"
+              disabled={busy}
+              aria-label={t('settings.config.remove', { path: file.path })}
+              onClick={() => send({ action: 'settingsConfigRemove', path: file.path })}
+            >
+              {t('brand.remove')}
+            </button>
+          </div>
+          <ItemRows
+            items={file.items}
+            labels={labels}
+            busy={busy}
+            onChange={(key, policy) =>
+              send({
+                action: 'settingsConfigItems',
+                path: file.path,
+                changes: [{ key, policy }],
+              })
+            }
+          />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function PackHeader({
+  title,
+  sub,
+  add,
+  busy,
+  disabled,
+  onAdd,
+}: {
+  title: string;
+  sub: string;
+  add: string;
+  busy: boolean;
+  disabled: boolean;
+  onAdd(): void;
+}) {
+  return (
+    <div className="sechead">
+      <div>
+        <h2>{title}</h2>
+        <p className="sub tight">{sub}</p>
+      </div>
+      <button
+        type="button"
+        className="btn sm"
+        disabled={busy || disabled}
+        data-testid="pack-add"
+        onClick={onAdd}
+      >
+        <PlusIcon />
+        {add}
+      </button>
+    </div>
+  );
+}
+
+const packColors = ['#2f6b4f', '#4a4f8f', '#8f5a2f', '#7a4fa3', '#2f6b8f', '#8f4a4a'];
+const packColor = (name: string) =>
+  packColors[[...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % packColors.length];
+
+function PackTab({
+  kind,
+  packs,
+  labels,
+  send,
+  busy,
+  sourceReady,
+}: {
+  kind: PackKind;
+  packs: StudioPack[];
+  labels: Labels;
+  send: Send;
+  busy: boolean;
+  sourceReady: boolean;
+}) {
+  const { t } = useStudioLocale();
+  return (
+    <section className="card" data-testid="settings-packs">
+      <PackHeader
+        title={t('settings.packs.title')}
+        sub={t('settings.packs.sub')}
+        add={t('settings.packs.add')}
+        busy={busy}
+        disabled={!sourceReady}
+        onAdd={() => send({ action: 'settingsPackAdd', kind })}
+      />
+      {!sourceReady && <p className="err">{t('settings.packs.needSource')}</p>}
+      {packs.length === 0 && <p className="empty-row">{t('settings.packs.empty')}</p>}
+      <div className="packlist">
+        {packs.map((pack, index) => (
+          <div className="pk" key={pack.name} data-testid="pack-row">
+            <span className="ord">
+              <button
+                type="button"
+                aria-label={t('settings.packs.up', { name: pack.name })}
+                disabled={busy || index === 0}
+                onClick={() =>
+                  send({ action: 'settingsPackMove', kind, name: pack.name, index: index - 1 })
+                }
+              >
+                <UpIcon />
+              </button>
+              <button
+                type="button"
+                aria-label={t('settings.packs.down', { name: pack.name })}
+                disabled={busy || index === packs.length - 1}
+                onClick={() =>
+                  send({ action: 'settingsPackMove', kind, name: pack.name, index: index + 1 })
+                }
+              >
+                <DownIcon />
+              </button>
+            </span>
+            <span className="pic" style={{ background: packColor(pack.name) }} aria-hidden="true">
+              {[...pack.name][0]?.toUpperCase()}
+            </span>
+            <span className="n">
+              <strong>{pack.name}</strong>
+              <small>{formatBytes(pack.length)}</small>
+            </span>
+            <PolicyControl
+              value={pack.policy}
+              disabled={busy}
+              onChange={(policy) =>
+                send({ action: 'settingsPackPolicy', kind, name: pack.name, policy })
+              }
+              labels={labels}
+              groupLabel={t('settings.policyOf', { name: pack.name })}
+            />
+            <button
+              type="button"
+              className="btn sm ghost"
+              disabled={busy}
+              aria-label={t('settings.packs.remove', { name: pack.name })}
+              onClick={() => send({ action: 'settingsPackRemove', kind, name: pack.name })}
+            >
+              {t('brand.remove')}
+            </button>
+          </div>
+        ))}
+      </div>
+      <p className="fine">{t('settings.packs.hint')}</p>
+      <p className="fine">{t('settings.packs.removeNote')}</p>
+    </section>
+  );
+}
+
+function ShadersTab({
+  game,
+  labels,
+  send,
+  busy,
+  sourceReady,
+}: {
+  game: StudioGameSettings | undefined;
+  labels: Labels;
+  send: Send;
+  busy: boolean;
+  sourceReady: boolean;
+}) {
+  const { t } = useStudioLocale();
+  const [showOptions, setShowOptions] = useState(false);
+  const packs = game?.shaderPacks ?? [];
+  const shader: StudioShaderSettings | undefined = game?.shader;
+  const enabled = shader?.enabled ?? { policy: 'none' as const, value: false };
+  const selection = shader?.pack ?? { policy: 'none' as const, value: '' };
+  const packOptions = shader?.packOptions.find((entry) => entry.pack === selection.value);
+  const row = (id: string, title: string, help: string, control: ReactNode, policy: ReactNode) => (
     <div className="kr" key={id}>
       <span className="n">
         <strong>{title}</strong>
         <small>{help}</small>
       </span>
-      {extra}
-      <PolicyControl
-        value={settings.policyOf(id)}
-        onChange={(value) => settings.setPolicy([id], value)}
-        labels={labels}
-        groupLabel={t('settings.policyOf', { name: title })}
-      />
+      {control}
+      {policy}
     </div>
   );
   return (
     <>
-      <div className="cols">
+      <div className="cols" data-testid="settings-shaders">
         <section className="card">
-          <div className="sechead">
-            <div>
-              <h2>{t('settings.shaders.title')}</h2>
-              <p className="sub tight">{t('settings.shaders.sub')}</p>
-            </div>
-            <button type="button" className="btn sm" disabled title={t('settings.unavailable')}>
-              <PlusIcon />
-              {t('settings.shaders.add')}
-            </button>
-          </div>
+          <PackHeader
+            title={t('settings.shaders.title')}
+            sub={t('settings.shaders.sub')}
+            add={t('settings.shaders.add')}
+            busy={busy}
+            disabled={!sourceReady}
+            onAdd={() => send({ action: 'settingsPackAdd', kind: 'shaderpack' })}
+          />
+          {!sourceReady && <p className="err">{t('settings.packs.needSource')}</p>}
+          {packs.length === 0 && <p className="empty-row">{t('settings.shaders.empty')}</p>}
           <div className="packlist" role="radiogroup" aria-label={t('settings.shaders.title')}>
-            {sampleShaders.map((shader) => (
-              // biome-ignore lint/a11y/useSemanticElements: segmented control of toggle buttons
-              <button
-                key={shader.id}
-                type="button"
-                role="radio"
-                aria-checked={settings.shader === shader.id}
-                className={`pk pick${settings.shader === shader.id ? ' on' : ''}`}
-                onClick={() => settings.setShader(shader.id)}
-              >
-                <span
-                  className={`rad${settings.shader === shader.id ? ' on' : ''}`}
-                  aria-hidden="true"
-                />
-                <span className="pic" style={{ background: shader.color }} aria-hidden="true">
-                  {shader.initial}
-                </span>
-                <span className="n">
-                  <strong>{shader.file}</strong>
-                  <small>
-                    {settings.shader === shader.id ? `${t('settings.shaders.default')} · ` : ''}
-                    {shader.size}
-                  </small>
-                </span>
-              </button>
-            ))}
+            {packs.map((pack) => {
+              const on = selection.value === pack.name;
+              return (
+                <div className={`pk${on ? ' on' : ''}`} key={pack.name} data-testid="shader-row">
+                  {/* biome-ignore lint/a11y/useSemanticElements: radio-styled card */}
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    aria-label={`${t('settings.shaders.pack')}: ${pack.name}`}
+                    className="radbtn"
+                    disabled={busy}
+                    onClick={() =>
+                      send({
+                        action: 'settingsShader',
+                        pack: { policy: selection.policy, value: pack.name },
+                      })
+                    }
+                  >
+                    <span className={`rad${on ? ' on' : ''}`} aria-hidden="true" />
+                  </button>
+                  <span
+                    className="pic"
+                    style={{ background: packColor(pack.name) }}
+                    aria-hidden="true"
+                  >
+                    {[...pack.name][0]?.toUpperCase()}
+                  </span>
+                  <span className="n">
+                    <strong>{pack.name}</strong>
+                    <small>
+                      {on ? `${t('settings.shaders.selected')} · ` : ''}
+                      {formatBytes(pack.length)}
+                    </small>
+                  </span>
+                  <PolicyControl
+                    value={pack.policy}
+                    disabled={busy}
+                    onChange={(policy) =>
+                      send({
+                        action: 'settingsPackPolicy',
+                        kind: 'shaderpack',
+                        name: pack.name,
+                        policy,
+                      })
+                    }
+                    labels={labels}
+                    groupLabel={t('settings.policyOf', { name: pack.name })}
+                  />
+                  <button
+                    type="button"
+                    className="btn sm ghost"
+                    disabled={busy}
+                    aria-label={t('settings.packs.remove', { name: pack.name })}
+                    onClick={() =>
+                      send({ action: 'settingsPackRemove', kind: 'shaderpack', name: pack.name })
+                    }
+                  >
+                    {t('brand.remove')}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
         <section className="card slimlist">
           {row(
-            'shader:enabled',
+            'configPath',
+            t('settings.shaders.configPath'),
+            shader?.configPath ?? 'config/iris.properties',
+            <span className="seg">
+              {(['config/iris.properties', 'config/oculus.properties'] as const).map((path) => (
+                <button
+                  key={path}
+                  type="button"
+                  className={
+                    (shader?.configPath ?? 'config/iris.properties') === path ? 'on' : undefined
+                  }
+                  disabled={busy}
+                  onClick={() => send({ action: 'settingsShader', configPath: path })}
+                >
+                  {path.includes('iris') ? 'Iris' : 'Oculus'}
+                </button>
+              ))}
+            </span>,
+            null,
+          )}
+          {row(
+            'enabled',
             t('settings.shaders.enabled'),
             t('settings.shaders.enabledHelp'),
             <button
               type="button"
-              className={`sw${settings.shaderEnabled ? ' on' : ''}`}
+              className={`sw${enabled.value ? ' on' : ''}`}
               role="switch"
-              aria-checked={settings.shaderEnabled}
+              aria-checked={enabled.value}
               aria-label={t('settings.shaders.enabled')}
-              onClick={() => settings.setShaderEnabled(!settings.shaderEnabled)}
+              disabled={busy}
+              onClick={() =>
+                send({
+                  action: 'settingsShader',
+                  enabled: { policy: enabled.policy, value: !enabled.value },
+                })
+              }
+            />,
+            <PolicyControl
+              value={enabled.policy}
+              disabled={busy}
+              onChange={(policy) =>
+                send({ action: 'settingsShader', enabled: { policy, value: enabled.value } })
+              }
+              labels={labels}
+              groupLabel={t('settings.policyOf', { name: t('settings.shaders.enabled') })}
             />,
           )}
           {row(
-            'shader:pack',
+            'pack',
             t('settings.shaders.pack'),
-            t('settings.shaders.packHelp', { name: selected?.file ?? '—' }),
+            t('settings.shaders.packHelp', {
+              name: selection.value || t('settings.shaders.packNone'),
+            }),
+            null,
+            <PolicyControl
+              value={selection.policy}
+              disabled={busy}
+              onChange={(policy) =>
+                send({ action: 'settingsShader', pack: { policy, value: selection.value } })
+              }
+              labels={labels}
+              groupLabel={t('settings.policyOf', { name: t('settings.shaders.pack') })}
+            />,
           )}
           {row(
-            'shader:options',
+            'options',
             t('settings.shaders.options'),
-            t('settings.shaders.optionsHelp', { count: sampleShaderOptionCount }),
-            <button type="button" className="btn sm" disabled title={t('settings.unavailable')}>
-              {t('settings.shaders.view')}
+            packOptions
+              ? t('settings.shaders.optionsHelp', { count: packOptions.items.length })
+              : t('settings.shaders.optionsNone'),
+            <button
+              type="button"
+              className="btn sm"
+              disabled={!packOptions}
+              aria-expanded={showOptions}
+              onClick={() => setShowOptions(!showOptions)}
+            >
+              {showOptions ? t('settings.shaders.hide') : t('settings.shaders.view')}
             </button>,
+            null,
+          )}
+          {showOptions && packOptions && (
+            <div data-testid="shader-options">
+              <ItemRows
+                items={packOptions.items}
+                labels={labels}
+                busy={busy}
+                onChange={(key, policy) =>
+                  send({
+                    action: 'settingsShaderOptions',
+                    pack: packOptions.pack,
+                    changes: [{ key, policy }],
+                  })
+                }
+              />
+            </div>
           )}
         </section>
       </div>
@@ -469,7 +811,15 @@ function ShadersTab({
   );
 }
 
-function PresetDialog({ onCancel, onLoad }: { onCancel(): void; onLoad(): void }) {
+function PresetDialog({
+  busy,
+  onCancel,
+  onImport,
+}: {
+  busy: boolean;
+  onCancel(): void;
+  onImport(source: 'folder' | 'file'): void;
+}) {
   const { t } = useStudioLocale();
   return (
     <Modal titleId="preset-title" testId="preset-dialog" className="wide" onCancel={onCancel}>
@@ -478,30 +828,41 @@ function PresetDialog({ onCancel, onLoad }: { onCancel(): void; onLoad(): void }
         {t('settings.dialog.lead1')} <b>{t('settings.dialog.lead2')}</b>{' '}
         {t('settings.dialog.lead3')}
       </p>
-      <div className="fld">
-        <span className="lbl">{t('settings.dialog.folder')}</span>
-        <div className="folderrow">
-          <div className="inp mono grow">{t('settings.dialog.folderNone')}</div>
-          <button type="button" className="btn" disabled title={t('settings.unavailable')}>
-            {t('settings.dialog.pick')}
-          </button>
-        </div>
-      </div>
-      <Note tone="ok">
-        <b>{t('settings.dialog.found')}</b> {samplePresetSource.files.join(' · ')}
-        <br />
-        {t('settings.dialog.counts', {
-          keys: samplePresetSource.keyCount,
-          mods: samplePresetSource.modKeyCount,
-        })}
-      </Note>
-      <p className="fine">{t('settings.dialog.sampleNote')}</p>
+      <button
+        type="button"
+        className="big p dlgbtn"
+        disabled={busy}
+        data-autofocus
+        data-testid="import-folder"
+        onClick={() => onImport('folder')}
+      >
+        <span className="ic">
+          <FolderIcon />
+        </span>
+        <span>
+          <strong>{t('settings.dialog.folder')}</strong>
+          <small>{t('settings.dialog.folderHelp')}</small>
+        </span>
+      </button>
+      <div className="or">{t('settings.dialog.or')}</div>
+      <button
+        type="button"
+        className="big dlgbtn"
+        disabled={busy}
+        data-testid="import-file"
+        onClick={() => onImport('file')}
+      >
+        <span className="ic">
+          <GamepadIcon />
+        </span>
+        <span>
+          <strong>{t('settings.dialog.file')}</strong>
+          <small>{t('settings.dialog.fileHelp')}</small>
+        </span>
+      </button>
       <div className="dialog-actions">
         <button type="button" className="btn" onClick={onCancel}>
           {t('common.cancel')}
-        </button>
-        <button type="button" className="btn primary" data-autofocus onClick={onLoad}>
-          {t('settings.dialog.load')}
         </button>
       </div>
     </Modal>

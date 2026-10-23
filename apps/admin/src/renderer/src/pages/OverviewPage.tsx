@@ -79,7 +79,17 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
         title={draft.name || t('overview.untitled')}
         lead={`${game} · ${draft.address}`}
       />
-      <section className="card" data-testid="deploy-status" data-state={deploy.status === 'changed' ? 'stale' : deploy.status === 'upToDate' ? 'current' : 'unknown'}>
+      <section
+        className="card"
+        data-testid="deploy-status"
+        data-state={
+          deploy.status === 'changed'
+            ? 'stale'
+            : deploy.status === 'upToDate'
+              ? 'current'
+              : 'unknown'
+        }
+      >
         <div className="stat">
           <span className={`sico ${status.tone}`}>{status.icon}</span>
           <div className="stat-body">

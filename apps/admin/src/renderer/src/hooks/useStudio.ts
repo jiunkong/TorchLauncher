@@ -73,10 +73,7 @@ export function useStudio() {
       .catch(() => setMessage(t('error.IO')));
   };
   /** Sends the pending draft to the main process first, then the command; keeps one at a time. */
-  const execute = async (
-    request: StudioRequest,
-    syncDraft: boolean,
-  ): Promise<boolean> => {
+  const execute = async (request: StudioRequest, syncDraft: boolean): Promise<boolean> => {
     if (actionLock.current) return false;
     actionLock.current = true;
     setPending(true);
@@ -122,7 +119,10 @@ export function useStudio() {
     }
     return ok;
   };
-  const run = async (action: StudioAction, options: { discard?: boolean } = {}): Promise<boolean> => {
+  const run = async (
+    action: StudioAction,
+    options: { discard?: boolean } = {},
+  ): Promise<boolean> => {
     if (action === 'cancel') {
       try {
         await window.torchlauncher.request({ action });

@@ -16,7 +16,8 @@ export function DeployPage({ studio, draft, insights, go }: PageProps) {
   const canBuild = sourceReady && serverReady;
   const stateClass =
     deploy.status === 'upToDate' ? 'ok' : deploy.status === 'changed' ? 'warn' : undefined;
-  const uiState = deploy.status === 'changed' ? 'stale' : deploy.status === 'upToDate' ? 'current' : 'unknown';
+  const uiState =
+    deploy.status === 'changed' ? 'stale' : deploy.status === 'upToDate' ? 'current' : 'unknown';
   const addressNote = {
     unchecked: t('deploy.address.unchecked'),
     ok: t('deploy.address.ok'),
@@ -26,7 +27,9 @@ export function DeployPage({ studio, draft, insights, go }: PageProps) {
   const rowStatus = (value: 'ok' | 'mismatch' | 'failed' | 'unknown'): 'ok' | 'bad' | 'pending' =>
     value === 'ok' ? 'ok' : value === 'unknown' ? 'pending' : 'bad';
   const remote = urlCheck?.remoteGame;
-  const remoteText = remote ? `${remote.minecraftVersion} · ${loaderLabel(remote.loader.kind)} ${remote.loader.version}` : undefined;
+  const remoteText = remote
+    ? `${remote.minecraftVersion} · ${loaderLabel(remote.loader.kind)} ${remote.loader.version}`
+    : undefined;
   const showChecks = !!urlCheck && insights.addressState !== 'stale';
   const reasons = deploy.reasons.map((reason) => t(`deploy.reason.${reason}`)).join(' · ');
   return (

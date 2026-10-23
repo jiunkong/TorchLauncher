@@ -4,6 +4,7 @@ import {
   finishClose,
   onCloseRequest,
   runConfirmedSwitch,
+  saveThenClose,
 } from './adapters/discard';
 import { deriveInsights } from './adapters/insights';
 import { Sidebar } from './components/Sidebar';
@@ -44,14 +45,17 @@ export function App() {
   const confirmSave = async () => {
     const action = confirm;
     if (!action) return;
+    if (action === 'close') {
+      setConfirm(null);
+      await saveThenClose(studio);
+      return;
+    }
     if (!(await studio.run('save'))) {
-      // A cancelled or failed save keeps a close request open so nothing is lost silently.
-      if (action !== 'close') setConfirm(null);
+      setConfirm(null);
       return;
     }
     setConfirm(null);
-    if (action === 'close') await finishClose(studio);
-    else await runConfirmedSwitch(studio, action);
+    await runConfirmedSwitch(studio, action);
   };
   const confirmDiscard = () => {
     const action = confirm;

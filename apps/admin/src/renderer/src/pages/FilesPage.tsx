@@ -210,7 +210,11 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                             role="radio"
                             aria-checked={entry.policy === policy}
                             className={
-                              entry.policy === policy ? (policy === 'always' ? 'a' : 'i') : undefined
+                              entry.policy === policy
+                                ? policy === 'always'
+                                  ? 'a'
+                                  : 'i'
+                                : undefined
                             }
                             disabled={busy}
                             onClick={() => void apply([entry.path], policy)}

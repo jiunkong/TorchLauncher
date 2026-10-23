@@ -7,12 +7,19 @@ import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
 import { validateServer } from './validation';
 
+/** The done screen is dismissed per export result; it must survive leaving the page. */
+let dismissedDone: string | null = null;
+
 export function ExportPage({ studio, draft, insights, go }: PageProps) {
   const { t } = useStudioLocale();
   const { busy, command, run, state } = studio;
   const { deploy } = insights;
   const status = insights.export;
-  const [dismissed, setDismissed] = useState<string | null>(null);
+  const [dismissed, setDismissedState] = useState<string | null>(dismissedDone);
+  const setDismissed = (key: string | null) => {
+    dismissedDone = key;
+    setDismissedState(key);
+  };
   const sourceReady = !!state?.sourceName;
   const serverReady = Object.keys(validateServer(draft)).length === 0;
   const game = `${draft.game.minecraftVersion} · ${loaderLabel(draft.game.loader.kind)} ${draft.game.loader.version}`;
