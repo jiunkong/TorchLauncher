@@ -1,8 +1,10 @@
 import { join } from 'node:path';
 import { MicrosoftAuthenticator } from '@torchlauncher/core/auth';
+import {
+  EncryptedMicrosoftTokenStorage,
+  LoopbackAuthenticationBrowser,
+} from '@torchlauncher/desktop-auth';
 import { app, safeStorage, shell } from 'electron';
-import { LoopbackAuthenticationBrowser } from './browser';
-import { EncryptedMicrosoftTokenStorage } from './storage';
 
 export interface ElectronAuthenticatorOptions {
   clientId: string;

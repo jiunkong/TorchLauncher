@@ -1,12 +1,14 @@
 // Dedicated harness entry; never imported by the product main process.
 import { join } from 'node:path';
 import { AuthenticationError, type StoredMicrosoftSession } from '@torchlauncher/core/auth';
+import {
+  EncryptedMicrosoftTokenStorage,
+  EncryptedPublicJavaCache,
+  HostAuthenticationError,
+} from '@torchlauncher/desktop-auth';
 import { app, BrowserWindow, safeStorage } from 'electron';
 import { createElectronAuthenticator } from './electron';
-import { HostAuthenticationError } from './errors';
-import { EncryptedPublicJavaCache } from './public-java-cache';
 import { createPublicJavaAuthenticator } from './public-java-electron';
-import { EncryptedMicrosoftTokenStorage } from './storage';
 
 interface SmokeConfig {
   mode: string;

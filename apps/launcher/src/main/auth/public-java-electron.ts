@@ -1,8 +1,9 @@
 import { join } from 'node:path';
+import {
+  createDesktopPublicJavaAuthenticator,
+  HostAuthenticationError,
+} from '@torchlauncher/desktop-auth';
 import { app, BrowserWindow, safeStorage, shell } from 'electron';
-import { HostAuthenticationError } from './errors';
-import { PublicJavaAuthenticator } from './public-java';
-import { EncryptedPublicJavaCache } from './public-java-cache';
 
 async function showCode(code: string, signal: AbortSignal) {
   if (!/^[A-Z0-9-]{4,16}$/.test(code)) throw new HostAuthenticationError('browser_failed');
@@ -52,11 +53,9 @@ export async function createPublicJavaAuthenticator(
   options: { cacheDirectory?: string; workerPath?: string; timeoutMs?: number } = {},
 ) {
   await app.whenReady();
-  return new PublicJavaAuthenticator({
-    store: new EncryptedPublicJavaCache({
-      directory: options.cacheDirectory ?? join(app.getPath('userData'), 'public-java'),
-      safeStorage,
-    }),
+  return createDesktopPublicJavaAuthenticator({
+    cacheDirectory: options.cacheDirectory ?? join(app.getPath('userData'), 'public-java'),
+    safeStorage,
     workerPath: options.workerPath ?? join(__dirname, 'public-java-worker.cjs'),
     showCode,
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),

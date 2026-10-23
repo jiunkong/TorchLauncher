@@ -16,10 +16,8 @@
   },
   "devDependencies": {
     "@torchlauncher/core": "workspace:*",
+    "@torchlauncher/desktop-auth": "workspace:*",
     "react": "19.3.1",
     "react-dom": "19.3.1"
-  },
-  "dependencies": {
-    "prismarine-auth": "3.1.1"
   }
 }

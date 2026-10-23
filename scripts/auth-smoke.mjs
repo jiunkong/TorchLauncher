@@ -221,7 +221,7 @@ async function main() {
             'auth-smoke': resolve(repository, 'apps/launcher/src/main/auth/smoke-entry.ts'),
             'public-java-worker': resolve(
               repository,
-              'apps/launcher/src/main/auth/public-java-worker.ts',
+              'packages/desktop-auth/src/public-java-worker.ts',
             ),
           },
           external: ['electron'],
