@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>내보내기 완료</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>body{margin:0;background:#0e0b0c}.okbig{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:rgba(91,214,160,.14);border:1.5px solid rgba(91,214,160,.6);flex:none}.okbig svg{width:28px;height:28px;stroke:var(--ok);fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}.fl{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-deep)}.fl .g{flex:1;min-width:0}.fl small{display:block;font-size:12px;color:var(--text-3)}.fl svg{width:22px;height:22px;stroke:var(--text-2);fill:none;stroke-width:1.8;flex:none;stroke-linecap:round;stroke-linejoin:round}</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div>
+      <nav class="menu" aria-label="프로젝트 섹션">
+        <a class="mi" href="Overview.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>개요</a>
+        <a class="mi" href="Server.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></svg>서버 정보</a>
+        <a class="mi" href="Brand.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>브랜딩</a>
+        <a class="mi" href="Files.dc.html"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>파일</a>
+        <a class="mi" href="Settings.dc.html"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 15h8"/></svg>게임 설정</a>
+        <a class="mi" href="DeployReady.dc.html"><svg viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>배포<span class="tag k">최신</span></a>
+        <a class="mi active" href="Export.dc.html" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>내보내기</a>
+      </nav>
+      <div class="sidefoot"><div class="savest"><span class="dot ok"></span>저장됨 · 방금 전</div><button class="btn" type="button">저장</button><a class="btn ghost sm" href="Main.dc.html">프로젝트 닫기</a></div>
+    </aside>
+    <div class="col">
+      <main class="page">
+        <section class="card" style="display: flex; align-items: center; gap: 20px; padding: 24px">
+          <span class="okbig"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>
+          <div style="flex: 1"><h1 style="margin: 0; font-size: 24px">런처를 내보냈습니다</h1><p style="margin: 4px 0 0; color: var(--text-2)">아래 ZIP 파일을 플레이어에게 전달하세요.</p></div>
+          <a class="btn primary lg" href="ExportDone.dc.html"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>폴더 열기</a>
+        </section>
+        <section class="card">
+          <h2>내보낸 파일</h2>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px">
+            <div class="fl"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M10 9h2M10 12h2M10 15h2"/></svg><span class="g"><span class="mono" style="color: var(--text)">서버이름-launcher.zip</span><small>런처 실행 파일과 서버 설정 · 96.2 MB</small></span></div>
+          </div>
+        </section>
+        <div class="note"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><span>서버를 업데이트할 때는 파일을 바꾸고 배포 파일을 다시 올리면 됩니다. 배포 주소가 그대로면 플레이어는 런처를 다시 받지 않아도 업데이트를 받습니다.</span></div>
+      </main>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

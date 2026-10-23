@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>브랜딩</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+body{margin:0;background:#0e0b0c}
+.lay{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start}
+.big{border-radius:12px;overflow:hidden;border:1px solid var(--line-2);background:#0e0b0c;box-shadow:0 18px 48px rgba(0,0,0,.45)}
+.big .tb{height:30px;display:flex;align-items:center;gap:8px;padding-left:10px;background:#0a0809;border-bottom:1px solid #2b2223;font-size:11px;color:#bbaeaa}
+.big .body{display:flex;height:430px}
+.big .rl{width:50px;background:#151112;border-right:1px solid #2b2223;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:6px}
+.big .rl i{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:#bbaeaa}
+.big .rl i.on{background:rgba(229,65,43,.18);color:#fff;box-shadow:inset 3px 0 0 #e5412b}
+.big .rl svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.big .rl em{margin-top:auto;width:28px;height:28px;border-radius:6px;background:#6b4a2b;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:12px;color:#f6e3cc}
+.big .st{position:relative;flex:1;display:flex;align-items:flex-end;overflow:hidden;background:linear-gradient(180deg,#171030 0%,#36204f 36%,#b04a3c 68%,#f0a15a 76%,#20121a 76.1%,#20121a 100%)}
+.big .st .sun{position:absolute;left:62%;top:54%;width:110px;height:110px;margin-left:-55px;border-radius:50%;background:radial-gradient(circle,#ffe3a0,#ffb35a 60%,transparent 72%)}
+.big .st .h{position:absolute;left:0;right:0;bottom:0;height:46%;background:#1c1220;clip-path:polygon(0 62%,6% 62%,6% 48%,14% 48%,14% 36%,22% 36%,22% 44%,30% 44%,30% 30%,38% 30%,38% 42%,46% 42%,46% 54%,56% 54%,56% 40%,64% 40%,64% 52%,74% 52%,74% 34%,82% 34%,82% 46%,92% 46%,92% 58%,100% 58%,100% 100%,0 100%)}
+.big .st .h2{height:32%;background:#130c15;clip-path:polygon(0 40%,10% 40%,10% 54%,20% 54%,20% 36%,32% 36%,32% 50%,44% 50%,44% 30%,52% 30%,52% 46%,66% 46%,66% 34%,78% 34%,78% 52%,90% 52%,90% 38%,100% 38%,100% 100%,0 100%)}
+.big .st .shd{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,6,7,0) 28%,rgba(8,6,7,.9) 100%),linear-gradient(90deg,rgba(8,6,7,.55),rgba(8,6,7,0) 62%)}
+.big .cp{position:relative;padding:0 30px 28px;display:flex;flex-direction:column;gap:8px}
+.big .cp small{font-size:12px;color:#bbaeaa}
+.big .cp b{font-size:34px;line-height:1.15}
+.big .cp i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;height:42px;width:140px;border-radius:9px;background:#c8321f;color:#fff;font-size:15px;font-weight:700}
+.row3{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.row3:last-child{border-bottom:0}
+.row3 .t{width:44px;height:44px;border-radius:10px;background:var(--bg);display:grid;place-items:center;flex:none;overflow:hidden}
+.row3 .g{flex:1;min-width:0}.row3 strong{display:block;font-size:13px;font-weight:500}.row3 small{display:block;font-size:12px;color:var(--text-3)}
+</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div>
+      <nav class="menu" aria-label="프로젝트 섹션">
+        <a class="mi" href="Overview.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>개요</a>
+        <a class="mi" href="Server.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></svg>서버 정보</a>
+        <a class="mi active" href="Brand.dc.html" aria-current="page"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>브랜딩</a>
+        <a class="mi" href="Files.dc.html"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>파일<span class="tag w">변경 2</span></a>
+        <a class="mi" href="Settings.dc.html"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 15h8"/></svg>게임 설정</a>
+        <a class="mi" href="DeployChanged.dc.html"><svg viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>배포<span class="tag w">다시 만들기</span></a>
+        <a class="mi" href="Export.dc.html"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>내보내기</a>
+      </nav>
+      <div class="sidefoot"><div class="savest"><span class="dot ok"></span>저장됨 · 방금 전</div><button class="btn" type="button">저장</button><a class="btn ghost sm" href="Main.dc.html">프로젝트 닫기</a></div>
+    </aside>
+    <div class="col">
+      <main class="page">
+        <header><span class="eyebrow">브랜딩</span><h1>플레이어가 보게 될 런처</h1><p class="lead">아이콘, 이름, 배경이 적용된 런처의 모습입니다.</p></header>
+        <div class="lay">
+          <div class="big" role="img" aria-label="런처 홈 화면 미리보기">
+            <div class="tb"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1l6 5-6 9-6-9z" fill="#3aa8e0"/><path d="M8 1l6 5H2z" fill="#8fe0ff"/><path d="M8 6l6 0-6 9z" fill="#2478b8"/></svg>서버 이름</div>
+            <div class="body">
+              <div class="rl"><i><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></i><i class="on"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg></i><i><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></i><i><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></i><em><svg viewBox="0 0 8 8" width="28" height="28" shape-rendering="crispEdges" role="img" aria-label="프로필 이미지"><rect width="8" height="8" fill="#c68e5f"/><rect width="8" height="2" fill="#3b2a1a"/><rect y="2" width="1" height="1" fill="#3b2a1a"/><rect x="7" y="2" width="1" height="1" fill="#3b2a1a"/><rect x="1" y="4" width="2" height="1" fill="#ffffff"/><rect x="2" y="4" width="1" height="1" fill="#3a4cc9"/><rect x="5" y="4" width="2" height="1" fill="#ffffff"/><rect x="5" y="4" width="1" height="1" fill="#3a4cc9"/><rect x="3" y="6" width="2" height="1" fill="#7a4a30"/></svg></em></div>
+              <div class="st"><span class="sun"></span><span class="h"></span><span class="h h2"></span><span class="shd"></span>
+                <div class="cp"><small>● 온라인 · 12명 접속</small><b>서버 이름</b><small>Minecraft 1.21.1 · Fabric 0.19.5</small><i>▶ 플레이</i></div>
+              </div>
+            </div>
+          </div>
+          <section class="card" style="padding: 8px 16px">
+            <div class="row3"><span class="t"><svg viewBox="0 0 16 16" width="30" height="30" aria-hidden="true"><path d="M8 1l6 5-6 9-6-9z" fill="#3aa8e0"/><path d="M8 1l6 5H2z" fill="#8fe0ff"/><path d="M8 6l6 0-6 9z" fill="#2478b8"/></svg></span><span class="g"><strong>앱 아이콘</strong><small>icon.png</small></span><button class="btn sm" type="button">변경</button></div>
+            <div class="row3"><span class="t" style="font-size: 12px; color: var(--text-2)">Aa</span><span class="g"><strong>앱 이름</strong><small>서버 이름</small></span><button class="btn sm" type="button">변경</button></div>
+            <div class="row3"><span class="t" style="background: linear-gradient(180deg,#36204f,#b04a3c)"></span><span class="g"><strong>홈 배경</strong><small>background.png</small></span><button class="btn sm" type="button">변경</button></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

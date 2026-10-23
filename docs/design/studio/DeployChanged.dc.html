@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>배포 · 변경됨</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>body{margin:0;background:#0e0b0c}.ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--text-2)}.ol li{display:flex;gap:10px}.ol b{color:var(--red-text);font-weight:700;width:14px;flex:none}.fi{padding:12px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-deep)}</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div>
+      <nav class="menu" aria-label="프로젝트 섹션">
+        <a class="mi" href="Overview.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>개요</a>
+        <a class="mi" href="Server.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></svg>서버 정보</a>
+        <a class="mi" href="Brand.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>브랜딩</a>
+        <a class="mi" href="Files.dc.html"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>파일<span class="tag w">변경 2</span></a>
+        <a class="mi" href="Settings.dc.html"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 15h8"/></svg>게임 설정</a>
+        <a class="mi active" href="DeployChanged.dc.html" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>배포<span class="tag w">다시 만들기</span></a>
+        <a class="mi" href="Export.dc.html"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>내보내기</a>
+      </nav>
+      <div class="sidefoot"><div class="savest"><span class="dot ok"></span>저장됨 · 방금 전</div><button class="btn" type="button">저장</button><a class="btn ghost sm" href="Main.dc.html">프로젝트 닫기</a></div>
+    </aside>
+    <div class="col">
+      <main class="page">
+        <header><span class="eyebrow">배포</span><h1>배포</h1><p class="lead">플레이어가 받을 파일 묶음을 만들고 공개 주소에 올립니다.</p></header>
+        <div class="grid2">
+          <div class="stack">
+            <section class="card">
+              <h2>배포 파일</h2>
+              <div class="note warn" style="margin: 12px 0"><svg viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg><span>마지막 배포 이후 파일이 바뀌었습니다 · 추가 1 · 수정 1</span></div>
+              <div class="fi"><div class="mono" style="color: var(--text)">server-name.torchpack</div><div style="font-size: 12px; color: var(--text-3)">마지막 배포 · 어제 오후 4:20 · 39개 파일 · 41.2 MB</div></div>
+              <div style="margin-top: 14px"><button class="btn primary" type="button">배포 파일 만들기</button></div>
+            </section>
+            <section class="card">
+              <h2>업로드 방법</h2>
+              <ol class="ol" style="margin-top: 12px">
+                <li><b>1</b><span>만든 배포 파일을 누구나 받을 수 있는 공개 HTTPS 주소에 올립니다.</span></li>
+                <li><b>2</b><span>Google Drive는 같은 파일에 <strong style="color: var(--text)">새 버전 업로드</strong>로 교체하면 링크가 바뀌지 않습니다.</span></li>
+                <li><b>3</b><span>올린 뒤 오른쪽에서 주소를 다시 검사합니다.</span></li>
+              </ol>
+            </section>
+          </div>
+          <section class="card">
+            <h2>배포 주소</h2>
+            <p class="sub">플레이어의 런처가 업데이트를 확인하는 주소입니다.</p>
+            <div class="fld"><div class="inp mono">https://drive.google.com/file/d/…/view</div></div>
+            <div class="note" style="margin-bottom: 14px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><span>이전 배포는 확인됨 · 새 파일을 올린 뒤 다시 검사하세요.</span></div>
+            <button class="btn" type="button">주소 검사</button>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

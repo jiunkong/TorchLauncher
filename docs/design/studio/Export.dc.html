@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>내보내기</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>body{margin:0;background:#0e0b0c}.opt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.pt{padding:12px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--panel-2)}.pt.on{border-color:var(--red);background:rgba(229,65,43,.12)}.pt.off{opacity:.5}.pt strong{display:block;font-size:13px}.pt small{display:block;font-size:12px;color:var(--text-3)}.plat{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pick{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-deep)}.pick .g{flex:1;min-width:0}.pick small{display:block;font-size:12px;color:var(--text-3)}.ck{display:flex;align-items:center;gap:10px;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line)}.ck:last-child{border-bottom:0}.ck svg{width:16px;height:16px;stroke:var(--ok);fill:none;stroke-width:2.4;flex:none;stroke-linecap:round;stroke-linejoin:round}.ck span:last-child{margin-left:auto;color:var(--text-3);font-size:12px}</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div>
+      <nav class="menu" aria-label="프로젝트 섹션">
+        <a class="mi" href="Overview.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>개요</a>
+        <a class="mi" href="Server.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></svg>서버 정보</a>
+        <a class="mi" href="Brand.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>브랜딩</a>
+        <a class="mi" href="Files.dc.html"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>파일<span class="tag w">변경 2</span></a>
+        <a class="mi" href="Settings.dc.html"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 15h8"/></svg>게임 설정</a>
+        <a class="mi" href="DeployChanged.dc.html"><svg viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>배포<span class="tag w">다시 만들기</span></a>
+        <a class="mi active" href="Export.dc.html" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>내보내기</a>
+      </nav>
+      <div class="sidefoot"><div class="savest"><span class="dot ok"></span>저장됨 · 방금 전</div><button class="btn" type="button">저장</button><a class="btn ghost sm" href="Main.dc.html">프로젝트 닫기</a></div>
+    </aside>
+    <div class="col">
+      <main class="page">
+        <header><span class="eyebrow">내보내기</span><h1>런처 내보내기</h1><p class="lead">서버 설정이 담긴 런처를 만들어 플레이어에게 전달합니다.</p></header>
+        <div class="grid2">
+          <section class="card">
+            <h2>내보낼 런처</h2>
+            <div class="fld" style="margin-top: 12px"><label>플랫폼</label>
+              <div class="plat"><div class="pt on"><strong>Windows</strong><small>포터블 .exe</small></div><div class="pt"><strong>Linux</strong><small>AppImage</small></div></div>
+            </div>
+            <div class="fld"><label>공통 런처 파일</label>
+              <div class="pick"><span class="g"><span class="mono">D:\Downloads\TorchLauncher-0.1.0-win-x64.exe</span><small>96.1 MB</small></span><button class="btn sm" type="button">변경</button></div>
+            </div>
+            <div class="fld"><label>저장 위치</label>
+              <div class="pick"><span class="g"><span class="mono">D:\Export\서버이름-launcher.zip</span><small>런처와 서버 설정이 ZIP 파일 하나로 만들어집니다.</small></span><button class="btn sm" type="button">변경</button></div>
+            </div>
+            <div style="margin-top: 18px"><a class="btn primary lg" href="ExportDone.dc.html"><svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg>런처 내보내기</a></div>
+          </section>
+          <div class="stack">
+            <section class="card">
+              <h2>내보내기 전 확인</h2>
+              <p class="sub">모두 통과해야 내보낼 수 있습니다.</p>
+              <div class="ck"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg><span>서버 ID 일치</span><span>배포 파일과 같음</span></div>
+              <div class="ck"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg><span>게임 환경 일치</span><span>1.21.1 · Fabric 0.19.5</span></div>
+              <div class="ck"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg><span>배포 주소 확인됨</span><span>오늘 오후 3:20 검사</span></div>
+            </section>
+            <div class="note warn"><svg viewBox="0 0 24 24"><path d="M12 4l9 16H3zM12 10v4M12 17v.5"/></svg><span><b>배포 파일이 최신이 아닙니다.</b> 파일이 2개 바뀌었습니다. 플레이어는 마지막으로 올린 배포를 받습니다. <a href="DeployChanged.dc.html" style="color: var(--red-text)">배포로 이동</a></span></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

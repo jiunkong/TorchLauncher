@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>저장하지 않은 변경 확인</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>body{margin:0;background:#0e0b0c}.win{position:relative}.scrim{position:absolute;left:0;right:0;top:36px;bottom:0;background:rgba(6,4,5,.72);display:grid;place-items:center}.dialog{width:460px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.6)}.dialog h2{margin:0 0 8px;font-size:20px}.btn.solid-danger{background:#a82818;border-color:#d4412e;color:#fff;font-weight:700}</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div>
+    </aside>
+    <div class="col"><main class="page"></main></div>
+  </div>
+  <div class="scrim">
+    <div class="dialog" role="dialog" aria-labelledby="dlg-title" aria-modal="true">
+      <h2 id="dlg-title">저장하지 않은 변경이 있습니다</h2>
+      <p style="margin: 0; font-size: 13px; color: var(--text-2)">저장하지 않고 닫으면 이번 변경 내용이 사라집니다.</p>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px">
+        <button class="btn ghost" type="button">저장 안 함</button>
+        <a class="btn" href="Brand.dc.html">취소</a>
+        <a class="btn primary" href="Main.dc.html">저장</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

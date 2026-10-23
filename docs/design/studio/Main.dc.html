@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Studio · 시작 화면</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+body{margin:0;background:#0e0b0c}
+.hero{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:radial-gradient(640px 420px at 50% 22%,rgba(255,90,50,.18),transparent 66%),#0e0b0c}
+.inner{width:880px;display:flex;flex-direction:column;gap:30px;position:relative}
+.head{display:flex;align-items:center;gap:18px}
+.head img{width:72px;height:72px}
+.head h1{margin:0;font-family:'Pixelify Sans','Noto Sans KR',sans-serif;font-size:36px;line-height:1.1;letter-spacing:.05em}
+.head h1 i{font-style:normal;color:#ff6a55}
+.head h1 s{text-decoration:none;font-family:'Silkscreen',monospace;font-size:13px;letter-spacing:.3em;color:#ff6a55;border:1px solid rgba(255,106,85,.5);border-radius:4px;padding:2px 8px;margin-left:12px;vertical-align:middle}
+.head p{margin:6px 0 0;color:var(--text-2);font-size:14px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.big{display:flex;gap:16px;align-items:center;padding:22px;border-radius:14px;background:var(--panel);border:1px solid var(--line-2);text-decoration:none;color:var(--text)}
+.big:hover{background:var(--panel-2)}
+.big.p{background:linear-gradient(135deg,rgba(229,65,43,.22),rgba(229,65,43,.06));border-color:rgba(229,65,43,.6)}
+.big .ic{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.07);flex:none}
+.big svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.big strong{display:block;font-size:17px}
+.big small{display:block;color:var(--text-2);font-size:13px}
+.rec h2{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--text-3);letter-spacing:.04em}
+.rr{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:10px;text-decoration:none;color:var(--text);border:1px solid transparent}
+.rr:hover{background:var(--panel);border-color:var(--line)}
+.rr .ri{width:38px;height:38px;border-radius:8px;background:var(--panel-2);display:grid;place-items:center;flex:none}
+.rr .ri img{width:28px;height:28px}
+.rr strong{display:block;font-size:14px;font-weight:500;line-height:1.35}
+.rr small{display:block;font-size:12px;color:var(--text-3);line-height:1.35}
+.rr .g{flex:1;min-width:0}
+.rr time{font-size:12px;color:var(--text-3)}
+</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="hero">
+    <div class="inner">
+      <div class="head">
+        <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+        <div>
+          <h1>TORCH<i>LAUNCHER</i><s>STUDIO</s></h1>
+          <p>서버 전용 런처를 만들어 플레이어에게 전달합니다.</p>
+        </div>
+      </div>
+      <div class="acts">
+        <a class="big p" href="Overview.dc.html"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span><strong>새 프로젝트</strong><small>서버 정보부터 차례로 입력합니다</small></span></a>
+        <a class="big" href="Overview.dc.html"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span><strong>프로젝트 열기</strong><small>저장해 둔 프로젝트 파일을 엽니다</small></span></a>
+      </div>
+      <div class="rec">
+        <h2>최근 프로젝트</h2>
+        <a class="rr" href="Overview.dc.html"><span class="ri"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span class="g"><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5 · D:\Projects\server-a</small></span><time>오늘 오후 3:12</time></a>
+        <a class="rr" href="Overview.dc.html"><span class="ri"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span class="g"><strong>테스트 서버</strong><small>Minecraft 1.21.1 · NeoForge 21.1.264 · D:\Projects\test</small></span><time>어제</time></a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

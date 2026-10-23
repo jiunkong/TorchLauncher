@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>게임 설정 프리셋 불러오기</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>body{margin:0;background:#0e0b0c}.win{position:relative}.scrim{position:absolute;left:0;right:0;top:36px;bottom:0;background:rgba(6,4,5,.72);display:grid;place-items:center}.dialog{width:560px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.6)}.dialog h2{margin:0 0 8px;font-size:20px}.or{display:flex;align-items:center;gap:12px;color:var(--text-3);font-size:12px;margin:14px 0}.or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side"><div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div></aside>
+    <div class="col"><main class="page"></main></div>
+  </div>
+  <div class="scrim">
+    <div class="dialog" role="dialog" aria-labelledby="dlg-title" aria-modal="true">
+      <h2 id="dlg-title">게임 설정 프리셋 불러오기</h2>
+      <p style="margin: 0 0 16px; font-size: 13px; color: var(--text-2)">모드를 넣고 <b style="color: var(--text)">게임을 한 번 실행한 뒤</b> 불러오세요. 게임이 기록한 설정 파일(options.txt)을 읽습니다.</p>
+      <div class="fld"><label>게임 폴더</label>
+        <div style="display: flex; gap: 8px"><div class="inp mono" style="flex: 1">D:\Games\minecraft</div><button class="btn" type="button">폴더 선택</button></div>
+      </div>
+      <div class="note ok"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg><span><b>설정 파일을 찾았습니다.</b> options.txt · config/iris.properties<br>단축키 38개 · 모드 단축키 6개 · 마지막 수정 오늘 오후 2:48</span></div>
+      <div class="or">또는</div>
+      <button class="btn" type="button">options.txt 직접 선택</button>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px">
+        <a class="btn" href="SettingsEmpty.dc.html">취소</a>
+        <a class="btn primary" href="Settings.dc.html">불러오기</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
