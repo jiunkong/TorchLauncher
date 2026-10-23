@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
@@ -9,6 +10,14 @@ export default defineConfig({
         // Same OFL notice file as the launcher package (the renderer bundles the same two fonts).
         name: 'font-license-notices',
         generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'prismarine-auth-NOTICE.txt',
+            source: readFileSync(
+              new URL('../../third-party/prismarine-auth/NOTICE.txt', import.meta.url),
+              'utf8',
+            ),
+          });
           const fontNotice = (name: string, file: string) =>
             `${name}\n\n${readFileSync(new URL(`../../third-party/${file}/LICENSE`, import.meta.url), 'utf8').trim()}\n`;
           this.emitFile({
@@ -25,7 +34,16 @@ export default defineConfig({
     ],
     build: {
       externalizeDeps: false,
-      lib: { formats: ['cjs'], fileName: () => 'index.cjs' },
+      lib: {
+        entry: {
+          index: fileURLToPath(new URL('./src/main/index.ts', import.meta.url)),
+          'public-java-worker': fileURLToPath(
+            import.meta.resolve('@torchlauncher/desktop-auth/worker'),
+          ),
+        },
+        formats: ['cjs'],
+        fileName: (_format, name) => `${name}.cjs`,
+      },
     },
   },
   preload: {

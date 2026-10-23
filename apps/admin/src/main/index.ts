@@ -11,9 +11,12 @@ import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
 import { SigningKeyStore } from './signing.js';
 import { StudioService } from './studio.js';
+import { createStudioTestRunner } from './test-auth.js';
 
 const applicationName = applicationNames.studio;
 app.setName(applicationName);
+const primary = app.requestSingleInstanceLock();
+if (!primary) app.quit();
 
 function createWindow(): void {
   const rendererFile = join(__dirname, '../renderer/index.html');
@@ -123,6 +126,7 @@ function createWindow(): void {
     undefined,
     decodeNativeImage,
     new SigningKeyStore(join(app.getPath('userData'), 'signing-keys'), safeStorage),
+    createStudioTestRunner(window),
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>
@@ -201,17 +205,18 @@ function createWindow(): void {
   });
 }
 
-void app.whenReady().then(() => {
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
-    callback(false);
-  });
-  session.defaultSession.setPermissionCheckHandler(() => false);
-  createWindow();
+if (primary)
+  void app.whenReady().then(() => {
+    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
+      callback(false);
+    });
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    createWindow();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
   });
-});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
