@@ -69,8 +69,12 @@ const appCases = [
       ['개요', '새 서버'],
       ['서버 정보', '서버 정보'],
       ['브랜딩', '플레이어가 보게 될 런처'],
+      ['모드 설정', '모드 설정'],
+      ['리소스팩', '리소스팩'],
+      ['셰이더', '셰이더'],
       ['파일', '배포할 파일'],
-      ['게임 설정', '게임 설정'],
+      ['테스트 실행', '테스트 실행'],
+      ['단축키 · 옵션', '단축키 · 옵션'],
       ['배포', '배포'],
       ['내보내기', '런처 내보내기'],
     ],
@@ -251,12 +255,22 @@ try {
         `${name}: renderer, navigation, IPC, isolation, and 760px/1100px layout checks passed`,
       );
     } finally {
-      await app.close();
+      // A Studio project with unsaved changes answers a window close with its in-app dialog, so a
+      // plain close can wait forever (and hide the real failure). Fall back to ending the process.
+      await Promise.race([
+        app.close(),
+        new Promise((resolveTimeout) => setTimeout(resolveTimeout, 5000)),
+      ]);
+      try {
+        app.process().kill('SIGKILL');
+      } catch {
+        // already gone
+      }
     }
   }
 } finally {
   for (const socket of statusSockets) socket.destroy();
   if (statusFixture.listening)
     await new Promise((resolveClose) => statusFixture.close(resolveClose));
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
 }
