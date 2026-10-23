@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>테스트 실행 · 게임 실행 중</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Pixelify+Sans:wght@500;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+body{margin:0;background:#0e0b0c}
+.win{position:relative}
+.scrim{position:absolute;left:0;right:0;top:36px;bottom:0;background:rgba(6,4,5,.72);display:grid;place-items:center}
+.dialog{width:480px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.dialog h2{margin:0 0 8px;font-size:20px}
+.btn.solid-danger{background:#a82818;border-color:#d4412e;color:#fff;font-weight:700}
+.sl{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.sl li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.sl li:last-child{border-bottom:0}
+.sl .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;border:1.5px solid var(--line-2);color:var(--text-3);font-size:12px;font-weight:700}
+.sl .n svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.sl .done .n{background:rgba(91,214,160,.14);border-color:rgba(91,214,160,.55);color:var(--ok)}
+.sl .cur .n{background:var(--red-600);border-color:#e0503c;color:#fff}
+.sl .bad .n{background:rgba(255,106,85,.14);border-color:rgba(255,106,85,.6);color:var(--red-text)}
+.sl .g{flex:1;min-width:0}.sl .g strong{display:block;font-weight:500;font-size:14px}.sl .g small{display:block;color:var(--text-3);font-size:12px}
+.sl .todo .g strong{color:var(--text-3)}
+.sl .r{font-size:12px;color:var(--text-3);white-space:nowrap}
+.log{background:var(--bg-deep);border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;font-family:'Consolas','D2Coding',monospace;font-size:12px;line-height:1.65;overflow:hidden;color:var(--text-2)}
+.log .l{display:flex;gap:10px;white-space:nowrap}.log .t{color:var(--text-3);flex:none}.log .x{overflow:hidden;text-overflow:ellipsis}
+.log .w{color:var(--warn)}.log .e{color:var(--red-text)}
+.fnd{border:1px solid var(--line-2);border-radius:12px;background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.fnd.err{border-color:rgba(255,106,85,.5)}.fnd.wrn{border-color:rgba(245,184,75,.4)}
+.fnd .hd2{display:flex;align-items:center;gap:10px}.fnd .hd2 strong{font-size:14px}
+.fnd p{margin:0;font-size:13px;color:var(--text-2)}
+.ev{background:var(--bg-deep);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:'Consolas','D2Coding',monospace;font-size:12px;color:var(--text-2);display:flex;flex-direction:column;gap:2px}
+.ev .ln{color:var(--text-3);margin-right:8px}
+.sev{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.sev.e{background:rgba(255,106,85,.16);color:var(--red-text)}.sev.w{background:rgba(245,184,75,.16);color:var(--warn)}.sev.i{background:rgba(255,255,255,.07);color:var(--text-2)}
+.mt{width:100%;border-collapse:collapse;font-size:13px}
+.mt td{padding:8px 4px;border-bottom:1px solid var(--line)}.mt tr:last-child td{border-bottom:0}
+.mt .nm{font-weight:500}.mt .vr{color:var(--text-3);font-size:12px}
+.dotb{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.dotb.e{background:var(--red-text)}.dotb.w{background:var(--warn)}.dotb.o{background:var(--ok)}
+.acct{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-deep)}
+.acct .av{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:var(--panel-3);flex:none}
+.acct .av svg{width:22px;height:22px;stroke:var(--text-3);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.acct .g{flex:1;min-width:0}.acct .g strong{display:block;font-size:14px}.acct .g small{display:block;font-size:12px;color:var(--text-3)}
+.code{font-family:'Consolas','D2Coding',monospace;font-size:30px;letter-spacing:.18em;font-weight:700;text-align:center;padding:16px;border-radius:10px;background:var(--bg-deep);border:1px solid var(--line-2);margin:14px 0}
+.spin{width:16px;height:16px;border-radius:50%;border:2.5px solid var(--line-2);border-top-color:var(--red-text);flex:none}
+.ic2{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}
+.ic2 svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic2.k{background:rgba(91,214,160,.14);color:var(--ok)}.ic2.w{background:rgba(245,184,75,.14);color:var(--warn)}.ic2.e{background:rgba(255,106,85,.14);color:var(--red-text)}.ic2.r{background:rgba(229,65,43,.16);color:var(--red-text)}
+.sum{display:flex;align-items:center;gap:14px;padding:16px 20px}
+.sum .g{flex:1;min-width:0}.sum h2{margin:0;font-size:17px}.sum p{margin:2px 0 0;font-size:13px;color:var(--text-2)}
+.two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start;min-height:0}
+.col2{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;border:1px solid var(--line-2);color:var(--text-2)}
+.pill.run{color:var(--ok);border-color:rgba(91,214,160,.5)}
+.pill.run i{width:7px;height:7px;border-radius:50%;background:var(--ok);display:block}
+.hint{display:flex;gap:10px;font-size:13px;color:var(--text-2)}.hint b{color:var(--red-text);width:14px;flex:none}
+.hl{display:flex;flex-direction:column;gap:8px}
+
+</style>
+</helmet>
+<div class="win">
+  <div class="titlebar">
+    <img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt="">
+    <span>TorchLauncher Studio</span><span class="proj">· 서버 이름</span>
+    <span class="spacer"></span>
+    <button class="wc" type="button" aria-label="최소화"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="wc" type="button" aria-label="최대화"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+    <button class="wc close" type="button" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="shell">
+    <aside class="side">
+      <div class="pcard"><span class="ico"><img src="/_blob/14bb1fef231f749f30e74f68f6997c5d" alt=""></span><span><strong>서버 이름</strong><small>Minecraft 1.21.1 · Fabric 0.19.5</small></span></div>
+      <nav class="menu" aria-label="프로젝트 섹션">
+        <a class="mi" href="Overview.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>개요</a>
+        <a class="mi" href="Server.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></svg>서버 정보</a>
+        <a class="mi" href="Brand.dc.html"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>브랜딩</a>
+        <div class="mg">게임 구성</div>
+        <a class="mi" href="SettingsMods.dc.html"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>모드 설정</a>
+        <a class="mi" href="SettingsPacks.dc.html"><svg viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/></svg>리소스팩</a>
+        <a class="mi" href="SettingsShaders.dc.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg>셰이더</a>
+        <a class="mi" href="Files.dc.html"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>파일</a>
+        <div class="mg">테스트</div>
+        <a class="mi active" href="TestStart.dc.html" aria-current="page"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>테스트 실행<span class="tag k">실행 중</span></a>
+        <div class="mg">플레이어 설정</div>
+        <a class="mi" href="Settings.dc.html"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 15h8"/></svg>단축키 · 옵션</a>
+        <div class="mg">배포</div>
+        <a class="mi" href="DeployReady.dc.html"><svg viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></svg>배포</a>
+        <a class="mi" href="Export.dc.html"><svg viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>내보내기</a>
+      </nav>
+      <div class="sidefoot"><div class="savest"><span class="dot ok"></span>저장됨 · 방금 전</div><button class="btn" type="button">저장</button><a class="btn ghost sm" href="Main.dc.html">프로젝트 닫기</a></div>
+    </aside>
+    <div class="col">
+      <main class="page">
+        <div class="hd"><div><span class="eyebrow">테스트 실행</span><h1>게임 실행 중</h1><p class="lead">테스트 실행에서 기록한 단축키와 옵션은 플레이어 설정에서 불러올 수 있습니다.</p></div><span class="pill run"><i></i>실행 중 · 00:03:12</span></div>
+        <section class="card" style="padding-bottom:14px;flex:1;min-height:0;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">게임 로그</h2><span class="chip">자동 스크롤 켬</span></div>
+          <div class="log" aria-label="게임 로그" style="flex:1;min-height:0">
+            <div class="l"><span class="t">14:05:31</span><span class="x">[main/INFO] Loading Minecraft 1.21.1 with Fabric Loader 0.19.5</span></div>
+            <div class="l"><span class="t">14:05:32</span><span class="x">[main/INFO] Loading 12 mods: fabric-api, lithium, sodium, iris…</span></div>
+            <div class="l"><span class="t">14:05:36</span><span class="x w">[main/WARN] Mod 'examplemap' requests a newer Fabric API</span></div>
+            <div class="l"><span class="t">14:05:41</span><span class="x">[Render thread/INFO] Setting user: Player_Name</span></div>
+            <div class="l"><span class="t">14:05:44</span><span class="x">[Render thread/INFO] Backend library: LWJGL version 3.3.3</span></div>
+            <div class="l"><span class="t">14:05:49</span><span class="x w">[Render thread/WARN] Shader pack 'BSL_v10' uses a deprecated option</span></div>
+            <div class="l"><span class="t">14:05:52</span><span class="x">[Render thread/INFO] Reloading ResourceManager</span></div>
+            <div class="l"><span class="t">14:05:58</span><span class="x">[Render thread/INFO] Sound engine started</span></div>
+            <div class="l"><span class="t">14:08:40</span><span class="x">[Server thread/INFO] Saving the game</span></div>
+          </div>
+        </section>
+        <div><a class="btn lg" href="DialogStopTest.dc.html"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>종료</a></div>
+      </main>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

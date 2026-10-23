@@ -123,7 +123,7 @@
 
 /* 섹션 메뉴(순서 없음) */
 .menu { display: flex; flex-direction: column; gap: 2px; }
-.mi { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 8px; color: var(--text-2); text-decoration: none; font-size: 14px; }
+.mi { display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 12px; border-radius: 8px; color: var(--text-2); text-decoration: none; font-size: 14px; }
 .mi:hover { background: var(--panel-2); color: var(--text); }
 .mi.active { color: var(--text); font-weight: 700; background: linear-gradient(90deg, rgba(229,65,43,.2), rgba(229,65,43,.04)); box-shadow: inset 3px 0 0 var(--red); }
 .mi svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -146,3 +146,6 @@
 .cl h2 { margin: 0; }
 .cl p { margin: 0; font-size: 13px; color: var(--text-2); }
 .pv .cp i { font-style: normal; display: inline-flex; align-items: center; justify-content: center; margin-top: 6px; height: 28px; width: 92px; border-radius: 6px; background: var(--red-600); color: #fff; font-size: 12px; font-weight: 700; }
+
+.mg { margin: 10px 12px 2px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--text-3); }
+.menu { gap: 1px; }
