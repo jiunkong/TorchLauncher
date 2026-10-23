@@ -2,6 +2,8 @@
 
 사용자가 테스트 실행 관련 기능 구현을 GPT 계열 작업자에게 맡기기로 했다(2026-10-23). 이 문서는 대화 기록 없이 바로 착수할 수 있게 쓴 작업서다. 제품 결정과 흐름은 [studio-test-run.md](studio-test-run.md)가 기준이고, 이 문서는 **순서, 범위, 인터페이스 초안, 완료 기준, 보고 형식**을 정한다.
 
+복사해서 쓰는 작업자 프롬프트: [studio-test-run-prompts.md](studio-test-run-prompts.md).
+
 ## 먼저 읽을 것
 
 1. `AGENTS.md`(역할 규칙, 개발 중 하위 호환 불필요, 구조/스타일), `docs/progress.md` 맨 아래, `docs/work-distribution.md`.
