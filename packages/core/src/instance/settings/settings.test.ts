@@ -206,7 +206,7 @@ describe('invalid input', () => {
     ['duplicate key', '{"version":1,"file":"options.txt","required":{"a":"1","a":"2"}}'],
     ['unknown field', { ...base, extra: 1 }],
     ['wrong file', { version: 1, file: 'servers.dat' }],
-    ['wrong version', { version: 2, file: 'options.txt' }],
+    ['wrong version', { version: 3, file: 'options.txt' }],
     ['key conflict', { ...base, required: { a: '1' }, initial: { a: '2' } }],
     ['newline in value', { ...base, required: { a: '1\nb:2' } }],
     ['resourcePacks as key', { ...base, required: { resourcePacks: '[]' } }],
