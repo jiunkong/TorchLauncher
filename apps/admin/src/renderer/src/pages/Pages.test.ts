@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateServer, validHttps } from './Pages';
+import { validateServer, validHttps } from './validation';
 
 function project() {
   return {

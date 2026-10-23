@@ -1,41 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
+  StudioBrandingCommand,
   StudioCommand,
   StudioError,
   StudioProject,
   StudioState,
 } from '../../../shared/studio.js';
+import { useStudioLocale } from '../i18n';
 
-const messages: Record<StudioError, string> = {
-  INVALID:
-    '입력값이나 선택한 경로를 확인하세요. 문제가 있는 필드와 작업 안내를 수정한 뒤 다시 시도할 수 있습니다.',
-  BUSY: '다른 작업이 진행 중입니다.',
-  CANCELLED: '작업을 취소했습니다.',
-  IO: '작업에 실패했습니다. 파일 접근 권한, 선택한 경로 또는 네트워크 상태를 확인하세요.',
-  MISMATCH: '배포 파일의 서버 ID, Minecraft 또는 로더가 현재 프로젝트와 다릅니다.',
-  NO_PROJECT: '프로젝트를 먼저 만들거나 여세요.',
-  UNTRUSTED: '요청을 허용하지 않았습니다. 앱을 다시 실행하세요.',
-  ENCRYPTION_UNAVAILABLE:
-    '이 환경에서는 서명 키를 안전하게 암호화해 보관할 수 없어 서명할 수 없습니다.',
-  KEY_EXISTS: '이 프로젝트에는 이미 다른 서명 키가 있습니다.',
-  KEY_MISSING: '이 프로젝트의 서명 키가 없습니다.',
-  KEY_CORRUPT: '저장된 서명 키를 읽을 수 없습니다. 백업에서 복원하세요.',
-  KEY_MISMATCH: '이 키 백업은 이 프로젝트(서버)의 것이 아닙니다.',
-  WEAK_PASSPHRASE: '패스프레이즈는 12자 이상이어야 합니다.',
-  BACKUP_INVALID: '서명 키 백업 파일이 올바르지 않습니다.',
-  BACKUP_UNSUPPORTED: '지원하지 않는 서명 키 백업 버전입니다.',
-  BACKUP_AUTH: '패스프레이즈가 틀렸거나 백업 파일이 손상되었습니다.',
-};
+export type StudioAction = Exclude<StudioCommand['action'], 'update' | 'touch' | 'state'>;
+
+/** The outcome of the latest user-started operation; adapters derive deploy/export status from it. */
+export interface StudioRun {
+  seq: number;
+  action: StudioAction | StudioBrandingCommand['action'];
+  ok: boolean;
+  code: StudioError | null;
+}
+
 export function useStudio() {
+  const { t } = useStudioLocale();
   const [state, setState] = useState<StudioState | null>(null);
   const [draft, setDraft] = useState<StudioProject | null>(null);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [lastRun, setLastRun] = useState<StudioRun | null>(null);
   const actionLock = useRef(false);
-  const [operation, setOperation] = useState<Exclude<
-    StudioCommand['action'],
-    'update' | 'touch' | 'state' | 'cancel'
-  > | null>(null);
+  const sequence = useRef(0);
+  const [operation, setOperation] = useState<StudioAction | null>(null);
+  const errorMessage = (code: StudioError) => t(`error.${code}`);
+  // The locale only affects the failure text; the polling must not restart with it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     let active = true;
     void window.torchlauncher
@@ -44,10 +40,13 @@ export function useStudio() {
         if (active && reply.ok) {
           setState(reply.state);
           setDraft(reply.state.project);
-        }
+        } else if (active) setLoadFailed(true);
       })
       .catch(() => {
-        if (active) setMessage(messages.IO);
+        if (active) {
+          setLoadFailed(true);
+          setMessage(t('error.IO'));
+        }
       });
     const timer = setInterval(() => {
       void window.torchlauncher
@@ -71,72 +70,85 @@ export function useStudio() {
       .then((reply) => {
         if (reply.ok) setState(reply.state);
       })
-      .catch(() => setMessage(messages.IO));
+      .catch(() => setMessage(t('error.IO')));
   };
-  const run = async (action: Exclude<StudioCommand['action'], 'update' | 'touch' | 'state'>) => {
-    if (action === 'cancel') {
-      try {
-        await window.torchlauncher.request({ action });
-      } catch {
-        setMessage(messages.IO);
-      }
-      return;
-    }
-    if (actionLock.current) return;
+  /** Sends the pending draft to the main process first, then the command; keeps one at a time. */
+  const execute = async (
+    request: StudioCommand | StudioBrandingCommand,
+    syncDraft: boolean,
+  ): Promise<boolean> => {
+    if (actionLock.current) return false;
     actionLock.current = true;
     setPending(true);
-    setOperation(action);
+    if (request.action !== 'update' && request.action in operationKeys)
+      setOperation(request.action as StudioAction);
     setMessage('');
+    let ok = false;
+    let code: StudioError | null = null;
     try {
-      if (draft && !['new', 'open'].includes(action)) {
+      if (draft && syncDraft) {
         const updated = await window.torchlauncher.request({ action: 'update', project: draft });
         if (!updated.ok) {
-          setMessage(messages[updated.code]);
-          return;
+          code = updated.code;
+          setMessage(errorMessage(updated.code));
+          return false;
         }
         setState(updated.state);
       }
-      const reply = await window.torchlauncher.request({ action });
+      const reply = await window.torchlauncher.request(request);
       if (reply.ok) {
+        ok = true;
         setState(reply.state);
         setDraft(reply.state.project);
         setMessage(reply.state.result ?? '');
-      } else setMessage(messages[reply.code]);
+      } else {
+        code = reply.code;
+        setMessage(errorMessage(reply.code));
+      }
     } catch {
-      setMessage(messages.IO);
+      code = 'IO';
+      setMessage(t('error.IO'));
     } finally {
       actionLock.current = false;
       setPending(false);
       setOperation(null);
+      sequence.current += 1;
+      if (request.action !== 'update')
+        setLastRun({
+          seq: sequence.current,
+          action: request.action as StudioRun['action'],
+          ok,
+          code,
+        });
     }
+    return ok;
   };
+  const run = async (action: StudioAction): Promise<boolean> => {
+    if (action === 'cancel') {
+      try {
+        await window.torchlauncher.request({ action });
+      } catch {
+        setMessage(t('error.IO'));
+      }
+      return false;
+    }
+    return execute({ action }, !['new', 'open'].includes(action));
+  };
+  /** Branding commands (icon, background, app name) go through the same serialized path. */
+  const branding = (request: StudioBrandingCommand) => execute(request, true);
   const serviceBusy = state?.busy ?? null;
   const effectiveOperation = operation ?? serviceBusy;
-  const operationLabel = (
-    {
-      new: '새 프로젝트를 준비하는 중…',
-      open: '프로젝트를 여는 중…',
-      save: '프로젝트를 저장하는 중…',
-      saveAs: '프로젝트를 저장하는 중…',
-      source: '소스 폴더를 선택하는 중…',
-      files: '파일을 추가하는 중…',
-      build: 'torchpack을 생성하는 중…',
-      check: '배포 URL을 확인하는 중…',
-      export: '런처 폴더를 내보내는 중…',
-      saving: '프로젝트를 저장하는 중…',
-      opening: '프로젝트를 여는 중…',
-      choosing: '선택을 기다리는 중…',
-      building: 'torchpack을 생성하는 중…',
-      checking: '배포 URL을 확인하는 중…',
-      exporting: '런처 폴더를 내보내는 중…',
-    } as const
-  )[effectiveOperation ?? 'new'];
+  const operationLabel = t(operationKeys[effectiveOperation ?? 'new']);
   return {
     state,
     draft,
     edit,
     run,
+    branding,
     message,
+    lastRun,
+    loaded: state !== null,
+    loadFailed,
     operationLabel,
     showByteProgress:
       effectiveOperation === 'build' ||
@@ -148,3 +160,22 @@ export function useStudio() {
   };
 }
 export type StudioController = ReturnType<typeof useStudio>;
+
+const operationKeys = {
+  new: 'op.new',
+  open: 'op.open',
+  save: 'op.save',
+  saveAs: 'op.save',
+  source: 'op.source',
+  files: 'op.files',
+  build: 'op.build',
+  check: 'op.check',
+  export: 'op.export',
+  cancel: 'op.new',
+  saving: 'op.save',
+  opening: 'op.open',
+  choosing: 'op.choosing',
+  building: 'op.build',
+  checking: 'op.check',
+  exporting: 'op.export',
+} as const;

@@ -1,0 +1,294 @@
+/* 시작 애니메이션 (런처와 같은 모양, 아래에 STUDIO 표식) */
+/* 시작 애니메이션 */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  overflow: hidden;
+  background:
+    radial-gradient(580px 420px at 50% 38%, rgba(255, 90, 50, 0.22), transparent 66%), #0a0809;
+}
+.splash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(circle at 50% 40%, #000, transparent 68%);
+  mask-image: radial-gradient(circle at 50% 40%, #000, transparent 68%);
+}
+.splash .torch-wrap {
+  position: relative;
+  width: 188px;
+  height: 188px;
+  margin-bottom: 6px;
+}
+.splash .halo {
+  position: absolute;
+  inset: -80px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 130, 70, 0.6),
+    rgba(255, 70, 40, 0.18) 45%,
+    transparent 66%
+  );
+  animation: haloIn 1.1s ease-out backwards;
+}
+.splash .torch-big {
+  position: relative;
+  width: 188px;
+  height: 188px;
+  animation:
+    torchIn 1.1s ease-out backwards,
+    idle 2.6s ease-in-out 1.1s infinite;
+}
+.splash .spark {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ff5a3c;
+  box-shadow: 0 0 8px #ff7a50;
+  opacity: 0;
+  animation: rise 2.2s ease-out infinite;
+}
+.splash .word {
+  position: relative;
+  display: flex;
+  gap: 0.04em;
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 60px;
+  line-height: 1;
+  letter-spacing: 0.07em;
+  color: #f6ede9;
+  filter: drop-shadow(0 0 22px rgba(255, 90, 50, 0.28));
+  animation: wordIn 0.65s ease-out 0.3s backwards;
+}
+.splash .word i {
+  font-style: normal;
+  background: linear-gradient(180deg, #ff8a5c, #ff4a2e 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.splash .bar {
+  position: relative;
+  width: 300px;
+  height: 4px;
+  border-radius: 2px;
+  background: #2a2021;
+  overflow: hidden;
+  animation: barIn 0.4s ease-out 0.35s backwards;
+}
+.splash .bar i {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #c8321f, #ffb347);
+  animation: fill calc(var(--splash-min, 1600ms) - 0.35s) cubic-bezier(0.2, 0.7, 0.3, 1) 0.35s both;
+}
+.splash.is-waiting .bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: sheen 1.6s linear infinite;
+}
+.splash.is-finishing {
+  animation: splashOut 0.5s ease-in 0.3s forwards;
+}
+.splash.is-finishing .torch-big {
+  animation: torchOut 0.6s ease-out forwards;
+}
+.splash.is-finishing .halo {
+  animation: haloOut 0.6s ease-out forwards;
+}
+.splash.is-finishing .word {
+  animation: wordOut 0.5s ease-in forwards;
+}
+.splash.is-finishing .bar i {
+  animation: fillEnd 0.25s ease-out forwards;
+}
+@keyframes torchIn {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+    filter: brightness(0.35);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(0.6);
+  }
+  70% {
+    filter: brightness(1.5);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+@keyframes idle {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(1.12);
+  }
+  70% {
+    filter: brightness(0.94);
+  }
+}
+@keyframes haloIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+}
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), -120px);
+  }
+}
+@keyframes wordIn {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes barIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fill {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(0.86);
+  }
+}
+@keyframes fillEnd {
+  from {
+    transform: scaleX(0.86);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes sheen {
+  0% {
+    left: -60px;
+  }
+  100% {
+    left: 300px;
+  }
+}
+@keyframes torchOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(1.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+    filter: brightness(1.9);
+  }
+}
+@keyframes haloOut {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+@keyframes wordOut {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes splashOut {
+  to {
+    opacity: 0;
+  }
+}
+
+.splash .studio-tag {
+  position: relative;
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5em;
+  padding: 4px 4px 4px calc(14px + 0.5em);
+  color: var(--red-text);
+  border: 1px solid rgba(255, 106, 85, 0.55);
+  border-radius: 4px;
+  animation: wordIn 0.65s ease-out 0.45s backwards;
+}
+.splash.is-finishing .studio-tag {
+  animation: wordOut 0.5s ease-in forwards;
+}
+@media (max-width: 900px) {
+  .splash .word {
+    font-size: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash *,
+  .splash::before {
+    animation: none !important;
+  }
+  .splash .bar i {
+    transform: scaleX(0.86);
+  }
+  .splash.is-finishing .bar i {
+    transform: scaleX(1);
+  }
+}

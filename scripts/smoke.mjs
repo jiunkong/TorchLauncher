@@ -66,9 +66,12 @@ const appCases = [
     directory: 'admin',
     name: 'TorchLauncher Studio',
     pages: [
-      ['개요', '서버 프로젝트를 시작하세요'],
-      ['서버 구성', '서버 구성'],
-      ['배포', '배포 파일'],
+      ['개요', '새 서버'],
+      ['서버 정보', '서버 정보'],
+      ['브랜딩', '플레이어가 보게 될 런처'],
+      ['파일', '배포할 파일'],
+      ['게임 설정', '게임 설정'],
+      ['배포', '배포'],
       ['내보내기', '런처 내보내기'],
     ],
     expectedBridge: ['request', 'getApplicationInfo'],
@@ -84,7 +87,11 @@ try {
       await readFile(resolve(applicationDirectory, 'package.json'), 'utf8'),
     );
     const app = await electron.launch({
-      args: [applicationDirectory, `--user-data-dir=${resolve(temp, directory)}`],
+      args: [
+        applicationDirectory,
+        `--user-data-dir=${resolve(temp, directory)}`,
+        ...(directory === 'admin' ? ['--lang=ko'] : []),
+      ],
       env: appCase.env,
       timeout: 30_000,
     });
@@ -182,27 +189,25 @@ try {
           window.torchlauncher.request({ action: 'not-a-studio-action' }),
         );
         assert.deepEqual(invalid, { ok: false, code: 'INVALID' });
+        // The start animation covers the app first; then the start screen offers a new project.
+        await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
+        await page.getByTestId('start-new').click();
+        await page.getByTestId('project-card').waitFor();
       }
 
       for (const [label, heading] of appCase.pages) {
-        const navButton = page.getByRole('button', { name: label, exact: true });
+        const navButton = page.getByRole('button', { name: label, exact: true }).first();
         await navButton.click();
         await page.getByRole('heading', { level: 1, name: heading, exact: true }).waitFor();
         assert.equal(await navButton.getAttribute('aria-current'), 'page');
       }
 
       if (directory === 'admin') {
-        await page.getByRole('button', { name: '개요', exact: true }).click();
-        await page.getByRole('button', { name: '새 프로젝트', exact: true }).first().click();
-        await page.getByRole('heading', { level: 2, name: '새 서버', exact: true }).waitFor();
-        await page.locator('.workflow-row').first().getByRole('button').click();
-        assert.equal(await page.getByLabel('공개 torchpack HTTPS URL').count(), 0);
-        await page.getByRole('button', { name: '다음: 소스와 파일 선택' }).waitFor();
-        await page.getByRole('button', { name: '배포' }).click();
-        await page
-          .getByText('팩을 만들려면 먼저 소스 폴더를 선택하세요.', { exact: false })
-          .waitFor();
-        assert.equal(await page.getByRole('button', { name: 'torchpack 생성' }).isDisabled(), true);
+        await page.getByRole('button', { name: '배포', exact: true }).click();
+        assert.equal(
+          await page.getByRole('button', { name: '배포 파일 만들기', exact: true }).isDisabled(),
+          true,
+        );
         const projectPath = resolve(temp, 'saved-project.json');
         await app.evaluate(({ dialog }, target) => {
           dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
@@ -230,7 +235,7 @@ try {
         sandbox: true,
       });
 
-      await page.getByRole('button', { name: appCase.pages[0][0], exact: true }).click();
+      await page.getByRole('button', { name: appCase.pages[0][0], exact: true }).first().click();
       await page.screenshot({ path: resolve(screenshots, `${directory}.png`) });
       await page.setViewportSize({ width: 1100, height: 760 });
       await page.waitForTimeout(100);
