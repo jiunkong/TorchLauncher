@@ -8,11 +8,42 @@ import { _electron } from 'playwright';
 const cwd = fileURLToPath(new URL('../../..', import.meta.url));
 const root = await mkdtemp(join(tmpdir(), 'studio-ui-smoke-'));
 const source = join(root, 'source');
+const game = join(root, 'game');
 await mkdir(source);
+await mkdir(join(game, 'config'), { recursive: true });
+await mkdir(join(game, 'shaderpacks'), { recursive: true });
 await writeFile(join(source, 'custom.data'), 'UI selected payload');
 await writeFile(join(source, 'options.txt'), 'renderDistance:12\n');
+await writeFile(
+  join(game, 'options.txt'),
+  [
+    'version:3955',
+    'renderDistance:12',
+    'fov:0.5',
+    'key_key.jump:key.keyboard.space',
+    'key_key.forward:key.keyboard.w',
+    'key_key.exampleminimap.zoom_in:key.keyboard.equal',
+    '',
+  ].join('\n'),
+);
+await writeFile(join(game, 'config/example.properties'), 'alpha=1\nbeta=true\n');
+await writeFile(join(game, 'config/iris.properties'), 'enableShaders=true\nshaderPack=Test.zip\n');
+await writeFile(join(game, 'shaderpacks/Test.zip.txt'), 'SHADOW_RES=2048\n');
+// Minimal zip-looking packs (the main process checks name, size and the zip signature).
+const zipBytes = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64, 7)]);
+const packs = join(root, 'packs');
+await mkdir(packs);
+await writeFile(join(packs, 'server-pack.zip'), zipBytes);
+await writeFile(join(packs, 'Test.zip'), zipBytes);
+const launcher = join(root, 'TorchLauncher-test.AppImage');
+await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
+  mode: 0o755,
+});
 const project = join(root, 'server-project.json');
 const pack = join(root, 'server.torchpack');
+const exported = join(root, 'export', 'launcher.zip');
+await mkdir(join(root, 'export'));
+const publicUrl = 'https://packs.example.org/server.torchpack';
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 let app;
@@ -21,17 +52,12 @@ try {
     ...(env.TORCH_STUDIO_ELECTRON_EXECUTABLE
       ? { executablePath: env.TORCH_STUDIO_ELECTRON_EXECUTABLE }
       : {}),
-    args: [
-      join(cwd, 'apps/admin'),
-      `--user-data-dir=${join(root, 'profile')}`,
-      '--lang=ko',
-      '--password-store=basic',
-    ],
+    args: [join(cwd, 'apps/admin'), `--user-data-dir=${join(root, 'profile')}`, '--lang=ko'],
     env,
     timeout: 30000,
   });
   await app.evaluate(
-    ({ dialog, safeStorage }, paths) => {
+    ({ dialog, safeStorage, shell }, paths) => {
       // Headless Linux has no keyring; a reversible stub lets the signing path run (test only).
       const stub = {
         isEncryptionAvailable: () => true,
@@ -41,44 +67,103 @@ try {
       };
       for (const [name, value] of Object.entries(stub))
         Object.defineProperty(safeStorage, name, { value, configurable: true, writable: true });
+      // Native file pickers stay native in the app; here they answer with fixture paths.
+      const answers = {
+        '프로젝트 열기': [paths.project],
+        '배포 소스 폴더': [paths.source],
+        '소스 폴더 안의 파일 선택': [paths.file, paths.options],
+        '게임을 한 번 실행한 폴더 선택': [paths.game],
+        'options.txt 선택': [join(paths.game, 'options.txt')],
+        '리소스팩(.zip) 선택': [join(paths.packs, 'server-pack.zip')],
+        '셰이더팩(.zip) 선택': [join(paths.packs, 'Test.zip')],
+        '기존 공통 런처 선택': [paths.launcher],
+      };
+      function join(...parts) {
+        return parts.join('/');
+      }
       dialog.showOpenDialog = async (_window, options) => {
         const canceled = globalThis.__studioSmokeCancelNext === true;
         globalThis.__studioSmokeCancelNext = false;
-        return {
-          canceled,
-          filePaths: canceled
-            ? []
-            : options.title === '프로젝트 열기'
-              ? [paths.project]
-              : options.title === '배포 소스 폴더'
-                ? [paths.source]
-                : options.title === '소스 폴더 안의 파일 선택'
-                  ? [paths.file, paths.options]
-                  : [paths.file],
-        };
+        globalThis.__studioSmokeOpenTitles = [
+          ...(globalThis.__studioSmokeOpenTitles ?? []),
+          options.title,
+        ];
+        return { canceled, filePaths: canceled ? [] : (answers[options.title] ?? [paths.file]) };
       };
       dialog.showSaveDialog = async (_window, options) => ({
         canceled: false,
-        filePath: options.title === '프로젝트 저장' ? paths.project : paths.pack,
+        filePath:
+          options.title === '프로젝트 저장'
+            ? paths.project
+            : options.title === '런처 내보내기 ZIP 저장'
+              ? paths.exported
+              : paths.pack,
       });
-      // The unsaved-changes confirmation is in-app; the main-process box only remains as a fallback.
+      // Studio must never show a native message box; count any attempt.
       dialog.showMessageBox = async () => {
         globalThis.__studioSmokeNativeBoxes = (globalThis.__studioSmokeNativeBoxes ?? 0) + 1;
-        return {
-          response: globalThis.__studioSmokeKeepEdits === true ? 0 : 1,
-          checkboxChecked: false,
-        };
+        return { response: 0, checkboxChecked: false };
+      };
+      shell.showItemInFolder = (path) => {
+        globalThis.__studioSmokeRevealed = [...(globalThis.__studioSmokeRevealed ?? []), path];
+      };
+      // The public deployment address is served from the built pack (range capable), test only.
+      const fs = process.getBuiltinModule('node:fs');
+      globalThis.fetch = async (input, init = {}) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (!url.startsWith(paths.publicUrl)) return new Response('not found', { status: 404 });
+        const data = fs.readFileSync(paths.pack);
+        const headers = new Headers(init.headers ?? {});
+        const range = headers.get('range');
+        const base = { 'accept-ranges': 'bytes', 'content-type': 'application/octet-stream' };
+        if (init.method === 'HEAD')
+          return new Response(null, {
+            status: 200,
+            headers: { ...base, 'content-length': String(data.length) },
+          });
+        const match = range ? /^bytes=(\d*)-(\d*)$/.exec(range) : null;
+        if (!match)
+          return new Response(data, {
+            status: 200,
+            headers: { ...base, 'content-length': String(data.length) },
+          });
+        const start =
+          match[1] === '' ? Math.max(0, data.length - Number(match[2])) : Number(match[1]);
+        const end =
+          match[1] === '' || match[2] === ''
+            ? data.length - 1
+            : Math.min(Number(match[2]), data.length - 1);
+        if (start > end)
+          return new Response(null, {
+            status: 416,
+            headers: { 'content-range': `bytes */${data.length}` },
+          });
+        const body = data.subarray(start, end + 1);
+        return new Response(body, {
+          status: 206,
+          headers: {
+            ...base,
+            'content-length': String(body.length),
+            'content-range': `bytes ${start}-${end}/${data.length}`,
+          },
+        });
       };
     },
     {
       source,
+      game,
+      packs,
+      launcher,
       file: join(source, 'custom.data'),
       options: join(source, 'options.txt'),
       project,
       pack,
+      exported,
+      publicUrl,
     },
   );
   const page = await app.firstWindow();
+  page.setDefaultTimeout(10000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20000 });
@@ -87,6 +172,15 @@ try {
   const goto = async (label) => {
     await nav(label).click();
     await page.getByRole('heading', { level: 1 }).first().waitFor();
+  };
+
+  const closeWindow = () =>
+    app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.close();
+    });
+  const expectRevealed = async (path) => {
+    const revealed = await app.evaluate(() => globalThis.__studioSmokeRevealed ?? []);
+    assert.ok(revealed.includes(path), `reveal called with ${path}: ${JSON.stringify(revealed)}`);
   };
 
   // Fonts: the bundled Pretendard and Pixelify Sans load from the app, not the network.
@@ -225,7 +319,29 @@ try {
     'branding name is unsaved until the project is saved',
   );
 
-  // Files: source folder, add files, policy, managed files.
+  // UNSAVED contract: replacing a dirty project needs the in-app confirmation flag.
+  await page
+    .getByLabel('서버 이름', { exact: true })
+    .waitFor()
+    .catch(() => {});
+  await goto('서버 정보');
+  await page.getByLabel('서버 이름', { exact: true }).fill('Dirty edit');
+  assert.deepEqual(await page.evaluate(() => window.torchlauncher.request({ action: 'new' })), {
+    ok: false,
+    code: 'UNSAVED',
+  });
+  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await page.getByTestId('unsaved-dialog').getByRole('button', { name: '저장 안 함' }).click();
+  await page.getByTestId('unsaved-dialog').waitFor({ state: 'detached' });
+  await goto('서버 정보');
+  await page.getByLabel('서버 이름', { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel('서버 이름', { exact: true }).inputValue(),
+    'Functional Studio smoke 2',
+    'discarding reopens the saved project',
+  );
+
+  // Files: source folder, add files, real sizes, bulk policy, rescan.
   await goto('파일');
   await app.evaluate(() => {
     globalThis.__studioSmokeCancelNext = true;
@@ -236,93 +352,155 @@ try {
   await page.getByRole('button', { name: '폴더 변경', exact: true }).click();
   await page.getByTestId('source-name').filter({ hasText: 'source' }).waitFor();
   await page.getByRole('button', { name: '파일 추가', exact: true }).click();
-  await page.getByRole('cell', { name: 'custom.data', exact: true }).waitFor();
+  const customRow = page.getByRole('row').filter({ hasText: 'custom.data' });
+  await customRow.waitFor();
+  assert.match(await customRow.textContent(), /19 B/);
   assert.equal(await page.getByRole('button', { name: '게임 설정에서 관리' }).count(), 1);
-  await page
+  await customRow
     .getByRole('radiogroup', { name: 'custom.data 적용 방식' })
     .getByRole('radio', { name: '최초만' })
     .click();
+  await customRow.locator('button.i[aria-checked=true]').waitFor();
   await page.getByLabel('custom.data 선택').check();
-  await page.getByTestId('files-bulk').waitFor();
-  await page.getByRole('button', { name: '선택 해제' }).click();
+  await page.getByTestId('files-bulk').getByRole('button', { name: '제외', exact: true }).click();
+  await page.locator('tr.off').filter({ hasText: 'custom.data' }).waitFor();
+  await page.getByLabel('custom.data 선택').check();
+  await page.getByTestId('files-bulk').getByRole('button', { name: '항상 적용' }).click();
+  await page.locator('tr:not(.off)').filter({ hasText: 'custom.data' }).waitFor();
+  await writeFile(join(source, 'extra.txt'), 'added later');
+  await page.getByTestId('files-rescan').click();
+  await page.getByRole('row').filter({ hasText: 'extra.txt' }).waitFor();
+  await page.getByLabel('extra.txt 선택').check();
+  await page.getByTestId('files-bulk').getByRole('button', { name: '제외', exact: true }).click();
 
-  // Game settings: layout and local state from fixtures.
+  // Game settings: real import from a fixture game folder.
   await goto('게임 설정');
   await page.getByTestId('settings-empty').waitFor();
   await page.getByRole('button', { name: '프리셋 불러오기' }).first().click();
   await page.getByTestId('preset-dialog').waitFor();
-  await page
-    .getByTestId('preset-dialog')
-    .getByRole('button', { name: '불러오기', exact: true })
-    .click();
+  await page.getByTestId('import-folder').click();
+  await page.getByTestId('preset-dialog').waitFor({ state: 'detached' });
   await page.getByTestId('settings-keys').waitFor();
-  assert.ok((await page.getByTestId('settings-key-row').count()) > 3);
-  await page.getByLabel('점프 선택').check();
+  assert.equal(await page.getByTestId('settings-key-row').count(), 3);
+  await page.getByLabel('key.jump 선택').check();
   await page.getByTestId('settings-bulk').getByRole('radio', { name: '항상 고정' }).click();
-  assert.equal(
-    await page
-      .getByRole('radiogroup', { name: '점프 적용 방식' })
-      .getByRole('radio', { name: '항상 고정' })
-      .getAttribute('aria-checked'),
-    'true',
-  );
-  for (const tab of ['소리 · 화면', '리소스팩', '셰이더', '단축키'])
-    await page.getByRole('tab', { name: tab, exact: true }).click();
-  await page.getByRole('tab', { name: '셰이더', exact: true }).click();
+  await page
+    .getByRole('radiogroup', { name: 'key.jump 적용 방식' })
+    .getByRole('radio', { name: '항상 고정', exact: true })
+    .and(page.locator('[aria-checked=true]'))
+    .waitFor();
+  await page.getByRole('tab', { name: '소리 · 화면' }).click();
+  await page.getByTestId('settings-options').waitFor();
+  await page
+    .getByRole('radiogroup', { name: 'renderDistance 적용 방식' })
+    .getByRole('radio', { name: '최초 기본값' })
+    .click();
+  await page.getByRole('tab', { name: '모드 설정' }).click();
+  await page
+    .getByRole('radiogroup', { name: 'alpha 적용 방식' })
+    .getByRole('radio', { name: '최초 기본값' })
+    .click();
+  await page.getByTestId('settings-policy').waitFor();
+  await page.getByRole('tab', { name: '리소스팩' }).click();
+  await page.getByTestId('pack-add').click();
+  await page.getByTestId('pack-row').filter({ hasText: 'server-pack.zip' }).waitFor();
+  assert.equal(await page.getByTestId('pack-row').count(), 1);
+  await page.getByRole('tab', { name: '셰이더' }).click();
+  await page.getByTestId('pack-add').click();
+  await page.getByTestId('shader-row').filter({ hasText: 'Test.zip' }).waitFor();
+  await page.getByRole('radio', { name: /선택할 셰이더팩: Test.zip/ }).click();
   await page.getByRole('switch', { name: '셰이더 사용' }).click();
+  await page
+    .getByRole('radiogroup', { name: '셰이더 사용 적용 방식' })
+    .getByRole('radio', { name: '최초 기본값' })
+    .click();
+  await page.getByRole('button', { name: '항목 보기' }).waitFor();
+  assert.equal(await page.getByTestId('settings-policy-error').count(), 0);
+  // The generated policy file is a managed file now.
+  await goto('파일');
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'resourcepacks/server-pack.zip' })
+    .getByRole('button', { name: '게임 설정에서 관리' })
+    .waitFor();
 
-  // Deploy and the file diff against the build.
+  // Deploy: build, status from the main process.
   await goto('배포');
   assert.equal(await page.getByTestId('deploy-card').getAttribute('data-state'), 'unknown');
-  await page.getByRole('button', { name: '배포 파일 만들기', exact: true }).click();
+  await page.getByTestId('build-button').click();
   await page
     .getByTestId('studio-message')
     .filter({ hasText: 'torchpack 배포 파일을 생성했습니다' })
     .waitFor();
   assert.equal((await readFile(pack)).subarray(0, 8).toString(), 'TORCHDEP');
-  await page.getByTestId('deploy-card').and(page.locator('[data-state="current"]')).waitFor();
+  await page.locator('[data-testid="deploy-card"][data-state="current"]').waitFor();
+  await page.getByTestId('deploy-lastbuild').filter({ hasText: 'server.torchpack' }).waitFor();
   await goto('개요');
   assert.equal(await page.getByTestId('deploy-status').getAttribute('data-state'), 'current');
-  await goto('파일');
-  await page
-    .getByRole('radiogroup', { name: 'custom.data 적용 방식' })
-    .getByRole('radio', { name: '항상' })
-    .click();
-  await page.getByText('수정', { exact: true }).waitFor();
-  await goto('개요');
-  assert.equal(await page.getByTestId('deploy-status').getAttribute('data-state'), 'stale');
-  await page.locator('nav.menu .mi').filter({ hasText: '다시 만들기' }).waitFor();
 
-  // Export is blocked until the deployment address was checked.
+  // Export is blocked until the public file was checked; the reason is listed.
+  await goto('내보내기');
+  await page.getByTestId('export-checks').waitFor();
+  assert.equal(await page.getByTestId('export-checks').getAttribute('data-blocked'), 'true');
+  assert.equal(await page.getByTestId('export-button').isDisabled(), true);
+  await page
+    .getByTestId('export-checks')
+    .getByText('배포 주소를 검사하지 않았습니다', { exact: false })
+    .first()
+    .waitFor();
+
+  // Address check against the (test-served) public file, then a real ZIP export.
   await goto('배포');
   await page.getByLabel('공개 torchpack HTTPS 주소').fill('http://example.org/server.torchpack');
   assert.equal(
     await page.getByRole('button', { name: '주소 검사', exact: true }).isDisabled(),
     true,
   );
-  await page.getByLabel('공개 torchpack HTTPS 주소').fill('https://example.org/server.torchpack');
-  assert.equal(
-    await page.getByRole('button', { name: '주소 검사', exact: true }).isEnabled(),
-    true,
-  );
+  await page.getByLabel('공개 torchpack HTTPS 주소').fill(publicUrl);
+  await page.getByRole('button', { name: '주소 검사', exact: true }).click();
+  await page.locator('[data-testid="address-card"][data-state="ok"]').waitFor();
+  assert.equal(await page.getByTestId('address-checks').locator('.ck.ok').count(), 5);
   await goto('내보내기');
-  assert.equal(await page.getByTestId('export-button').isDisabled(), true);
-  assert.equal(await page.getByTestId('export-checks').getAttribute('data-blocked'), 'true');
-  await page.getByTestId('export-stale').waitFor();
+  await page.locator('[data-testid="export-checks"][data-blocked="false"]').waitFor();
+  await page.getByTestId('export-button').click();
+  await page.getByTestId('export-done').waitFor();
+  const zip = await readFile(exported);
+  assert.equal(zip.subarray(0, 2).toString(), 'PK');
+  assert.ok(zip.includes(Buffer.from('torchlauncher-server.json')), 'zip lists the server config');
+  assert.ok(zip.includes(Buffer.from('TorchLauncher-test.AppImage')), 'zip lists the launcher');
+  await page.getByRole('button', { name: '폴더 열기' }).click();
+  await expectRevealed(exported);
+  await page.getByRole('button', { name: '다시 내보내기' }).click();
 
-  // Persistence: save, reopen from the start state of the same session.
+  // A later file change blocks the export again with its reason.
+  await goto('파일');
+  await writeFile(join(source, 'custom.data'), 'UI payload changed after the build');
+  await page.getByTestId('files-rescan').click();
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'custom.data' })
+    .getByText('수정', { exact: true })
+    .waitFor();
+  await goto('내보내기');
+  await page.locator('[data-testid="export-checks"][data-blocked="true"]').waitFor();
+  await page.getByTestId('export-stale').waitFor();
+  await page
+    .getByTestId('export-checks')
+    .getByText('마지막 배포 이후 파일이 바뀌었습니다', { exact: false })
+    .waitFor();
+  assert.equal(await page.getByTestId('export-button').isDisabled(), true);
+  assert.equal(await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0), 0);
+
+  // Persistence: save, reopen the saved project.
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
-  assert.deepEqual(
-    JSON.parse(await readFile(project, 'utf8')).files.find((f) => f.path === 'custom.data'),
-    {
-      path: 'custom.data',
-      policy: 'always',
-    },
-  );
+  const saved = JSON.parse(await readFile(project, 'utf8'));
+  assert.equal(saved.version, 2);
+  assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
+  assert.equal(saved.gameSettings.shader.pack.value, 'Test.zip');
   await page.getByRole('button', { name: '열기', exact: true }).click();
-  await goto('파일');
-  await page.getByTestId('source-name').filter({ hasText: '선택되지 않음' }).waitFor();
+  await goto('게임 설정');
+  await page.getByTestId('settings-preset').and(page.locator('[data-loaded="true"]')).waitFor();
 
   // Layout at the minimum and the default widths: every page paints and nothing overflows.
   await mkdir(join(cwd, '.cache/smoke'), { recursive: true });
@@ -349,10 +527,30 @@ try {
     keys: ['getApplicationInfo', 'onCloseRequest', 'request'],
   });
   assert.deepEqual(errors, []);
+
+  // Window close with unsaved changes: main asks, the app answers in its own modal.
+  await goto('서버 정보');
+  await page.getByLabel('서버 이름', { exact: true }).fill('Closing edit');
+  await closeWindow();
+  const closing = page.getByTestId('unsaved-dialog');
+  await closing.waitFor();
+  await closing.getByRole('button', { name: '취소', exact: true }).click();
+  await closing.waitFor({ state: 'detached' });
+  await page.waitForTimeout(300);
+  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
+  await closeWindow();
+  await closing.waitFor();
+  await closing.getByRole('button', { name: '저장', exact: true }).click();
+  await page.waitForEvent('close', { timeout: 15000 });
+  assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Closing edit');
+  assert.equal(
+    await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0).catch(() => 0),
+    0,
+  );
   console.log(
     'Studio Electron smoke passed: shell and splash, in-app unsaved dialog, server/branding/files/settings/deploy/export pages, persistence, painted layout at 760 and 1100 px and isolation',
   );
 } finally {
-  await app?.close();
+  await app?.close().catch(() => {});
   await rm(root, { recursive: true, force: true });
 }

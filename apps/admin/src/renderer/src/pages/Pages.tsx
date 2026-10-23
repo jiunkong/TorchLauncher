@@ -39,7 +39,7 @@ export function PageContent({
     case 'files':
       return <FilesPage {...props} />;
     case 'settings':
-      return <SettingsPage settings={settings} />;
+      return <SettingsPage {...props} settings={settings} />;
     case 'deploy':
       return <DeployPage {...props} />;
     case 'export':

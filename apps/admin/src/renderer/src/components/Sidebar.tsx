@@ -44,17 +44,14 @@ export function Sidebar({
   const { t } = useStudioLocale();
   const { draft, state, busy, run } = studio;
   if (!draft) return null;
-  const changed = insights.deploy.changes.added + insights.deploy.changes.modified;
   const tags: Partial<Record<PageId, { text: string; tone: 'w' | 'k' }>> = {};
   if (Object.keys(validateServer(draft)).length > 0)
     tags.server = { text: t('tag.needed'), tone: 'w' };
-  if (changed + insights.deploy.changes.excluded > 0 && insights.deploy.state !== 'unknown')
-    tags.files = {
-      text: t('tag.changes', { count: changed + insights.deploy.changes.excluded }),
-      tone: 'w',
-    };
-  if (insights.deploy.state === 'stale') tags.deploy = { text: t('tag.rebuild'), tone: 'w' };
-  else if (insights.deploy.state === 'current') tags.deploy = { text: t('tag.current'), tone: 'k' };
+  if (insights.changed > 0)
+    tags.files = { text: t('tag.changes', { count: insights.changed }), tone: 'w' };
+  if (insights.deploy.status === 'changed') tags.deploy = { text: t('tag.rebuild'), tone: 'w' };
+  else if (insights.deploy.status === 'upToDate')
+    tags.deploy = { text: t('tag.current'), tone: 'k' };
   const dirty = !!state?.dirty;
   return (
     <aside className="side" aria-label={t('nav.sidebar')}>

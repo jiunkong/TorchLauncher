@@ -1777,3 +1777,59 @@ button.chip.pick {
     transition: none !important;
   }
 }
+
+/* 실제 데이터 연결 후 추가 */
+small.err.block {
+  display: block;
+  margin-top: 2px;
+}
+.tbl tr.off td {
+  opacity: 0.45;
+}
+.usage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.meter {
+  flex: 1;
+  max-width: 240px;
+  height: 6px;
+  border-radius: 3px;
+  background: #2a2021;
+  overflow: hidden;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--red-600), var(--ember));
+}
+.radbtn {
+  background: none;
+  border: 0;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+}
+.pk .rad {
+  pointer-events: none;
+}
+.dialog .or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-3);
+  font-size: 12px;
+  margin: 14px 0;
+}
+.dialog .or::before,
+.dialog .or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+button.big.dlgbtn {
+  width: 100%;
+  padding: 16px;
+}

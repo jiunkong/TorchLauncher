@@ -89,11 +89,13 @@ export function PolicyControl({
   onChange,
   labels,
   groupLabel,
+  disabled,
 }: {
   value: Policy3 | null;
   onChange(value: Policy3): void;
   labels: Record<Policy3, string>;
   groupLabel: string;
+  disabled?: boolean;
 }) {
   const cls: Record<Policy3, string> = { none: 'n0', initial: 'i', required: 'a' };
   return (
@@ -105,6 +107,7 @@ export function PolicyControl({
           type="button"
           role="radio"
           aria-checked={value === item}
+          disabled={disabled}
           className={value === item ? cls[item] : undefined}
           onClick={() => onChange(item)}
         >

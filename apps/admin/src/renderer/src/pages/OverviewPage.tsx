@@ -8,11 +8,11 @@ import { validateServer } from './validation';
 export function OverviewPage({ studio, draft, insights, go }: PageProps) {
   const { t, locale } = useStudioLocale();
   const { state } = studio;
-  const { deploy, address } = insights;
+  const { deploy } = insights;
   const loader = `${loaderLabel(draft.game.loader.kind)} ${draft.game.loader.version}`;
   const game = `Minecraft ${draft.game.minecraftVersion} · ${loader}`;
   const serverReady = Object.keys(validateServer(draft)).length === 0;
-  const changed = deploy.changes.added + deploy.changes.modified + deploy.changes.excluded;
+  const changed = insights.changed;
   const initialOnly = draft.files.filter((file) => file.policy === 'initial-only').length;
   const brandingSet = [draft.branding?.icon, draft.branding?.appName, draft.branding?.background];
   const brandingCount = brandingSet.filter(Boolean).length;
@@ -24,7 +24,7 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
       body: t('overview.stale.body', {
         added: deploy.changes.added,
         modified: deploy.changes.modified,
-        excluded: deploy.changes.excluded,
+        excluded: deploy.changes.removed,
       }),
       cta: t('overview.stale.cta'),
     },
@@ -42,13 +42,13 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
       body: t('overview.unknown.body'),
       cta: t('overview.unknown.cta'),
     },
-  }[deploy.state];
+  }[deploy.status === 'changed' ? 'stale' : deploy.status === 'upToDate' ? 'current' : 'unknown'];
   const addressText = {
     unchecked: t('overview.address.unchecked'),
     ok: t('overview.address.ok'),
     bad: t('overview.address.bad'),
     stale: t('overview.address.stale'),
-  }[address.state];
+  }[insights.addressState];
   const card = (
     page: PageId,
     title: string,
@@ -79,7 +79,17 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
         title={draft.name || t('overview.untitled')}
         lead={`${game} · ${draft.address}`}
       />
-      <section className="card" data-testid="deploy-status" data-state={deploy.state}>
+      <section
+        className="card"
+        data-testid="deploy-status"
+        data-state={
+          deploy.status === 'changed'
+            ? 'stale'
+            : deploy.status === 'upToDate'
+              ? 'current'
+              : 'unknown'
+        }
+      >
         <div className="stat">
           <span className={`sico ${status.tone}`}>{status.icon}</span>
           <div className="stat-body">
@@ -87,10 +97,10 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
             <p>{status.body}</p>
             <div className="meta">
               <span>
-                {deploy.builtAt && deploy.fileCount !== null
+                {deploy.lastBuild
                   ? t('overview.lastDeploy', {
-                      date: formatDateTime(deploy.builtAt, locale),
-                      count: deploy.fileCount,
+                      date: formatDateTime(new Date(deploy.lastBuild.builtAt), locale),
+                      count: deploy.lastBuild.fileCount,
                     })
                   : t('overview.noDeploy')}
               </span>
@@ -99,7 +109,7 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
           </div>
           <button
             type="button"
-            className={`btn lg${deploy.state === 'current' ? '' : ' primary'}`}
+            className={`btn lg${deploy.status === 'upToDate' ? '' : ' primary'}`}
             onClick={() => go('deploy')}
           >
             {status.cta}
@@ -144,12 +154,12 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
         {card(
           'export',
           t('nav.export'),
-          insights.exported
+          insights.export?.done
             ? { text: t('overview.chip.exported'), tone: 'ok' }
             : { text: t('overview.chip.notExported') },
           [
-            insights.exported
-              ? t('overview.export.last', { date: formatDateTime(insights.exported.at, locale) })
+            insights.export?.done
+              ? t('overview.export.last', { name: insights.export.done.fileName })
               : t('overview.export.none'),
             t('overview.export.hint'),
           ],
