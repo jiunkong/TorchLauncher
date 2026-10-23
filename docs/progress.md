@@ -700,3 +700,4 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 시안 `docs/design/studio/`(`d30b099`), 명세·작업 분해 `docs/studio-ui.md`(`c5035df`). 사용자 지시로 UI 적용과 신규 기능(게임 설정, 파일 diff, 배포 상태, 런처 ZIP 내보내기)을 병렬 진행.
 - 배정(모두 background 작업자, 통합은 #0만): STUDIO-UI-01 agent-1 `feat/studio-ui-shell`(renderer 독점), SET-CORE-01 agent-2 `feat/settings-core-shaders`(core 설정 정책 독점), STUDIO-MAIN-01 agent-3 `feat/studio-main-features`(admin main/shared/preload 독점). 기준 `c5035df`.
 - 후속: 세 작업 통합 후 STUDIO-UI-02(실제 API 연결) 배정. 아직 어떤 작업도 통합·검증되지 않았다.
+- SET-CORE-01 `8284a53`/`e74b354` → `37a56a8` 통합(--no-ff). main `pnpm check` 성공(로그 환경 로컬). 설정 정책 v2(`configFiles`: 셰이더·모드 설정 파일), Studio용 `parseOptionsEntries`/`buildSettingsPolicy` API. 런처 호출부 변경 불필요, 단 v2 정책은 이 변경을 포함한 런처가 필요(구 런처는 거부). 한계: key=value ASCII만, Iris/Oculus 키·경로는 실게임 미검증. [인계](handoffs/SET-CORE-01.md). 남은 작업자: STUDIO-UI-01, STUDIO-MAIN-01 진행 중.
