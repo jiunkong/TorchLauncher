@@ -31,7 +31,7 @@ async function policy(dir: string, value: unknown | string): Promise<void> {
   );
 }
 const v2 = (configFiles: unknown, extra: object = {}) => ({
-  version: 2,
+  version: 1,
   file: 'options.txt',
   ...extra,
   configFiles,
@@ -56,8 +56,8 @@ const ownership = (files: SyncOwnership['files']): SyncOwnership => ({
 });
 const hash = 'a'.repeat(64);
 
-describe('policy version 2 parsing', () => {
-  it('parses config files and keeps version 1 behavior unchanged', () => {
+describe('policy config files parsing', () => {
+  it('parses config files alongside the options sections', () => {
     const parsed = parseSettingsPolicy(
       bytes(
         JSON.stringify(
@@ -68,20 +68,22 @@ describe('policy version 2 parsing', () => {
         ),
       ),
     );
-    expect(parsed.version).toBe(2);
+    expect(parsed.version).toBe(1);
     expect(parsed.configFiles.map((f) => f.path)).toEqual([IRIS, 'shaderpacks/BSL.zip.txt']);
-    const v1 = parseSettingsPolicy(
+    const plain = parseSettingsPolicy(
       bytes('{"version":1,"file":"options.txt","required":{"a":"1"}}'),
     );
-    expect(v1.version).toBe(1);
-    expect(v1.configFiles).toEqual([]);
+    expect(plain.configFiles).toEqual([]);
   });
 
-  it('keeps configFiles an unknown field in version 1', () => {
-    expect(() =>
+  it('accepts an empty configFiles object and rejects version 2', () => {
+    expect(
       parseSettingsPolicy(
         bytes(JSON.stringify({ version: 1, file: 'options.txt', configFiles: {} })),
-      ),
+      ).configFiles,
+    ).toEqual([]);
+    expect(() =>
+      parseSettingsPolicy(bytes(JSON.stringify({ version: 2, file: 'options.txt' }))),
     ).toThrow(SettingsError);
   });
 
@@ -237,7 +239,7 @@ describe('applying config files', () => {
     expect(iris?.enforcedKeys).toEqual(['enableShaders']);
     expect(iris?.initialSkipped).toEqual([{ key: 'shaderPack', reason: 'user-value-present' }]);
     const state = JSON.parse(await read(dir, '.torchlauncher-user/settings.json'));
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(1);
     expect(state.initial.files['shaderpacks/BSL.zip.txt']).toEqual(['SHADOW']);
     // The user changes the initial item and a later run keeps it; required is restored.
     await writeFile(join(dir, IRIS), 'enableShaders=false\nshaderPack=Mine.zip\n');
@@ -289,17 +291,17 @@ describe('applying config files', () => {
     expect(await read(dir, IRIS)).toBe('x=1\n');
   });
 
-  it('keeps version 1 state files for version 1 policies', async () => {
+  it('writes one state format, with an empty files map when no config file is involved', async () => {
     const dir = await root();
     await policy(dir, { version: 1, file: 'options.txt', initial: { a: '1' } });
     await applySettingsPolicy(dir);
     expect(JSON.parse(await read(dir, '.torchlauncher-user/settings.json'))).toEqual({
       version: 1,
-      initial: { keys: ['a'], resourcePacks: false },
+      initial: { keys: ['a'], resourcePacks: false, files: {} },
     });
   });
 
-  it('reads old version 1 state when a policy later gains config files', async () => {
+  it('records config files when a policy later gains them', async () => {
     const dir = await root();
     await policy(dir, { version: 1, file: 'options.txt', initial: { a: '1' } });
     await applySettingsPolicy(dir);
@@ -309,7 +311,7 @@ describe('applying config files', () => {
     expect(result.initialSkipped).toEqual([]);
     const state = JSON.parse(await read(dir, '.torchlauncher-user/settings.json'));
     expect(state).toEqual({
-      version: 2,
+      version: 1,
       initial: { keys: ['a'], resourcePacks: false, files: { [IRIS]: ['b'] } },
     });
   });
@@ -424,7 +426,7 @@ describe('applying config files', () => {
     await writeFile(
       join(dir, '.torchlauncher-user/settings.json'),
       JSON.stringify({
-        version: 2,
+        version: 1,
         initial: { keys: [], resourcePacks: false, files: { '../x.txt': [] } },
       }),
     );

@@ -43,14 +43,13 @@ function createWindow(): void {
   const service = new StudioService(
     {
       open: async (kind, root) => {
-        const directory = kind === 'source' || kind === 'output' || kind === 'gamefolder';
+        const directory = kind === 'source' || kind === 'gamefolder';
         const result = await dialog.showOpenDialog(window, {
           title: {
             project: '프로젝트 열기',
             source: '배포 소스 폴더',
             files: '소스 폴더 안의 파일 선택',
             binary: '기존 공통 런처 선택',
-            output: '비어 있는 출력 폴더 선택',
             icon: brandingDialogText.icon,
             background: brandingDialogText.background,
             keybackup: '서명 키 백업 파일 선택',

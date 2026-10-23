@@ -495,7 +495,7 @@ try {
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
   const saved = JSON.parse(await readFile(project, 'utf8'));
-  assert.equal(saved.version, 2);
+  assert.equal(saved.version, 1);
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
   assert.equal(saved.gameSettings.shader.pack.value, 'Test.zip');
   await page.getByRole('button', { name: '열기', exact: true }).click();

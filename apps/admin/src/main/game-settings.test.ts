@@ -377,7 +377,7 @@ describe('service: game settings preset', () => {
     await writeFile(join(h.source, 'options.txt'), 'old');
     expect((await h.importFolder()).ok).toBe(true);
     expect(h.s.snapshot().preset).toMatchObject({ source: 'folder', optionCount: 4 });
-    expect(h.s.snapshot().project?.version).toBe(2);
+    expect(h.s.snapshot().project?.version).toBe(1);
     expect(
       (
         await h.s.request({
@@ -588,11 +588,11 @@ describe('service: game settings preset', () => {
     h.d.open.mockResolvedValueOnce([saved]);
     await h.s.request({ action: 'open', discard: true });
     expect(h.s.snapshot().project).toEqual(before);
-    expect(before?.version).toBe(2);
+    expect(before?.version).toBe(1);
   });
 });
 
-describe('project schema compatibility', () => {
+describe('project schema', () => {
   const v1 = () => {
     const raw = JSON.parse(
       encodeProject(
@@ -611,35 +611,24 @@ describe('project schema compatibility', () => {
     );
     return raw;
   };
-  it('reads schema 1 unchanged and keeps it schema 1 until a new feature is used', () => {
+  it('reads the current schema and rejects earlier or unknown versions', () => {
     const raw = v1();
     const loaded = decodeProject(raw, () => ({ width: 1, height: 1 }));
     expect(parseProject(loaded.input).version).toBe(1);
+    expect(() => parseProject({ ...v1(), version: 2 })).toThrow(
+      expect.objectContaining({ code: 'INVALID' }),
+    );
+    expect(() => parseProject({ ...v1(), version: 0 })).toThrow();
   });
-  it('rejects schema 1 files that already carry schema 2 fields, and unknown fields', () => {
-    expect(() =>
-      parseProject({ ...v1(), gameSettings: { options: [], resourcePacks: [], shaderPacks: [] } }),
-    ).toThrow();
-    expect(() => parseProject({ ...v1(), version: 3 })).toThrow();
-    expect(() =>
-      parseProject({
-        ...v1(),
-        version: 2,
-        gameSettings: { options: [], resourcePacks: [], shaderPacks: [], extra: 1 },
-      }),
-    ).toThrow();
-    expect(() => parseProject({ ...v1(), version: 2, lastBuild: { files: [] } })).toThrow();
-    expect(
-      parseProject({
-        ...v1(),
-        version: 2,
-        gameSettings: { options: [], resourcePacks: [], shaderPacks: [] },
-      }).version,
-    ).toBe(2);
+  it('validates the optional fields strictly', () => {
+    const empty = { options: [], resourcePacks: [], shaderPacks: [] };
+    expect(parseProject({ ...v1(), gameSettings: empty }).gameSettings).toEqual(empty);
+    expect(() => parseProject({ ...v1(), gameSettings: { ...empty, extra: 1 } })).toThrow();
+    expect(() => parseProject({ ...v1(), lastBuild: { files: [] } })).toThrow();
   });
 });
 
-describe('service: mod configs and shaders (policy v2)', () => {
+describe('service: mod configs and shaders', () => {
   async function folder(h: Awaited<ReturnType<typeof harness>>) {
     await mkdir(join(h.game, 'config'), { recursive: true });
     await mkdir(join(h.game, 'shaderpacks'), { recursive: true });
@@ -695,22 +684,28 @@ describe('service: mod configs and shaders (policy v2)', () => {
       kind: 'keybind',
       group: 'inventory',
     });
-    expect(state.policy).toEqual({ version: null, bytes: 0, limit: 65536, error: null });
+    expect(state.policy).toEqual({
+      generated: false,
+      configFiles: 0,
+      bytes: 0,
+      limit: 65536,
+      error: null,
+    });
   });
-  it('keeps policy v1 until a config item is set, then builds v2 with all three states', async () => {
+  it('adds config files to the policy only when an item is set, with all three states', async () => {
     const h = await harness();
     await folder(h);
     await h.importFolder();
     await h.s.request({ action: 'settingsOptions', changes: [{ key: 'fov', policy: 'required' }] });
-    expect(h.s.snapshot().policy).toMatchObject({ version: 1, error: null });
-    expect((await policyOf(h)).version).toBe(1);
-    // items that stay "none" do not force v2
+    expect(h.s.snapshot().policy).toMatchObject({ generated: true, configFiles: 0, error: null });
+    expect((await policyOf(h)).configFiles).toEqual([]);
+    // items that stay "none" add no config file to the policy
     await h.s.request({
       action: 'settingsConfigItems',
       path: 'config/sodium-extra.properties',
       changes: [{ key: 'fog', policy: 'none' }],
     });
-    expect(h.s.snapshot().policy?.version).toBe(1);
+    expect(h.s.snapshot().policy?.configFiles).toBe(0);
     await h.s.request({
       action: 'settingsConfigItems',
       path: 'config/sodium-extra.properties',
@@ -729,9 +724,9 @@ describe('service: mod configs and shaders (policy v2)', () => {
       pack: 'BSL.zip',
       changes: [{ key: 'SHADOW', policy: 'initial', value: '4096' }],
     });
-    expect(h.s.snapshot().policy).toMatchObject({ version: 2, error: null });
+    expect(h.s.snapshot().policy).toMatchObject({ configFiles: 3, error: null });
     const policy = await policyOf(h);
-    expect(policy.version).toBe(2);
+    expect(policy.version).toBe(1);
     const byPath = Object.fromEntries(policy.configFiles.map((f) => [f.path, f]));
     expect(Object.keys(byPath).sort()).toEqual([
       'config/iris.properties',
@@ -761,7 +756,7 @@ describe('service: mod configs and shaders (policy v2)', () => {
       pack: { policy: 'none', value: 'BSL.zip' },
     });
     await h.s.request({ action: 'settingsShaderOptionsRemove', pack: 'BSL.zip' });
-    expect(h.s.snapshot().policy?.version).toBe(1);
+    expect(h.s.snapshot().policy?.configFiles).toBe(0);
   });
   it('rejects a policy over 64 KiB with a structured error and keeps the project unchanged', async () => {
     const h = await harness();

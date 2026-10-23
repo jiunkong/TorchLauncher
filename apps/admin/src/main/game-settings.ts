@@ -38,10 +38,9 @@ import { hashFile } from './scan.js';
 /*
  * Game settings preset.
  *
- * Everything that talks to the settings policy format lives here, behind three functions
- * (parseOptionsText, generatePolicy, packId). It is written against the core v1 policy API
- * (options.txt keys, resource pack lists). Shader selection and mod config items need the
- * SET-CORE-01 extension and are not generated yet.
+ * Everything that talks to the settings policy format lives here: option parsing, config file
+ * import, and policy generation through core's `buildSettingsPolicy` (options.txt items, resource
+ * pack lists, mod config files and Iris/Oculus shader settings in one policy format).
  */
 export { PolicyFailure, SETTINGS_POLICY_PATH };
 export const OPTIONS_READ_LIMIT = SETTINGS_LIMITS.optionsBytes;
@@ -292,7 +291,7 @@ export const validPackOptionsName = (pack: unknown): pack is string =>
 
 export interface GeneratedPolicy {
   text: string;
-  version: 1 | 2;
+  configFiles: number;
   bytes: number;
 }
 const knownProfileVersion = (version: string) =>
@@ -352,7 +351,7 @@ export function generatePolicy(
     });
     return {
       text: built.json,
-      version: built.policy.configFiles.length > 0 ? 2 : 1,
+      configFiles: built.policy.configFiles.length,
       bytes: built.bytes.length,
     };
   } catch (error) {
@@ -387,9 +386,6 @@ export function applyConfigChanges(
     }
   }
   if (items.length > MAX_ITEMS_PER_FILE) throw new StudioFailure('TOO_LARGE');
-}
-export function countPolicies(settings: StudioGameSettings): number {
-  return settings.options.filter((o) => o.policy !== 'none').length;
 }
 
 export interface PresetImport {

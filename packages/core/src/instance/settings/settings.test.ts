@@ -119,7 +119,7 @@ describe('required and initial keys', () => {
       JSON.parse(await readFile(join(dir, '.torchlauncher-user/settings.json'), 'utf8')),
     ).toEqual({
       version: 1,
-      initial: { keys: ['gamma', 'musicVolume'], resourcePacks: false },
+      initial: { keys: ['gamma', 'musicVolume'], resourcePacks: false, files: {} },
     });
   });
 

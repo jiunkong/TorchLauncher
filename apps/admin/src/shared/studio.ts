@@ -24,8 +24,8 @@ export interface StudioBranding {
 }
 export interface StudioProject {
   format: 'torchlauncher-project';
-  /** 1 = original schema; 2 adds optional `lastBuild` and `gameSettings`. Both are read; v1 is upgraded in memory. */
-  version: 1 | 2;
+  /** The one current schema. Earlier development files are rejected, not migrated. */
+  version: 1;
   serverId: string;
   name: string;
   address: string;
@@ -216,8 +216,9 @@ export interface StudioPresetPreview {
 }
 /** Result of building `torchlauncher/settings-policy.json` from the current preset. */
 export interface StudioPolicyStatus {
-  /** 1 when no config file item is set (old launchers accept it), 2 otherwise; null when no policy is generated. */
-  version: 1 | 2 | null;
+  /** Number of config files the policy edits (0 when only options.txt items); `generated` is false when no policy is produced. */
+  configFiles: number;
+  generated: boolean;
   bytes: number;
   /** The launcher's policy size limit. */
   limit: number;

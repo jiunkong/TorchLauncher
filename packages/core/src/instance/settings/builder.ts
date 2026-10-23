@@ -61,7 +61,7 @@ function split(items: readonly SettingChoice[] | undefined, name: string) {
 
 /**
  * Serialize a policy deterministically: sorted keys and config files, empty sections omitted,
- * `version` 1 unless config files are present (2). The output is re-parsed with the launcher's
+ * The output is re-parsed with the launcher's
  * strict parser, so anything returned is accepted by `applySettingsPolicy`. Resource pack lists
  * keep their order (it is meaningful).
  */
@@ -69,7 +69,7 @@ export function serializeSettingsPolicy(policy: SettingsPolicy): BuiltSettingsPo
   const map = (pairs: readonly (readonly [string, string])[]) =>
     Object.fromEntries([...pairs].sort((a, b) => cmp(a[0], b[0])));
   const out: Record<string, unknown> = {
-    version: policy.configFiles.length > 0 ? 2 : 1,
+    version: 1,
     file: 'options.txt',
   };
   if (policy.required.length > 0) out.required = map(policy.required);
@@ -115,7 +115,7 @@ export function buildSettingsPolicy(selection: PolicySelection): BuiltSettingsPo
     paths.add(file.path);
   }
   const draft: SettingsPolicy = {
-    version: files.some((f) => f.required.length + f.initial.length > 0) ? 2 : 1,
+    version: 1,
     file: 'options.txt',
     required: options.required,
     initial: options.initial,
