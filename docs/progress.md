@@ -695,3 +695,8 @@ worktree를 직접 수정하는 방식으로 통합하지 않는다.
 - 메인 `pnpm check` 통과(1137 테스트 기준 워커 보고, 통합 후 재실행 통과). 키 파일·프로젝트·산출물에 개인 키 원문이 없음을 테스트로 확인.
 - 한계/후속: Studio `check` 명령은 아직 공개 키로 서명을 검증하지 않음(재배포 전 무서명 팩이 실패하게 되므로 UI 단계에서 결정). Linux `basic_text` 키링에서는 서명 불가. 내보내기가 실패해도 새로 만든 키는 남음. 실제 `safeStorage`·Windows·네이티브 백업 대화상자는 미검증. `useStudio.ts`에 새 오류 코드 문구만 추가(UI 재작성 때 정리).
 - 이로써 SIGN 코어·런처·Studio 함수가 모두 `main`에 통합됨. 종단 검증(Studio가 서명한 팩을 실제 호스팅에서 런처가 검증)과 Windows 확인은 미실시.
+
+## Studio UI 시안 적용 + 신규 기능 착수 (2026-10-23, #0 Claude)
+- 시안 `docs/design/studio/`(`d30b099`), 명세·작업 분해 `docs/studio-ui.md`(`c5035df`). 사용자 지시로 UI 적용과 신규 기능(게임 설정, 파일 diff, 배포 상태, 런처 ZIP 내보내기)을 병렬 진행.
+- 배정(모두 background 작업자, 통합은 #0만): STUDIO-UI-01 agent-1 `feat/studio-ui-shell`(renderer 독점), SET-CORE-01 agent-2 `feat/settings-core-shaders`(core 설정 정책 독점), STUDIO-MAIN-01 agent-3 `feat/studio-main-features`(admin main/shared/preload 독점). 기준 `c5035df`.
+- 후속: 세 작업 통합 후 STUDIO-UI-02(실제 API 연결) 배정. 아직 어떤 작업도 통합·검증되지 않았다.
