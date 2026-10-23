@@ -13,6 +13,12 @@ export class StudioFailure extends Error {
     super(code);
   }
 }
+/** A precise settings-source failure within the existing INVALID request category. */
+export class TestSettingsFailure extends StudioFailure {
+  constructor(readonly detailCode: import('../shared/studio.js').StudioTestSettingsError) {
+    super('INVALID');
+  }
+}
 /** A policy that cannot be built; `code` is the core SettingsError code (or `config-owned-by-sync`). */
 export class PolicyFailure extends StudioFailure {
   constructor(

@@ -198,13 +198,13 @@ export interface StudioExport {
   done: { fileName: string; size: number } | null;
 }
 export interface StudioPresetPreview {
-  source: 'folder' | 'file';
+  source: 'folder' | 'file' | 'test';
   optionCount: number;
   /** Lines/keys that were ignored (invalid key, too long value, duplicates, owned by the game). */
   ignored: number;
   /** Informational: files found next to options.txt that the preset cannot manage yet. */
   detected: { modConfigs: string[]; resourcePacks: string[]; shaderPacks: string[] };
-  /** Config files read into `gameSettings.configFiles` (folder import only). */
+  /** Config files parsed as candidates. Read-only test previews do not import them. */
   importedConfigs: string[];
   /** Config files found but not importable (unsupported format, unsafe, too large). */
   skippedConfigs: {
@@ -261,6 +261,13 @@ export interface StudioAccount {
   available: boolean;
   error: string | null;
 }
+/** Read-only last-test preview. Counts never imply that settings have been imported. */
+export interface StudioTestExtracted extends StudioPresetPreview {
+  keybindCount: number;
+  otherOptionCount: number;
+  /** Newly detected generic configs, including formats the item editor cannot import. */
+  newConfigCount: number;
+}
 export interface StudioTestRun {
   phase:
     | 'idle'
@@ -296,7 +303,11 @@ export interface StudioTestRun {
   report: StudioCompatibilityReport | null;
   mods: StudioModInfo[];
   metadataErrors: { file: string; code: string }[];
-  extracted: StudioPresetPreview | null;
+  extracted: StudioTestExtracted | null;
+  /** Read-only instance config candidates, separate from project.gameSettings. */
+  configFiles: StudioConfigFile[] | null;
+  configPreview: StudioPresetPreview | null;
+  configError: string | null;
   extractionError: string | null;
   error: string | null;
 }
@@ -367,6 +378,8 @@ export type StudioWorkCommand =
     };
 export type StudioSettingsCommand =
   | { action: 'settingsImport'; source: 'folder' | 'file' }
+  | { action: 'settingsImportOptions'; source: 'test' | 'file' }
+  | { action: 'settingsTestConfigs' }
   | {
       action: 'settingsOptions';
       /** Max 512 changes. `value` (optional) overrides the imported value. */
@@ -434,7 +447,10 @@ export type StudioError =
   | 'BLOCKED'
   /** A chosen file or pack is larger than the limit. */
   | 'TOO_LARGE';
-export type StudioReply = { ok: true; state: StudioState } | { ok: false; code: StudioError };
+export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
+export type StudioReply =
+  | { ok: true; state: StudioState }
+  | { ok: false; code: StudioError; detail?: { code: StudioTestSettingsError } };
 export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;
   /** Subscribes to window-close requests while the project has unsaved changes. Returns an unsubscribe function. */

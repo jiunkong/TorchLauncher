@@ -23,8 +23,14 @@ import {
 import type { StudioAccount, StudioProject, StudioTestRun } from '../shared/studio.js';
 import { buildPlan } from './files-diff.js';
 import { noLinks, safeRead, saveProject } from './filesystem.js';
-import { type PresetImport, readPreset, SETTINGS_POLICY_PATH } from './game-settings.js';
-import { StudioFailure } from './project.js';
+import {
+  isShaderConfigPath,
+  type PresetImport,
+  readPreset,
+  readPresetConfigs,
+  SETTINGS_POLICY_PATH,
+} from './game-settings.js';
+import { StudioFailure, TestSettingsFailure } from './project.js';
 import { hashFile, scanSource } from './scan.js';
 import { applyTestInstance, recoverTestInstance, removeTestInstance } from './test-instance.js';
 
@@ -67,12 +73,16 @@ export const emptyTestRun = (): StudioTestRun => ({
   mods: [],
   metadataErrors: [],
   extracted: null,
+  configFiles: null,
+  configPreview: null,
+  configError: null,
   extractionError: null,
   error: null,
 });
 function safeCode(error: unknown): string {
   if (error instanceof AuthenticationError || error instanceof HostAuthenticationError)
     return error.code;
+  if (error instanceof TestSettingsFailure) return error.detailCode;
   if (error instanceof StudioFailure) return error.code;
   if (error instanceof testInstance.TestInstanceError) return error.code;
   if (error instanceof Error && error.name === 'AbortError') return 'cancelled';
@@ -187,12 +197,7 @@ export class StudioTestRunner {
       safe.droppedEntries > 0 ||
       safe.discardedLines > 0;
   }
-  async start(
-    project: StudioProject,
-    sourceRoot: string,
-    signal: AbortSignal,
-    extract: (preset: PresetImport) => void,
-  ) {
+  async start(project: StudioProject, sourceRoot: string, signal: AbortSignal) {
     const root = this.root(project);
     if (below(resolve(sourceRoot), root) || below(root, resolve(sourceRoot)))
       throw new StudioFailure('INVALID');
@@ -410,14 +415,35 @@ export class StudioTestRunner {
           if (this.state.report.status === 'no-problems-found')
             this.state.report.status = 'incomplete';
         }
+        // Refresh config candidates independently of options.txt and never mutate the project.
         try {
-          const preset = JSON.parse(
-            JSON.stringify(await readPreset(root, 'folder', true)),
-            (_key, value: unknown) => (typeof value === 'string' ? this.text(value) : value),
-          ) as PresetImport;
+          await this.scanConfigs(root, signal);
+        } catch (error) {
           signal.throwIfAborted();
-          extract(preset);
-          this.state.extracted = preset.preview;
+          this.state.configError = safeCode(error);
+        }
+        try {
+          const preset = this.sanitizePreset(
+            await readPreset(join(root, 'options.txt'), 'file', true),
+          );
+          signal.throwIfAborted();
+          const keybindCount = preset.entries.filter(
+            (entry) => entry.kind === 'keybind' || entry.kind === 'mod-keybind',
+          ).length;
+          const known = new Set(project.gameSettings?.configFiles?.map((file) => file.path) ?? []);
+          this.state.extracted = {
+            ...preset.preview,
+            ...(this.state.configPreview ?? {}),
+            source: 'test',
+            optionCount: preset.entries.length,
+            ignored: preset.preview.ignored,
+            keybindCount,
+            otherOptionCount: preset.entries.length - keybindCount,
+            newConfigCount:
+              this.state.configPreview?.detected.modConfigs.filter(
+                (name) => !isShaderConfigPath(`config/${name}`) && !known.has(`config/${name}`),
+              ).length ?? 0,
+          };
         } catch (error) {
           signal.throwIfAborted();
           this.state.extractionError = safeCode(error);
@@ -448,6 +474,78 @@ export class StudioTestRunner {
     }
     function dirnameOfPolicy(root: string) {
       return join(root, 'torchlauncher');
+    }
+  }
+  private sanitizePreset<T>(preset: T): T {
+    return JSON.parse(JSON.stringify(preset), (_key, value: unknown) =>
+      typeof value === 'string' ? this.text(value) : value,
+    ) as T;
+  }
+  private async scanConfigs(root: string, signal: AbortSignal) {
+    this.state.configFiles = null;
+    this.state.configPreview = null;
+    this.state.configError = null;
+    const preset = this.sanitizePreset(await readPresetConfigs(root));
+    signal.throwIfAborted();
+    this.state.configFiles = preset.configFiles;
+    this.state.configPreview = { ...preset.preview, source: 'test' };
+  }
+  /** Root is derived only from the current project. Both instance leases exclude other processes. */
+  private async readInstance<T>(
+    project: StudioProject,
+    signal: AbortSignal,
+    read: (root: string) => Promise<T>,
+  ): Promise<T> {
+    const root = this.root(project);
+    if (!(await maybeStat(root))) throw new TestSettingsFailure('NO_TEST_RESULT');
+    await noLinks(root);
+    const outerRoot = join(this.host.userData, 'test-instance-locks', project.serverId);
+    await secureDirectory(outerRoot);
+    const outer = await acquireServerDataLock(outerRoot, 'maintenance');
+    try {
+      const lease = await acquireServerDataLock(root, 'maintenance');
+      try {
+        signal.throwIfAborted();
+        // Refuse an interrupted apply; these commands never repair/write game data.
+        if (await maybeStat(join(root, '.torchlauncher-test/transaction')))
+          throw new StudioFailure('MISMATCH');
+        const result = await read(root);
+        signal.throwIfAborted();
+        return result;
+      } finally {
+        await lease.release();
+      }
+    } finally {
+      await outer.release();
+    }
+  }
+  async readLastOptions(project: StudioProject, signal: AbortSignal): Promise<PresetImport> {
+    if (this.state.serverId !== project.serverId || this.state.phase !== 'done' || !this.state.exit)
+      throw new TestSettingsFailure('NO_TEST_RESULT');
+    return this.readInstance(project, signal, async (root) => {
+      let preset: PresetImport;
+      try {
+        preset = await readPreset(join(root, 'options.txt'), 'file');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+          throw new TestSettingsFailure('TEST_OPTIONS_MISSING');
+        throw error;
+      }
+      const safe = this.sanitizePreset(preset);
+      safe.preview.source = 'test';
+      return safe;
+    });
+  }
+  /** Refreshes config candidates only; never imports values or edits project policy. */
+  async refreshConfigs(project: StudioProject, signal: AbortSignal): Promise<void> {
+    this.state.configFiles = null;
+    this.state.configPreview = null;
+    this.state.configError = null;
+    try {
+      await this.readInstance(project, signal, (root) => this.scanConfigs(root, signal));
+    } catch (error) {
+      this.state.configError = safeCode(error);
+      throw error;
     }
   }
   async reset(project: StudioProject) {

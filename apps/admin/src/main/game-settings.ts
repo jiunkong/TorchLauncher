@@ -441,6 +441,32 @@ export async function readPreset(
     options = Buffer.alloc(0);
   }
   const { entries, ignored } = parseOptionsText(options);
+  const contents = folder
+    ? await readPresetConfigs(folder)
+    : {
+        configFiles: [],
+        shader: null,
+        preview: {
+          source: 'file' as const,
+          optionCount: 0,
+          ignored: 0,
+          detected: { modConfigs: [], resourcePacks: [], shaderPacks: [] },
+          importedConfigs: [],
+          skippedConfigs: [],
+          shader: null,
+        },
+      };
+  return {
+    ...contents,
+    entries,
+    preview: { ...contents.preview, optionCount: entries.length, ignored },
+  };
+}
+
+/** Reads only bounded config/pack metadata; malformed or missing options.txt cannot block it. */
+export async function readPresetConfigs(folder: string): Promise<Omit<PresetImport, 'entries'>> {
+  await noLinks(folder);
+  if (!(await lstat(folder)).isDirectory()) throw new StudioFailure('INVALID');
   const detected = {
     modConfigs: [] as string[],
     resourcePacks: [] as string[],
@@ -451,7 +477,7 @@ export async function readPreset(
   let shader: PresetImport['shader'] = null;
   const packOptionFiles: string[] = [];
   let configFound = false;
-  if (folder) {
+  {
     const root = folder;
     const list = async (sub: string, filter: RegExp, recursive = false) => {
       const names: string[] = [];
@@ -544,13 +570,12 @@ export async function readPreset(
     }
   }
   return {
-    entries,
     configFiles,
     shader,
     preview: {
-      source,
-      optionCount: entries.length,
-      ignored,
+      source: 'folder',
+      optionCount: 0,
+      ignored: 0,
       detected,
       importedConfigs: configFiles.map((f) => f.path),
       skippedConfigs: skipped,

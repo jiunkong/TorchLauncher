@@ -10,7 +10,6 @@ import { zip } from '../../../../packages/core/src/diagnostics/fixtures/zip.js';
 import type { Installation } from '../../../../packages/core/src/minecraft/installer.js';
 import type { GameExit, RunningGame } from '../../../../packages/core/src/minecraft/process.js';
 import { testAuthText } from '../shared/test-auth-text.js';
-import { emptySettings } from './game-settings.js';
 import { handleStudioRequest } from './ipc.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 import { StudioTestRunner, TEST_LOG_LIMIT, type TestRunHost } from './test-run.js';
@@ -97,6 +96,7 @@ async function setup() {
   const root = join(host.userData, 'test-instances', project.serverId);
   return {
     base,
+    dialogs,
     source,
     root,
     host,
@@ -111,8 +111,12 @@ async function setup() {
     project,
   };
 }
-it('runs preparation, installation, sync, process, analysis and shared settings extraction without writing source', async () => {
+it('keeps completed test extraction read-only until options are explicitly imported', async () => {
   const h = await setup();
+  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.json'));
+  expect(await h.service.request({ action: 'saveAs' })).toMatchObject({ ok: true });
+  const before = h.service.snapshot();
+  expect(before.dirty).toBe(false);
   const phases: string[] = [];
   h.install.mockImplementationOnce(async (options) => {
     phases.push(h.runner.state.phase);
@@ -161,14 +165,28 @@ it('runs preparation, installation, sync, process, analysis and shared settings 
     },
   });
   expect(phases).toEqual(['installing']);
+  expect(h.service.snapshot().project).toEqual(before.project);
+  expect(h.service.snapshot().dirty).toBe(false);
+  expect(h.service.snapshot().preset).toEqual(before.preset);
+  expect(h.runner.state.extracted).toMatchObject({
+    source: 'test',
+    optionCount: 2,
+    keybindCount: 1,
+    otherOptionCount: 1,
+    newConfigCount: 2,
+  });
+  expect(h.runner.state.configFiles?.map((file) => file.path)).toEqual([
+    'config/example.properties',
+    'config/nested/detail.properties',
+  ]);
+  expect(
+    await h.service.request({ action: 'settingsImportOptions', source: 'test' }),
+  ).toMatchObject({ ok: true, state: { dirty: true, preset: { source: 'test' } } });
   expect(h.service.snapshot().project?.gameSettings).toMatchObject({
     options: expect.arrayContaining([expect.objectContaining({ key: 'gamma', value: '0.9' })]),
-    configFiles: expect.arrayContaining([
-      expect.objectContaining({ path: 'config/example.properties' }),
-      expect.objectContaining({ path: 'config/nested/detail.properties' }),
-    ]),
-    shader: { pack: { value: 'example.zip' } },
   });
+  expect(h.service.snapshot().project?.gameSettings?.configFiles).toBeUndefined();
+  expect(h.service.snapshot().project?.gameSettings?.shader).toBeUndefined();
   expect(h.runner.state.extracted?.optionCount).toBeGreaterThan(0);
   expect(await readFile(join(h.source, 'options.txt'), 'utf8')).toBe('version:3955\ngamma:0.5\n');
   expect(JSON.stringify(h.service.snapshot())).not.toContain(account.accessToken);
@@ -176,9 +194,9 @@ it('runs preparation, installation, sync, process, analysis and shared settings 
 });
 it('preserves chosen settings policies when importing test-run files', async () => {
   const h = await setup();
-  const settings = emptySettings();
-  settings.options.push({ key: 'gamma', value: '0.5', policy: 'required' });
-  h.project.gameSettings = settings;
+  await mkdir(join(h.source, 'config'));
+  await writeFile(join(h.source, 'config/example.properties'), 'quality=high\n');
+  await writeFile(join(h.source, 'config/iris.properties'), 'enableShaders=false\n');
   // Use the existing external import and command path to create a policy, then test-run extraction.
   const d = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue([h.source]),
@@ -192,9 +210,24 @@ it('preserves chosen settings policies when importing test-run files', async () 
     action: 'settingsOptions',
     changes: [{ key: 'gamma', policy: 'required' }],
   });
+  expect(
+    await service.request({
+      action: 'settingsConfigItems',
+      path: 'config/example.properties',
+      changes: [{ key: 'quality', policy: 'required' }],
+    }),
+  ).toMatchObject({ ok: true });
+  expect(
+    await service.request({
+      action: 'settingsShader',
+      enabled: { policy: 'required', value: false },
+    }),
+  ).toMatchObject({ ok: true });
   const root = join(h.host.userData, 'test-instances', service.snapshot().project?.serverId ?? '');
   h.launch.mockImplementationOnce(async () => {
     await writeFile(join(root, 'options.txt'), 'version:3955\ngamma:0.8\n');
+    await writeFile(join(root, 'config/example.properties'), 'quality=low\n');
+    await writeFile(join(root, 'config/iris.properties'), 'enableShaders=true\n');
     await h.stop();
     return {
       pid: 123,
@@ -203,10 +236,19 @@ it('preserves chosen settings policies when importing test-run files', async () 
       getLogs: () => h.logs,
     };
   });
+  const before = service.snapshot().project;
   expect(await service.request({ action: 'testStart' })).toMatchObject({ ok: true });
+  expect(service.snapshot().project).toEqual(before);
+  expect(await service.request({ action: 'settingsImportOptions', source: 'test' })).toMatchObject({
+    ok: true,
+  });
   expect(
     service.snapshot().project?.gameSettings?.options.find((o) => o.key === 'gamma'),
   ).toMatchObject({ value: '0.8', policy: 'required' });
+  expect(service.snapshot().project?.gameSettings?.configFiles).toEqual(
+    before?.gameSettings?.configFiles,
+  );
+  expect(service.snapshot().project?.gameSettings?.shader).toEqual(before?.gameSettings?.shader);
 });
 it('cancels installation and forbids process spawn or reset while preparation is active', async () => {
   const h = await setup();
@@ -292,7 +334,13 @@ it('requires exact IPC fields and trusted main frame before auth, reset or nativ
     });
   const frame = { url: 'file:///studio/index.html' };
   const contents = { mainFrame: frame } as unknown as WebContents;
-  for (const input of [{ action: 'testLogin' }, { action: 'testReset', confirmed: true }]) {
+  for (const input of [
+    { action: 'testLogin' },
+    { action: 'testReset', confirmed: true },
+    { action: 'settingsImportOptions', source: 'test' },
+    { action: 'settingsImportOptions', source: 'file' },
+    { action: 'settingsTestConfigs' },
+  ]) {
     for (const [sender, senderFrame] of [
       [{}, frame],
       [contents, { ...frame }],
@@ -383,3 +431,199 @@ it('redacts token fields even when the account name is itself a token-field name
   await pending;
   expect(JSON.stringify(h.runner.state)).not.toContain('synthetic-other-secret');
 });
+
+async function completeTest(
+  h: Awaited<ReturnType<typeof setup>>,
+  options: string | null = 'gamma:0.8\n',
+) {
+  h.launch.mockImplementationOnce(async () => {
+    if (options !== null) await writeFile(join(h.root, 'options.txt'), options);
+    await mkdir(join(h.root, 'config/nested'), { recursive: true });
+    await writeFile(join(h.root, 'config/nested/example.properties'), 'quality=high\n');
+    await writeFile(join(h.root, 'config/unsupported.json'), '{"quality":"high"}');
+    return {
+      pid: 123,
+      finished: Promise.resolve({ reason: 'exited', code: 0, signal: null, logs: h.logs }),
+      stop: h.stop,
+      getLogs: () => h.logs,
+    };
+  });
+  expect(await h.service.request({ action: 'testStart' })).toMatchObject({ ok: true });
+}
+it('returns explicit errors without a last result and after clearing/resetting the result', async () => {
+  const h = await setup();
+  const before = h.service.snapshot().project;
+  expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+    detail: { code: 'NO_TEST_RESULT' },
+  });
+  expect(h.service.snapshot().project).toEqual(before);
+  expect(await h.service.request({ action: 'settingsTestConfigs' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+    detail: { code: 'NO_TEST_RESULT' },
+  });
+  await completeTest(h);
+  await h.service.request({ action: 'testReset', confirmed: true });
+  expect(h.runner.state).toMatchObject({ extracted: null, configFiles: null, configPreview: null });
+  expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+    detail: { code: 'NO_TEST_RESULT' },
+  });
+  await h.service.request({ action: 'new', discard: true });
+  expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+    detail: { code: 'NO_TEST_RESULT' },
+  });
+});
+it('imports the current last-instance options only and retains policies for present and missing keys', async () => {
+  const h = await setup();
+  await writeFile(join(h.source, 'options.txt'), 'gamma:0.5\nrenderDistance:12\n');
+  h.dialogs.open.mockResolvedValueOnce([join(h.source, 'options.txt')]);
+  expect(await h.service.request({ action: 'settingsImport', source: 'file' })).toMatchObject({
+    ok: true,
+  });
+  await h.service.request({
+    action: 'settingsOptions',
+    changes: [
+      { key: 'gamma', policy: 'required', value: '0.5' },
+      { key: 'renderDistance', policy: 'initial', value: '12' },
+    ],
+  });
+  const before = h.service.snapshot().project?.gameSettings;
+  await completeTest(h);
+  expect(h.service.snapshot().project?.gameSettings).toEqual(before);
+  // Re-read the fixed instance path on import, not a cached preset or the source options.txt.
+  await writeFile(join(h.root, 'options.txt'), 'gamma:0.95\nfov:0.7\n');
+  expect(
+    await h.service.request({ action: 'settingsImportOptions', source: 'test' }),
+  ).toMatchObject({ ok: true, state: { dirty: true } });
+  expect(h.service.snapshot().project?.gameSettings?.options).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ key: 'gamma', value: '0.95', policy: 'required' }),
+      expect.objectContaining({ key: 'renderDistance', value: '12', policy: 'initial' }),
+      expect.objectContaining({ key: 'fov', value: '0.7', policy: 'none' }),
+    ]),
+  );
+  expect(h.service.snapshot().project?.gameSettings?.configFiles).toBeUndefined();
+});
+it('routes file options import through the existing picker and merge path', async () => {
+  const h = await setup();
+  h.dialogs.open.mockResolvedValueOnce([join(h.source, 'options.txt')]);
+  expect(await h.service.request({ action: 'settingsImport', source: 'file' })).toMatchObject({
+    ok: true,
+  });
+  await h.service.request({
+    action: 'settingsOptions',
+    changes: [{ key: 'gamma', policy: 'required', value: '0.1' }],
+  });
+  h.dialogs.open.mockResolvedValueOnce([join(h.source, 'options.txt')]);
+  expect(
+    await h.service.request({ action: 'settingsImportOptions', source: 'file' }),
+  ).toMatchObject({ ok: true, state: { dirty: true, preset: { source: 'file' } } });
+  expect(h.dialogs.open).toHaveBeenLastCalledWith('optionsfile', undefined);
+  expect(h.service.snapshot().project?.gameSettings?.options).toContainEqual(
+    expect.objectContaining({ key: 'gamma', value: '0.5', policy: 'required' }),
+  );
+  h.dialogs.open.mockResolvedValueOnce(null);
+  const before = h.service.snapshot().project;
+  expect(await h.service.request({ action: 'settingsImportOptions', source: 'file' })).toEqual({
+    ok: false,
+    code: 'CANCELLED',
+  });
+  expect(h.service.snapshot().project).toEqual(before);
+});
+it('refreshes config candidates without importing, including when options.txt is invalid', async () => {
+  const h = await setup();
+  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.json'));
+  await h.service.request({ action: 'saveAs' });
+  const before = h.service.snapshot();
+  await completeTest(h, 'invalid\u0000options');
+  expect(h.runner.state).toMatchObject({
+    phase: 'done',
+    extracted: null,
+    extractionError: 'INVALID',
+    configError: null,
+  });
+  await writeFile(join(h.root, 'config/nested/example.properties'), 'quality=ultra\n');
+  const reply = await h.service.request({ action: 'settingsTestConfigs' });
+  expect(reply).toMatchObject({
+    ok: true,
+    state: {
+      dirty: false,
+      testRun: {
+        configFiles: [
+          {
+            path: 'config/nested/example.properties',
+            items: [expect.objectContaining({ key: 'quality', value: 'ultra', policy: 'none' })],
+          },
+        ],
+        configPreview: {
+          source: 'test',
+          skippedConfigs: [{ path: 'config/unsupported.json', reason: 'unsupported' }],
+        },
+      },
+    },
+  });
+  expect(h.service.snapshot().project).toEqual(before.project);
+  expect(h.service.snapshot().preset).toEqual(before.preset);
+  expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+  });
+  expect(h.service.snapshot().project).toEqual(before.project);
+});
+it('reports missing test options separately and preserves config-only crash results', async () => {
+  const h = await setup();
+  await completeTest(h, null);
+  expect(h.runner.state).toMatchObject({
+    extracted: { optionCount: 0, newConfigCount: 2 },
+    configError: null,
+  });
+  expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+    detail: { code: 'TEST_OPTIONS_MISSING' },
+  });
+  expect(await h.service.request({ action: 'settingsTestConfigs' })).toMatchObject({ ok: true });
+});
+it('rejects unexpected options/config command fields and sources before reading files or selecting', async () => {
+  const h = await setup();
+  const before = h.service.snapshot();
+  for (const input of [
+    { action: 'settingsImportOptions' },
+    { action: 'settingsImportOptions', source: 'folder' },
+    { action: 'settingsImportOptions', source: 'test', path: h.source },
+    { action: 'settingsImportOptions', source: 'file', root: h.source },
+    { action: 'settingsTestConfigs', path: h.source },
+    { action: 'settingsTestConfigs', source: 'test' },
+    Object.assign(Object.create({ action: 'settingsTestConfigs' }), { path: h.source }),
+    Object.assign(Object.create({ action: 'settingsImportOptions' }), {
+      source: 'test',
+      path: h.source,
+    }),
+  ])
+    expect(await h.service.request(input)).toEqual({ ok: false, code: 'INVALID' });
+  expect(h.service.snapshot()).toEqual(before);
+});
+it.skipIf(process.platform === 'win32')(
+  'does not follow linked instance options or config paths',
+  async () => {
+    const h = await setup();
+    await completeTest(h);
+    const project = h.service.snapshot().project;
+    await rm(join(h.root, 'options.txt'));
+    await symlink(join(h.source, 'options.txt'), join(h.root, 'options.txt'));
+    expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    await symlink(h.source, join(h.root, 'config/linked'), 'dir');
+    expect(await h.service.request({ action: 'settingsTestConfigs' })).toMatchObject({ ok: true });
+    expect(h.runner.state.configPreview?.detected.modConfigs).not.toContain('linked/options.txt');
+    expect(h.service.snapshot().project).toEqual(project);
+  },
+);
