@@ -81,3 +81,7 @@ Use imperative, scoped messages such as `feat(core): validate range responses`, 
 ## Configuration & Data Safety
 
 Never commit tokens, credentials, or private configuration. Keep game data in server-specific OS user-data directories. Track user-added mods through the launcher. Adapt public-download logic from gdown with its MIT notice and source commit recorded; do not add Google account integration. Validate paths and hashes before applying remote files.
+
+## Development-Phase Compatibility
+
+Until the first release, backward compatibility is not required (user decision, 2026-10-23). Do not add or keep migration paths, legacy format readers, or version-negotiation shims for earlier project, deployment, or settings-policy formats; change formats directly and update the specs and tests. Revisit this rule before the first public release.
