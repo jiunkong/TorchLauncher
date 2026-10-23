@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { finishClose, onCloseRequest, runConfirmedSwitch } from './adapters/discard';
-import { useInsights } from './adapters/insights';
+import {
+  cancelClose,
+  finishClose,
+  onCloseRequest,
+  runConfirmedSwitch,
+} from './adapters/discard';
+import { deriveInsights } from './adapters/insights';
 import { Sidebar } from './components/Sidebar';
 import { Splash } from './components/Splash';
 import { UnsavedDialog } from './components/UnsavedDialog';
@@ -14,7 +19,7 @@ import { appReady } from './splash';
 export function App() {
   const { t } = useStudioLocale();
   const studio = useStudio();
-  const insights = useInsights(studio);
+  const insights = deriveInsights(studio.state);
   const settings = useSettingsState();
   const { info, error } = useApplicationInfo();
   const [page, setPage] = useState<PageId>('overview');
@@ -40,18 +45,23 @@ export function App() {
     const action = confirm;
     if (!action) return;
     if (!(await studio.run('save'))) {
-      setConfirm(null);
+      // A cancelled or failed save keeps a close request open so nothing is lost silently.
+      if (action !== 'close') setConfirm(null);
       return;
     }
     setConfirm(null);
-    if (action === 'close') await finishClose();
+    if (action === 'close') await finishClose(studio);
     else await runConfirmedSwitch(studio, action);
   };
   const confirmDiscard = () => {
     const action = confirm;
     setConfirm(null);
-    if (action === 'close') void finishClose();
+    if (action === 'close') void finishClose(studio);
     else if (action) void runConfirmedSwitch(studio, action);
+  };
+  const confirmCancel = () => {
+    if (confirm === 'close') void cancelClose(studio);
+    setConfirm(null);
   };
 
   const infoText = error
@@ -122,7 +132,7 @@ export function App() {
           busy={busy}
           onSave={() => void confirmSave()}
           onDiscard={confirmDiscard}
-          onCancel={() => setConfirm(null)}
+          onCancel={confirmCancel}
         />
       )}
       {!splashDone && (

@@ -8,7 +8,7 @@ import type { PageProps } from './types';
 
 export function BrandPage({ studio, draft }: PageProps) {
   const { t } = useStudioLocale();
-  const { busy, branding: command } = studio;
+  const { busy, command } = studio;
   const branding = draft.branding ?? {};
   const name = branding.appName ?? '';
   const shown = name || draft.name;

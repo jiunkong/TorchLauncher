@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
-  StudioBrandingCommand,
   StudioCommand,
   StudioError,
   StudioProject,
+  StudioRequest,
   StudioState,
 } from '../../../shared/studio.js';
 import { useStudioLocale } from '../i18n';
@@ -13,7 +13,7 @@ export type StudioAction = Exclude<StudioCommand['action'], 'update' | 'touch' |
 /** The outcome of the latest user-started operation; adapters derive deploy/export status from it. */
 export interface StudioRun {
   seq: number;
-  action: StudioAction | StudioBrandingCommand['action'];
+  action: StudioRequest['action'];
   ok: boolean;
   code: StudioError | null;
 }
@@ -28,7 +28,7 @@ export function useStudio() {
   const [lastRun, setLastRun] = useState<StudioRun | null>(null);
   const actionLock = useRef(false);
   const sequence = useRef(0);
-  const [operation, setOperation] = useState<StudioAction | null>(null);
+  const [operation, setOperation] = useState<keyof typeof operationKeys | null>(null);
   const errorMessage = (code: StudioError) => t(`error.${code}`);
   // The locale only affects the failure text; the polling must not restart with it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
@@ -74,14 +74,13 @@ export function useStudio() {
   };
   /** Sends the pending draft to the main process first, then the command; keeps one at a time. */
   const execute = async (
-    request: StudioCommand | StudioBrandingCommand,
+    request: StudioRequest,
     syncDraft: boolean,
   ): Promise<boolean> => {
     if (actionLock.current) return false;
     actionLock.current = true;
     setPending(true);
-    if (request.action !== 'update' && request.action in operationKeys)
-      setOperation(request.action as StudioAction);
+    if (request.action in operationKeys) setOperation(request.action as keyof typeof operationKeys);
     setMessage('');
     let ok = false;
     let code: StudioError | null = null;
@@ -116,14 +115,14 @@ export function useStudio() {
       if (request.action !== 'update')
         setLastRun({
           seq: sequence.current,
-          action: request.action as StudioRun['action'],
+          action: request.action,
           ok,
           code,
         });
     }
     return ok;
   };
-  const run = async (action: StudioAction): Promise<boolean> => {
+  const run = async (action: StudioAction, options: { discard?: boolean } = {}): Promise<boolean> => {
     if (action === 'cancel') {
       try {
         await window.torchlauncher.request({ action });
@@ -132,19 +131,30 @@ export function useStudio() {
       }
       return false;
     }
-    return execute({ action }, !['new', 'open'].includes(action));
+    if (action === 'new' || action === 'open')
+      return execute(options.discard ? { action, discard: true } : { action }, false);
+    return execute({ action }, true);
   };
-  /** Branding commands (icon, background, app name) go through the same serialized path. */
-  const branding = (request: StudioBrandingCommand) => execute(request, true);
+  /** Every other command (branding, files, settings, export, ...) goes through the same serialized path. */
+  const command = (request: StudioRequest) => execute(request, true);
+  /** Answers to a window-close request; not serialized with other work and never syncs the draft. */
+  const answerClose = async (action: 'closeConfirm' | 'closeCancel') => {
+    try {
+      await window.torchlauncher.request({ action });
+    } catch {
+      setMessage(t('error.IO'));
+    }
+  };
   const serviceBusy = state?.busy ?? null;
   const effectiveOperation = operation ?? serviceBusy;
-  const operationLabel = t(operationKeys[effectiveOperation ?? 'new']);
+  const operationLabel = t(operationKeys[effectiveOperation ?? 'work']);
   return {
     state,
     draft,
     edit,
     run,
-    branding,
+    command,
+    answerClose,
     message,
     lastRun,
     loaded: state !== null,
@@ -178,4 +188,9 @@ const operationKeys = {
   building: 'op.build',
   checking: 'op.check',
   exporting: 'op.export',
+  work: 'op.work',
+  rescan: 'op.rescan',
+  exportCheck: 'op.check',
+  settingsImport: 'op.settings',
+  settingsPackAdd: 'op.settings',
 } as const;

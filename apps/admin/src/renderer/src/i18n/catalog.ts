@@ -60,6 +60,9 @@ const table = {
   'op.build': ['Building the torchpack…', 'torchpack을 생성하는 중…'],
   'op.check': ['Checking the deployment address…', '배포 주소를 확인하는 중…'],
   'op.export': ['Exporting the launcher…', '런처를 내보내는 중…'],
+  'op.work': ['Working…', '작업 중…'],
+  'op.rescan': ['Reading the source folder…', '소스 폴더를 다시 읽는 중…'],
+  'op.settings': ['Reading game settings…', '게임 설정을 읽는 중…'],
   'op.choosing': ['Waiting for a selection…', '선택을 기다리는 중…'],
 
   'error.INVALID': [
@@ -196,7 +199,7 @@ const table = {
   ],
   'overview.files.source': ['Source folder · {name}', '소스 폴더 · {name}'],
   'overview.files.noSource': ['No source folder selected', '소스 폴더를 선택하지 않았습니다'],
-  'overview.export.last': ['Last export · {date}', '마지막 내보내기 · {date}'],
+  'overview.export.last': ['Last export · {name}', '마지막 내보내기 · {name}'],
   'overview.export.none': ['Not exported in this session.', '이번 실행에서 내보낸 적이 없습니다.'],
   'overview.export.hint': [
     'Re-export the launcher only when the server info or branding changed.',
@@ -274,10 +277,6 @@ const table = {
   'files.sourceChange': ['Change folder', '폴더 변경'],
   'files.add': ['Add files', '파일 추가'],
   'files.rescan': ['Rescan', '다시 읽기'],
-  'files.rescanUnavailable': [
-    'Rescanning the source folder is not available yet.',
-    '소스 폴더 다시 읽기는 아직 사용할 수 없습니다.',
-  ],
   'files.needSource': [
     'Choose a source folder first. Saving the project and editing the server info work without one.',
     '먼저 소스 폴더를 선택하세요. 선택하지 않아도 프로젝트 저장과 서버 정보 편집은 계속할 수 있습니다.',
@@ -294,6 +293,21 @@ const table = {
   'files.legend.initial': [
     'Installed once; later changes by the player are kept. Use it for personal settings such as default key bindings.',
     '처음 한 번만 넣고, 이후 플레이어가 바꾼 내용은 유지합니다. 기본 단축키 같은 개인 설정에 사용합니다.',
+  ],
+  'files.totalSize': ['{count} files · {size}', '전체 {count}개 · {size}'],
+  'files.chg.removed': ['Removed', '삭제됨'],
+  'files.missing': ['{count} missing', '누락 {count}'],
+  'files.missingRow': [
+    'The source folder no longer has this file; a build would fail.',
+    '소스 폴더에 이 파일이 없습니다. 이대로는 배포 파일을 만들 수 없습니다.',
+  ],
+  'files.truncated': [
+    'The source folder has more files than can be listed. Only the first ones are shown.',
+    '소스 폴더에 표시할 수 있는 수보다 많은 파일이 있습니다. 앞쪽 일부만 표시합니다.',
+  ],
+  'files.skipped': [
+    '{count} links or special files were skipped.',
+    '링크나 특수 파일 {count}개는 건너뛰었습니다.',
   ],
   'files.total': ['{count} files', '전체 {count}개'],
   'files.changed': ['{count} changed since last deployment', '마지막 배포 이후 변경 {count}'],
@@ -464,7 +478,25 @@ const table = {
     'Same as the current files: the latest deployment file.',
     '현재 파일과 같은 최신 배포 파일입니다.',
   ],
-  'deploy.built': ['Built {date} · {count} files', '만든 시각 {date} · {count}개 파일'],
+  'deploy.built': [
+    'Built {date} · {count} files · {size}',
+    '만든 시각 {date} · {count}개 파일 · {size}',
+  ],
+  'deploy.unknownSource': [
+    'A deployment file was built before. Choose the source folder to compare it with the current files.',
+    '이전에 만든 배포 파일이 있습니다. 소스 폴더를 선택하면 현재 파일과 비교합니다.',
+  ],
+  'deploy.reveal': ['Show in folder', '폴더에서 보기'],
+  'deploy.reason.files': ['Files changed', '파일 변경'],
+  'deploy.reason.game': ['Game environment changed', '게임 환경 변경'],
+  'deploy.reason.branding': ['Branding changed', '브랜딩 변경'],
+  'deploy.reason.settings': ['Game settings changed', '게임 설정 변경'],
+  'deploy.check.count': ['{count} files', '{count}개'],
+  'deploy.check.deployment': ['Same deployment as the last build', '마지막으로 만든 배포와 같음'],
+  'deploy.check.older': [
+    'The public file is an older deployment. Upload the latest file.',
+    '공개된 파일이 이전 배포입니다. 최신 파일을 올리세요.',
+  ],
   'deploy.needSource': [
     'Choose the source folder before building the deployment file.',
     '배포 파일을 만들기 전에 소스 폴더를 선택하세요.',
@@ -535,52 +567,57 @@ const table = {
     '공통 Windows portable .exe 또는 Linux .AppImage입니다. Linux AppImage는 실행 권한이 있어야 합니다.',
   ],
   'export.destination': ['Save location', '저장 위치'],
-  'export.destinationValue': ['You choose it when exporting', '내보낼 때 폴더를 선택합니다'],
+  'export.destinationValue': ['You choose it when exporting', '내보낼 때 저장 위치를 선택합니다'],
   'export.destinationHelp': [
-    'An empty output folder. The launcher and the server settings are copied into it (a single ZIP file comes later).',
-    '비어 있는 출력 폴더입니다. 런처와 서버 설정이 그 안에 복사됩니다(ZIP 하나로 만들기는 후속 구현).',
+    'The launcher and the server settings are written into one ZIP file.',
+    '런처와 서버 설정이 ZIP 파일 하나로 만들어집니다.',
   ],
   'export.run': ['Export launcher', '런처 내보내기'],
   'export.serverId': ['Server ID matches', '서버 ID 일치'],
-  'export.serverId.ok': ['Same as the deployment file', '배포 파일과 같음'],
-  'export.serverId.bad': ['Server ID mismatch', '서버 ID 불일치'],
-  'export.serverId.badHelp': [
+  'export.url': ['Deployment address verified', '배포 주소 확인됨'],
+  'export.deployment': ['Deployment file is current', '배포 파일이 최신'],
+  'export.noChecks': [
+    'Choose a source folder and build the deployment file to see the checks.',
+    '소스 폴더를 선택하고 배포 파일을 만들면 확인 항목이 표시됩니다.',
+  ],
+  'export.needSource': [
+    'Choose the source folder before exporting.',
+    '내보내기 전에 소스 폴더를 선택하세요.',
+  ],
+  'export.reason.server-id': [
     'The public file belongs to a different server.',
     '공개된 파일이 다른 서버의 것입니다.',
   ],
+  'export.reason.game': [
+    'The game environment differs from the public deployment file.',
+    '공개된 배포 파일과 게임 환경이 다릅니다.',
+  ],
+  'export.reason.url-unchecked': [
+    'The deployment address was not checked since the last change. Check it in Deploy.',
+    '마지막 변경 뒤에 배포 주소를 검사하지 않았습니다. 배포에서 검사하세요.',
+  ],
+  'export.reason.url-failed': [
+    'The public file could not be read.',
+    '공개된 파일을 읽지 못했습니다.',
+  ],
+  'export.reason.range': [
+    'The host does not support partial downloads.',
+    '호스팅이 일부 구간 다운로드를 지원하지 않습니다.',
+  ],
+  'export.reason.no-deployment': [
+    'Build the deployment file first.',
+    '먼저 배포 파일을 만드세요.',
+  ],
+  'export.reason.deployment-outdated': [
+    'The public file is an older deployment. Upload the latest file and check again.',
+    '공개된 파일이 이전 배포입니다. 최신 파일을 올린 뒤 다시 검사하세요.',
+  ],
+  'export.reason.deployment-changed': [
+    'Files changed since the last build. Rebuild, upload and check again.',
+    '마지막 배포 이후 파일이 바뀌었습니다. 다시 만들고 올린 뒤 검사하세요.',
+  ],
+  'export.done.size': ['Launcher and server settings · {size}', '런처 실행 파일과 서버 설정 · {size}'],
   'export.game': ['Game environment matches', '게임 환경 일치'],
-  'export.game.bad': ['Game environment mismatch', '게임 환경 불일치'],
-  'export.game.badHelp': [
-    'Project · {game}. The public deployment file differs; rebuild and upload it.',
-    '프로젝트 · {game}. 공개된 배포 파일과 다릅니다. 배포 파일을 다시 만들어 올리세요.',
-  ],
-  'export.address.unchecked': [
-    'The deployment address must be checked',
-    '배포 주소를 검사해야 합니다',
-  ],
-  'export.address.uncheckedHelp': [
-    'It has not been checked in this session.',
-    '이번 실행에서 아직 검사하지 않았습니다.',
-  ],
-  'export.address.ok': ['Deployment address verified', '배포 주소 확인됨'],
-  'export.address.checkedAt': ['Checked {date}', '{date} 검사'],
-  'export.address.bad': [
-    'The deployment address failed the check',
-    '배포 주소 검사에 실패했습니다',
-  ],
-  'export.address.badHelp': [
-    'The public file does not match this project.',
-    '공개된 파일이 이 프로젝트와 다릅니다.',
-  ],
-  'export.address.stale': [
-    'The deployment address must be checked again',
-    '배포 주소를 다시 검사해야 합니다',
-  ],
-  'export.address.staleHelp': [
-    'The server info or address changed after the last check.',
-    '마지막 검사 뒤에 서버 정보나 주소를 바꿨습니다.',
-  ],
-  'export.toCheck': ['Check address', '주소 검사'],
   'export.toDeploy': ['Go to deploy', '배포로 이동'],
   'export.needServer': [
     'Fix the required inputs in the server info before exporting.',
@@ -597,20 +634,11 @@ const table = {
     '내보낸 파일을 플레이어에게 전달하세요.',
   ],
   'export.done.files': ['Exported files', '내보낸 파일'],
-  'export.done.fallback': [
-    'The launcher and the server settings were copied to the output folder.',
-    '런처와 서버 설정을 출력 폴더에 복사했습니다.',
-  ],
-  'export.done.at': ['Exported {date}', '내보낸 시각 {date}'],
   'export.done.note': [
     'To update the server, change the files and upload the deployment file again. While the address stays the same, players receive the update without downloading a new launcher.',
     '서버를 업데이트할 때는 파일을 바꾸고 배포 파일을 다시 올리면 됩니다. 배포 주소가 그대로면 플레이어는 런처를 다시 받지 않아도 업데이트를 받습니다.',
   ],
   'export.openFolder': ['Open folder', '폴더 열기'],
-  'export.openUnavailable': [
-    'Opening the folder is not available yet.',
-    '폴더 열기는 아직 사용할 수 없습니다.',
-  ],
   'export.again': ['Export again', '다시 내보내기'],
 } as const;
 

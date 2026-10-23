@@ -1,37 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { StudioExportCheck } from '../../../shared/studio.js';
 import { CheckIcon, DownloadIcon, FileIcon, FolderIcon } from '../components/Icons';
 import { CheckRow, Note, PageHeader } from '../components/ui';
-import { formatDateTime, loaderLabel } from '../format';
+import { formatBytes, loaderLabel } from '../format';
 import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
-import { validateServer, validHttps } from './validation';
+import { validateServer } from './validation';
 
 export function ExportPage({ studio, draft, insights, go }: PageProps) {
-  const { t, locale } = useStudioLocale();
-  const { busy, run, state } = studio;
-  const { address, deploy, exported } = insights;
-  const [dismissed, setDismissed] = useState<number | null>(null);
+  const { t } = useStudioLocale();
+  const { busy, command, run, state } = studio;
+  const { deploy } = insights;
+  const status = insights.export;
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const sourceReady = !!state?.sourceName;
   const serverReady = Object.keys(validateServer(draft)).length === 0;
-  const urlValid = validHttps(draft.sourceUrl);
   const game = `${draft.game.minecraftVersion} · ${loaderLabel(draft.game.loader.kind)} ${draft.game.loader.version}`;
-  const identity = address.checks[0]?.status ?? 'pending';
-  const gameStatus = address.checks[1]?.status ?? 'pending';
-  const addressRow = {
-    unchecked: { text: t('export.address.unchecked'), detail: t('export.address.uncheckedHelp') },
-    ok: {
-      text: t('export.address.ok'),
-      detail: address.checkedAt
-        ? t('export.address.checkedAt', { date: formatDateTime(address.checkedAt, locale) })
-        : undefined,
-    },
-    bad: { text: t('export.address.bad'), detail: t('export.address.badHelp') },
-    stale: { text: t('export.address.stale'), detail: t('export.address.staleHelp') },
-  }[address.state];
-  const addressStatus = address.state === 'ok' ? 'ok' : address.state === 'bad' ? 'bad' : 'pending';
-  const ready = address.state === 'ok' && serverReady && urlValid;
-  const blocked = !ready;
+  const done = status?.done ?? null;
+  const doneKey = done ? `${done.fileName}:${done.size}` : null;
 
-  if (exported && dismissed !== exported.at.getTime()) {
+  // Re-evaluate the checks (rescans the source folder, no network) when the page opens.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per visit
+  useEffect(() => {
+    if (sourceReady) void command({ action: 'exportCheck' });
+  }, []);
+
+  const rows: StudioExportCheck[] = status?.checks ?? [];
+  const labels = {
+    serverId: t('export.serverId'),
+    game: t('export.game'),
+    url: t('export.url'),
+    deployment: t('export.deployment'),
+  } as const;
+  const rowStatus = (check: StudioExportCheck): 'ok' | 'bad' | 'pending' => {
+    if (check.ok) return 'ok';
+    return check.reasons.every((reason) => reason === 'url-unchecked') ? 'pending' : 'bad';
+  };
+  const rowDetail = (check: StudioExportCheck): string | undefined => {
+    if (check.ok) return check.id === 'game' ? game : undefined;
+    const text = check.reasons.map((reason) => t(`export.reason.${reason}`)).join(' ');
+    return check.id === 'game' ? `${text} (${game})` : text;
+  };
+  const blocked = !status || status.blocked;
+
+  if (done && dismissed !== doneKey) {
     return (
       <>
         <section className="card done" data-testid="export-done">
@@ -45,8 +57,8 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
           <button
             type="button"
             className="btn primary lg"
-            disabled
-            title={t('export.openUnavailable')}
+            disabled={busy}
+            onClick={() => void command({ action: 'revealExport' })}
           >
             <FolderIcon />
             {t('export.openFolder')}
@@ -58,15 +70,15 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
             <FileIcon />
             <span className="g">
               <span className="mono" data-testid="export-result">
-                {state?.result ?? t('export.done.fallback')}
+                {done.fileName}
               </span>
-              <small>{t('export.done.at', { date: formatDateTime(exported.at, locale) })}</small>
+              <small>{t('export.done.size', { size: formatBytes(done.size) })}</small>
             </span>
           </div>
         </section>
         <Note>{t('export.done.note')}</Note>
         <div className="row-actions start">
-          <button type="button" className="btn" onClick={() => setDismissed(exported.at.getTime())}>
+          <button type="button" className="btn" onClick={() => setDismissed(doneKey)}>
             {t('export.again')}
           </button>
         </div>
@@ -103,9 +115,12 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
               <button
                 type="button"
                 className="btn primary lg"
-                disabled={busy || blocked}
+                disabled={busy || blocked || !serverReady}
                 data-testid="export-button"
-                onClick={() => void run('export')}
+                onClick={() => {
+                  setDismissed(null);
+                  void run('export');
+                }}
               >
                 <DownloadIcon />
                 {t('export.run')}
@@ -115,42 +130,36 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
         </section>
         <div className="stack">
           <section
-            className={`card${blocked && address.state !== 'unchecked' ? ' badedge' : ''}`}
+            className={`card${blocked && rows.some((row) => rowStatus(row) === 'bad') ? ' badedge' : ''}`}
             data-testid="export-checks"
             data-blocked={blocked}
           >
             <h2>{t('export.card.checks')}</h2>
             <p className="sub">{t('export.checksSub')}</p>
-            <CheckRow
-              status={identity}
-              label={identity === 'bad' ? t('export.serverId.bad') : t('export.serverId')}
-              detail={
-                identity === 'ok'
-                  ? t('export.serverId.ok')
-                  : identity === 'bad'
-                    ? t('export.serverId.badHelp')
-                    : undefined
-              }
-            />
-            <CheckRow
-              status={gameStatus}
-              label={gameStatus === 'bad' ? t('export.game.bad') : t('export.game')}
-              detail={
-                gameStatus === 'ok'
-                  ? game
-                  : gameStatus === 'bad'
-                    ? t('export.game.badHelp', { game })
-                    : undefined
-              }
-            />
-            <CheckRow status={addressStatus} label={addressRow.text} detail={addressRow.detail}>
-              {address.state !== 'ok' && (
-                <button type="button" className="textlink nowrap" onClick={() => go('deploy')}>
-                  {t('export.toCheck')}
-                </button>
-              )}
-            </CheckRow>
+            {rows.length === 0 && <p className="fine">{t('export.noChecks')}</p>}
+            {rows.map((check) => (
+              <CheckRow
+                key={check.id}
+                status={rowStatus(check)}
+                label={labels[check.id]}
+                detail={rowDetail(check)}
+              >
+                {!check.ok && (check.id === 'url' || check.id === 'deployment') && (
+                  <button type="button" className="textlink nowrap" onClick={() => go('deploy')}>
+                    {t('export.toDeploy')}
+                  </button>
+                )}
+              </CheckRow>
+            ))}
           </section>
+          {!sourceReady && (
+            <Note tone="warn">
+              {t('export.needSource')}{' '}
+              <button type="button" className="textlink" onClick={() => go('files')}>
+                {t('nav.files')}
+              </button>
+            </Note>
+          )}
           {!serverReady && (
             <Note tone="warn">
               {t('export.needServer')}{' '}
@@ -159,12 +168,9 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
               </button>
             </Note>
           )}
-          {deploy.state === 'stale' && (
+          {deploy.status === 'changed' && (
             <Note tone="warn" testId="export-stale">
-              <b>{t('export.stale.title')}</b>{' '}
-              {t('export.stale.body', {
-                count: deploy.changes.added + deploy.changes.modified + deploy.changes.excluded,
-              })}{' '}
+              <b>{t('export.stale.title')}</b> {t('export.stale.body', { count: insights.changed })}{' '}
               <button type="button" className="textlink" onClick={() => go('deploy')}>
                 {t('export.toDeploy')}
               </button>
