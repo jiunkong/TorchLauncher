@@ -355,7 +355,7 @@ try {
   const customRow = page.getByRole('row').filter({ hasText: 'custom.data' });
   await customRow.waitFor();
   assert.match(await customRow.textContent(), /19 B/);
-  assert.equal(await page.getByRole('button', { name: '게임 설정에서 관리' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: '설정 화면에서 관리' }).count(), 1);
   await customRow
     .getByRole('radiogroup', { name: 'custom.data 적용 방식' })
     .getByRole('radio', { name: '최초만' })
@@ -373,13 +373,33 @@ try {
   await page.getByLabel('extra.txt 선택').check();
   await page.getByTestId('files-bulk').getByRole('button', { name: '제외', exact: true }).click();
 
-  // Game settings: real import from a fixture game folder.
-  await goto('게임 설정');
+  // Player settings imports options explicitly from either source.
+  await goto('단축키 · 옵션');
   await page.getByTestId('settings-empty').waitFor();
-  await page.getByRole('button', { name: '프리셋 불러오기' }).first().click();
+  assert.equal(await page.locator('[data-testid="settings-empty"] .srcc').count(), 2);
+  assert.equal(await page.getByRole('button', { name: '불러오기' }).first().isDisabled(), true);
+  await page.getByRole('button', { name: '테스트 실행으로 이동' }).click();
+  await page.getByTestId('test-placeholder').waitFor();
+  await page.getByRole('heading', { name: '테스트 실행' }).waitFor();
+  await goto('단축키 · 옵션');
+  await page.getByRole('button', { name: '파일 선택' }).click();
+  await page.getByTestId('settings-keys').waitFor();
+  assert.equal(await page.getByTestId('settings-key-row').count(), 3);
+  await page.getByRole('tab', { name: '테스트 실행 결과', exact: true }).click();
+  await page.getByRole('button', { name: '다시 가져오기' }).click();
+  await page
+    .getByTestId('studio-message')
+    .filter({ hasText: '가져올 테스트 실행 결과가 없습니다.' })
+    .waitFor();
+
+  // Folder import remains a helper for the mod and shader settings candidates.
+  await goto('모드 설정');
+  await page.getByRole('button', { name: '폴더에서 불러오기' }).click();
   await page.getByTestId('preset-dialog').waitFor();
   await page.getByTestId('import-folder').click();
   await page.getByTestId('preset-dialog').waitFor({ state: 'detached' });
+  await page.getByTestId('settings-config').waitFor();
+  await goto('단축키 · 옵션');
   await page.getByTestId('settings-keys').waitFor();
   assert.equal(await page.getByTestId('settings-key-row').count(), 3);
   await page.getByLabel('key.jump 선택').check();
@@ -395,17 +415,17 @@ try {
     .getByRole('radiogroup', { name: 'renderDistance 적용 방식' })
     .getByRole('radio', { name: '최초 기본값' })
     .click();
-  await page.getByRole('tab', { name: '모드 설정' }).click();
+  await goto('모드 설정');
   await page
     .getByRole('radiogroup', { name: 'alpha 적용 방식' })
     .getByRole('radio', { name: '최초 기본값' })
     .click();
   await page.getByTestId('settings-policy').waitFor();
-  await page.getByRole('tab', { name: '리소스팩' }).click();
+  await goto('리소스팩');
   await page.getByTestId('pack-add').click();
   await page.getByTestId('pack-row').filter({ hasText: 'server-pack.zip' }).waitFor();
   assert.equal(await page.getByTestId('pack-row').count(), 1);
-  await page.getByRole('tab', { name: '셰이더' }).click();
+  await goto('셰이더');
   await page.getByTestId('pack-add').click();
   await page.getByTestId('shader-row').filter({ hasText: 'Test.zip' }).waitFor();
   await page.getByRole('radio', { name: /선택할 셰이더팩: Test.zip/ }).click();
@@ -421,7 +441,7 @@ try {
   await page
     .getByRole('row')
     .filter({ hasText: 'resourcepacks/server-pack.zip' })
-    .getByRole('button', { name: '게임 설정에서 관리' })
+    .getByRole('button', { name: '설정 화면에서 관리' })
     .waitFor();
 
   // Deploy: build, status from the main process.
@@ -499,15 +519,27 @@ try {
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
   assert.equal(saved.gameSettings.shader.pack.value, 'Test.zip');
   await page.getByRole('button', { name: '열기', exact: true }).click();
-  await goto('게임 설정');
-  await page.getByTestId('settings-preset').and(page.locator('[data-loaded="true"]')).waitFor();
+  await goto('단축키 · 옵션');
+  await page.getByTestId('settings-imported').waitFor();
 
   // Layout at the minimum and the default widths: every page paints and nothing overflows.
   await mkdir(join(cwd, '.cache/smoke'), { recursive: true });
   for (const width of [760, 1100]) {
     await page.setViewportSize({ width, height: width === 760 ? 760 : 800 });
     assert.equal(await page.evaluate(() => innerWidth), width);
-    for (const label of ['개요', '서버 정보', '브랜딩', '파일', '게임 설정', '배포', '내보내기']) {
+    for (const label of [
+      '개요',
+      '서버 정보',
+      '브랜딩',
+      '모드 설정',
+      '리소스팩',
+      '셰이더',
+      '파일',
+      '테스트 실행',
+      '단축키 · 옵션',
+      '배포',
+      '내보내기',
+    ]) {
       await goto(label);
       await assertPainted(`${label}@${width}`);
       await page.screenshot({
@@ -548,7 +580,7 @@ try {
     0,
   );
   console.log(
-    'Studio Electron smoke passed: shell and splash, in-app unsaved dialog, server/branding/files/settings/deploy/export pages, persistence, painted layout at 760 and 1100 px and isolation',
+    'Studio Electron smoke passed: shell and splash, in-app unsaved dialog, split game/player settings pages, explicit options imports, server/branding/files/test/deploy/export pages, persistence, painted layout at 760 and 1100 px and isolation',
   );
 } finally {
   await app?.close().catch(() => {});

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import type { SettingPolicyChoice } from '../../../shared/studio.js';
 
-export type SettingsTab = 'keys' | 'options' | 'config' | 'packs' | 'shaders';
+export type SettingsTab = 'keys' | 'options';
 export type KeyFilter = 'all' | 'base' | 'mod' | 'set';
 
-/** View state of the game-settings page (selection, tab, search); the data lives in the project. */
+/** View state for player settings (selection, tab, search); the data lives in the project. */
 export function useSettingsState() {
   const [tab, setTab] = useState<SettingsTab>('keys');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
