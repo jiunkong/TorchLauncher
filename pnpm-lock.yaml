@@ -58,14 +58,13 @@ importers:
         version: 19.3.1(react@19.3.1)
 
   apps/launcher:
-    dependencies:
-      prismarine-auth:
-        specifier: 3.1.1
-        version: 3.1.1
     devDependencies:
       '@torchlauncher/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@torchlauncher/desktop-auth':
+        specifier: workspace:*
+        version: link:../../packages/desktop-auth
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -74,6 +73,15 @@ importers:
         version: 19.3.1(react@19.3.1)
 
   packages/core: {}
+
+  packages/desktop-auth:
+    dependencies:
+      '@torchlauncher/core':
+        specifier: workspace:*
+        version: link:../core
+      prismarine-auth:
+        specifier: 3.1.1
+        version: 3.1.1
 
 packages:
 

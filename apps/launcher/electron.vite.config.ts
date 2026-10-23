@@ -37,7 +37,7 @@ export default defineConfig({
         entry: {
           index: fileURLToPath(new URL('./src/main/index.ts', import.meta.url)),
           'public-java-worker': fileURLToPath(
-            new URL('./src/main/auth/public-java-worker.ts', import.meta.url),
+            import.meta.resolve('@torchlauncher/desktop-auth/worker'),
           ),
         },
         formats: ['cjs'],

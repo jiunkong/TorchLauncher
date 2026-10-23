@@ -1,0 +1,17 @@
+{
+  "name": "@torchlauncher/desktop-auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/public-java-worker.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@torchlauncher/core": "workspace:*",
+    "prismarine-auth": "3.1.1"
+  }
+}
