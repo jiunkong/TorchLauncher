@@ -3,24 +3,36 @@ import { constants } from 'node:fs';
 import { link, lstat, mkdir, open, readdir, realpath, rename, rm } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
-  parseSettingsPolicy,
+  buildSettingsPolicy,
+  classifyOptionKey,
+  IRIS_CONFIG_PATH,
+  OPTIONS_PROFILES,
+  parsePropertiesEntries,
   SETTINGS_LIMITS,
   SETTINGS_POLICY_PATH,
+  SettingsError,
+  shaderSelectionToConfigFiles,
+  validConfigPath,
 } from '../../../../packages/core/src/instance/settings/index.js';
 import {
   validOptionKey,
   validOptionValue,
 } from '../../../../packages/core/src/instance/settings/policy.js';
-import type {
-  PackKind,
-  SettingPolicyChoice,
-  StudioGameOption,
-  StudioGameSettings,
-  StudioPack,
-  StudioPresetPreview,
+import {
+  type PackKind,
+  type SettingPolicyChoice,
+  type SettingValueType,
+  type StudioConfigFile,
+  type StudioConfigItem,
+  type StudioGameOption,
+  type StudioGameSettings,
+  type StudioPack,
+  type StudioPresetPreview,
+  type StudioShaderSettings,
+  shaderConfigPaths,
 } from '../shared/studio.js';
 import { noLinks, safeRead } from './filesystem.js';
-import { StudioFailure } from './project.js';
+import { PolicyFailure, StudioFailure } from './project.js';
 import { hashFile } from './scan.js';
 
 /*
@@ -31,7 +43,7 @@ import { hashFile } from './scan.js';
  * (options.txt keys, resource pack lists). Shader selection and mod config items need the
  * SET-CORE-01 extension and are not generated yet.
  */
-export { SETTINGS_POLICY_PATH };
+export { PolicyFailure, SETTINGS_POLICY_PATH };
 export const OPTIONS_READ_LIMIT = SETTINGS_LIMITS.optionsBytes;
 export const PACK_LIMIT = 256 * 1024 ** 2;
 export const PACK_DIRECTORY: Record<PackKind, string> = {
@@ -70,6 +82,14 @@ export function validatePackName(name: unknown): asserts name is string {
 }
 export const packId = (name: string) => `file/${name}`;
 
+const valueTypeOf = (value: string): SettingValueType =>
+  value === 'true' || value === 'false'
+    ? 'boolean'
+    : /^-?[0-9]+(\.[0-9]+)?$/.test(value)
+      ? 'number'
+      : value.startsWith('[') || value.startsWith('{')
+        ? 'json'
+        : 'text';
 export function parseOptionsText(buffer: Buffer): { entries: StudioGameOption[]; ignored: number } {
   if (buffer.length > OPTIONS_READ_LIMIT) throw new StudioFailure('TOO_LARGE');
   if (buffer.includes(0)) throw new StudioFailure('INVALID');
@@ -99,15 +119,16 @@ export function parseOptionsText(buffer: Buffer): { entries: StudioGameOption[];
       continue;
     }
     seen.add(key);
-    entries.push({ key, value, policy: 'none' });
+    const { kind, group } = classifyOptionKey(key);
+    entries.push({ key, value, policy: 'none', kind, group, valueType: valueTypeOf(value) });
   }
   return { entries, ignored };
 }
-/** Imported entries replace the list; policies of keys that remain are kept, set ones that vanished too. */
-export function mergeOptions(
-  current: readonly StudioGameOption[],
-  imported: readonly StudioGameOption[],
-): StudioGameOption[] {
+/** Imported items replace the list; policies of items that remain are kept, set ones that vanished too. */
+export function mergeOptions<T extends { key: string; policy: SettingPolicyChoice }>(
+  current: readonly T[],
+  imported: readonly T[],
+): T[] {
   const old = new Map(current.map((o) => [o.key, o]));
   const merged = imported.map((o) => ({ ...o, policy: old.get(o.key)?.policy ?? 'none' }));
   const keys = new Set(imported.map((o) => o.key));
@@ -117,41 +138,78 @@ export function mergeOptions(
 export function emptySettings(): StudioGameSettings {
   return { options: [], resourcePacks: [], shaderPacks: [] };
 }
+export function defaultShader(): StudioShaderSettings {
+  return {
+    configPath: IRIS_CONFIG_PATH as StudioShaderSettings['configPath'],
+    enabled: { policy: 'none', value: false },
+    pack: { policy: 'none', value: '' },
+    packOptions: [],
+  };
+}
 const CHOICES: readonly string[] = ['none', 'initial', 'required'];
+const VALUE_TYPES: readonly string[] = ['boolean', 'number', 'json', 'text'];
+export const MAX_CONFIG_FILES = SETTINGS_LIMITS.configFiles;
+export const MAX_ITEMS_PER_FILE = SETTINGS_LIMITS.keysPerMap;
+/** Paths the shader model owns; they never appear as generic config files. */
+export const isShaderConfigPath = (path: string) =>
+  (shaderConfigPaths as readonly string[]).includes(path);
+export function validGenericConfigPath(path: unknown): path is string {
+  return (
+    validConfigPath(path) &&
+    path.startsWith('config/') &&
+    !isShaderConfigPath(path) &&
+    path.toLowerCase() !== 'config/'
+  );
+}
+function parseItems(list: unknown, shape: 'option' | 'config'): void {
+  const fail: () => never = () => {
+    throw new StudioFailure('INVALID');
+  };
+  if (!Array.isArray(list) || list.length > (shape === 'option' ? MAX_OPTIONS : MAX_ITEMS_PER_FILE))
+    fail();
+  const keys = new Set<string>();
+  for (const o of list as unknown[]) {
+    const e = o as Record<string, unknown>;
+    if (!e || typeof e !== 'object' || Array.isArray(e)) fail();
+    const allowed =
+      shape === 'option'
+        ? ['key', 'value', 'policy', 'kind', 'group', 'valueType']
+        : ['key', 'value', 'policy', 'valueType'];
+    if (
+      Object.keys(e).some((k) => !allowed.includes(k)) ||
+      !('key' in e && 'value' in e && 'policy' in e) ||
+      typeof e.key !== 'string' ||
+      typeof e.value !== 'string' ||
+      !validOptionKey(e.key) ||
+      (shape === 'option' && GAME_OWNED.has(e.key)) ||
+      !validOptionValue(e.value) ||
+      !CHOICES.includes(e.policy as string) ||
+      keys.has(e.key) ||
+      (e.valueType !== undefined && !VALUE_TYPES.includes(e.valueType as string)) ||
+      (e.kind !== undefined && !['keybind', 'mod-keybind', 'other'].includes(e.kind as string)) ||
+      (e.group !== undefined && (typeof e.group !== 'string' || e.group.length > 128))
+    )
+      fail();
+    keys.add(e.key);
+  }
+}
 export function parseGameSettings(input: unknown): StudioGameSettings {
   const fail = (): never => {
     throw new StudioFailure('INVALID');
   };
   if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
   const g = input as Record<string, unknown>;
+  const required = ['options', 'resourcePacks', 'shaderPacks'];
   if (
-    Object.keys(g).sort().join(',') !== 'options,resourcePacks,shaderPacks' ||
-    !Array.isArray(g.options) ||
-    g.options.length > MAX_OPTIONS ||
+    Object.keys(g).some((k) => ![...required, 'configFiles', 'shader'].includes(k)) ||
+    required.some((k) => !Object.hasOwn(g, k)) ||
     !Array.isArray(g.resourcePacks) ||
     !Array.isArray(g.shaderPacks) ||
     g.resourcePacks.length > MAX_PACKS ||
     g.shaderPacks.length > MAX_PACKS
   )
     return fail();
-  const keys = new Set<string>();
-  for (const o of g.options as unknown[]) {
-    const e = o as Record<string, unknown>;
-    if (
-      !e ||
-      typeof e !== 'object' ||
-      Object.keys(e).sort().join(',') !== 'key,policy,value' ||
-      typeof e.key !== 'string' ||
-      typeof e.value !== 'string' ||
-      !validOptionKey(e.key) ||
-      GAME_OWNED.has(e.key) ||
-      !validOptionValue(e.value) ||
-      !CHOICES.includes(e.policy as string) ||
-      keys.has(e.key)
-    )
-      return fail();
-    keys.add(e.key);
-  }
+  parseItems(g.options, 'option');
   for (const list of [g.resourcePacks, g.shaderPacks] as unknown[][]) {
     const names = new Set<string>();
     for (const p of list) {
@@ -173,55 +231,200 @@ export function parseGameSettings(input: unknown): StudioGameSettings {
       names.add((e.name as string).toLowerCase());
     }
   }
-  try {
-    generatePolicy(g as unknown as StudioGameSettings);
-  } catch {
-    return fail();
+  if (Object.hasOwn(g, 'configFiles')) {
+    if (!Array.isArray(g.configFiles) || g.configFiles.length > MAX_CONFIG_FILES) return fail();
+    const paths = new Set<string>();
+    for (const f of g.configFiles as unknown[]) {
+      const e = f as Record<string, unknown>;
+      if (
+        !e ||
+        typeof e !== 'object' ||
+        Object.keys(e).sort().join(',') !== 'items,path' ||
+        !validGenericConfigPath(e.path) ||
+        paths.has((e.path as string).toLowerCase())
+      )
+        return fail();
+      paths.add((e.path as string).toLowerCase());
+      parseItems(e.items, 'config');
+    }
+  }
+  if (Object.hasOwn(g, 'shader')) {
+    const e = g.shader as Record<string, unknown>;
+    const flag = e?.enabled as Record<string, unknown> | undefined;
+    const pack = e?.pack as Record<string, unknown> | undefined;
+    if (
+      !e ||
+      typeof e !== 'object' ||
+      Object.keys(e).sort().join(',') !== 'configPath,enabled,pack,packOptions' ||
+      !isShaderConfigPath(e.configPath as string) ||
+      !flag ||
+      Object.keys(flag).sort().join(',') !== 'policy,value' ||
+      !CHOICES.includes(flag.policy as string) ||
+      typeof flag.value !== 'boolean' ||
+      !pack ||
+      Object.keys(pack).sort().join(',') !== 'policy,value' ||
+      !CHOICES.includes(pack.policy as string) ||
+      typeof pack.value !== 'string' ||
+      pack.value.length > SETTINGS_LIMITS.valueLength ||
+      !Array.isArray(e.packOptions) ||
+      e.packOptions.length > MAX_CONFIG_FILES
+    )
+      return fail();
+    const names = new Set<string>();
+    for (const o of e.packOptions as unknown[]) {
+      const f = o as Record<string, unknown>;
+      if (
+        !f ||
+        typeof f !== 'object' ||
+        Object.keys(f).sort().join(',') !== 'items,pack' ||
+        !validPackOptionsName(f.pack) ||
+        names.has((f.pack as string).toLowerCase())
+      )
+        return fail();
+      names.add((f.pack as string).toLowerCase());
+      parseItems(f.items, 'config');
+    }
   }
   return structuredClone(g) as unknown as StudioGameSettings;
 }
-/** The `settings-policy.json` text for the preset, or null when nothing is set. Validated by core. */
-export function generatePolicy(settings: StudioGameSettings): string | null {
-  const required: Record<string, string> = {};
-  const initial: Record<string, string> = {};
-  for (const o of settings.options) {
-    if (o.policy === 'required') required[o.key] = o.value;
-    else if (o.policy === 'initial') initial[o.key] = o.value;
+export const validPackOptionsName = (pack: unknown): pack is string =>
+  typeof pack === 'string' && validConfigPath(`shaderpacks/${pack}.txt`);
+
+export interface GeneratedPolicy {
+  text: string;
+  version: 1 | 2;
+  bytes: number;
+}
+const knownProfileVersion = (version: string) =>
+  OPTIONS_PROFILES.some((p) => p.minecraftVersions.includes(version));
+const toChoice = (policy: SettingPolicyChoice): 'unset' | 'initial' | 'required' =>
+  policy === 'none' ? 'unset' : policy;
+const choices = (items: readonly { key: string; value: string; policy: SettingPolicyChoice }[]) =>
+  items.map((i) => ({ key: i.key, value: i.value, state: toChoice(i.policy) }));
+/** Config file paths whose items the policy manages (generic files, the shader file, pack options). */
+export function policyConfigPaths(settings: StudioGameSettings): string[] {
+  const paths: string[] = [];
+  for (const f of settings.configFiles ?? [])
+    if (f.items.some((i) => i.policy !== 'none')) paths.push(f.path);
+  const shader = settings.shader;
+  if (shader) {
+    if (shader.enabled.policy !== 'none' || shader.pack.policy !== 'none')
+      paths.push(shader.configPath);
+    for (const o of shader.packOptions)
+      if (o.items.some((i) => i.policy !== 'none')) paths.push(`shaderpacks/${o.pack}.txt`);
   }
+  return paths;
+}
+/**
+ * The `settings-policy.json` for the preset, or null when nothing is set. Version 1 unless a
+ * config file item is set (then 2, which launchers without v2 reject). Throws PolicyFailure.
+ */
+export function generatePolicy(
+  settings: StudioGameSettings,
+  minecraftVersion?: string,
+): GeneratedPolicy | null {
   const ids = (policy: SettingPolicyChoice) =>
     settings.resourcePacks.filter((p) => p.policy === policy).map((p) => packId(p.name));
-  const packs = { required: ids('required'), initial: ids('initial') };
-  if (
-    !Object.keys(required).length &&
-    !Object.keys(initial).length &&
-    !packs.required.length &&
-    !packs.initial.length
-  )
-    return null;
-  const policy = {
-    version: 1,
-    file: 'options.txt',
-    required,
-    initial,
-    resourcePacks: packs,
-  };
-  const text = `${JSON.stringify(policy, null, 2)}\n`;
+  const shader = settings.shader;
+  const configFiles = [
+    ...(settings.configFiles ?? []).map((f) => ({ path: f.path, items: choices(f.items) })),
+    ...(shader
+      ? shaderSelectionToConfigFiles({
+          configPath: shader.configPath,
+          enabled: { state: toChoice(shader.enabled.policy), value: shader.enabled.value },
+          pack: { state: toChoice(shader.pack.policy), value: shader.pack.value },
+          packOptions: shader.packOptions.map((o) => ({ pack: o.pack, items: choices(o.items) })),
+        })
+      : []),
+  ];
+  const anything =
+    settings.options.some((o) => o.policy !== 'none') ||
+    ids('required').length > 0 ||
+    ids('initial').length > 0 ||
+    policyConfigPaths(settings).length > 0;
+  if (!anything) return null;
   try {
-    parseSettingsPolicy(Buffer.from(text));
-  } catch {
-    throw new StudioFailure('INVALID');
+    const built = buildSettingsPolicy({
+      options: choices(settings.options),
+      resourcePacks: { required: ids('required'), initial: ids('initial') },
+      configFiles,
+      ...(minecraftVersion && knownProfileVersion(minecraftVersion) ? { minecraftVersion } : {}),
+    });
+    return {
+      text: built.json,
+      version: built.policy.configFiles.length > 0 ? 2 : 1,
+      bytes: built.bytes.length,
+    };
+  } catch (error) {
+    if (error instanceof SettingsError) throw new PolicyFailure(error.code, error.message);
+    throw error;
   }
-  return text;
+}
+/** Applies `changes` to config items. Unknown keys are created (they need a valid `value`). */
+export function applyConfigChanges(
+  items: StudioConfigItem[],
+  changes: readonly { key: string; policy: SettingPolicyChoice; value?: string }[],
+): void {
+  for (const change of changes) {
+    const existing = items.find((i) => i.key === change.key);
+    if (change.value !== undefined && !validOptionValue(change.value))
+      throw new StudioFailure('INVALID');
+    if (existing) {
+      existing.policy = change.policy;
+      if (change.value !== undefined) {
+        existing.value = change.value;
+        existing.valueType = valueTypeOf(change.value);
+      }
+    } else {
+      if (change.value === undefined || !validOptionKey(change.key))
+        throw new StudioFailure('INVALID');
+      items.push({
+        key: change.key,
+        value: change.value,
+        policy: change.policy,
+        valueType: valueTypeOf(change.value),
+      });
+    }
+  }
+  if (items.length > MAX_ITEMS_PER_FILE) throw new StudioFailure('TOO_LARGE');
 }
 export function countPolicies(settings: StudioGameSettings): number {
   return settings.options.filter((o) => o.policy !== 'none').length;
 }
 
-/** Reads options.txt from a chosen file (named options.txt) or game folder, with size and name checks. */
-export async function readPreset(
-  path: string,
-  source: 'folder' | 'file',
-): Promise<{ entries: StudioGameOption[]; preview: StudioPresetPreview }> {
+export interface PresetImport {
+  entries: StudioGameOption[];
+  preview: StudioPresetPreview;
+  configFiles: StudioConfigFile[];
+  shader: {
+    configPath: StudioShaderSettings['configPath'];
+    enabled: boolean | null;
+    pack: string | null;
+    packOptions: { pack: string; items: StudioConfigItem[] }[];
+  } | null;
+}
+type SkipReason = StudioPresetPreview['skippedConfigs'][number]['reason'];
+async function readProperties(
+  folder: string,
+  rel: string,
+): Promise<StudioConfigItem[] | SkipReason> {
+  try {
+    const bytes = await safeRead(join(folder, rel), SETTINGS_LIMITS.configBytes);
+    const items: StudioConfigItem[] = [];
+    for (const e of parsePropertiesEntries(bytes))
+      if (validOptionKey(e.key) && validOptionValue(e.value))
+        items.push({ key: e.key, value: e.value, policy: 'none', valueType: e.valueType });
+    return items.length > MAX_ITEMS_PER_FILE ? 'limit-exceeded' : items;
+  } catch (error) {
+    if (error instanceof StudioFailure)
+      return error.code === 'TOO_LARGE' ? 'limit-exceeded' : 'unsafe-path';
+    if (error instanceof SettingsError)
+      return error.code === 'limit-exceeded' ? 'limit-exceeded' : 'invalid-config';
+    return 'unsafe-path';
+  }
+}
+/** Reads options.txt (and, from a game folder, mod config and shader files) with size and name checks. */
+export async function readPreset(path: string, source: 'folder' | 'file'): Promise<PresetImport> {
   let file = path;
   let folder: string | null = null;
   if (source === 'folder') {
@@ -236,10 +439,16 @@ export async function readPreset(
     resourcePacks: [] as string[],
     shaderPacks: [] as string[],
   };
+  const configFiles: StudioConfigFile[] = [];
+  const skipped: StudioPresetPreview['skippedConfigs'] = [];
+  let shader: PresetImport['shader'] = null;
+  const packOptionFiles: string[] = [];
+  let configFound = false;
   if (folder) {
+    const root = folder;
     const list = async (sub: string, filter: RegExp) => {
       try {
-        const dir = join(folder as string, sub);
+        const dir = join(root, sub);
         await noLinks(dir);
         const found = await readdir(dir, { withFileTypes: true });
         return found
@@ -254,10 +463,80 @@ export async function readPreset(
     detected.modConfigs = await list('config', /\.(?:toml|json5?|properties|cfg|txt|yaml|yml)$/i);
     detected.resourcePacks = await list('resourcepacks', /\.zip$/i);
     detected.shaderPacks = await list('shaderpacks', /\.zip$/i);
+    for (const name of detected.modConfigs) {
+      const rel = `config/${name}`;
+      if (isShaderConfigPath(rel)) continue;
+      if (!/\.(?:properties|txt)$/i.test(name)) skipped.push({ path: rel, reason: 'unsupported' });
+      else if (!validGenericConfigPath(rel)) skipped.push({ path: rel, reason: 'unsafe-path' });
+      else if (configFiles.length >= MAX_CONFIG_FILES - 8)
+        skipped.push({ path: rel, reason: 'limit-exceeded' });
+      else {
+        const items = await readProperties(root, rel);
+        if (typeof items === 'string') skipped.push({ path: rel, reason: items });
+        else configFiles.push({ path: rel, items });
+      }
+    }
+    for (const configPath of shaderConfigPaths) {
+      if (!detected.modConfigs.includes(configPath.slice('config/'.length))) continue;
+      const items = await readProperties(root, configPath);
+      if (typeof items === 'string') {
+        skipped.push({ path: configPath, reason: items });
+        continue;
+      }
+      configFound = true;
+      shader = {
+        configPath,
+        enabled:
+          items.find((i) => i.key === 'enableShaders')?.value === 'true'
+            ? true
+            : items.some((i) => i.key === 'enableShaders')
+              ? false
+              : null,
+        pack: items.find((i) => i.key === 'shaderPack')?.value ?? null,
+        packOptions: [],
+      };
+      break;
+    }
+    for (const name of await list('shaderpacks', /\.txt$/i)) {
+      const pack = name.slice(0, -'.txt'.length);
+      const rel = `shaderpacks/${name}`;
+      if (!validPackOptionsName(pack) || packOptionFiles.length >= 8) {
+        skipped.push({
+          path: rel,
+          reason: validPackOptionsName(pack) ? 'limit-exceeded' : 'unsafe-path',
+        });
+        continue;
+      }
+      const items = await readProperties(root, rel);
+      if (typeof items === 'string') {
+        skipped.push({ path: rel, reason: items });
+        continue;
+      }
+      packOptionFiles.push(rel);
+      shader ??= {
+        configPath: IRIS_CONFIG_PATH as StudioShaderSettings['configPath'],
+        enabled: null,
+        pack: null,
+        packOptions: [],
+      };
+      shader.packOptions.push({ pack, items });
+    }
   }
   return {
     entries,
-    preview: { source, optionCount: entries.length, ignored, detected },
+    configFiles,
+    shader,
+    preview: {
+      source,
+      optionCount: entries.length,
+      ignored,
+      detected,
+      importedConfigs: configFiles.map((f) => f.path),
+      skippedConfigs: skipped,
+      shader: shader
+        ? { configPath: configFound ? shader.configPath : null, packOptionFiles }
+        : null,
+    },
   };
 }
 
