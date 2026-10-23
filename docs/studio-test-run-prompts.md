@@ -115,3 +115,19 @@
 
 완료 기준: pnpm check, noNativeDialogs 테스트 유지, 760px/1100px 실제 페인트 검사(elementFromPoint, 가로 스크롤 없음)를 포함한 Studio 기능 smoke 확장(가짜 상태 주입으로 로그인/실행/결과 화면 검증), 두 앱 smoke 통과(DISPLAY=:0). 실제 로그인·게임 실행은 미실행으로 표기하세요.
 ```
+
+---
+
+## 프롬프트 3b — TESTRUN-MAIN-02
+
+```
+작업 ID: TESTRUN-MAIN-02. 선행: TESTRUN-MAIN-01이 main에 통합되어 있어야 합니다(git log main으로 확인). worktree: 비어 있는 .agents/worktrees/agent-N, 브랜치 feat/testrun-main-2, 기준 <BASE>.
+
+목표: 테스트 실행의 설정 추출을 확정 시안에 맞게 분리하세요. docs/studio-test-run-task.md의 "TESTRUN-MAIN-02" 절, docs/design/studio/README.md의 결정 사항, docs/handoffs/TESTRUN-MAIN-01.md(현재 계약)를 먼저 읽으세요.
+
+독점 범위: apps/admin/src/main/**, apps/admin/src/shared/**, apps/admin/src/preload/**(필요 시), docs/handoffs/TESTRUN-MAIN-02.md. 렌더러는 수정하지 마세요.
+
+요구사항: 테스트 종료 때 project.gameSettings를 바꾸거나 프로젝트를 dirty로 만들지 말고 읽기 전용 미리보기(extracted)만 만드세요. 사용자가 단축키 · 옵션 화면에서 가져올 곳을 골라 가져오는 명령을 추가하세요(source 'test' = 마지막 테스트 인스턴스의 options.txt를 기존 병합 경로로 가져오기, 이미 정한 정책 유지; source 'file' = 기존 settingsImport). 테스트 결과가 없을 때 source 'test'는 명확한 오류 코드를 냅니다. 모드 설정 파일 목록을 인스턴스 config에서 읽기 전용으로 갱신하는 경로를 제공하되(인스턴스 루트 고정, 새 임의 경로 IPC 금지) 가져오기와 분리하세요. 신뢰된 메인 프레임과 정확한 인자 검증을 유지하고, 최종 명령/상태 계약을 인계에 정확히 적으세요.
+
+테스트(미리보기가 프로젝트를 바꾸지 않음, 가져오기 후 dirty, 결과 없음 오류, 정책 유지), pnpm check, node scripts/smoke.mjs, node apps/admin/scripts/smoke-functional.mjs 통과(DISPLAY=:0). 실제 로그인/게임 실행은 미실행으로 표기하세요.
+```

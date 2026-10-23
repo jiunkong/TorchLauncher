@@ -105,3 +105,17 @@ AUTH-SHARE-01과 TESTRUN-CORE-01은 병렬 가능. 한 작업자가 둘 다 맡�
 ## 공통 완료 보고
 
 PR 또는 인계 파일에 다음을 쓴다: 세션/모델 이름, 작업 ID, 브랜치, 기준/최종 커밋, 변경 파일 범위 확인(`git diff --stat main...`), 실행한 명령과 결과(정확한 개수), 미실행 검증과 이유, 알려진 한계, #0이 알아야 할 계약 변경. #0이 검토·통합한 뒤에 다음 작업을 시작한다.
+
+---
+
+## TESTRUN-MAIN-02 — 설정 가져오기 분리 (시안 확정 후속)
+
+확정 시안은 "테스트 종료가 값을 자동으로 채우지 않고, 사용자가 플레이어 설정(단축키 · 옵션)에서 가져올 곳(테스트 실행 결과 / options.txt 파일)을 골라 가져온다"이다. TESTRUN-MAIN-01 구현은 테스트 종료 때 추출 결과를 `project.gameSettings`에 바로 병합한다(`extracted`는 미리보기). 이를 시안에 맞게 바꾼다.
+
+- 범위(독점): `apps/admin/src/main/**`, `apps/admin/src/shared/**`, `apps/admin/src/preload/**`(필요 시), `docs/handoffs/TESTRUN-MAIN-02.md`.
+- 테스트 종료 시 추출은 읽기 전용 미리보기(`extracted`: 단축키/옵션 개수, 새 모드 설정 파일 개수)만 만들고 프로젝트를 바꾸지 않는다. 프로젝트가 dirty가 되지 않는다.
+- 새 명령(이름은 구현자가 정해 인계에 확정): 가져오기 `{ source: 'test' }`는 마지막 테스트 인스턴스의 `options.txt`를 기존 병합 경로로 가져오고(이미 정한 정책은 유지), `{ source: 'file' }`는 기존 `settingsImport`(options.txt 직접 선택)를 쓴다. 테스트 결과가 없을 때 `source: 'test'`는 명확한 오류 코드를 낸다.
+- 모드 설정 파일 목록 갱신은 가져오기와 분리한다: 모드 설정 화면이 열릴 때/테스트 후에 인스턴스의 config 파일 목록을 읽기 전용으로 보여 줄 수 있어야 한다(소스는 인스턴스 루트 고정, 새 임의 경로 IPC 금지).
+- 테스트와 문서 갱신, `pnpm check`, 두 앱 smoke, Studio 기능 smoke.
+
+선행: 없음(TESTRUN-MAIN-01 통합 완료). TESTRUN-UI-01의 단축키 · 옵션 가져오기 화면 연결 전에 끝낸다.
