@@ -1,19 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { lstat } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { BRANDING_LIMITS, BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
 import { DeploymentValidationError } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import { createEd25519Signer } from '../../../../packages/core/src/deployment/signing/index.js';
 import { writeDeployment } from '../../../../packages/core/src/deployment/writer/index.js';
+import { RangeNotSupportedError } from '../../../../packages/core/src/download/http/range-client.js';
 import { createDownloadSource } from '../../../../packages/core/src/download/source/factory.js';
+import { SETTINGS_LIMITS } from '../../../../packages/core/src/instance/settings/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import type {
+  PackKind,
+  StudioExport,
+  StudioExportCheck,
+  StudioPack,
   StudioProject,
   StudioReply,
   StudioRequest,
   StudioSigning,
   StudioState,
+  StudioUrlCheck,
+  UrlCheckState,
 } from '../shared/studio.js';
 import {
   type BrandingSnapshots,
@@ -26,8 +34,28 @@ import {
   validateImage,
   writerBranding,
 } from './branding.js';
-import { exportLauncher, noLinks, safeRead, saveProject } from './filesystem.js';
+import {
+  brandingKey,
+  buildPlan,
+  computeDeploy,
+  computeFiles,
+  type DiffResult,
+} from './files-diff.js';
+import { exportLauncherZip, noLinks, safeRead, saveProject } from './filesystem.js';
+import {
+  addPack,
+  emptySettings,
+  isReservedPath,
+  MAX_PACKS,
+  mergeOptions,
+  PACK_LIMIT,
+  parseGameSettings,
+  readPreset,
+  validatePackName,
+  writeGeneratedPolicy,
+} from './game-settings.js';
 import { newProject, parseProject, StudioFailure } from './project.js';
+import { hashFile, type ScanResult, scanSource } from './scan.js';
 import type { SigningKeyStore } from './signing.js';
 
 export interface StudioDialogs {
@@ -40,11 +68,89 @@ export interface StudioDialogs {
       | 'output'
       | 'icon'
       | 'background'
-      | 'keybackup',
+      | 'keybackup'
+      | 'optionsfile'
+      | 'gamefolder'
+      | 'resourcepack'
+      | 'shaderpack',
     root?: string,
   ): Promise<string[] | null>;
-  save(kind: 'project' | 'pack' | 'keybackup'): Promise<string | null>;
+  save(kind: 'project' | 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
   discard(): Promise<boolean>;
+  /** Shows a file in the OS file manager. Optional so tests can omit it. */
+  reveal?(path: string): void;
+}
+const RESCAN = new Set([
+  'source',
+  'files',
+  'filesPolicy',
+  'rescan',
+  'exportCheck',
+  'build',
+  'export',
+  'settingsPackAdd',
+]);
+const POLICY_CHOICES = ['none', 'initial', 'required'];
+const SPECIAL_FIELDS: Record<string, string[]> = {
+  filesPolicy: ['paths', 'policy'],
+  settingsImport: ['source'],
+  settingsOptions: ['changes'],
+  settingsPackAdd: ['kind'],
+  settingsPackPolicy: ['kind', 'name', 'policy'],
+  settingsPackMove: ['kind', 'name', 'index'],
+  settingsPackRemove: ['kind', 'name'],
+};
+function validSpecial(value: Record<string, unknown>): boolean {
+  const fields = SPECIAL_FIELDS[value.action as string] ?? [];
+  if (
+    Object.keys(value).length !== fields.length + 1 ||
+    fields.some((f) => !Object.hasOwn(value, f))
+  )
+    return false;
+  const isKind = (v: unknown) => v === 'resourcepack' || v === 'shaderpack';
+  switch (value.action) {
+    case 'filesPolicy':
+      return (
+        Array.isArray(value.paths) &&
+        value.paths.length > 0 &&
+        value.paths.length <= 1000 &&
+        value.paths.every((p) => typeof p === 'string' && p.length > 0 && p.length <= 1024) &&
+        ['always', 'initial-only', 'excluded'].includes(value.policy as string)
+      );
+    case 'settingsImport':
+      return value.source === 'folder' || value.source === 'file';
+    case 'settingsOptions':
+      return (
+        Array.isArray(value.changes) &&
+        value.changes.length > 0 &&
+        value.changes.length <= SETTINGS_LIMITS.keysPerMap &&
+        value.changes.every((c) => {
+          if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
+          const keys = Object.keys(c);
+          return (
+            keys.every((k) => ['key', 'policy', 'value'].includes(k)) &&
+            typeof c.key === 'string' &&
+            POLICY_CHOICES.includes(c.policy) &&
+            (c.value === undefined || typeof c.value === 'string')
+          );
+        })
+      );
+    case 'settingsPackAdd':
+      return isKind(value.kind);
+    case 'settingsPackPolicy':
+      return (
+        isKind(value.kind) &&
+        typeof value.name === 'string' &&
+        POLICY_CHOICES.includes(value.policy as string)
+      );
+    case 'settingsPackMove':
+      return (
+        isKind(value.kind) && typeof value.name === 'string' && Number.isSafeInteger(value.index)
+      );
+    case 'settingsPackRemove':
+      return isKind(value.kind) && typeof value.name === 'string';
+  }
+  return false;
 }
 export class StudioService {
   private state: StudioState = {
@@ -56,7 +162,17 @@ export class StudioService {
     progress: 0,
     result: null,
     signing: null,
+    files: null,
+    deploy: null,
+    urlCheck: null,
+    export: null,
+    preset: null,
   };
+  private lastScan: ScanResult | null = null;
+  private hashes = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
+  private urlKey: string | null = null;
+  private lastPackPath: string | null = null;
+  private lastExportPath: string | null = null;
   private projectPath: string | null = null;
   private sourceRoot: string | null = null;
   private snapshots: BrandingSnapshots = {};
@@ -103,6 +219,10 @@ export class StudioService {
       'check',
       'export',
       'cancel',
+      'rescan',
+      'exportCheck',
+      'revealPack',
+      'revealExport',
     ];
     const extra =
       value.action === 'update'
@@ -119,7 +239,9 @@ export class StudioService {
       keyImport: ['passphrase', 'replace'],
     };
     const keyFields = typeof value.action === 'string' ? keyActions[value.action] : undefined;
-    if (keyFields) {
+    if (typeof value.action === 'string' && SPECIAL_FIELDS[value.action]) {
+      if (!validSpecial(value)) return Promise.resolve({ ok: false, code: 'INVALID' });
+    } else if (keyFields) {
       if (
         Object.keys(value).length !== keyFields.length + 1 ||
         keyFields.some((k) => !Object.hasOwn(value, k)) ||
@@ -154,6 +276,8 @@ export class StudioService {
           build: 'building',
           check: 'checking',
           export: 'exporting',
+          exportCheck: 'checking',
+          rescan: 'checking',
           keyStatus: 'checking',
         } as const
       )[command.action as 'save'] ?? (command.action.startsWith('key') ? 'saving' : 'choosing');
@@ -192,7 +316,221 @@ export class StudioService {
     return paths;
   }
   private async perform(command: StudioRequest, signal: AbortSignal): Promise<void> {
+    await this.execute(command, signal);
+    if (!this.state.project) return;
+    const rescan = RESCAN.has(command.action);
+    try {
+      await this.derive(signal, rescan);
+    } catch (error) {
+      if (command.action === 'rescan' || signal.aborted) throw error;
+      // Derived data is advisory: a failed listing must not turn a finished command into an error.
+      this.state.files = null;
+      this.state.deploy = computeDeploy(this.state.project, null, null);
+      this.state.export = this.exportState(this.state.project);
+    }
+  }
+  /** Recomputes file listing, deploy status and export checks. Never changes the project. */
+  private async derive(signal: AbortSignal, rescan: boolean): Promise<void> {
+    const project = this.state.project;
+    if (!project) return;
+    let diff: DiffResult | null = null;
+    const root = this.sourceRoot;
+    if (root) {
+      if (rescan || !this.lastScan) this.lastScan = await scanSource(root, signal);
+      const scan = this.lastScan;
+      const mtimes = new Map(scan.files.map((f) => [f.path, f.mtimeMs]));
+      diff = await computeFiles(project, scan, async (path, size) => {
+        const mtimeMs = mtimes.get(path) ?? -1;
+        const cached = this.hashes.get(path);
+        if (cached && cached.size === size && cached.mtimeMs === mtimeMs) return cached.sha256;
+        try {
+          const { sha256 } = await hashFile(join(root, path), 4 * 1024 ** 3, signal);
+          this.hashes.set(path, { size, mtimeMs, sha256 });
+          return sha256;
+        } catch (error) {
+          signal.throwIfAborted();
+          if (error instanceof StudioFailure && error.code === 'CANCELLED') throw error;
+          return null;
+        }
+      });
+    } else this.lastScan = null;
+    this.state.files = diff?.files ?? null;
+    this.state.deploy = computeDeploy(project, diff, diff?.files ?? null);
+    if (this.state.urlCheck) this.state.urlCheck.stale = this.urlKey !== this.fingerprint(project);
+    this.state.export = this.exportState(project);
+  }
+  private fingerprint(project: StudioProject): string {
+    return JSON.stringify([
+      project.serverId,
+      project.sourceUrl,
+      project.game,
+      brandingKey(project),
+      project.lastBuild?.deploymentId ?? null,
+    ]);
+  }
+  private exportState(project: StudioProject): StudioExport {
+    const check = this.state.urlCheck;
+    const fresh = check && !check.stale ? check : null;
+    const unchecked = (): StudioExportCheck['reasons'] => ['url-unchecked'];
+    const item = (state: UrlCheckState | undefined, bad: 'server-id' | 'game') => {
+      if (!fresh || state === undefined) return unchecked();
+      if (state === 'ok') return [];
+      return state === 'mismatch' ? [bad] : (['url-failed'] as const);
+    };
+    const urlReasons: StudioExportCheck['reasons'] = !fresh
+      ? unchecked()
+      : fresh.range === 'failed'
+        ? ['range']
+        : fresh.fileList.state !== 'ok'
+          ? ['url-failed']
+          : [];
+    const deployment: StudioExportCheck['reasons'] = !project.lastBuild
+      ? ['no-deployment']
+      : this.state.deploy?.status === 'changed'
+        ? ['deployment-changed']
+        : fresh?.deployment === 'older'
+          ? ['deployment-outdated']
+          : [];
+    const checks: StudioExportCheck[] = [
+      { id: 'serverId', reasons: [...item(fresh?.serverId, 'server-id')] },
+      { id: 'game', reasons: [...item(fresh?.game, 'game')] },
+      { id: 'url', reasons: urlReasons },
+      { id: 'deployment', reasons: deployment },
+    ].map((c) => ({ ...c, ok: c.reasons.length === 0 })) as StudioExportCheck[];
+    return {
+      checks,
+      blocked: checks.some((c) => !c.ok),
+      done: this.exportDone,
+    };
+  }
+  private exportDone: StudioExport['done'] = null;
+  private updatePack(kind: PackKind, mutate: (list: StudioPack[]) => void, create = false): void {
+    this.updateSettings(
+      (g) => mutate(kind === 'resourcepack' ? g.resourcePacks : g.shaderPacks),
+      create,
+    );
+  }
+  private updateSettings(
+    mutate: (settings: import('../shared/studio.js').StudioGameSettings) => void,
+    create = false,
+  ): void {
+    const project = this.project();
+    if (!project.gameSettings && !create) throw new StudioFailure('INVALID');
+    const next = structuredClone(project.gameSettings ?? emptySettings());
+    mutate(next);
+    this.state.project = { ...project, version: 2, gameSettings: parseGameSettings(next) };
+    this.state.dirty = true;
+  }
+  private async execute(command: StudioRequest, signal: AbortSignal): Promise<void> {
     switch (command.action) {
+      case 'rescan':
+      case 'exportCheck':
+        this.project();
+        return;
+      case 'revealPack':
+      case 'revealExport': {
+        this.project();
+        const path = command.action === 'revealPack' ? this.lastPackPath : this.lastExportPath;
+        if (!path || !this.dialogs.reveal) throw new StudioFailure('INVALID');
+        if (!(await lstat(path)).isFile()) throw new StudioFailure('IO');
+        this.dialogs.reveal(path);
+        return;
+      }
+      case 'filesPolicy': {
+        const project = this.project();
+        const root = this.sourceRoot;
+        if (!root) throw new StudioFailure('INVALID');
+        const scan = await scanSource(root, signal);
+        const onDisk = new Set(scan.files.map((f) => f.path));
+        const files = new Map(project.files.map((f) => [f.path, f]));
+        for (const path of new Set(command.paths)) {
+          if (isReservedPath(path)) throw new StudioFailure('INVALID');
+          if (command.policy === 'excluded') {
+            if (!files.has(path) && !onDisk.has(path)) throw new StudioFailure('INVALID');
+            files.delete(path);
+          } else {
+            if (!onDisk.has(path)) throw new StudioFailure('INVALID');
+            files.set(path, { path, policy: command.policy });
+          }
+        }
+        signal.throwIfAborted();
+        this.lastScan = scan;
+        this.state.project = parseProject({ ...project, files: [...files.values()] });
+        this.state.dirty = true;
+        return;
+      }
+      case 'settingsImport': {
+        this.project();
+        const picked = (
+          await this.selected(command.source === 'folder' ? 'gamefolder' : 'optionsfile')
+        )[0];
+        if (!picked) throw new StudioFailure('CANCELLED');
+        const { entries, preview } = await readPreset(picked, command.source);
+        signal.throwIfAborted();
+        this.updateSettings((g) => {
+          g.options = mergeOptions(g.options, entries);
+        }, true);
+        this.state.preset = preview;
+        return;
+      }
+      case 'settingsOptions': {
+        const changes = new Map(command.changes.map((c) => [c.key, c]));
+        this.updateSettings((g) => {
+          for (const option of g.options) {
+            const change = changes.get(option.key);
+            if (!change) continue;
+            option.policy = change.policy;
+            if (change.value !== undefined) option.value = change.value;
+          }
+          const known = new Set(g.options.map((o) => o.key));
+          if (command.changes.some((c) => !known.has(c.key))) throw new StudioFailure('INVALID');
+          for (const policy of ['required', 'initial'] as const)
+            if (g.options.filter((o) => o.policy === policy).length > SETTINGS_LIMITS.keysPerMap)
+              throw new StudioFailure('TOO_LARGE');
+        });
+        return;
+      }
+      case 'settingsPackAdd': {
+        this.project();
+        if (!this.sourceRoot) throw new StudioFailure('INVALID');
+        const picked = (await this.selected(command.kind))[0];
+        if (!picked) throw new StudioFailure('CANCELLED');
+        const pack = await addPack(this.sourceRoot, command.kind, picked, signal);
+        signal.throwIfAborted();
+        this.updatePack(
+          command.kind,
+          (list) => {
+            const index = list.findIndex((p) => p.name.toLowerCase() === pack.name.toLowerCase());
+            const existing = list[index];
+            if (existing) list[index] = { ...pack, policy: existing.policy };
+            else if (list.length >= MAX_PACKS) throw new StudioFailure('TOO_LARGE');
+            else list.push({ ...pack, policy: 'initial' });
+          },
+          true,
+        );
+        return;
+      }
+      case 'settingsPackPolicy':
+      case 'settingsPackMove':
+      case 'settingsPackRemove': {
+        validatePackName(command.name);
+        this.updatePack(command.kind, (list) => {
+          const index = list.findIndex((p) => p.name === command.name);
+          const pack = list[index];
+          if (!pack) throw new StudioFailure('INVALID');
+          if (command.action === 'settingsPackPolicy') pack.policy = command.policy;
+          else {
+            list.splice(index, 1);
+            if (command.action === 'settingsPackMove') {
+              if (command.index < 0 || command.index > list.length)
+                throw new StudioFailure('INVALID');
+              list.splice(command.index, 0, pack);
+            }
+          }
+        });
+        return;
+      }
+
       case 'touch':
         this.project();
         this.state.dirty = true;
@@ -223,6 +561,17 @@ export class StudioService {
         this.state.sourceName = null;
         this.state.dirty = !path;
         this.state.signing = null;
+        this.state.files = null;
+        this.state.deploy = null;
+        this.state.urlCheck = null;
+        this.state.export = null;
+        this.state.preset = null;
+        this.lastScan = null;
+        this.hashes.clear();
+        this.urlKey = null;
+        this.exportDone = null;
+        this.lastPackPath = null;
+        this.lastExportPath = null;
         await this.refreshSigning();
         return;
       }
@@ -269,6 +618,9 @@ export class StudioService {
           JSON.stringify(project.branding) !== JSON.stringify(current.branding) ||
           project.serverId !== current.serverId ||
           project.sequence !== current.sequence ||
+          JSON.stringify(project.lastBuild) !== JSON.stringify(current.lastBuild) ||
+          JSON.stringify(project.gameSettings) !== JSON.stringify(current.gameSettings) ||
+          project.version !== current.version ||
           project.files.some((f) => !paths.has(f.path))
         )
           throw new StudioFailure('INVALID');
@@ -303,6 +655,8 @@ export class StudioService {
         signal.throwIfAborted();
         this.sourceRoot = resolve(path);
         this.state.sourceName = basename(path);
+        this.lastScan = null;
+        this.hashes.clear();
         return;
       }
       case 'files': {
@@ -364,10 +718,18 @@ export class StudioService {
       case 'build': {
         const project = this.project();
         if (!this.sourceRoot) throw new StudioFailure('INVALID');
+        const plan = buildPlan(project);
         const path = await this.dialogs.save('pack');
         if (!path) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
         await noLinks(dirname(path));
+        for (const item of plan.items) {
+          if (item.kind !== 'pack') continue;
+          // A pack that changed on disk since it was added would ship bytes the preset never described.
+          const actual = await hashFile(join(this.sourceRoot, item.path), PACK_LIMIT, signal);
+          if (actual.sha256 !== item.sha256) throw new StudioFailure('MISMATCH');
+        }
+        if (plan.policyText) await writeGeneratedPolicy(this.sourceRoot, plan.policyText);
         const branding = writerBranding(project, this.snapshots);
         let signing: { sequence: number; sign: ReturnType<typeof createEd25519Signer> } | null =
           null;
@@ -381,15 +743,16 @@ export class StudioService {
           this.state.dirty = true;
           signing = { sequence, sign: createEd25519Signer(key) };
         }
-        await writeDeployment({
+        const deploymentId = randomUUID();
+        const written = await writeDeployment({
           ...(branding ? { branding } : {}),
           ...(signing ? signing : {}),
           sourceRoot: this.sourceRoot,
           outputPath: path,
           serverId: project.serverId,
-          deploymentId: randomUUID(),
+          deploymentId,
           game: project.game,
-          files: project.files.map((f) => ({
+          files: plan.items.map((f) => ({
             sourcePath: f.path,
             policy: f.policy,
             compression: 'none',
@@ -399,6 +762,28 @@ export class StudioService {
             this.state.progress = p.processedBytes;
           },
         });
+        const built = this.state.project ?? project;
+        this.state.project = {
+          ...built,
+          version: 2,
+          lastBuild: {
+            deploymentId,
+            builtAt: Date.now(),
+            fileName: basename(path),
+            totalLength: written.header.totalLength,
+            sequence: signing?.sequence ?? null,
+            game: structuredClone(project.game),
+            brandingKey: brandingKey(project),
+            files: written.index.files.map((f) => ({
+              path: f.path,
+              sha256: f.sha256,
+              length: f.originalLength,
+              policy: f.policy,
+            })),
+          },
+        };
+        this.state.dirty = true;
+        this.lastPackPath = path;
         await this.refreshSigning({ keyCreated, sequence: signing?.sequence ?? null });
         this.state.result = `torchpack 배포 파일을 생성했습니다${
           signing
@@ -408,16 +793,24 @@ export class StudioService {
         return;
       }
       case 'check': {
-        await this.verify(signal);
+        const { check, brandingMismatch } = await this.runUrlCheck(signal);
+        if (check.serverId === 'mismatch' || check.game === 'mismatch' || brandingMismatch)
+          throw new StudioFailure('MISMATCH');
+        if (check.fileList.state !== 'ok') throw new StudioFailure('IO');
         this.state.result = '공개 배포 파일의 서버 ID · Minecraft · 로더가 프로젝트와 일치합니다.';
         return;
       }
       case 'export': {
         const project = this.project();
+        this.exportDone = null;
+        // Local state first: the source folder may have changed since the last listing.
+        await this.runUrlCheck(signal);
+        await this.derive(signal, true);
+        const state = this.state.export;
+        if (!state || state.blocked) throw new StudioFailure('BLOCKED');
         const binary = (await this.selected('binary'))[0];
-        const output = (await this.selected('output'))[0];
-        if (!binary || !output) throw new StudioFailure('CANCELLED');
-        await this.verify(signal);
+        const destination = await this.dialogs.save('zip');
+        if (!binary || !destination) throw new StudioFailure('CANCELLED');
         let keyCreated = false;
         let publicKey: string | null = null;
         if (this.keys) {
@@ -435,9 +828,9 @@ export class StudioService {
           ...(project.branding ? { branding: profileBranding(project) } : {}),
           ...(publicKey ? { signing: { algorithm: 'ed25519', publicKey } } : {}),
         });
-        await exportLauncher(
+        const size = await exportLauncherZip(
           binary,
-          output,
+          destination,
           config,
           signal,
           (bytes) => {
@@ -445,8 +838,10 @@ export class StudioService {
           },
           this.snapshots,
         );
+        this.exportDone = { fileName: basename(destination), size };
+        this.lastExportPath = destination;
         await this.refreshSigning({ keyCreated, sequence: null });
-        this.state.result = `공통 런처와 서버 설정을 출력 폴더에 복사했습니다${
+        this.state.result = `공통 런처와 서버 설정을 ZIP 파일 하나로 만들었습니다${
           keyCreated ? ' (새 서명 키 생성: 이전 런처 사용자는 새 런처가 필요합니다)' : ''
         }.`;
         return;
@@ -477,7 +872,10 @@ export class StudioService {
       lastOperation: lastOperation ?? this.state.signing?.lastOperation ?? null,
     };
   }
-  private async verify(signal: AbortSignal): Promise<void> {
+  /** Opens the public deployment and records a structured result in `state.urlCheck`. */
+  private async runUrlCheck(
+    signal: AbortSignal,
+  ): Promise<{ check: StudioUrlCheck; brandingMismatch: boolean }> {
     const project = this.project();
     const config = parseServerConfig({
       format: 'torchlauncher-server',
@@ -487,18 +885,37 @@ export class StudioService {
       address: project.address,
       sourceUrl: project.sourceUrl,
     });
+    const check: StudioUrlCheck = {
+      checkedAt: Date.now(),
+      url: config.sourceUrl,
+      serverId: 'unknown',
+      game: 'unknown',
+      remoteGame: null,
+      fileList: { state: 'unknown', count: null },
+      range: 'unknown',
+      deployment: 'unknown',
+      stale: false,
+    };
+    let brandingMismatch = false;
     const source = this.sourceFactory(config.sourceUrl);
     try {
       const reader = await openDeploymentReader(source, {
         expectedServerId: project.serverId,
         signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
       });
-      if (
-        reader.index.game.minecraftVersion !== project.game.minecraftVersion ||
-        reader.index.game.loader.kind !== project.game.loader.kind ||
-        reader.index.game.loader.version !== project.game.loader.version
-      )
-        throw new StudioFailure('MISMATCH');
+      reader.assertCurrent();
+      const remote = reader.index.game;
+      check.serverId = 'ok';
+      check.remoteGame = structuredClone(remote);
+      check.game =
+        remote.minecraftVersion === project.game.minecraftVersion &&
+        remote.loader.kind === project.game.loader.kind &&
+        remote.loader.version === project.game.loader.version
+          ? 'ok'
+          : 'mismatch';
+      check.fileList = { state: 'ok', count: reader.index.files.length };
+      // The reader reads the tail and index with range requests, so reaching here proves them.
+      check.range = 'ok';
       for (const role of BRANDING_ROLES) {
         const expected = project.branding?.[role];
         if (expected === undefined) continue;
@@ -511,15 +928,31 @@ export class StudioService {
               actual.originalLength !== expected.length ||
               actual.mediaType !== expected.mediaType
         )
-          throw new StudioFailure('MISMATCH');
+          brandingMismatch = true;
       }
-      reader.assertCurrent();
+      if (project.lastBuild)
+        check.deployment =
+          reader.index.deploymentId === project.lastBuild.deploymentId && !brandingMismatch
+            ? 'current'
+            : 'older';
     } catch (error) {
+      signal.throwIfAborted();
       if (error instanceof DeploymentValidationError && error.code === 'server-mismatch')
-        throw new StudioFailure('MISMATCH');
-      throw error;
+        check.serverId = 'mismatch';
+      else {
+        check.fileList = { state: 'failed', count: null };
+        let cause: unknown = error;
+        for (let depth = 0; cause && depth < 6; depth++) {
+          if (cause instanceof RangeNotSupportedError) check.range = 'failed';
+          cause = (cause as { cause?: unknown }).cause;
+        }
+      }
     } finally {
       source.reset();
     }
+    this.state.urlCheck = check;
+    this.urlKey = this.fingerprint(project);
+    this.state.export = this.exportState(project);
+    return { check, brandingMismatch };
   }
 }

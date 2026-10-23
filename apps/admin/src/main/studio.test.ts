@@ -18,6 +18,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import { exportLauncher, safeRead } from './filesystem.js';
+import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
@@ -224,30 +225,33 @@ describe('Studio project and trusted disk selections', () => {
     const checkerDialogs = dialogs();
     const checker = new StudioService(checkerDialogs, () => memorySource(bytes));
     const projectPath = join(root, 'project.json');
-    project.sourceUrl = 'https://example.org/pack';
-    await writeFile(projectPath, JSON.stringify(project));
+    const built = parseProject(s.snapshot().project);
+    built.sourceUrl = 'https://example.org/pack';
+    project.sourceUrl = built.sourceUrl;
+    await writeFile(projectPath, JSON.stringify(built));
     checkerDialogs.open.mockResolvedValueOnce([projectPath]);
     await checker.request({ action: 'open' });
     expect((await checker.request({ action: 'check' })).ok).toBe(true);
-    const output = join(root, 'export');
-    await mkdir(output);
+    const zipPath = join(root, 'export.zip');
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, 'MZ portable launcher fixture');
-    checkerDialogs.open.mockResolvedValueOnce([binary]).mockResolvedValueOnce([output]);
+    checkerDialogs.open.mockResolvedValueOnce([binary]);
+    checkerDialogs.save.mockResolvedValueOnce(zipPath);
     expect((await checker.request({ action: 'export' })).ok).toBe(true);
-    expect(await readFile(join(output, 'Torch.exe'), 'utf8')).toBe('MZ portable launcher fixture');
+    const zip = readZip(await readFile(zipPath));
+    expect(zip.get('Torch.exe')?.data.toString('utf8')).toBe('MZ portable launcher fixture');
     expect(
-      JSON.parse(await readFile(join(output, 'torchlauncher-server.json'), 'utf8')).serverId,
+      JSON.parse(zip.get('torchlauncher-server.json')?.data.toString('utf8') ?? '').serverId,
     ).toBe(project.serverId);
 
     await checker.request({
       action: 'update',
-      project: { ...project, game: { ...project.game, minecraftVersion: '1.21.2' } },
+      project: { ...built, game: { ...built.game, minecraftVersion: '1.21.2' } },
     });
     expect(await checker.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
     await writeFile(
       projectPath,
-      JSON.stringify({ ...project, serverId: '11111111-1111-4111-8111-111111111111' }),
+      JSON.stringify({ ...built, serverId: '11111111-1111-4111-8111-111111111111' }),
     );
     checkerDialogs.open.mockResolvedValueOnce([projectPath]);
     await checker.request({ action: 'open' });

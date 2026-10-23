@@ -13,6 +13,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import { deriveEd25519PublicKey } from '../../../../packages/core/src/deployment/signing/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
+import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
 import { type SafeStorageLike, SigningKeyStore } from './signing.js';
 import { type StudioDialogs, StudioService } from './studio.js';
@@ -103,6 +104,7 @@ function rawSecrets(_store: SigningKeyStore, key: KeyObject) {
 }
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
+  if (!(await stat(dir)).isDirectory()) return [dir];
   for (const e of await readdir(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
     if (e.isDirectory()) out.push(...(await walk(p)));
@@ -443,24 +445,31 @@ describe('Studio signing integration', () => {
     d0.save.mockResolvedValueOnce(oldPack);
     expect((await legacy.request({ action: 'build' })).ok).toBe(true);
     const oldBytes = await readFile(oldPack);
+    // The project file as a pre-upgrade Studio saved it, plus the build record the current one keeps.
+    await writeFile(join(root, 'proj.json'), JSON.stringify(legacy.snapshot().project));
     expect(
       (await openDeploymentReader(memorySource(oldBytes), { expectedServerId: project.serverId }))
         .header.formatVersion.minor,
     ).toBeLessThan(2);
     // upgraded Studio opens the legacy project and exports
     const d = dialogs();
-    const s = new StudioService(d, () => memorySource(oldBytes), undefined, store);
+    let remote = oldBytes;
+    const s = new StudioService(d, () => memorySource(remote), undefined, store);
     d.open.mockResolvedValueOnce([join(root, 'proj.json')]);
     expect((await s.request({ action: 'open' })).ok).toBe(true);
     expect(s.snapshot().signing).toMatchObject({ keyExists: false, publicKey: null });
-    const out = join(root, 'out');
-    await mkdir(out);
+    const out = join(root, 'out.zip');
     const bin = join(root, 'Torch.exe');
     await writeFile(bin, 'MZ fixture');
-    d.open.mockResolvedValueOnce([bin]).mockResolvedValueOnce([out]);
+    d.open.mockResolvedValueOnce([bin]);
+    d.save.mockResolvedValueOnce(out);
     expect((await s.request({ action: 'export' })).ok).toBe(true);
     const cfg = parseServerConfig(
-      JSON.parse(await readFile(join(out, 'torchlauncher-server.json'), 'utf8')),
+      JSON.parse(
+        readZip(await readFile(out))
+          .get('torchlauncher-server.json')
+          ?.data.toString('utf8') ?? '',
+      ),
     );
     const pub = (await store.status(project.serverId)).publicKey;
     expect(cfg.signing).toEqual({ algorithm: 'ed25519', publicKey: pub });
@@ -479,15 +488,21 @@ describe('Studio signing integration', () => {
       trustedPublicKey: cfg.signing?.publicKey as string,
     });
     expect(reader.index.sequence).toBe(1);
-    // second export in a fresh folder reuses the same key
-    const out2 = join(root, 'out2');
-    await mkdir(out2);
-    d.open.mockResolvedValueOnce([bin]).mockResolvedValueOnce([out2]);
+    // second export reuses the same key once the new pack is the public one
+    remote = await readFile(pack);
+    const out2 = join(root, 'out2.zip');
+    d.open.mockResolvedValueOnce([bin]);
+    d.save.mockResolvedValueOnce(out2);
     expect((await s.request({ action: 'export' })).ok).toBe(true);
     expect(s.snapshot().signing?.lastOperation?.keyCreated).toBe(false);
     expect(
-      parseServerConfig(JSON.parse(await readFile(join(out2, 'torchlauncher-server.json'), 'utf8')))
-        .signing?.publicKey,
+      parseServerConfig(
+        JSON.parse(
+          readZip(await readFile(out2))
+            .get('torchlauncher-server.json')
+            ?.data.toString('utf8') ?? '',
+        ),
+      ).signing?.publicKey,
     ).toBe(pub);
   });
   it('validates key commands and drives create/export/import through the service', async () => {

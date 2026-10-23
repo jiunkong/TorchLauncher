@@ -22,7 +22,8 @@ export interface StudioBranding {
 }
 export interface StudioProject {
   format: 'torchlauncher-project';
-  version: 1;
+  /** 1 = original schema; 2 adds optional `lastBuild` and `gameSettings`. Both are read; v1 is upgraded in memory. */
+  version: 1 | 2;
   serverId: string;
   name: string;
   address: string;
@@ -32,6 +33,43 @@ export interface StudioProject {
   branding?: StudioBranding;
   /** Highest deployment sequence used by a build of this project (signing, torchpack 1.2). */
   sequence?: number;
+  /** v2. Written by the main process after a build; the renderer cannot change it. */
+  lastBuild?: StudioLastBuild;
+  /** v2. Game settings preset (options.txt items, packs). Edited only through settings commands. */
+  gameSettings?: StudioGameSettings;
+}
+/** What the last successful build of this project contained (basis of the file diff). */
+export interface StudioLastBuild {
+  deploymentId: string;
+  builtAt: number;
+  fileName: string;
+  totalLength: number;
+  sequence: number | null;
+  game: DeploymentGame;
+  /** sha256 of "<icon sha>|<background sha>|<appName>" at build time. */
+  brandingKey: string;
+  files: { path: string; sha256: string; length: number; policy: DeploymentFilePolicy }[];
+}
+export type SettingPolicyChoice = 'none' | 'initial' | 'required';
+export type PackKind = 'resourcepack' | 'shaderpack';
+export interface StudioGameOption {
+  key: string;
+  value: string;
+  policy: SettingPolicyChoice;
+}
+export interface StudioPack {
+  /** File name inside `resourcepacks/` or `shaderpacks/` of the source folder, e.g. `server.zip`. */
+  name: string;
+  sha256: string;
+  length: number;
+  /** none = not shipped; initial = initial-only file and default list; required = always file and forced. */
+  policy: SettingPolicyChoice;
+}
+export interface StudioGameSettings {
+  options: StudioGameOption[];
+  /** Order is the operator's pack order (later = higher priority in Minecraft's list). */
+  resourcePacks: StudioPack[];
+  shaderPacks: StudioPack[];
 }
 export interface StudioSigning {
   encryptionAvailable: boolean;
@@ -42,6 +80,96 @@ export interface StudioSigning {
   /** Set by the last build or export: what happened to the key and the sequence. */
   lastOperation: { keyCreated: boolean; sequence: number | null } | null;
 }
+export type FilePolicyChoice = 'always' | 'initial-only' | 'excluded';
+export type FileChange = 'added' | 'modified' | 'removed' | 'unchanged';
+export interface StudioFileEntry {
+  path: string;
+  /** Bytes in the source folder; null when the file is not (or no longer) there. */
+  size: number | null;
+  /** `managed` = options.txt, resourcepacks/, shaderpacks/ and the generated policy (game settings). */
+  policy: FilePolicyChoice | 'managed';
+  /** Change versus the last build; null when the project has no last build. */
+  change: FileChange | null;
+  /** The project includes the file but the source folder no longer has it (a build would fail). */
+  missing: boolean;
+}
+export interface StudioFileCounts {
+  total: number;
+  totalBytes: number;
+  added: number;
+  modified: number;
+  removed: number;
+  excluded: number;
+  managed: number;
+  missing: number;
+}
+export interface StudioFiles {
+  scannedAt: number;
+  entries: StudioFileEntry[];
+  counts: StudioFileCounts;
+  /** More than the file limit exist in the source folder; the extra ones are not listed. */
+  truncated: boolean;
+  /** Entries skipped because they are links or special files. */
+  skipped: number;
+}
+export type StudioDeployReason = 'files' | 'game' | 'branding' | 'settings';
+export interface StudioDeploy {
+  /** none = never built; unknown = built before but no source folder is selected to compare; */
+  status: 'none' | 'unknown' | 'changed' | 'upToDate';
+  reasons: StudioDeployReason[];
+  lastBuild: {
+    fileName: string;
+    builtAt: number;
+    fileCount: number;
+    totalLength: number;
+    sequence: number | null;
+  } | null;
+  /** Added/modified/removed against the last build (same numbers as `files.counts`). */
+  changes: { added: number; modified: number; removed: number };
+}
+export type UrlCheckState = 'ok' | 'mismatch' | 'failed' | 'unknown';
+export interface StudioUrlCheck {
+  checkedAt: number;
+  url: string;
+  serverId: UrlCheckState;
+  game: UrlCheckState;
+  /** Game environment the remote pack declares (null when it could not be read). */
+  remoteGame: DeploymentGame | null;
+  fileList: { state: UrlCheckState; count: number | null };
+  range: UrlCheckState;
+  /** current = same deployment as the last build; older = a different one; unknown = no last build or unreadable. */
+  deployment: 'current' | 'older' | 'unknown';
+  /** True when project fields the check depends on changed after the check ran. */
+  stale: boolean;
+}
+export type ExportBlockReason =
+  | 'server-id'
+  | 'game'
+  | 'url-unchecked'
+  | 'url-failed'
+  | 'range'
+  | 'no-deployment'
+  | 'deployment-outdated'
+  | 'deployment-changed';
+export interface StudioExportCheck {
+  id: 'serverId' | 'game' | 'url' | 'deployment';
+  ok: boolean;
+  reasons: ExportBlockReason[];
+}
+export interface StudioExport {
+  checks: StudioExportCheck[];
+  blocked: boolean;
+  /** Set after a successful export. */
+  done: { fileName: string; size: number } | null;
+}
+export interface StudioPresetPreview {
+  source: 'folder' | 'file';
+  optionCount: number;
+  /** Lines/keys that were ignored (invalid key, too long value, duplicates, owned by the game). */
+  ignored: number;
+  /** Informational: files found next to options.txt that the preset cannot manage yet. */
+  detected: { modConfigs: string[]; resourcePacks: string[]; shaderPacks: string[] };
+}
 export interface StudioState {
   project: StudioProject | null;
   projectName: string | null;
@@ -51,6 +179,13 @@ export interface StudioState {
   progress: number;
   result: string | null;
   signing: StudioSigning | null;
+  /** Source folder listing and diff; null until a source folder is selected and scanned. */
+  files: StudioFiles | null;
+  deploy: StudioDeploy | null;
+  urlCheck: StudioUrlCheck | null;
+  export: StudioExport | null;
+  /** Result of the last preset import (informational). */
+  preset: StudioPresetPreview | null;
 }
 export type StudioCommand =
   | {
@@ -69,6 +204,35 @@ export type StudioCommand =
         | 'cancel';
     }
   | { action: 'update'; project: StudioProject };
+/** Source folder, deploy and export commands added by STUDIO-MAIN-01. */
+export type StudioWorkCommand =
+  | {
+      action: /** Re-read the source folder and recompute `files` and `deploy`. */
+        | 'rescan'
+        /** Re-evaluate `export.checks` (rescans the source folder; no network, nothing written). */
+        | 'exportCheck'
+        /** Show the last built pack in the OS file manager. */
+        | 'revealPack'
+        /** Show the last exported ZIP in the OS file manager. */
+        | 'revealExport';
+    }
+  | {
+      action: 'filesPolicy';
+      /** Source-relative, slash-separated paths (max 1000); each must exist in the source folder. */
+      paths: string[];
+      policy: FilePolicyChoice;
+    };
+export type StudioSettingsCommand =
+  | { action: 'settingsImport'; source: 'folder' | 'file' }
+  | {
+      action: 'settingsOptions';
+      /** Max 512 changes. `value` (optional) overrides the imported value. */
+      changes: { key: string; policy: SettingPolicyChoice; value?: string }[];
+    }
+  | { action: 'settingsPackAdd'; kind: PackKind }
+  | { action: 'settingsPackPolicy'; kind: PackKind; name: string; policy: SettingPolicyChoice }
+  | { action: 'settingsPackMove'; kind: PackKind; name: string; index: number }
+  | { action: 'settingsPackRemove'; kind: PackKind; name: string };
 export type StudioBrandingCommand =
   | { action: 'brandingSelect' | 'brandingRemove'; role: 'icon' | 'background' }
   | { action: 'brandingName'; appName: string | null };
@@ -76,7 +240,12 @@ export type StudioSigningCommand =
   | { action: 'keyStatus' | 'keyCreate' }
   | { action: 'keyExport'; passphrase: string }
   | { action: 'keyImport'; passphrase: string; replace: boolean };
-export type StudioRequest = StudioCommand | StudioBrandingCommand | StudioSigningCommand;
+export type StudioRequest =
+  | StudioCommand
+  | StudioWorkCommand
+  | StudioBrandingCommand
+  | StudioSigningCommand
+  | StudioSettingsCommand;
 export type StudioError =
   | 'INVALID'
   | 'BUSY'
@@ -93,7 +262,11 @@ export type StudioError =
   | 'WEAK_PASSPHRASE'
   | 'BACKUP_INVALID'
   | 'BACKUP_UNSUPPORTED'
-  | 'BACKUP_AUTH';
+  | 'BACKUP_AUTH'
+  /** Export refused: read `state.export.checks`. */
+  | 'BLOCKED'
+  /** A chosen file or pack is larger than the limit. */
+  | 'TOO_LARGE';
 export type StudioReply = { ok: true; state: StudioState } | { ok: false; code: StudioError };
 export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;
