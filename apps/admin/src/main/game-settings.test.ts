@@ -246,7 +246,7 @@ describe('policy generation', () => {
     shaderPacks: [],
   });
   it('produces a v1 policy that core accepts, in operator order', () => {
-    const text = generatePolicy(base()) ?? '';
+    const text = generatePolicy(base())?.text ?? '';
     const policy = parseSettingsPolicy(Buffer.from(text));
     expect(policy.required).toEqual([['renderDistance', '12']]);
     expect(policy.initial).toEqual([['musicVolume', '0.2']]);
@@ -261,7 +261,7 @@ describe('policy generation', () => {
       policy: 'required' as const,
     }));
     expect(() => generatePolicy(many)).toThrow(expect.objectContaining({ code: 'INVALID' }));
-    expect(() => parseGameSettings(many)).toThrow();
+    expect(() => parseGameSettings(many)).not.toThrow();
   });
   it('rejects malformed stored settings', () => {
     const bad: unknown[] = [
@@ -359,8 +359,9 @@ async function harness() {
       expectedServerId: s.snapshot().project?.serverId ?? '',
     });
     const files = new Map<string, Buffer>();
+    const stage = await mkdtemp(join(root, 'stage-'));
     for (const f of reader.index.files) {
-      const out = join(root, `staged-${files.size}`);
+      const out = join(stage, `f-${files.size}`);
       await reader.stageFile(f.path, out);
       files.set(`${f.path}|${f.policy}`, await readFile(out));
     }
@@ -422,8 +423,8 @@ describe('service: game settings preset', () => {
     );
     expect(policy.required).toEqual([['renderDistance', '12']]);
     expect(policy.initial).toEqual([
-      ['musicVolume', '0.1'],
       ['key_key.inventory', 'key.keyboard.e'],
+      ['musicVolume', '0.1'],
     ]);
     expect(policy.resourcePacks).toEqual({
       required: ['file/server pack.zip'],
@@ -635,5 +636,279 @@ describe('project schema compatibility', () => {
         gameSettings: { options: [], resourcePacks: [], shaderPacks: [] },
       }).version,
     ).toBe(2);
+  });
+});
+
+describe('service: mod configs and shaders (policy v2)', () => {
+  async function folder(h: Awaited<ReturnType<typeof harness>>) {
+    await mkdir(join(h.game, 'config'), { recursive: true });
+    await mkdir(join(h.game, 'shaderpacks'), { recursive: true });
+    await writeFile(
+      join(h.game, 'config', 'sodium-extra.properties'),
+      '# c\r\nfog=true\r\nlevel=3\r\n',
+    );
+    await writeFile(join(h.game, 'config', 'big.toml'), 'a = 1');
+    await writeFile(join(h.game, 'config', 'bad.properties'), 'a=1\na=2\n');
+    await writeFile(
+      join(h.game, 'config', 'iris.properties'),
+      'enableShaders=true\nshaderPack=BSL.zip\n',
+    );
+    await writeFile(join(h.game, 'shaderpacks', 'BSL.zip.txt'), 'SHADOW=2048\nCLOUDS=true\n');
+    await writeFile(join(h.game, 'shaderpacks', 'BSL.zip'), zipBytes('s'));
+  }
+  const policyOf = async (h: Awaited<ReturnType<typeof harness>>) => {
+    const files = await h.readPack();
+    return parseSettingsPolicy(
+      files.get('torchlauncher/settings-policy.json|always') ?? Buffer.alloc(0),
+    );
+  };
+  it('imports config files, skips unsupported ones and reads the shader files', async () => {
+    const h = await harness();
+    await folder(h);
+    expect((await h.importFolder()).ok).toBe(true);
+    const state = h.s.snapshot();
+    expect(state.preset).toMatchObject({
+      importedConfigs: ['config/sodium-extra.properties'],
+      shader: {
+        configPath: 'config/iris.properties',
+        packOptionFiles: ['shaderpacks/BSL.zip.txt'],
+      },
+    });
+    expect(state.preset?.skippedConfigs).toEqual(
+      expect.arrayContaining([
+        { path: 'config/big.toml', reason: 'unsupported' },
+        { path: 'config/bad.properties', reason: 'invalid-config' },
+      ]),
+    );
+    const g = state.project?.gameSettings;
+    expect(g?.configFiles?.[0]?.items).toEqual([
+      { key: 'fog', value: 'true', policy: 'none', valueType: 'boolean' },
+      { key: 'level', value: '3', policy: 'none', valueType: 'number' },
+    ]);
+    expect(g?.shader).toMatchObject({
+      configPath: 'config/iris.properties',
+      enabled: { policy: 'none', value: true },
+      pack: { policy: 'none', value: 'BSL.zip' },
+      packOptions: [{ pack: 'BSL.zip' }],
+    });
+    expect(g?.options.find((o) => o.key === 'key_key.inventory')).toMatchObject({
+      kind: 'keybind',
+      group: 'inventory',
+    });
+    expect(state.policy).toEqual({ version: null, bytes: 0, limit: 65536, error: null });
+  });
+  it('keeps policy v1 until a config item is set, then builds v2 with all three states', async () => {
+    const h = await harness();
+    await folder(h);
+    await h.importFolder();
+    await h.s.request({ action: 'settingsOptions', changes: [{ key: 'fov', policy: 'required' }] });
+    expect(h.s.snapshot().policy).toMatchObject({ version: 1, error: null });
+    expect((await policyOf(h)).version).toBe(1);
+    // items that stay "none" do not force v2
+    await h.s.request({
+      action: 'settingsConfigItems',
+      path: 'config/sodium-extra.properties',
+      changes: [{ key: 'fog', policy: 'none' }],
+    });
+    expect(h.s.snapshot().policy?.version).toBe(1);
+    await h.s.request({
+      action: 'settingsConfigItems',
+      path: 'config/sodium-extra.properties',
+      changes: [
+        { key: 'fog', policy: 'required', value: 'false' },
+        { key: 'brand_new', policy: 'initial', value: '7' },
+      ],
+    });
+    await h.s.request({
+      action: 'settingsShader',
+      enabled: { policy: 'required', value: true },
+      pack: { policy: 'initial', value: 'BSL.zip' },
+    });
+    await h.s.request({
+      action: 'settingsShaderOptions',
+      pack: 'BSL.zip',
+      changes: [{ key: 'SHADOW', policy: 'initial', value: '4096' }],
+    });
+    expect(h.s.snapshot().policy).toMatchObject({ version: 2, error: null });
+    const policy = await policyOf(h);
+    expect(policy.version).toBe(2);
+    const byPath = Object.fromEntries(policy.configFiles.map((f) => [f.path, f]));
+    expect(Object.keys(byPath).sort()).toEqual([
+      'config/iris.properties',
+      'config/sodium-extra.properties',
+      'shaderpacks/BSL.zip.txt',
+    ]);
+    expect(byPath['config/sodium-extra.properties']).toMatchObject({
+      required: [['fog', 'false']],
+      initial: [['brand_new', '7']],
+    });
+    expect(byPath['config/iris.properties']).toMatchObject({
+      required: [['enableShaders', 'true']],
+      initial: [['shaderPack', 'BSL.zip']],
+    });
+    expect(byPath['shaderpacks/BSL.zip.txt']?.initial).toEqual([['SHADOW', '4096']]);
+    const managed =
+      h.s
+        .snapshot()
+        .files?.entries.filter((e) => e.policy === 'managed')
+        .map((e) => e.path) ?? [];
+    expect(managed).toContain('torchlauncher/settings-policy.json');
+    // switching everything back to unset returns to v1 / no config files
+    await h.s.request({ action: 'settingsConfigRemove', path: 'config/sodium-extra.properties' });
+    await h.s.request({
+      action: 'settingsShader',
+      enabled: { policy: 'none', value: true },
+      pack: { policy: 'none', value: 'BSL.zip' },
+    });
+    await h.s.request({ action: 'settingsShaderOptionsRemove', pack: 'BSL.zip' });
+    expect(h.s.snapshot().policy?.version).toBe(1);
+  });
+  it('rejects a policy over 64 KiB with a structured error and keeps the project unchanged', async () => {
+    const h = await harness();
+    await folder(h);
+    await h.importFolder();
+    const before = JSON.stringify(h.s.snapshot().project);
+    const changes = Array.from({ length: 40 }, (_, i) => ({
+      key: `key${i}`,
+      policy: 'required' as const,
+      value: 'v'.repeat(1900),
+    }));
+    expect(
+      await h.s.request({ action: 'settingsConfigItems', path: 'config/big.properties', changes }),
+    ).toEqual({ ok: false, code: 'TOO_LARGE' });
+    expect(JSON.stringify(h.s.snapshot().project)).toBe(before);
+    await h.s.request({ action: 'rescan' });
+    expect(h.s.snapshot().policy?.error?.code).toBe('limit-exceeded');
+    // a later valid change clears the rejection
+    await h.s.request({ action: 'settingsOptions', changes: [{ key: 'fov', policy: 'initial' }] });
+    expect(h.s.snapshot().policy?.error).toBeNull();
+  });
+  it('rejects values and paths the launcher would refuse', async () => {
+    const h = await harness();
+    await folder(h);
+    await h.importFolder();
+    const set = (changes: { key: string; policy: 'required'; value: string }[]) =>
+      h.s.request({
+        action: 'settingsConfigItems',
+        path: 'config/sodium-extra.properties',
+        changes,
+      });
+    expect(await set([{ key: 'fog', policy: 'required', value: 'caf\u00e9' }])).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect(h.s.snapshot().policy?.error?.code).toBe('invalid-policy');
+    expect(await set([{ key: 'fog', policy: 'required', value: ' padded' }])).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    for (const path of [
+      'config/../options.txt',
+      '../config/a.properties',
+      '/config/a.properties',
+      'config/a.toml',
+      'config/iris.properties',
+      'config/oculus.properties',
+      'options.txt',
+      'mods/a.properties',
+      'shaderpacks/a.txt',
+      'config\\a.properties',
+    ])
+      expect(
+        await h.s.request({
+          action: 'settingsConfigItems',
+          path,
+          changes: [{ key: 'a', policy: 'none', value: '1' }],
+        }),
+        path,
+      ).toEqual({ ok: false, code: 'INVALID' });
+    for (const pack of ['../x', 'a/b', '', '.hidden'])
+      expect(
+        await h.s.request({
+          action: 'settingsShaderOptions',
+          pack,
+          changes: [{ key: 'a', policy: 'none', value: '1' }],
+        }),
+        pack,
+      ).toEqual({ ok: false, code: 'INVALID' });
+    // unknown key without a value, malformed shapes
+    expect(await set([{ key: 'nothere', policy: 'required' } as never])).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    for (const bad of [
+      { action: 'settingsShader' },
+      { action: 'settingsShader', extra: 1 },
+      { action: 'settingsShader', enabled: { policy: 'required', value: 'yes' } },
+      { action: 'settingsShader', pack: { policy: 'required', value: 1 } },
+      { action: 'settingsShader', configPath: 'config/other.properties' },
+      { action: 'settingsConfigRemove' },
+      { action: 'settingsConfigRemove', path: 'x', extra: 1 },
+      { action: 'settingsShaderOptionsRemove', pack: 5 },
+    ])
+      expect(await h.s.request(bad), JSON.stringify(bad)).toEqual({ ok: false, code: 'INVALID' });
+    expect(
+      await h.s.request({ action: 'settingsConfigRemove', path: 'config/none.properties' }),
+    ).toEqual({ ok: false, code: 'INVALID' });
+  });
+  it('refuses a build when a plain always file is also edited by the policy, and the bulk command refuses such paths', async () => {
+    const h = await harness();
+    await folder(h);
+    await h.importFolder();
+    await h.s.request({
+      action: 'settingsConfigItems',
+      path: 'config/sodium-extra.properties',
+      changes: [{ key: 'fog', policy: 'required' }],
+    });
+    await mkdir(join(h.source, 'config'), { recursive: true });
+    await writeFile(join(h.source, 'config', 'sodium-extra.properties'), 'fog=true\n');
+    expect(
+      await h.s.request({
+        action: 'filesPolicy',
+        paths: ['config/sodium-extra.properties'],
+        policy: 'always',
+      }),
+    ).toEqual({ ok: false, code: 'INVALID' });
+    await h.reopenWithFiles([{ path: 'config/sodium-extra.properties', policy: 'always' }]);
+    expect(h.s.snapshot().policy?.error?.code).toBe('config-owned-by-sync');
+    h.d.save.mockResolvedValueOnce(join(h.root, 'x.torchpack'));
+    expect(await h.s.request({ action: 'build' })).toEqual({ ok: false, code: 'INVALID' });
+    expect(await readdir(h.root)).not.toContain('x.torchpack');
+    // initial-only for the same file is allowed
+    await h.reopenWithFiles([{ path: 'config/sodium-extra.properties', policy: 'initial-only' }]);
+    expect(h.s.snapshot().policy?.error).toBeNull();
+  });
+  it('re-import keeps chosen policies and saves/reopens the v2 schema; older settings without the new fields still open', async () => {
+    const h = await harness();
+    await folder(h);
+    await h.importFolder();
+    await h.s.request({ action: 'settingsShader', pack: { policy: 'required', value: 'BSL.zip' } });
+    await h.s.request({
+      action: 'settingsConfigItems',
+      path: 'config/sodium-extra.properties',
+      changes: [{ key: 'fog', policy: 'initial' }],
+    });
+    await h.importFolder();
+    const g = h.s.snapshot().project?.gameSettings;
+    expect(g?.shader?.pack).toEqual({ policy: 'required', value: 'BSL.zip' });
+    expect(g?.configFiles?.[0]?.items.find((i) => i.key === 'fog')?.policy).toBe('initial');
+    const saved = join(h.root, 'p.json');
+    h.d.save.mockResolvedValueOnce(saved);
+    await h.s.request({ action: 'save' });
+    const before = h.s.snapshot().project;
+    h.d.open.mockResolvedValueOnce([saved]);
+    await h.s.request({ action: 'open', discard: true });
+    expect(h.s.snapshot().project).toEqual(before);
+    const old = JSON.parse(await readFile(saved, 'utf8'));
+    delete old.gameSettings.configFiles;
+    delete old.gameSettings.shader;
+    expect(() => parseProject(old)).not.toThrow();
+    old.gameSettings.shader = {
+      configPath: 'config/other.properties',
+      enabled: { policy: 'none', value: false },
+      pack: { policy: 'none', value: '' },
+      packOptions: [],
+    };
+    expect(() => parseProject(old)).toThrow();
   });
 });

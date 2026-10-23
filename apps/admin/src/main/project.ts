@@ -13,6 +13,15 @@ export class StudioFailure extends Error {
     super(code);
   }
 }
+/** A policy that cannot be built; `code` is the core SettingsError code (or `config-owned-by-sync`). */
+export class PolicyFailure extends StudioFailure {
+  constructor(
+    readonly settingsCode: string,
+    readonly detail: string,
+  ) {
+    super(settingsCode === 'limit-exceeded' ? 'TOO_LARGE' : 'INVALID');
+  }
+}
 export function parseProject(input: unknown): StudioProject {
   if (!input || typeof input !== 'object' || Array.isArray(input))
     throw new StudioFailure('INVALID');

@@ -54,10 +54,39 @@ export interface StudioLastBuild {
 }
 export type SettingPolicyChoice = 'none' | 'initial' | 'required';
 export type PackKind = 'resourcepack' | 'shaderpack';
+export type SettingValueType = 'boolean' | 'number' | 'json' | 'text';
 export interface StudioGameOption {
   key: string;
   value: string;
   policy: SettingPolicyChoice;
+  /** From the import (core `classifyOptionKey`); absent for items created by hand. */
+  kind?: 'keybind' | 'mod-keybind' | 'other';
+  group?: string;
+  valueType?: SettingValueType;
+}
+/** One `key=value` item of a mod config file or a shader pack options file. */
+export interface StudioConfigItem {
+  key: string;
+  value: string;
+  policy: SettingPolicyChoice;
+  valueType?: SettingValueType;
+}
+/** A `.properties`/`.txt` mod config file below `config/` managed item by item. */
+export interface StudioConfigFile {
+  /** Game-relative path such as `config/sodium-extra.properties`. */
+  path: string;
+  items: StudioConfigItem[];
+}
+export const shaderConfigPaths = ['config/iris.properties', 'config/oculus.properties'] as const;
+export interface StudioShaderSettings {
+  /** Iris (Fabric) or Oculus (NeoForge) settings file. */
+  configPath: (typeof shaderConfigPaths)[number];
+  /** `enableShaders` */
+  enabled: { policy: SettingPolicyChoice; value: boolean };
+  /** `shaderPack`: file name inside `shaderpacks/`; empty string means "no pack". */
+  pack: { policy: SettingPolicyChoice; value: string };
+  /** Values of `shaderpacks/<pack>.txt`. */
+  packOptions: { pack: string; items: StudioConfigItem[] }[];
 }
 export interface StudioPack {
   /** File name inside `resourcepacks/` or `shaderpacks/` of the source folder, e.g. `server.zip`. */
@@ -72,6 +101,10 @@ export interface StudioGameSettings {
   /** Order is the operator's pack order (later = higher priority in Minecraft's list). */
   resourcePacks: StudioPack[];
   shaderPacks: StudioPack[];
+  /** Mod config files (schema 2, optional). Needs a launcher that reads policy v2 when any item is set. */
+  configFiles?: StudioConfigFile[];
+  /** Shader selection and per-pack options (optional). Needs policy v2 when any item is set. */
+  shader?: StudioShaderSettings;
 }
 export interface StudioSigning {
   encryptionAvailable: boolean;
@@ -171,6 +204,25 @@ export interface StudioPresetPreview {
   ignored: number;
   /** Informational: files found next to options.txt that the preset cannot manage yet. */
   detected: { modConfigs: string[]; resourcePacks: string[]; shaderPacks: string[] };
+  /** Config files read into `gameSettings.configFiles` (folder import only). */
+  importedConfigs: string[];
+  /** Config files found but not importable (unsupported format, unsafe, too large). */
+  skippedConfigs: {
+    path: string;
+    reason: 'unsupported' | 'invalid-config' | 'limit-exceeded' | 'unsafe-path';
+  }[];
+  /** Iris/Oculus file read for shader selection, and the `shaderpacks/*.txt` option files read. */
+  shader: { configPath: string | null; packOptionFiles: string[] } | null;
+}
+/** Result of building `torchlauncher/settings-policy.json` from the current preset. */
+export interface StudioPolicyStatus {
+  /** 1 when no config file item is set (old launchers accept it), 2 otherwise; null when no policy is generated. */
+  version: 1 | 2 | null;
+  bytes: number;
+  /** The launcher's policy size limit. */
+  limit: number;
+  /** Why the policy cannot be built (or why the last settings command was rejected); null when fine. */
+  error: { code: string; message: string } | null;
 }
 export interface StudioState {
   project: StudioProject | null;
@@ -188,6 +240,7 @@ export interface StudioState {
   export: StudioExport | null;
   /** Result of the last preset import (informational). */
   preset: StudioPresetPreview | null;
+  policy: StudioPolicyStatus | null;
 }
 export type StudioCommand =
   | {
@@ -238,6 +291,27 @@ export type StudioSettingsCommand =
       /** Max 512 changes. `value` (optional) overrides the imported value. */
       changes: { key: string; policy: SettingPolicyChoice; value?: string }[];
     }
+  | {
+      action: 'settingsConfigItems';
+      /** `config/**.properties|txt` (not iris/oculus). Creates the file entry; unknown keys are created and need `value`. */
+      path: string;
+      changes: { key: string; policy: SettingPolicyChoice; value?: string }[];
+    }
+  | { action: 'settingsConfigRemove'; path: string }
+  | {
+      action: 'settingsShader';
+      /** At least one field. */
+      configPath?: (typeof shaderConfigPaths)[number];
+      enabled?: { policy: SettingPolicyChoice; value: boolean };
+      pack?: { policy: SettingPolicyChoice; value: string };
+    }
+  | {
+      action: 'settingsShaderOptions';
+      /** Pack file name; the options file is `shaderpacks/<pack>.txt`. Unknown keys are created and need `value`. */
+      pack: string;
+      changes: { key: string; policy: SettingPolicyChoice; value?: string }[];
+    }
+  | { action: 'settingsShaderOptionsRemove'; pack: string }
   | { action: 'settingsPackAdd'; kind: PackKind }
   | { action: 'settingsPackPolicy'; kind: PackKind; name: string; policy: SettingPolicyChoice }
   | { action: 'settingsPackMove'; kind: PackKind; name: string; index: number }
