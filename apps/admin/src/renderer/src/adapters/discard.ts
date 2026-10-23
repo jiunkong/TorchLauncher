@@ -18,16 +18,3 @@ export function onCloseRequest(handler: () => void): () => void {
 
 export const finishClose = (studio: StudioController) => studio.answerClose('closeConfirm');
 export const cancelClose = (studio: StudioController) => studio.answerClose('closeCancel');
-
-/**
- * Save-then-close. While a close request is outstanding main answers every other command with
- * BUSY, so the request is cancelled first, the project saved, and the window closed again (a
- * clean project closes without asking). STUDIO-MAIN could accept `save` during a close request
- * to make this a single step.
- */
-export async function saveThenClose(studio: StudioController): Promise<boolean> {
-  await studio.answerClose('closeCancel');
-  if (!(await studio.run('save'))) return false;
-  window.close();
-  return true;
-}

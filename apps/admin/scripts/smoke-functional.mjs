@@ -541,7 +541,7 @@ try {
   await closeWindow();
   await closing.waitFor();
   await closing.getByRole('button', { name: '저장', exact: true }).click();
-  await page.waitForEvent('close', { timeout: 15000 });
+  await page.waitForEvent('close', { timeout: 15000 }); // save, then closeConfirm
   assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Closing edit');
   assert.equal(
     await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0).catch(() => 0),

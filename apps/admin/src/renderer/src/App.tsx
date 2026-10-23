@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  cancelClose,
-  finishClose,
-  onCloseRequest,
-  runConfirmedSwitch,
-  saveThenClose,
-} from './adapters/discard';
+import { cancelClose, finishClose, onCloseRequest, runConfirmedSwitch } from './adapters/discard';
 import { deriveInsights } from './adapters/insights';
 import { Sidebar } from './components/Sidebar';
 import { Splash } from './components/Splash';
@@ -45,17 +39,14 @@ export function App() {
   const confirmSave = async () => {
     const action = confirm;
     if (!action) return;
-    if (action === 'close') {
-      setConfirm(null);
-      await saveThenClose(studio);
-      return;
-    }
     if (!(await studio.run('save'))) {
-      setConfirm(null);
+      // A cancelled or failed save keeps a close request open so nothing is lost silently.
+      if (action !== 'close') setConfirm(null);
       return;
     }
     setConfirm(null);
-    await runConfirmedSwitch(studio, action);
+    if (action === 'close') await finishClose(studio);
+    else await runConfirmedSwitch(studio, action);
   };
   const confirmDiscard = () => {
     const action = confirm;
