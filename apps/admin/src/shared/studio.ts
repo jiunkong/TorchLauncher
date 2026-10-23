@@ -225,7 +225,87 @@ export interface StudioPolicyStatus {
   /** Why the policy cannot be built (or why the last settings command was rejected); null when fine. */
   error: { code: string; message: string } | null;
 }
+/** Renderer-safe structural DTOs; do not import Node implementation modules into this contract. */
+export interface StudioCompatibilityReport {
+  status: 'problems' | 'no-problems-found' | 'incomplete';
+  truncated: boolean;
+  items: {
+    severity: 'error' | 'warning' | 'info';
+    category:
+      | 'loader-resolution'
+      | 'mixin'
+      | 'class-loading'
+      | 'out-of-memory'
+      | 'java-version'
+      | 'crash'
+      | 'unclassified';
+    modIds?: string[];
+    files?: string[];
+    summary: { code: string; parameters: Record<string, string | number> };
+    evidence: { source: 'log' | 'crash-report'; line: number; text: string }[];
+  }[];
+}
+export interface StudioModInfo {
+  loader: 'fabric' | 'neoforge';
+  file?: string;
+  mods: {
+    id: string;
+    version: string;
+    environment?: '*' | 'client' | 'server';
+    dependencies: { id: string; version: string | string[]; type?: string; side?: string }[];
+  }[];
+}
+export interface StudioAccount {
+  signedIn: boolean;
+  name: string | null;
+  available: boolean;
+  error: string | null;
+}
+export interface StudioTestRun {
+  phase:
+    | 'idle'
+    | 'preparing'
+    | 'installing'
+    | 'syncing'
+    | 'running'
+    | 'analyzing'
+    | 'done'
+    | 'failed';
+  serverId: string | null;
+  exit: {
+    reason: 'exited' | 'stopped' | 'cancelled' | 'process-error' | 'lock-error';
+    code: number | null;
+    signal: string | null;
+  } | null;
+  progress: {
+    component:
+      | 'metadata'
+      | 'game'
+      | 'java'
+      | 'library'
+      | 'asset'
+      | 'logging'
+      | 'loader'
+      | 'files'
+      | 'settings';
+    completed: number;
+    total: number | null;
+  } | null;
+  logs: { stream: 'stdout' | 'stderr'; text: string }[];
+  truncated: boolean;
+  report: StudioCompatibilityReport | null;
+  mods: StudioModInfo[];
+  metadataErrors: { file: string; code: string }[];
+  extracted: StudioPresetPreview | null;
+  extractionError: string | null;
+  error: string | null;
+}
+export type StudioTestCommand =
+  | { action: 'testLogin' | 'testLogout' | 'testStart' | 'testStop' }
+  | { action: 'testReset'; confirmed: true };
 export interface StudioState {
+  account: StudioAccount;
+  testRun: StudioTestRun;
   project: StudioProject | null;
   projectName: string | null;
   sourceName: string | null;
@@ -329,7 +409,8 @@ export type StudioRequest =
   | StudioWorkCommand
   | StudioBrandingCommand
   | StudioSigningCommand
-  | StudioSettingsCommand;
+  | StudioSettingsCommand
+  | StudioTestCommand;
 export type StudioError =
   | 'INVALID'
   | 'BUSY'

@@ -420,7 +420,11 @@ async function readProperties(
   }
 }
 /** Reads options.txt (and, from a game folder, mod config and shader files) with size and name checks. */
-export async function readPreset(path: string, source: 'folder' | 'file'): Promise<PresetImport> {
+export async function readPreset(
+  path: string,
+  source: 'folder' | 'file',
+  allowMissingOptions = false,
+): Promise<PresetImport> {
   let file = path;
   let folder: string | null = null;
   if (source === 'folder') {
@@ -429,7 +433,14 @@ export async function readPreset(path: string, source: 'folder' | 'file'): Promi
     folder = path;
     file = join(path, 'options.txt');
   } else if (basename(path) !== 'options.txt') throw new StudioFailure('INVALID');
-  const { entries, ignored } = parseOptionsText(await safeRead(file, OPTIONS_READ_LIMIT));
+  let options: Buffer;
+  try {
+    options = await safeRead(file, OPTIONS_READ_LIMIT);
+  } catch (error) {
+    if (!allowMissingOptions || (error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    options = Buffer.alloc(0);
+  }
+  const { entries, ignored } = parseOptionsText(options);
   const detected = {
     modConfigs: [] as string[],
     resourcePacks: [] as string[],
@@ -442,21 +453,35 @@ export async function readPreset(path: string, source: 'folder' | 'file'): Promi
   let configFound = false;
   if (folder) {
     const root = folder;
-    const list = async (sub: string, filter: RegExp) => {
-      try {
-        const dir = join(root, sub);
-        await noLinks(dir);
-        const found = await readdir(dir, { withFileTypes: true });
-        return found
-          .filter((e) => e.isFile() && filter.test(e.name))
-          .map((e) => e.name)
-          .sort()
-          .slice(0, 200);
-      } catch {
-        return [];
-      }
+    const list = async (sub: string, filter: RegExp, recursive = false) => {
+      const names: string[] = [];
+      let visited = 0;
+      const walk = async (prefix: string, depth: number): Promise<void> => {
+        if (++visited > 256 || names.length >= 200) return;
+        const dir = join(root, sub, prefix);
+        try {
+          await noLinks(dir);
+          const found = await readdir(dir, { withFileTypes: true });
+          found.sort((a, b) => a.name.localeCompare(b.name));
+          for (const entry of found) {
+            if (names.length >= 200) break;
+            if (entry.isSymbolicLink()) continue;
+            const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+            if (entry.isDirectory() && recursive && depth < 8) await walk(path, depth + 1);
+            else if (entry.isFile() && filter.test(entry.name)) names.push(path);
+          }
+        } catch {
+          /* Missing or unsafe directories are not followed. */
+        }
+      };
+      await walk('', 0);
+      return names.sort();
     };
-    detected.modConfigs = await list('config', /\.(?:toml|json5?|properties|cfg|txt|yaml|yml)$/i);
+    detected.modConfigs = await list(
+      'config',
+      /\.(?:toml|json5?|properties|cfg|txt|yaml|yml)$/i,
+      true,
+    );
     detected.resourcePacks = await list('resourcepacks', /\.zip$/i);
     detected.shaderPacks = await list('shaderpacks', /\.zip$/i);
     for (const name of detected.modConfigs) {

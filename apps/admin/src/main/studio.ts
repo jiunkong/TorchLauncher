@@ -44,6 +44,7 @@ import {
   type DiffResult,
 } from './files-diff.js';
 import { exportLauncherZip, noLinks, safeRead, saveProject } from './filesystem.js';
+import type { PresetImport } from './game-settings.js';
 import {
   addPack,
   applyConfigChanges,
@@ -67,6 +68,7 @@ import {
 import { newProject, parseProject, StudioFailure } from './project.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
 import type { SigningKeyStore } from './signing.js';
+import { emptyTestRun, type StudioTestRunner } from './test-run.js';
 
 export interface StudioDialogs {
   open(
@@ -212,6 +214,8 @@ function validSpecial(value: Record<string, unknown>): boolean {
 }
 export class StudioService {
   private state: StudioState = {
+    account: { signedIn: false, name: null, available: false, error: null },
+    testRun: emptyTestRun(),
     project: null,
     projectName: null,
     sourceName: null,
@@ -246,9 +250,13 @@ export class StudioService {
     },
     /** Production always injects a store; without one (tests only) builds stay unsigned. */
     private readonly keys: SigningKeyStore | null = null,
+    private readonly tests: StudioTestRunner | null = null,
   ) {}
   snapshot(): StudioState {
-    return structuredClone(this.state);
+    return structuredClone({
+      ...this.state,
+      ...(this.tests ? { account: this.tests.account, testRun: this.tests.state } : {}),
+    });
   }
   resume(): void {
     this.closing = false;
@@ -256,7 +264,9 @@ export class StudioService {
   async close(): Promise<void> {
     this.closing = true;
     this.controller?.abort();
+    await this.tests?.stop();
     await this.pending;
+    await this.testControl;
   }
   private closeAsked = false;
   private closeHandlers: { confirm(): void; cancel(): void } | null = null;
@@ -281,8 +291,44 @@ export class StudioService {
     if (!input || typeof input !== 'object' || Array.isArray(input))
       return Promise.resolve({ ok: false, code: 'INVALID' });
     const value = input as Record<string, unknown>;
+    if (typeof value.action === 'string' && value.action.startsWith('test')) {
+      if (
+        !['testLogin', 'testLogout', 'testStart', 'testStop', 'testReset'].includes(value.action) ||
+        Object.keys(value).sort().join(',') !==
+          (value.action === 'testReset' ? 'action,confirmed' : 'action') ||
+        (value.action === 'testReset' && value.confirmed !== true)
+      )
+        return Promise.resolve({ ok: false, code: 'INVALID' });
+      if (!this.tests) return Promise.resolve({ ok: false, code: 'IO' });
+      if (this.closing || this.closeAsked || this.testControl)
+        return Promise.resolve({ ok: false, code: 'BUSY' });
+      if (value.action === 'testStop' || value.action === 'testLogout') {
+        if (this.state.busy && !this.testActive)
+          return Promise.resolve({ ok: false, code: 'BUSY' });
+        const pending = this.pending;
+        if (this.testActive && this.tests.state.phase !== 'running') this.controller?.abort();
+        this.testControl = (async (): Promise<StudioReply> => {
+          try {
+            await this.tests?.stop();
+            await pending;
+            if (value.action === 'testLogout') await this.tests?.logout();
+            return { ok: true, state: this.snapshot() };
+          } catch {
+            return { ok: false, code: 'IO' };
+          } finally {
+            this.testControl = null;
+          }
+        })();
+        return this.testControl;
+      }
+    }
+
     const actions = [
       'state',
+      'testLogin',
+      'testStart',
+      'testStop',
+      'testLogout',
       'touch',
       'new',
       'open',
@@ -302,13 +348,15 @@ export class StudioService {
       'closeCancel',
     ];
     const extra =
-      value.action === 'update'
-        ? 'project'
-        : value.action === 'brandingName'
-          ? 'appName'
-          : ['brandingSelect', 'brandingRemove'].includes(String(value.action))
-            ? 'role'
-            : null;
+      value.action === 'testReset'
+        ? 'confirmed'
+        : value.action === 'update'
+          ? 'project'
+          : value.action === 'brandingName'
+            ? 'appName'
+            : ['brandingSelect', 'brandingRemove'].includes(String(value.action))
+              ? 'role'
+              : null;
     const keyActions: Record<string, string[]> = {
       keyStatus: [],
       keyCreate: [],
@@ -329,7 +377,9 @@ export class StudioService {
     } else if (
       typeof value.action !== 'string' ||
       (!actions.includes(value.action) &&
-        !['update', 'brandingSelect', 'brandingRemove', 'brandingName'].includes(value.action)) ||
+        !['update', 'brandingSelect', 'brandingRemove', 'brandingName', 'testReset'].includes(
+          value.action,
+        )) ||
       Object.keys(value).length !==
         (extra ? 2 : 1) + (['new', 'open'].includes(value.action) && 'discard' in value ? 1 : 0) ||
       ('discard' in value && typeof value.discard !== 'boolean') ||
@@ -351,8 +401,10 @@ export class StudioService {
       this.controller?.abort();
       return Promise.resolve({ ok: true, state: this.snapshot() });
     }
-    if (this.closing || this.state.busy) return Promise.resolve({ ok: false, code: 'BUSY' });
+    if (this.closing || this.state.busy || this.testControl)
+      return Promise.resolve({ ok: false, code: 'BUSY' });
     const command = value as unknown as StudioRequest;
+    this.testActive = ['testLogin', 'testStart', 'testReset'].includes(command.action);
     this.controller = new AbortController();
     this.state.busy =
       (
@@ -384,11 +436,14 @@ export class StudioService {
         };
       })
       .finally(() => {
+        this.testActive = false;
         this.controller = null;
         this.pending = null;
       });
     return this.pending;
   }
+  private testActive = false;
+  private testControl: Promise<StudioReply> | null = null;
   private project(): StudioProject {
     if (!this.state.project) throw new StudioFailure('NO_PROJECT');
     return this.state.project;
@@ -534,8 +589,60 @@ export class StudioService {
         : this.policyRejected,
     };
   }
+  private importPreset(preset: PresetImport): void {
+    const { entries, preview, configFiles, shader } = preset;
+    this.updateSettings((g) => {
+      g.options = mergeOptions(g.options, entries);
+      if (configFiles.length) {
+        const files = g.configFiles ?? [];
+        for (const file of configFiles) {
+          const old = files.find((f) => f.path === file.path);
+          if (old) old.items = mergeOptions(old.items, file.items);
+          else files.push(file);
+        }
+        g.configFiles = files;
+      }
+      if (shader) {
+        const current = g.shader ?? defaultShader();
+        if (g.shader === undefined || shader.enabled !== null) {
+          if (current.enabled.policy === 'none' && shader.enabled !== null)
+            current.enabled.value = shader.enabled;
+        }
+        if (current.pack.policy === 'none' && shader.pack !== null)
+          current.pack.value = shader.pack;
+        current.configPath = shader.configPath;
+        for (const file of shader.packOptions) {
+          const old = current.packOptions.find((f) => f.pack === file.pack);
+          if (old) old.items = mergeOptions(old.items, file.items);
+          else current.packOptions.push(file);
+        }
+        g.shader = current;
+      }
+    }, true);
+    this.state.preset = preview;
+  }
   private async execute(command: StudioRequest, signal: AbortSignal): Promise<void> {
     switch (command.action) {
+      case 'testLogin':
+        if (!this.tests) throw new StudioFailure('IO');
+        await this.tests.login(signal);
+        return;
+      case 'testStart': {
+        const project = structuredClone(this.project());
+        if (!this.tests || !this.sourceRoot) throw new StudioFailure('INVALID');
+        await this.tests.start(project, this.sourceRoot, signal, (preset) =>
+          this.importPreset(preset),
+        );
+        return;
+      }
+      case 'testReset':
+        if (!this.tests || command.confirmed !== true) throw new StudioFailure('INVALID');
+        await this.tests.reset(this.project());
+        return;
+      case 'testStop':
+      case 'testLogout':
+        return;
+
       case 'rescan':
       case 'exportCheck':
         this.project();
@@ -583,35 +690,7 @@ export class StudioService {
         if (!picked) throw new StudioFailure('CANCELLED');
         const { entries, preview, configFiles, shader } = await readPreset(picked, command.source);
         signal.throwIfAborted();
-        this.updateSettings((g) => {
-          g.options = mergeOptions(g.options, entries);
-          if (configFiles.length) {
-            const files = g.configFiles ?? [];
-            for (const file of configFiles) {
-              const old = files.find((f) => f.path === file.path);
-              if (old) old.items = mergeOptions(old.items, file.items);
-              else files.push(file);
-            }
-            g.configFiles = files;
-          }
-          if (shader) {
-            const current = g.shader ?? defaultShader();
-            if (g.shader === undefined || shader.enabled !== null) {
-              if (current.enabled.policy === 'none' && shader.enabled !== null)
-                current.enabled.value = shader.enabled;
-            }
-            if (current.pack.policy === 'none' && shader.pack !== null)
-              current.pack.value = shader.pack;
-            current.configPath = shader.configPath;
-            for (const file of shader.packOptions) {
-              const old = current.packOptions.find((f) => f.pack === file.pack);
-              if (old) old.items = mergeOptions(old.items, file.items);
-              else current.packOptions.push(file);
-            }
-            g.shader = current;
-          }
-        }, true);
-        this.state.preset = preview;
+        this.importPreset({ entries, preview, configFiles, shader });
         return;
       }
       case 'settingsConfigItems': {
@@ -754,6 +833,7 @@ export class StudioService {
         } else project = newProject();
         signal.throwIfAborted();
         this.state.project = project;
+        this.tests?.clearResult();
         this.snapshots = snapshots;
         this.projectPath = path;
         this.state.projectName = path ? basename(path) : null;
