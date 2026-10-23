@@ -65,7 +65,7 @@ import {
   validPackOptionsName,
   writeGeneratedPolicy,
 } from './game-settings.js';
-import { newProject, parseProject, StudioFailure } from './project.js';
+import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './project.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
 import type { SigningKeyStore } from './signing.js';
 import { emptyTestRun, type StudioTestRunner } from './test-run.js';
@@ -104,6 +104,8 @@ const POLICY_CHOICES = ['none', 'initial', 'required'];
 const SPECIAL_FIELDS: Record<string, string[]> = {
   filesPolicy: ['paths', 'policy'],
   settingsImport: ['source'],
+  settingsImportOptions: ['source'],
+  settingsTestConfigs: [],
   settingsOptions: ['changes'],
   settingsShader: [],
   settingsConfigItems: ['path', 'changes'],
@@ -154,11 +156,7 @@ function validSpecial(value: Record<string, unknown>): boolean {
     );
   }
   const fields = SPECIAL_FIELDS[value.action as string] ?? [];
-  if (
-    Object.keys(value).length !== fields.length + 1 ||
-    fields.some((f) => !Object.hasOwn(value, f))
-  )
-    return false;
+  if (Object.keys(value).sort().join(',') !== ['action', ...fields].sort().join(',')) return false;
   const isKind = (v: unknown) => v === 'resourcepack' || v === 'shaderpack';
   switch (value.action) {
     case 'filesPolicy':
@@ -169,6 +167,10 @@ function validSpecial(value: Record<string, unknown>): boolean {
         value.paths.every((p) => typeof p === 'string' && p.length > 0 && p.length <= 1024) &&
         ['always', 'initial-only', 'excluded'].includes(value.policy as string)
       );
+    case 'settingsTestConfigs':
+      return true;
+    case 'settingsImportOptions':
+      return value.source === 'test' || value.source === 'file';
     case 'settingsImport':
       return value.source === 'folder' || value.source === 'file';
     case 'settingsOptions':
@@ -433,6 +435,9 @@ export class StudioService {
         return {
           ok: false,
           code: cancelled ? 'CANCELLED' : error instanceof StudioFailure ? error.code : 'IO',
+          ...(!cancelled && error instanceof TestSettingsFailure
+            ? { detail: { code: error.detailCode } }
+            : {}),
         };
       })
       .finally(() => {
@@ -630,9 +635,7 @@ export class StudioService {
       case 'testStart': {
         const project = structuredClone(this.project());
         if (!this.tests || !this.sourceRoot) throw new StudioFailure('INVALID');
-        await this.tests.start(project, this.sourceRoot, signal, (preset) =>
-          this.importPreset(preset),
-        );
+        await this.tests.start(project, this.sourceRoot, signal);
         return;
       }
       case 'testReset':
@@ -680,6 +683,26 @@ export class StudioService {
         this.lastScan = scan;
         this.state.project = parseProject({ ...project, files: [...files.values()] });
         this.state.dirty = true;
+        return;
+      }
+      case 'settingsTestConfigs':
+        if (!this.tests) throw new TestSettingsFailure('NO_TEST_RESULT');
+        await this.tests.refreshConfigs(this.project(), signal);
+        return;
+      case 'settingsImportOptions': {
+        const project = this.project();
+        if (command.source === 'test') {
+          if (!this.tests) throw new TestSettingsFailure('NO_TEST_RESULT');
+          const preset = await this.tests.readLastOptions(project, signal);
+          signal.throwIfAborted();
+          this.importPreset(preset);
+        } else {
+          const picked = (await this.selected('optionsfile'))[0];
+          if (!picked) throw new StudioFailure('CANCELLED');
+          const preset = await readPreset(picked, 'file');
+          signal.throwIfAborted();
+          this.importPreset(preset);
+        }
         return;
       }
       case 'settingsImport': {
