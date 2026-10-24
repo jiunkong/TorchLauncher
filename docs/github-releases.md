@@ -20,8 +20,9 @@
 ## 실행 순서
 
 1. 버전 일치와 기존 태그·릴리스 유무를 검사한다. API 오류를 '릴리스 없음'으로 처리하지 않는다.
-2. Windows와 Linux 러너에서 Node 24·pnpm 10.34.7·고정 lockfile로 설치한다.
-   각 OS의 `pnpm check`, 릴리스 보조 스크립트 테스트, Electron smoke를 통과해야 한다.
+2. Windows와 Linux 러너에서 Node 24·pnpm 10.34.7·고정 lockfile로 설치하고 `pnpm build`를 실행한다.
+   릴리스 워크플로에서는 테스트·lint·타입 검사·Electron smoke를 반복하지 않는다.
+   release 브랜치에 넣을 소스의 사전 검증은 기존 CI와 통합 담당자가 맡는다.
 3. 해당 OS에서 두 앱을 x64로 패키징한다. electron-builder에는 `--publish never`를 전달한다.
    Windows는 portable, Linux는 AppImage를 명시한다. 로컬 기본 Linux tar.gz 설정은 그대로다.
 4. 예상한 실행 파일 네 개만 수집해 헤더·크기·SHA-256을 검사하고

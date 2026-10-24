@@ -65,14 +65,7 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: node --test scripts/release.test.mjs
-      - name: Smoke test (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum pnpm smoke
-      - name: Smoke test (Windows)
-        if: runner.os == 'Windows'
-        run: pnpm smoke
+      - run: pnpm build
       - name: Package launcher and Studio (x64, unsigned, no builder publishing)
         run: |
           pnpm --filter @torchlauncher/launcher exec electron-builder --config electron-builder.config.cjs --${{ matrix.builder-platform }} ${{ matrix.target }} --x64 --publish never
