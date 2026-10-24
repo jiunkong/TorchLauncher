@@ -3,6 +3,7 @@ import {
   createContext,
   type PropsWithChildren,
   useContext,
+  useEffect,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -38,6 +39,12 @@ function browserStore(): LocaleStore {
 
 export function StudioLocaleProvider({ children }: PropsWithChildren) {
   const [store] = useState(browserStore);
+  const locale = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  useEffect(() => {
+    void window.torchlauncher
+      .request({ action: 'setLanguage', language: locale.locale })
+      .catch(() => {});
+  }, [locale.locale]);
   return <LocaleContext.Provider value={store}>{children}</LocaleContext.Provider>;
 }
 

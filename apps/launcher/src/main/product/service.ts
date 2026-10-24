@@ -377,6 +377,7 @@ export class ProductService {
     } catch {
       return { ok: false, error: 'invalid-request', state: this.snapshot() };
     }
+    if (command.type === 'set-language') return { ok: true, state: this.snapshot() };
     if (command.type === 'open-logs') return this.openLogs();
     if (command.type === 'copy-login-code')
       return this.host.deviceCode?.copy()

@@ -5,6 +5,7 @@ export const productChannel = 'torchlauncher:product';
 export const productStateChannel = 'torchlauncher:product-state';
 export const copyServerDataPathChannel = 'torchlauncher:copy-server-data-path';
 export type ProductCommand =
+  | { type: 'set-language'; language: 'ko' | 'en' }
   | {
       type:
         | 'status'
@@ -157,6 +158,15 @@ export function parseProductCommand(input: unknown): ProductCommand {
     'copy-login-code',
   ];
   if (typeof value.type !== 'string') return fail();
+  if (
+    value.type === 'set-language' &&
+    Reflect.ownKeys(value).length === 2 &&
+    Object.hasOwn(value, 'type') &&
+    Object.hasOwn(value, 'language') &&
+    exact('type', 'language') &&
+    (value.language === 'ko' || value.language === 'en')
+  )
+    return value as ProductCommand;
   if (
     value.type === 'set-close-on-launch' &&
     exact('type', 'value') &&

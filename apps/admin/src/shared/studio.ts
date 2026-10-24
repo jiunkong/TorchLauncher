@@ -6,11 +6,6 @@ import type {
 export const studioChannel = 'studio:request';
 /** Main -> renderer event: the window is closing with unsaved changes; the renderer must answer with `closeConfirm` or `closeCancel`. */
 export const studioCloseChannel = 'studio:close-request';
-export const brandingDialogText = {
-  icon: '앱 아이콘 선택',
-  background: '홈 배경 선택',
-  filter: '브랜딩 이미지',
-} as const;
 export interface ProjectFile {
   path: string;
   policy: DeploymentFilePolicy;
@@ -330,7 +325,7 @@ export interface StudioState {
   dirty: boolean;
   busy: 'saving' | 'opening' | 'choosing' | 'building' | 'checking' | 'exporting' | null;
   progress: number;
-  result: string | null;
+  result: StudioResult | null;
   signing: StudioSigning | null;
   /** Source folder listing and diff; null until a source folder is selected and scanned. */
   files: StudioFiles | null;
@@ -341,6 +336,17 @@ export interface StudioState {
   preset: StudioPresetPreview | null;
   policy: StudioPolicyStatus | null;
 }
+export type StudioResult =
+  | {
+      key:
+        | 'projectSaved'
+        | 'signingKeyCreated'
+        | 'signingKeyBackupSaved'
+        | 'signingKeyRestored'
+        | 'remoteMatches';
+    }
+  | { key: 'packCreated'; sequence: number | null; signed: boolean; keyCreated: boolean }
+  | { key: 'launcherZipCreated'; keyCreated: boolean };
 export type StudioCommand =
   | {
       action:
@@ -355,6 +361,7 @@ export type StudioCommand =
         | 'export'
         | 'cancel';
     }
+  | { action: 'setLanguage'; language: 'ko' | 'en' }
   | {
       action: 'new' | 'open';
       /** Must be true when the current project has unsaved changes, sent only after the renderer's own confirmation. */

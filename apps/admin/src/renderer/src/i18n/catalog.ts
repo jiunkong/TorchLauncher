@@ -986,6 +986,35 @@ const table = {
   ],
   'export.openFolder': ['Open folder', '폴더 열기'],
   'export.again': ['Export again', '다시 내보내기'],
+  'result.projectSaved': ['Project saved.', '프로젝트를 저장했습니다.'],
+  'result.signingKeyCreated': ['A new signing key was created.', '새 서명 키를 만들었습니다.'],
+  'result.signingKeyBackupSaved': [
+    'The signing key backup was saved.',
+    '서명 키 백업 파일을 저장했습니다.',
+  ],
+  'result.signingKeyRestored': ['The signing key was restored.', '서명 키를 복원했습니다.'],
+  'result.packCreated': [
+    'The torchpack deployment file was created.',
+    'torchpack 배포 파일을 생성했습니다.',
+  ],
+  'result.packSigned': ['Signed, sequence {sequence}.', '서명됨, sequence {sequence}.'],
+  'result.packKeyCreated': ['A new signing key was created.', '새 서명 키를 만들었습니다.'],
+  'result.packUploadHelp': [
+    'Upload it to public hosting, then check the URL.',
+    '공개 호스팅에 직접 업로드한 뒤 URL을 검사하세요.',
+  ],
+  'result.remoteMatches': [
+    'The public deployment file matches the project server ID, Minecraft version and loader.',
+    '공개 배포 파일의 서버 ID · Minecraft · 로더가 프로젝트와 일치합니다.',
+  ],
+  'result.launcherZipCreated': [
+    'The shared launcher and server settings were saved in one ZIP file.',
+    '공통 런처와 서버 설정을 ZIP 파일 하나로 만들었습니다.',
+  ],
+  'result.launcherZipKeyCreated': [
+    'A new signing key was created. Players using the previous launcher need the new launcher.',
+    '새 서명 키를 만들었습니다. 이전 런처 사용자는 새 런처가 필요합니다.',
+  ],
 } as const;
 
 type Table = typeof table;
