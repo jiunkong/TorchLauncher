@@ -24,6 +24,20 @@ export function studioResultMessage(result: StudioResult | null, t: Translate): 
         ...(result.keyCreated ? [t('result.packKeyCreated')] : []),
         t('result.packUploadHelp'),
       ].join(' ');
+    case 'packsAdded': {
+      const parts = [t('result.packsAdded', { count: result.added })];
+      if (result.skippedCount > 0) {
+        const listed = result.skipped
+          .map((s) => `${s.name} (${t(`result.packSkip.${s.reason}`)})`)
+          .join(', ');
+        const more = result.skippedCount - result.skipped.length;
+        parts.push(
+          t('result.packsSkipped', { count: result.skippedCount }),
+          more > 0 ? `${listed} ${t('result.packsMore', { count: more })}` : listed,
+        );
+      }
+      return parts.join(' ');
+    }
     case 'launcherZipCreated':
       return [
         t('result.launcherZipCreated'),

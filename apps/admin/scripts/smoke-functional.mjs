@@ -593,7 +593,7 @@ try {
   await goto('파일');
   await page.getByTestId('source-name').filter({ hasText: 'server-project' }).waitFor();
   await page.getByTestId('project-reveal').click();
-  await page.getByRole('button', { name: '파일 추가(프로젝트에 복사)', exact: true }).click();
+  await page.getByRole('button', { name: '파일 추가', exact: true }).click();
   const customRow = page.getByRole('row').filter({ hasText: 'custom.data' });
   await customRow.waitFor();
   assert.match(await customRow.textContent(), /19 B/);

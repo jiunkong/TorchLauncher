@@ -134,7 +134,9 @@ export function ServerPage({ studio, draft }: PageProps) {
                   }
                   disabled={busy}
                   aria-invalid={!!errors.minecraftVersion}
-                  aria-describedby={`${id}-minecraftVersion-d`}
+                  aria-describedby={
+                    errors.minecraftVersion ? `${id}-minecraftVersion-d` : undefined
+                  }
                   onChange={(event) => {
                     const nextVersion = event.target.value;
                     pendingLoaderVersion.current = {
@@ -159,12 +161,11 @@ export function ServerPage({ studio, draft }: PageProps) {
                     </option>
                   ))}
                 </select>
-                <span
-                  id={`${id}-minecraftVersion-d`}
-                  className={errors.minecraftVersion ? 'err' : 'help'}
-                >
-                  {errors.minecraftVersion ? t(errors.minecraftVersion) : t('server.minecraftHelp')}
-                </span>
+                {errors.minecraftVersion ? (
+                  <span id={`${id}-minecraftVersion-d`} className="err">
+                    {t(errors.minecraftVersion)}
+                  </span>
+                ) : null}
               </div>
               <div className="fld">
                 <span className="lbl" id={`${id}-loader`}>
@@ -252,11 +253,7 @@ export function ServerPage({ studio, draft }: PageProps) {
                     </>
                   ) : loaderVersions.length === 0 ? (
                     t('server.noLoaderVersions')
-                  ) : errors.loaderVersion ? (
-                    t(errors.loaderVersion)
-                  ) : (
-                    ''
-                  )}
+                  ) : null}
                 </span>
               </div>
             </div>

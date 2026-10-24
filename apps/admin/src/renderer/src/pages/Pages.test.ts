@@ -59,6 +59,6 @@ describe('Studio field validation', () => {
         ...value,
         game: { ...value.game, minecraftVersion: '1.21.1/evil' },
       }),
-    ).toHaveProperty('minecraftVersion', 'validation.version');
+    ).toHaveProperty('minecraftVersion', 'validation.gameVersion');
   });
 });
