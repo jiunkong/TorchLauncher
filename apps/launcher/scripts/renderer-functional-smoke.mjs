@@ -53,7 +53,7 @@ try {
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
   const menu = page.getByTestId('menu');
   assert.equal(await menu.getAttribute('data-open'), 'false');
-  const toggle = page.getByRole('button', { name: '메뉴 열기', exact: true });
+  const toggle = page.locator('.tg');
   assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
   await toggle.click();
   assert.equal(await menu.getAttribute('data-open'), 'true');
@@ -156,6 +156,62 @@ try {
   await choose('en').click();
   assert.equal(await pathTitle(), 'Copy path');
   assert.equal(await choose('en').getAttribute('aria-checked'), 'true');
+  await mkdir(resolve('.cache/smoke'), { recursive: true });
+  const openEnglishMenu = async () => {
+    if ((await menu.getAttribute('data-open')) !== 'true') await toggle.click();
+  };
+  const captureEnglishPage = async (name, check) => {
+    for (const width of [760, 1100]) {
+      await page.setViewportSize({ width, height: width === 760 ? 900 : 760 });
+      await check();
+      const layout = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        windowWidth: document.documentElement.clientWidth,
+        pageWidth: document.querySelector('[data-testid="page"]')?.scrollWidth ?? 0,
+        pageClientWidth: document.querySelector('[data-testid="page"]')?.clientWidth ?? 0,
+      }));
+      assert.ok(layout.documentWidth <= layout.windowWidth, `${name} overflows at ${width}px`);
+      assert.ok(
+        layout.pageWidth <= layout.pageClientWidth,
+        `${name} content overflows at ${width}px`,
+      );
+      await page.screenshot({ path: resolve(`.cache/smoke/launcher-en-${name}-${width}.png`) });
+    }
+  };
+  await captureEnglishPage('settings', async () => {
+    await page.getByRole('heading', { level: 2, name: 'Active resource pack order' }).waitFor();
+    assert.equal(await pathTitle(), 'Copy path');
+    await page.getByRole('button', { name: 'Play', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'My mods', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Logs', exact: true }).waitFor();
+  });
+  await openEnglishMenu();
+  await page.getByRole('button', { name: 'My mods', exact: true }).click();
+  await captureEnglishPage('mods', async () => {
+    await page.getByRole('heading', { level: 1, name: 'My mods' }).waitFor();
+    await page.getByText('You have not added any mods.', { exact: true }).waitFor();
+  });
+  await openEnglishMenu();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await captureEnglishPage('settings', async () => {
+    await page.getByRole('heading', { level: 2, name: 'Active resource pack order' }).waitFor();
+  });
+  await openEnglishMenu();
+  await page.getByRole('button', { name: 'Logs', exact: true }).click();
+  await captureEnglishPage('logs', async () => {
+    await page.getByRole('heading', { level: 1, name: 'Logs' }).waitFor();
+    await page.getByRole('tab', { name: 'Launcher', exact: true }).waitFor();
+  });
+  await openEnglishMenu();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await captureEnglishPage('home', async () => {
+    const status = await page.getByTestId('server-status').textContent();
+    assert.ok(status && !/[\u3131-\u318e\uac00-\ud7a3]/.test(status));
+    await page.getByRole('button', { name: 'Play', exact: true }).waitFor();
+  });
+  await openEnglishMenu();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('heading', { level: 2, name: 'Active resource pack order' }).waitFor();
   await choose('ko').click();
   assert.equal(await pathTitle(), '경로 복사');
   await choose('auto').click();
@@ -330,42 +386,46 @@ try {
   const openMenu = async () => {
     if ((await menu.getAttribute('data-open')) !== 'true') await toggle.click();
   };
+  await openMenu();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await choose('en').click();
+  assert.equal(await pathTitle(), 'Copy path');
   // Logout: cancel button, Escape, then confirm; no command until confirmed.
   for (const size of [760, 1100]) {
     await page.setViewportSize({ width: size, height: 900 });
     await openMenu();
-    await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     const logoutDialog = page.getByTestId('logout-dialog');
     await logoutDialog.waitFor();
-    await logoutDialog.getByText('저장된 계정을 로그아웃할까요?').waitFor();
+    await logoutDialog.getByText('Sign out of the saved account?').waitFor();
     await page.screenshot({
-      path: resolve(`apps/launcher/.cache/inapp-confirms/logout-${size}.png`),
+      path: resolve(`.cache/smoke/launcher-en-confirm-${size}.png`),
     });
     await page.keyboard.press('Escape');
     await logoutDialog.waitFor({ state: 'detached' });
     assert.equal(await recorded(), '');
   }
   await openMenu();
-  await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await page.getByTestId('logout-dialog').locator('[data-autofocus]').click();
   await page.getByTestId('logout-dialog').waitFor({ state: 'detached' });
   assert.equal(await recorded(), '');
   await openMenu();
-  await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await page.getByTestId('logout-confirm').click();
   await page.getByTestId('logout-dialog').waitFor({ state: 'detached' });
   assert.equal(await recorded(), 'logout');
   // Mod removal: same sequence.
-  await page.getByRole('button', { name: '내 모드', exact: true }).click();
-  const removeButton = page.getByRole('button', { name: 'fixture.jar 삭제', exact: true });
+  await page.getByRole('button', { name: 'My mods', exact: true }).click();
+  const removeButton = page.getByRole('button', { name: 'Remove fixture.jar', exact: true });
   for (const size of [760, 1100]) {
     await page.setViewportSize({ width: size, height: 900 });
     await removeButton.click();
     const removeDialog = page.getByTestId('remove-mod-dialog');
     await removeDialog.waitFor();
-    await removeDialog.getByText('fixture.jar 모드를 삭제할까요?').waitFor();
+    await removeDialog.getByText('Remove fixture.jar?', { exact: true }).waitFor();
     await page.screenshot({
-      path: resolve(`apps/launcher/.cache/inapp-confirms/remove-mod-${size}.png`),
+      path: resolve(`.cache/smoke/launcher-en-remove-mod-${size}.png`),
     });
     await page.keyboard.press('Escape');
     await removeDialog.waitFor({ state: 'detached' });
