@@ -7,6 +7,21 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-EXPORT-01 + 릴리스 workflow 통합 (2026-10-25)
+
+GPT 작업자 `studio_export_launcher`의 두 브랜치를 main에 병합했다. 현행 인계는 로컬 전용 `docs/handoffs/STUDIO-EXPORT-RELEASE-01.md`.
+- export `eda9356`/`b38035e` → `0de1615`: 공통 런처 파일 선택 제거. 개발 모드는 로컬 패키지(`apps/launcher/dist/TorchLauncher-<v>-<os>-x64.*`),
+  패키지된 Studio는 `jiunkong/TorchLauncher` 최신 릴리스를 조회해 size+`sha256` digest를 필수 검증하고 검증된 캐시를 재사용한다. 오프라인은 버전을 명시한 동의 후 캐시 사용.
+  충돌(`studio.ts`, `shared/studio.ts`, `index.ts`, `fixtures/signing.ts`, 기능 smoke)은 main의 프로젝트 이름+상위 폴더 흐름을 보존해 해결했다
+  (`defaultServerName` 제거 반영, `launcherResolver`는 생성자 6번째 인자).
+- workflow `d7ca404`/`c5a3004` → `878a79a`: `release` 브랜치 push 시 Windows/Linux 두 앱 포터블 패키징·태그·릴리스 게시.
+  릴리스 workflow 안에서는 테스트를 실행하지 않고(사용자 결정) `pnpm build`만 한다. 업로드 size/digest 검증은 유지.
+- main 검증: export 병합 후 `pnpm check` 117 files/**1552 passed**(9 skip), 타입·Biome 오류0(41 warnings)·두 앱 빌드, 공통 smoke, Studio 기능 smoke, branding smoke 성공.
+  workflow 병합 후 `node --test scripts/release.test.mjs` 11 passed, `release.mjs version` v0.1.0, `pnpm lint` 성공.
+- **미실행/미검증:** actionlint(이 환경에 없음, 작업자 로그만 있음), 실제 Actions, Windows/Linux 패키징·패키지 실행, 실제 GitHub 릴리스 다운로드, push.
+  digest는 GitHub API 응답이라 신뢰 기준은 GitHub이며 서명 매니페스트 검증은 RELEASE-02.
+- 보류: `chore/ignore-agent-docs` `cdab0fc`(추적 문서 100여 개를 저장소에서 제외하고 AGENTS.md 수정)는 저장소 정책 변경이라 사용자 확인 전 병합하지 않았다.
+
 ### STUDIO-PROJECT-FOLDER-02 통합 (2026-10-25)
 
 새 프로젝트/다른 이름으로 저장이 이름 입력(앱 내 모달) + 상위 폴더 선택으로 `<상위>/<이름>/`을 직접 만든다.
