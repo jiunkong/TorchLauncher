@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RangeNotSupportedError } from '../../../../packages/core/src/download/http/range-client.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import type { StudioFileEntry, StudioState } from '../shared/studio.js';
+import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
@@ -78,8 +79,7 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
     }
     return memorySource(remote.value ?? Buffer.alloc(0));
   });
-  d.open.mockResolvedValueOnce([projDir]);
-  await s.request({ action: 'new', discard: true });
+  await createProjectAt(s, d, projDir);
   const source = join(projDir, PROJECT_DATA_DIR);
   for (const [path, content] of Object.entries(files)) {
     await mkdir(join(source, path, '..'), { recursive: true });
@@ -466,25 +466,28 @@ describe('zip writer', () => {
 describe('in-app discard confirmation', () => {
   it('requires an explicit discard flag only for dirty projects and validates its shape', async () => {
     const h = await harness();
-    expect(await h.s.request({ action: 'new' })).toEqual({ ok: false, code: 'UNSAVED' });
-    expect(await h.s.request({ action: 'new', discard: 'yes' })).toEqual({
+    expect(await h.s.request({ action: 'new', name: 'n' })).toEqual({
+      ok: false,
+      code: 'UNSAVED',
+    });
+    expect(await h.s.request({ action: 'new', name: 'n', discard: 'yes' })).toEqual({
       ok: false,
       code: 'INVALID',
     });
-    expect(await h.s.request({ action: 'new', discard: true, x: 1 })).toEqual({
+    expect(await h.s.request({ action: 'new', name: 'n', discard: true, x: 1 })).toEqual({
       ok: false,
       code: 'INVALID',
     });
     const dir1 = await temp();
     h.d.open.mockResolvedValueOnce([dir1]);
-    expect((await h.s.request({ action: 'new', discard: true })).ok).toBe(true);
+    expect((await h.s.request({ action: 'new', name: 'one', discard: true })).ok).toBe(true);
     await h.s.request({ action: 'touch' });
     expect(h.s.snapshot().dirty).toBe(true);
     await h.s.request({ action: 'save' });
     expect(h.s.snapshot().dirty).toBe(false);
     const dir2 = await temp();
     h.d.open.mockResolvedValueOnce([dir2]);
-    expect((await h.s.request({ action: 'new' })).ok).toBe(true);
+    expect((await h.s.request({ action: 'new', name: 'two' })).ok).toBe(true);
   });
   it('answers a close request only when main asked, and never closes on its own for dirty projects', async () => {
     const h = await harness();

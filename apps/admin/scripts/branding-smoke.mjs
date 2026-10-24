@@ -35,11 +35,12 @@ try {
   assert.throws(()=>validateImage('icon',jpeg,decodeNativeImage));
   assert.throws(()=>validateImage('background',png.subarray(0,33),decodeNativeImage));
   const path=join(${JSON.stringify(root)},'native.png');await writeFile(path,png);
-  const projDir=join(${JSON.stringify(root)},'test-project');
-  await mkdir(projDir);
-  let selected=[projDir];
+  const parentDir=join(${JSON.stringify(root)},'projects');
+  await mkdir(parentDir);
+  const projDir=join(parentDir,'test-project');
+  let selected=[parentDir];
   const service=new StudioService({open:async()=>selected,save:async()=>projDir,discard:async()=>true},undefined,decodeNativeImage,new SigningKeyStore(join(${JSON.stringify(root)},'keys'),safeStorage));
-  assert.equal((await service.request({action:'new'})).ok,true);
+  assert.equal((await service.request({action:'new',name:'test-project'})).ok,true);
   selected=[path];
   assert.equal((await service.request({action:'brandingSelect',role:'icon'})).ok,true);
   const before=service.snapshot().project;

@@ -23,15 +23,17 @@ export function PageContent({
   insights,
   settings,
   go,
+  onNew,
 }: {
   page: PageId;
   studio: StudioController;
   insights: Insights;
   settings: SettingsState;
   go(page: PageId): void;
+  onNew(): void;
 }) {
   const { draft } = studio;
-  if (!draft) return <StartPage studio={studio} />;
+  if (!draft) return <StartPage studio={studio} onNew={onNew} />;
   const props = { studio, draft, insights, go };
   switch (page) {
     case 'overview':

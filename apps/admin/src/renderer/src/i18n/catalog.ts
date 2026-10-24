@@ -55,6 +55,30 @@ const table = {
   'about.version': ['Version', '버전'],
   'about.platform': ['Platform', '플랫폼'],
   'project.new': ['New project', '새 프로젝트'],
+  'projectName.titleNew': ['Name the new project', '새 프로젝트 이름'],
+  'projectName.titleSaveAs': ['Save project as', '프로젝트를 다른 이름으로 저장'],
+  'projectName.body': [
+    'This name is used for the server and for the project folder. You will choose where to create the folder next.',
+    '이 이름은 서버 이름과 프로젝트 폴더 이름으로 사용됩니다. 다음 단계에서 폴더를 만들 위치를 선택합니다.',
+  ],
+  'projectName.bodySaveAs': [
+    'The project is copied into a new folder with this name. You will choose where to create it next.',
+    '이 이름의 새 폴더에 프로젝트를 복사합니다. 다음 단계에서 폴더를 만들 위치를 선택합니다.',
+  ],
+  'projectName.label': ['Project name', '프로젝트 이름'],
+  'projectName.next': ['Choose location…', '위치 선택…'],
+  'projectName.defaultName': ['New server', '새 서버'],
+  'projectName.empty': ['Enter a name.', '이름을 입력하세요.'],
+  'projectName.long': ['Use at most 64 characters.', '64자 이하로 입력하세요.'],
+  'projectName.characters': [
+    'The name cannot contain  / : * ? " < > | or control characters.',
+    '이름에는  / : * ? " < > | 및 제어 문자를 쓸 수 없습니다.',
+  ],
+  'projectName.ending': ['The name cannot end with a dot.', '이름은 마침표로 끝날 수 없습니다.'],
+  'projectName.reserved': [
+    'This name is reserved by Windows (CON, NUL, COM1, …).',
+    '이 이름은 Windows 예약어(CON, NUL, COM1 등)입니다.',
+  ],
   'project.open': ['Open', '열기'],
   'unsaved.title': ['You have unsaved changes', '저장하지 않은 변경이 있습니다'],
   'unsaved.body': [
@@ -140,8 +164,16 @@ const table = {
   ],
   'error.UNSAVED': ['There are unsaved changes.', '저장하지 않은 변경 사항이 있습니다.'],
   'error.FOLDER_NOT_EMPTY': [
-    'Choose an empty folder for the project.',
-    '프로젝트용으로 비어 있는 폴더를 선택하세요.',
+    'The project folder must be empty.',
+    '프로젝트 폴더는 비어 있어야 합니다.',
+  ],
+  'error.FOLDER_NAME_INVALID': [
+    'This name cannot be used as a folder name.',
+    '이 이름은 폴더 이름으로 사용할 수 없습니다.',
+  ],
+  'error.FOLDER_EXISTS': [
+    'A file or folder with this name already exists there. Choose another name or location.',
+    '같은 이름의 파일이나 폴더가 이미 있습니다. 다른 이름이나 위치를 선택하세요.',
   ],
   'error.BLOCKED': [
     'The pre-export checks did not pass.',

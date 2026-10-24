@@ -17,9 +17,9 @@ describe('Studio native dialogs', () => {
       properties: ['openDirectory'],
     });
 
-    await dialogs.open('projectnew');
+    await dialogs.open('projectparent');
     expect(showOpenDialog.mock.calls[1]?.[1]).toMatchObject({
-      title: '새 프로젝트 폴더 선택',
+      title: '프로젝트 폴더를 만들 위치 선택',
       properties: ['openDirectory', 'createDirectory'],
     });
 

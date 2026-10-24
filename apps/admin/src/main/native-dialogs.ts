@@ -21,11 +21,11 @@ export function createStudioNativeDialogs(
   return {
     open: async (kind, root) => {
       const t = studioMainText(getLocale());
-      const directory = kind === 'project' || kind === 'projectnew' || kind === 'gamefolder';
+      const directory = kind === 'project' || kind === 'projectparent' || kind === 'gamefolder';
       const result = await native.showOpenDialog(window, {
         title: {
           project: t('dialog.projectOpen'),
-          projectnew: t('dialog.projectNew'),
+          projectparent: t('dialog.projectParent'),
           files: t('dialog.filesOpen'),
           binary: t('dialog.binaryOpen'),
           icon: t('dialog.iconOpen'),
@@ -39,7 +39,7 @@ export function createStudioNativeDialogs(
         }[kind],
         ...(root ? { defaultPath: root } : {}),
         properties: directory
-          ? kind === 'projectnew'
+          ? kind === 'projectparent'
             ? ['openDirectory', 'createDirectory']
             : ['openDirectory']
           : kind === 'files'

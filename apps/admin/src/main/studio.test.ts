@@ -16,6 +16,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import { exportLauncherZip, safeRead } from './filesystem.js';
+import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
@@ -68,8 +69,7 @@ async function projectService(dir?: string) {
   const d = dialogs();
   const s = new StudioService(d);
   const projDir = dir ?? (await temp());
-  d.open.mockResolvedValueOnce([projDir]);
-  await s.request({ action: 'new', discard: true });
+  await createProjectAt(s, d, projDir);
   return { d, s, projDir };
 }
 function config() {
@@ -105,24 +105,94 @@ describe('Studio project and trusted disk selections', () => {
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot()).toMatchObject({ dirty: false, project });
     await s.request({ action: 'touch' });
-    expect(await s.request({ action: 'new' })).toEqual({ ok: false, code: 'UNSAVED' });
+    expect(await s.request({ action: 'new', name: 'x' })).toEqual({
+      ok: false,
+      code: 'UNSAVED',
+    });
     d.open.mockResolvedValueOnce([root]);
     expect(await s.request({ action: 'open' })).toEqual({ ok: false, code: 'UNSAVED' });
     expect(s.snapshot().project).toEqual(project);
     expect((await readdir(root)).sort()).toEqual([PROJECT_DATA_DIR, PROJECT_FILE_NAME]);
   });
 
-  it('rejects new in non-empty folder with FOLDER_NOT_EMPTY and open in invalid folder with INVALID', async () => {
-    const root = await temp();
-    await writeFile(join(root, 'other.txt'), 'content');
+  it('creates <parent>/<name> for new, uses the name as server name, and rejects bad input', async () => {
+    const parent = await temp();
     const d = dialogs();
     const s = new StudioService(d);
-    d.open.mockResolvedValueOnce([root]);
+    // Invalid names are rejected before any picker opens or anything is written.
+    for (const name of ['', 'a/b', '..', 'CON', 'bad.', 'x'.repeat(65)]) {
+      expect(await s.request({ action: 'new', name, discard: true })).toEqual({
+        ok: false,
+        code: 'FOLDER_NAME_INVALID',
+      });
+    }
+    expect(await s.request({ action: 'new', name: 5, discard: true })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
     expect(await s.request({ action: 'new', discard: true })).toEqual({
       ok: false,
-      code: 'FOLDER_NOT_EMPTY',
+      code: 'INVALID',
     });
+    expect(d.open).not.toHaveBeenCalled();
+    expect(await readdir(parent)).toEqual([]);
 
+    d.open.mockResolvedValueOnce([parent]);
+    expect(await s.request({ action: 'new', name: '  My Server ', discard: true })).toMatchObject({
+      ok: true,
+      state: { dirty: false, projectName: 'My Server', project: { name: 'My Server' } },
+    });
+    expect(d.open).toHaveBeenCalledWith('projectparent', undefined);
+    expect((await readdir(join(parent, 'My Server'))).sort()).toEqual([
+      PROJECT_DATA_DIR,
+      PROJECT_FILE_NAME,
+    ]);
+  });
+
+  it('rejects new over an existing folder or file without touching it, then keeps state', async () => {
+    const { s, d } = await projectService();
+    const before = s.snapshot();
+    const parent = await temp();
+    await mkdir(join(parent, 'taken'));
+    await writeFile(join(parent, 'taken', 'other.txt'), 'content');
+    await writeFile(join(parent, 'file'), 'plain');
+    for (const name of ['taken', 'file']) {
+      d.open.mockResolvedValueOnce([parent]);
+      expect(await s.request({ action: 'new', name, discard: true })).toEqual({
+        ok: false,
+        code: 'FOLDER_EXISTS',
+      });
+    }
+    expect(await readdir(join(parent, 'taken'))).toEqual(['other.txt']);
+    expect(await readFile(join(parent, 'file'), 'utf8')).toBe('plain');
+    expect(s.snapshot()).toEqual(before);
+  });
+
+  it('cancelling the parent picker for new leaves state and disk unchanged', async () => {
+    const { s, d } = await projectService();
+    const before = s.snapshot();
+    d.open.mockResolvedValueOnce(null);
+    expect(await s.request({ action: 'new', name: 'Nope', discard: true })).toEqual({
+      ok: false,
+      code: 'CANCELLED',
+    });
+    expect(s.snapshot()).toEqual(before);
+  });
+
+  it('leaves nothing behind when new is cancelled while the picker is open', async () => {
+    const parent = await temp();
+    const d = dialogs();
+    const s = new StudioService(d);
+    d.open.mockResolvedValueOnce([parent]);
+    const pending = s.request({ action: 'new', name: 'Doomed', discard: true });
+    await s.request({ action: 'cancel' });
+    expect((await pending).ok).toBe(false);
+    expect(await readdir(parent)).toEqual([]);
+  });
+
+  it('rejects open of a folder without project.torchproj with INVALID', async () => {
+    const d = dialogs();
+    const s = new StudioService(d);
     const empty = await temp();
     d.open.mockResolvedValueOnce([empty]);
     expect(await s.request({ action: 'open', discard: true })).toEqual({
@@ -146,12 +216,13 @@ describe('Studio project and trusted disk selections', () => {
     await s.request({ action: 'update', project });
     await writeFile(join(projDir, PROJECT_DATA_DIR, 'custom.txt'), 'hello');
 
-    const destDir = await temp();
-    d.open.mockResolvedValueOnce([destDir]);
-    expect(await s.request({ action: 'saveAs' })).toMatchObject({
+    const parent = await temp();
+    d.open.mockResolvedValueOnce([parent]);
+    expect(await s.request({ action: 'saveAs', name: 'Copy' })).toMatchObject({
       ok: true,
-      state: { dirty: false, projectName: destDir.split(/[\\/]/).pop() },
+      state: { dirty: false, projectName: 'Copy' },
     });
+    const destDir = join(parent, 'Copy');
 
     const copied = await readFile(join(destDir, PROJECT_DATA_DIR, 'custom.txt'), 'utf8');
     expect(copied).toBe('hello');
@@ -161,11 +232,45 @@ describe('Studio project and trusted disk selections', () => {
     })).project;
     expect(projOnDest.name).toBe('Copied server');
 
-    // Reject nested saveAs
-    const nestedDir = join(destDir, 'nested');
-    await mkdir(nestedDir);
-    d.open.mockResolvedValueOnce([nestedDir]);
+    // Reject a parent inside the (now current) project folder, and leave nothing behind
+    d.open.mockResolvedValueOnce([destDir]);
+    expect(await s.request({ action: 'saveAs', name: 'nested' })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    expect(await readdir(destDir)).not.toContain('nested');
+  });
+
+  it('saveAs validates the name, never overwrites, and cancels cleanly', async () => {
+    const { s, d, projDir } = await projectService();
+    const before = s.snapshot();
+    const parent = await temp();
+    await mkdir(join(parent, 'taken'));
+    expect(await s.request({ action: 'saveAs', name: 'a\\b' })).toEqual({
+      ok: false,
+      code: 'FOLDER_NAME_INVALID',
+    });
     expect(await s.request({ action: 'saveAs' })).toEqual({ ok: false, code: 'INVALID' });
+    expect(await s.request({ action: 'saveAs', name: 'x', discard: true })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+    d.open.mockResolvedValueOnce([parent]);
+    expect(await s.request({ action: 'saveAs', name: 'taken' })).toEqual({
+      ok: false,
+      code: 'FOLDER_EXISTS',
+    });
+    expect(await readdir(join(parent, 'taken'))).toEqual([]);
+    d.open.mockResolvedValueOnce(null);
+    expect(await s.request({ action: 'saveAs', name: 'later' })).toEqual({
+      ok: false,
+      code: 'CANCELLED',
+    });
+    expect(await readdir(parent)).toEqual(['taken']);
+    expect(s.snapshot()).toEqual(before);
+    // the project folder is still the original one
+    expect(await s.request({ action: 'revealProject' })).toMatchObject({ ok: true });
+    expect(d.reveal).toHaveBeenCalledWith(projDir);
   });
 
   it('keeps prior state after malformed open, rejects forged renderer paths', async () => {
@@ -196,14 +301,17 @@ describe('Studio project and trusted disk selections', () => {
     const { s, d } = await projectService();
     await s.close();
     expect(await s.request({ action: 'save' })).toEqual({ ok: false, code: 'BUSY' });
-    expect(await s.request({ action: 'new', discard: true })).toEqual({ ok: false, code: 'BUSY' });
+    expect(await s.request({ action: 'new', name: 'x', discard: true })).toEqual({
+      ok: false,
+      code: 'BUSY',
+    });
     s.resume();
-    const empty = await temp();
-    d.open.mockResolvedValueOnce([empty]);
-    expect((await s.request({ action: 'new', discard: true })).ok).toBe(true);
+    const parent = await temp();
+    d.open.mockResolvedValueOnce([parent]);
+    expect((await s.request({ action: 'new', name: 'Again', discard: true })).ok).toBe(true);
   });
 
-  it('cancels projectnew dialog before modifying state', async () => {
+  it('cancels the parent folder dialog before modifying state', async () => {
     const { s, d } = await projectService();
     const original = s.snapshot().project;
     let finish!: (paths: string[]) => void;
@@ -213,10 +321,10 @@ describe('Studio project and trusted disk selections', () => {
           finish = resolve;
         }),
     );
-    const pending = s.request({ action: 'saveAs' });
+    const pending = s.request({ action: 'saveAs', name: 'Cancelled' });
     await s.request({ action: 'cancel' });
-    const empty = await temp();
-    finish([empty]);
+    const parent = await temp();
+    finish([parent]);
     expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
     expect(s.snapshot().project).toEqual(original);
   });

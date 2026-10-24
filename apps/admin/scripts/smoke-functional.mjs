@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,8 +78,10 @@ const launcher = join(root, 'TorchLauncher-test.AppImage');
 await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
   mode: 0o755,
 });
-const project = join(root, 'server-project');
-await mkdir(project);
+// New project creates <parent>/<name> itself; only the parent exists beforehand.
+const projectParent = join(root, 'projects');
+await mkdir(projectParent);
+const project = join(projectParent, 'server-project');
 const projectFile = join(project, 'project.torchproj');
 const pack = join(root, 'server.torchpack');
 const exported = join(root, 'export', 'launcher.zip');
@@ -110,7 +113,7 @@ try {
       // Native file pickers stay native in the app; here they answer with fixture paths.
       const answers = {
         '프로젝트 폴더 열기': [paths.project],
-        '새 프로젝트 폴더 선택': [paths.project],
+        '프로젝트 폴더를 만들 위치 선택': [paths.projectParent],
         '추가할 파일 선택': [paths.file, paths.options],
         '게임을 한 번 실행한 폴더 선택': [paths.game],
         'options.txt 선택': [join(paths.game, 'options.txt')],
@@ -202,6 +205,7 @@ try {
       file: join(source, 'custom.data'),
       options: join(source, 'options.txt'),
       project,
+      projectParent,
       pack,
       exported,
       publicUrl,
@@ -379,8 +383,42 @@ try {
   await language('auto').click();
   await page.getByTestId('start-new').filter({ hasText: '새 프로젝트' }).waitFor();
   assert.equal(await language('auto').getAttribute('aria-checked'), 'true');
+  // New project: in-app name prompt first (also at 760 px), then the native parent picker.
   await page.getByTestId('start-new').click();
+  const nameDialog = page.getByTestId('project-name-dialog');
+  await nameDialog.waitFor();
+  const nameInput = page.getByTestId('project-name-input');
+  const nameSubmit = page.getByTestId('project-name-submit');
+  assert.equal(await nameInput.inputValue(), '새 서버');
+  for (const bad of ['', 'a/b', 'CON', 'ends.']) {
+    await nameInput.fill(bad);
+    assert.equal(await nameSubmit.isDisabled(), true, `name "${bad}" must be refused`);
+  }
+  assert.notEqual(await page.getByTestId('project-name-error').textContent(), '');
+  await nameInput.fill('server-project');
+  assert.equal(await nameSubmit.isDisabled(), false);
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 760 });
+    const box = await nameDialog.boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= width, `name dialog fits at ${width}px`);
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-project-name-${width}.png`) });
+  }
+  // Cancelling the native parent picker leaves the prompt open and creates nothing.
+  await app.evaluate(() => {
+    globalThis.__studioSmokeCancelNext = true;
+  });
+  await nameSubmit.click();
+  await page.getByTestId('project-name-error').filter({ hasText: /\S/ }).waitFor();
+  assert.equal(
+    (await page.evaluate(() => window.torchlauncher.request({ action: 'state' }))).state.project,
+    null,
+  );
+  assert.equal(await page.getByTestId('project-card').count(), 0);
+  assert.equal(existsSync(project), false);
+  await nameSubmit.click();
+  await nameDialog.waitFor({ state: 'detached' });
   await page.getByTestId('project-card').waitFor();
+  assert.deepEqual((await readdir(project)).sort(), ['files', 'project.torchproj']);
   assert.equal(await nav('개요').getAttribute('aria-current'), 'page');
   // The sidebar footer only shows the save state; the version lives in the About dialog.
   assert.equal(await page.locator('.sidefoot button').count(), 0);
@@ -467,6 +505,17 @@ try {
     await page.getByLabel('서버 이름', { exact: true }).inputValue(),
     'Functional Studio smoke',
   );
+  // Save As asks for the name in-app too (prefilled with the folder name); Escape cancels.
+  await menuAction('file', 'saveAs');
+  await nameDialog.waitFor();
+  assert.equal(await nameInput.inputValue(), 'server-project');
+  await page.keyboard.press('Escape');
+  await nameDialog.waitFor({ state: 'detached' });
+  assert.equal(
+    (await page.evaluate(() => window.torchlauncher.request({ action: 'state' }))).state
+      .projectName,
+    'server-project',
+  );
   // Ctrl+S saves even while a text input has focus.
   await page.getByTestId('menu-view').click();
   await page.getByTestId('menu-item-lang-en').click();
@@ -510,10 +559,13 @@ try {
     .catch(() => {});
   await goto('서버 정보');
   await page.getByLabel('서버 이름', { exact: true }).fill('Dirty edit');
-  assert.deepEqual(await page.evaluate(() => window.torchlauncher.request({ action: 'new' })), {
-    ok: false,
-    code: 'UNSAVED',
-  });
+  assert.deepEqual(
+    await page.evaluate(() => window.torchlauncher.request({ action: 'new', name: 'x' })),
+    {
+      ok: false,
+      code: 'UNSAVED',
+    },
+  );
   await menuAction('file', 'open');
   await page.getByTestId('unsaved-dialog').getByRole('button', { name: '저장 안 함' }).click();
   await page.getByTestId('unsaved-dialog').waitFor({ state: 'detached' });

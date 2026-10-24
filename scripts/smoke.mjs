@@ -229,12 +229,16 @@ try {
         assert.deepEqual(invalid, { ok: false, code: 'INVALID' });
         // The start animation covers the app first; then the start screen offers a new project.
         await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
-        const projectDir = resolve(temp, 'project');
-        await mkdir(projectDir);
+        // New project: the in-app name prompt, then the native parent picker; Studio creates
+        // <parent>/새 서버 itself.
+        const parentDir = resolve(temp, 'projects');
+        await mkdir(parentDir);
         await app.evaluate(({ dialog }, dir) => {
           dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] });
-        }, projectDir);
+        }, parentDir);
         await page.getByTestId('start-new').click();
+        await page.getByTestId('project-name-input').fill('새 서버');
+        await page.getByTestId('project-name-submit').click();
         await page.getByTestId('project-card').waitFor();
       }
 
@@ -251,7 +255,7 @@ try {
           await page.getByRole('button', { name: '배포 파일 만들기', exact: true }).isDisabled(),
           false, // A project folder always has its files/ directory; a valid default server is buildable.
         );
-        const projectFile = resolve(temp, 'project', 'project.torchproj');
+        const projectFile = resolve(temp, 'projects', '새 서버', 'project.torchproj');
         // Saving lives in the top menu bar (File > Save).
         await page.getByTestId('menu-file').click();
         await page.getByTestId('menu-item-save').click();

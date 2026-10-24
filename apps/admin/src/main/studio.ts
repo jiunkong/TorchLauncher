@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstat } from 'node:fs/promises';
+import { lstat, rm } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { BRANDING_LIMITS, BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
 import { DeploymentValidationError } from '../../../../packages/core/src/deployment/contracts/index.js';
@@ -28,7 +28,7 @@ import type {
   StudioUrlCheck,
   UrlCheckState,
 } from '../shared/studio.js';
-import { shaderConfigPaths } from '../shared/studio.js';
+import { projectNameProblem, shaderConfigPaths } from '../shared/studio.js';
 import {
   type BrandingSnapshots,
   type ImageDecoder,
@@ -72,7 +72,7 @@ import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './
 import { encodeProjectFile } from './project-file.js';
 import {
   copyIntoDataDir,
-  copyProjectFolder,
+  copyProjectFolderInto,
   createProjectFolder,
   PROJECT_DATA_DIR,
   PROJECT_FILE_NAME,
@@ -86,7 +86,7 @@ export interface StudioDialogs {
   open(
     kind:
       | 'project'
-      | 'projectnew'
+      | 'projectparent'
       | 'files'
       | 'binary'
       | 'icon'
@@ -267,7 +267,6 @@ export class StudioService {
     },
     private readonly keys: SigningKeyStore,
     private readonly tests: StudioTestRunner | null = null,
-    private readonly defaultServerName: () => string = () => 'New server',
   ) {}
   snapshot(): StudioState {
     return structuredClone({
@@ -382,10 +381,8 @@ export class StudioService {
       'testStop',
       'testLogout',
       'touch',
-      'new',
       'open',
       'save',
-      'saveAs',
       'files',
       'build',
       'check',
@@ -410,7 +407,9 @@ export class StudioService {
             ? 'appName'
             : ['brandingSelect', 'brandingRemove'].includes(String(value.action))
               ? 'role'
-              : null;
+              : value.action === 'new' || value.action === 'saveAs'
+                ? 'name'
+                : null;
     const keyActions: Record<string, string[]> = {
       keyStatus: [],
       keyCreate: [],
@@ -431,15 +430,22 @@ export class StudioService {
     } else if (
       typeof value.action !== 'string' ||
       (!actions.includes(value.action) &&
-        !['update', 'brandingSelect', 'brandingRemove', 'brandingName', 'testReset'].includes(
-          value.action,
-        )) ||
+        ![
+          'update',
+          'brandingSelect',
+          'brandingRemove',
+          'brandingName',
+          'testReset',
+          'new',
+          'saveAs',
+        ].includes(value.action)) ||
       Object.keys(value).length !==
         (extra ? 2 : 1) +
           (['new', 'open', 'closeProject'].includes(value.action) && 'discard' in value ? 1 : 0) ||
       ('discard' in value && typeof value.discard !== 'boolean') ||
       (extra && !Object.hasOwn(value, extra)) ||
       (extra === 'role' && value.role !== 'icon' && value.role !== 'background') ||
+      (extra === 'name' && typeof value.name !== 'string') ||
       (extra === 'appName' && value.appName !== null && typeof value.appName !== 'string')
     )
       return Promise.resolve({ ok: false, code: 'INVALID' });
@@ -925,13 +931,16 @@ export class StudioService {
         return;
       case 'new': {
         if (this.state.dirty && !command.discard) throw new StudioFailure('UNSAVED');
+        const name = command.name.trim();
+        if (projectNameProblem(name) !== null) throw new StudioFailure('FOLDER_NAME_INVALID');
         signal.throwIfAborted();
-        const dir = (await this.selected('projectnew'))[0] ?? null;
-        if (!dir) throw new StudioFailure('CANCELLED');
-        await createProjectFolder(dir);
-        const project = newProject(this.defaultServerName());
-        signal.throwIfAborted();
-        await saveProject(join(dir, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
+        const parent = (await this.selected('projectparent'))[0] ?? null;
+        if (!parent) throw new StudioFailure('CANCELLED');
+        const project = newProject(name);
+        const dir = await createProjectFolder(parent, name, async (created) => {
+          signal.throwIfAborted();
+          await saveProject(join(created, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
+        });
         this.state.project = project;
         this.tests?.clearResult();
         this.snapshots = {};
@@ -1043,14 +1052,21 @@ export class StudioService {
       case 'saveAs': {
         const project = this.project();
         if (!this.projectDir) throw new StudioFailure('NO_PROJECT');
-        const newDir = (await this.selected('projectnew'))[0] ?? null;
-        if (!newDir) throw new StudioFailure('CANCELLED');
+        const name = command.name.trim();
+        if (projectNameProblem(name) !== null) throw new StudioFailure('FOLDER_NAME_INVALID');
+        const parent = (await this.selected('projectparent'))[0] ?? null;
+        if (!parent) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
-        await copyProjectFolder(this.projectDir, newDir, signal);
-        await saveProject(
-          join(newDir, PROJECT_FILE_NAME),
-          encodeProjectFile(project, this.snapshots),
-        );
+        const newDir = await copyProjectFolderInto(this.projectDir, parent, name, signal);
+        try {
+          await saveProject(
+            join(newDir, PROJECT_FILE_NAME),
+            encodeProjectFile(project, this.snapshots),
+          );
+        } catch (error) {
+          await rm(newDir, { recursive: true, force: true }).catch(() => undefined);
+          throw error;
+        }
         this.projectDir = newDir;
         this.state.projectName = basename(newDir);
         this.state.dirty = false;

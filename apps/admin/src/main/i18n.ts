@@ -3,9 +3,8 @@ import { createTranslator, defineTranslations, normalizeLocale } from '@torchlau
 
 export const studioMainTranslations = defineTranslations(
   {
-    defaultServerName: 'New server',
     'dialog.projectOpen': 'Open project folder',
-    'dialog.projectNew': 'Select new project folder',
+    'dialog.projectParent': 'Choose where to create the project folder',
     'dialog.filesOpen': 'Select files to add',
     'dialog.binaryOpen': 'Select the shared launcher',
     'dialog.iconOpen': 'Choose app icon',
@@ -28,9 +27,8 @@ export const studioMainTranslations = defineTranslations(
     'dialog.deploymentFileFilter': 'Deployment file',
   },
   {
-    defaultServerName: '새 서버',
     'dialog.projectOpen': '프로젝트 폴더 열기',
-    'dialog.projectNew': '새 프로젝트 폴더 선택',
+    'dialog.projectParent': '프로젝트 폴더를 만들 위치 선택',
     'dialog.filesOpen': '추가할 파일 선택',
     'dialog.binaryOpen': '기존 공통 런처 선택',
     'dialog.iconOpen': '앱 아이콘 선택',
