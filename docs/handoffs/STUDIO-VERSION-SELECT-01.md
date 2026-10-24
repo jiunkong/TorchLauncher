@@ -35,6 +35,14 @@ Passed on the worktree sources:
 - `PATH=/tmp/main-i18n-bin:$PATH pnpm --filter @torchlauncher/studio typecheck` — passed.
 - `PATH=/tmp/main-i18n-bin:$PATH pnpm exec biome check` on the 12 changed TypeScript files plus `styles.css` — exit 0, no errors; 31 existing CSS warnings remain.
 - `PATH=/tmp/main-i18n-bin:$PATH pnpm --filter @torchlauncher/studio build` — passed.
+
+## STUDIO-VERSION-SELECT-03 test correction
+
+After the minimum moved to `1.14`, the NeoForge no-compatible-version fixture now uses allowed release `1.14`.
+The unsupported-version test now verifies `1.7.10` is rejected before metadata is queried.
+
+- `PATH=/tmp/main-i18n-bin:$PATH pnpm exec vitest run apps/admin/src/main/loader-versions.test.ts` — 1 file, 5 tests passed.
+- `PATH=/tmp/main-i18n-bin:$PATH pnpm exec biome check apps/admin/src/main/loader-versions.test.ts` — passed.
 - `DISPLAY=:0 node apps/admin/scripts/smoke-functional.mjs` — passed; Studio pages, persistence, layout and IPC/isolation smoke.
 - Queried Mojang, Fabric Meta and NeoForged official endpoints during implementation. Mojang returned 76 stable
   releases at/above the selected minimum; the live Fabric response had stable loader entries for `1.21.1`, and
