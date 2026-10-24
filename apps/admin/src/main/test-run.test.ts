@@ -30,9 +30,9 @@ async function setup() {
   roots.push(base);
   const source = join(base, 'source');
   await mkdir(source);
-  await mkdir(join(source, 'mods'));
+  const mod = join(base, 'example.jar');
   await writeFile(
-    join(source, 'mods/example.jar'),
+    mod,
     zip([
       { name: 'fabric.mod.json', data: '{"id":"example","version":"1.0","environment":"client"}' },
     ]),
@@ -91,7 +91,18 @@ async function setup() {
   await service.request({ action: 'new' });
   dialogs.open.mockResolvedValueOnce([source]);
   await service.request({ action: 'source' });
-  await service.request({ action: 'filesPolicy', paths: ['mods/example.jar'], policy: 'always' });
+  dialogs.open.mockResolvedValueOnce([mod]);
+  expect(await service.request({ action: 'settingsPackAdd', kind: 'mod' })).toMatchObject({
+    ok: true,
+  });
+  expect(
+    await service.request({
+      action: 'settingsPackPolicy',
+      kind: 'mod',
+      name: 'example.jar',
+      policy: 'required',
+    }),
+  ).toMatchObject({ ok: true });
   const project = service.snapshot().project;
   if (!project) throw new Error('Missing test project');
   const root = join(host.userData, 'test-instances', project.serverId);

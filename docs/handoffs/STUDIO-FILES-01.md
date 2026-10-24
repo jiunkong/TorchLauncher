@@ -31,6 +31,19 @@
 - The worktree initially had no app-local dependency links. A temporary `apps/admin/node_modules`
   symlink to the coordinator checkout enabled validation and was removed before commit.
 
+## Integration follow-up
+
+Commit `95a2c09` caused two test-run checks on main to fail because their shared fixture still
+registered `mods/example.jar` through generic `filesPolicy`. The fixture now selects a valid JAR from
+outside the source folder through `settingsPackAdd`, then sets its policy to `required`. This retains
+the test assertions that test extraction leaves project/source data unchanged and that changing the
+deployed candidate before `preSpawn` yields `MISMATCH`.
+
+- Focused Vitest rerun: 5 files, 62 tests passed (including `test-run.test.ts`).
+- Studio main TypeScript check passed; scoped Biome passed with the same existing fixture warning.
+- This follow-up only changes test setup, so product build and functional smoke were not repeated;
+  both had passed for the implementation commit above.
+
 ## Limits and remaining checks
 
 - Windows native file picker behavior and a real Minecraft install were not exercised here.
