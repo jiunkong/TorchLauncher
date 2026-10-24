@@ -5,16 +5,16 @@ Worker: `studio_version_select_low` (Studio version selector), branch `feat/stud
 
 ## Implemented
 
-- Replaced the free-text Minecraft version field with a newest-first stable release dropdown. The 76 IDs from
-  `1.7.10` through `26.3` were fetched from the official Mojang version manifest on 2026-10-24 and committed
-  as data in `apps/admin/src/shared/minecraft-versions.ts`. Snapshots and pre-releases are excluded; the app
-  makes no runtime request for the Minecraft list.
+- Replaced the free-text Minecraft version field with a newest-first stable release dropdown. The official
+  Mojang manifest was fetched on 2026-10-24; following the STUDIO-VERSION-SELECT-02 decision, the committed
+  catalog now contains the 48 releases from `1.14` through `26.3`. Snapshots, pre-releases, and stable releases
+  below `1.14` are excluded; the app makes no runtime request for the Minecraft list.
 - Replaced the free-text loader version field with a dropdown populated for the selected Minecraft release and
   Fabric/NeoForge kind. Fabric uses `https://meta.fabricmc.net/v2/versions/loader/{minecraftVersion}` and the
   stable loader entries. NeoForge uses the official Maven metadata at
   `https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml` and matches the version
   family (`21.1.*` for Minecraft `1.21.1`, `21.0.*` for `1.21`). Old releases without a NeoForge family, such
-  as `1.7.10`, show an empty compatible list.
+  as `1.14`, show an empty compatible list.
 - Loader metadata is requested only through the trusted Studio request IPC. The main process accepts exact
   fields, validates Minecraft IDs against the pinned catalog, uses fixed upstream URLs, applies a 10 second
   timeout and 2 MiB response limit, and filters to stable numeric versions. Renderer responses are cached by
@@ -53,3 +53,16 @@ before commit. No product dependency or lockfile changed.
   cached for the renderer session after a successful response.
 - Selector availability is broader than installation QA. No extra game/loader combinations were installed or
   end-to-end tested in this task.
+
+## STUDIO-VERSION-SELECT-02 follow-up
+
+User changed the Minecraft minimum from `1.7.10` to `1.14`. The pinned catalog and its test were pruned to 48
+stable releases, retaining newest-first order and the no-runtime-fetch behavior. The version selector continues
+to require a listed value before saving; English and Korean selector guidance now both state the `1.14` minimum.
+
+Follow-up validation on the updated worktree:
+
+- `PATH=/tmp/main-i18n-bin:$PATH pnpm exec vitest run apps/admin/src/shared/minecraft-versions.test.ts apps/admin/src/renderer/src/i18n/catalog.test.ts` — 2 files, 2 tests passed.
+- `PATH=/tmp/main-i18n-bin:$PATH pnpm exec biome check apps/admin/src/shared/minecraft-versions.ts apps/admin/src/shared/minecraft-versions.test.ts apps/admin/src/renderer/src/i18n/catalog.ts apps/admin/src/renderer/src/i18n/catalog.test.ts` — passed.
+- `PATH=/tmp/main-i18n-bin:$PATH pnpm --filter @torchlauncher/studio typecheck` — passed.
+- `PATH=/tmp/main-i18n-bin:$PATH pnpm --filter @torchlauncher/studio build` — passed.
