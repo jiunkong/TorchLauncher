@@ -34,7 +34,7 @@ try {
   assert.throws(()=>validateImage('icon',jpeg,decodeNativeImage));
   assert.throws(()=>validateImage('background',png.subarray(0,33),decodeNativeImage));
   const path=join(${JSON.stringify(root)},'native.png');await writeFile(path,png);
-  let selected=[path]; const projectPath=join(${JSON.stringify(root)},'project.json');
+  let selected=[path]; const projectPath=join(${JSON.stringify(root)},'project.torchproj');
   const service=new StudioService({open:async()=>selected,save:async()=>projectPath,discard:async()=>true},undefined,decodeNativeImage);
   assert.equal((await service.request({action:'new'})).ok,true);
   assert.equal((await service.request({action:'brandingSelect',role:'icon'})).ok,true);

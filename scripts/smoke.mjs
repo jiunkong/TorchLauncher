@@ -1,8 +1,45 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { inflateSync } from 'node:zlib';
+
+/** Reads the META section of a TorchLauncher Studio file (checks magic, trailer hash and section hashes). */
+function readStudioFile(bytes) {
+  assert.deepEqual(
+    [...bytes.subarray(0, 8)],
+    [0x89, 0x54, 0x4c, 0x53, 0x0d, 0x0a, 0x1a, 0x0a],
+    'magic',
+  );
+  assert.equal(bytes.readUInt16LE(8), 1, 'format');
+  const end = bytes.length - 32;
+  assert.ok(
+    createHash('sha256').update(bytes.subarray(0, end)).digest().equals(bytes.subarray(end)),
+    'trailer hash',
+  );
+  let offset = 16;
+  let meta;
+  for (let i = bytes.readUInt32LE(12); i > 0; i--) {
+    const id = bytes.subarray(offset, offset + 4).toString('latin1');
+    const length = bytes.readUInt32LE(offset + 4);
+    const data = bytes.subarray(offset + 40, offset + 40 + length);
+    assert.ok(
+      createHash('sha256')
+        .update(data)
+        .digest()
+        .equals(bytes.subarray(offset + 8, offset + 40)),
+      `${id} hash`,
+    );
+    if (id === 'META') meta = JSON.parse(inflateSync(data).toString('utf8'));
+    offset += 40 + length;
+  }
+  assert.equal(offset, end, 'no trailing bytes');
+  assert.ok(meta, 'META section');
+  return meta;
+}
+
 import { _electron as electron } from 'playwright';
 
 const temp = await mkdtemp(resolve(tmpdir(), 'torchlauncher-smoke-'));
@@ -212,7 +249,7 @@ try {
           await page.getByRole('button', { name: '배포 파일 만들기', exact: true }).isDisabled(),
           true,
         );
-        const projectPath = resolve(temp, 'saved-project.json');
+        const projectPath = resolve(temp, 'saved-project.torchproj');
         await app.evaluate(({ dialog }, target) => {
           dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
         }, projectPath);
@@ -220,7 +257,9 @@ try {
         await page.getByTestId('menu-file').click();
         await page.getByTestId('menu-item-save').click();
         await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
-        const savedProject = JSON.parse(await readFile(projectPath, 'utf8'));
+        // Reopening goes through native dialogs and is covered by the functional smoke; here the
+        // binary container is verified (magic, hashes) and its META section is read.
+        const savedProject = readStudioFile(await readFile(projectPath));
         assert.equal(savedProject.format, 'torchlauncher-project');
         assert.equal(savedProject.version, 1);
         assert.match(savedProject.serverId, /^[0-9a-f-]{36}$/i);

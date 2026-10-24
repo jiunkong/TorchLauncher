@@ -1,8 +1,45 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateSync } from 'node:zlib';
+
+/** Reads the META section of a TorchLauncher Studio file (checks magic, trailer hash and section hashes). */
+function readStudioFile(bytes) {
+  assert.deepEqual(
+    [...bytes.subarray(0, 8)],
+    [0x89, 0x54, 0x4c, 0x53, 0x0d, 0x0a, 0x1a, 0x0a],
+    'magic',
+  );
+  assert.equal(bytes.readUInt16LE(8), 1, 'format');
+  const end = bytes.length - 32;
+  assert.ok(
+    createHash('sha256').update(bytes.subarray(0, end)).digest().equals(bytes.subarray(end)),
+    'trailer hash',
+  );
+  let offset = 16;
+  let meta;
+  for (let i = bytes.readUInt32LE(12); i > 0; i--) {
+    const id = bytes.subarray(offset, offset + 4).toString('latin1');
+    const length = bytes.readUInt32LE(offset + 4);
+    const data = bytes.subarray(offset + 40, offset + 40 + length);
+    assert.ok(
+      createHash('sha256')
+        .update(data)
+        .digest()
+        .equals(bytes.subarray(offset + 8, offset + 40)),
+      `${id} hash`,
+    );
+    if (id === 'META') meta = JSON.parse(inflateSync(data).toString('utf8'));
+    offset += 40 + length;
+  }
+  assert.equal(offset, end, 'no trailing bytes');
+  assert.ok(meta, 'META section');
+  return meta;
+}
+
 import { _electron } from 'playwright';
 
 const cwd = fileURLToPath(new URL('../../..', import.meta.url));
@@ -39,7 +76,7 @@ const launcher = join(root, 'TorchLauncher-test.AppImage');
 await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
   mode: 0o755,
 });
-const project = join(root, 'server-project.json');
+const project = join(root, 'server-project.torchproj');
 const pack = join(root, 'server.torchpack');
 const exported = join(root, 'export', 'launcher.zip');
 await mkdir(join(root, 'export'));
@@ -394,14 +431,14 @@ try {
   await page.getByLabel('서버 이름', { exact: true }).focus();
   await page.keyboard.press('Control+s');
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
-  assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Functional Studio smoke');
+  assert.equal(readStudioFile(await readFile(project)).name, 'Functional Studio smoke');
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke 2');
   await menuAction('file', 'open');
   await dialog.waitFor();
   await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
   await page.getByTestId('save-state').filter({ hasText: '저장됨' }).waitFor();
-  assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Functional Studio smoke 2');
+  assert.equal(readStudioFile(await readFile(project)).name, 'Functional Studio smoke 2');
   await goto('서버 정보');
   assert.equal(
     await page.getByLabel('서버 이름', { exact: true }).inputValue(),
@@ -415,7 +452,7 @@ try {
   await page.locator('.nameform').getByRole('button', { name: '적용', exact: true }).click();
   await page.getByTestId('brand-preview').getByText('Branded Name').first().waitFor();
   assert.equal(
-    JSON.parse(await readFile(project, 'utf8')).branding?.appName,
+    readStudioFile(await readFile(project)).branding?.appName,
     undefined,
     'branding name is unsaved until the project is saved',
   );
@@ -690,7 +727,7 @@ try {
   // Persistence: save, reopen the saved project.
   await menuAction('file', 'save');
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
-  const saved = JSON.parse(await readFile(project, 'utf8'));
+  const saved = readStudioFile(await readFile(project));
   assert.equal(saved.version, 1);
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
   assert.equal(saved.gameSettings.shader.pack.value, 'Test.zip');
@@ -817,7 +854,7 @@ try {
   await closing.waitFor();
   await closing.getByRole('button', { name: '저장', exact: true }).click();
   await page.waitForEvent('close', { timeout: 15000 }); // save, then closeConfirm
-  assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Closing edit');
+  assert.equal(readStudioFile(await readFile(project)).name, 'Closing edit');
   assert.equal(
     await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0).catch(() => 0),
     0,

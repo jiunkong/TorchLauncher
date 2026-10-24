@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  BRANDING_LIMITS,
   BRANDING_ROLES,
   type BrandingAssetMetadata,
   type BrandingMediaType,
@@ -14,7 +13,6 @@ import { StudioFailure } from './project.js';
 
 export type ImageDecoder = (bytes: Buffer) => { width: number; height: number };
 export type BrandingSnapshots = Partial<Record<BrandingRole, Buffer>>;
-export const PROJECT_READ_LIMIT = 20 * 1024 ** 2;
 export function validateImage(
   role: BrandingRole,
   bytes: Buffer,
@@ -78,51 +76,6 @@ export function parseBranding(input: unknown): StudioBranding {
     }
   }
   return structuredClone(input) as StudioBranding;
-}
-export function encodeProject(project: StudioProject, snapshots: BrandingSnapshots): string {
-  const stored = structuredClone(project);
-  const branding = stored.branding as Record<string, unknown> | undefined;
-  for (const role of BRANDING_ROLES) {
-    const asset = project.branding?.[role];
-    if (asset) {
-      const bytes = snapshots[role];
-      if (!bytes || !branding) throw new StudioFailure('INVALID');
-      branding[role] = { ...asset, base64: bytes.toString('base64') };
-    }
-  }
-  return `${JSON.stringify(stored, null, 2)}\n`;
-}
-export function decodeProject(
-  input: unknown,
-  decode: ImageDecoder,
-): { input: unknown; snapshots: BrandingSnapshots } {
-  const stored = structuredClone(input) as StudioProject;
-  const snapshots: BrandingSnapshots = {};
-  if (
-    stored &&
-    typeof stored === 'object' &&
-    stored.branding &&
-    typeof stored.branding === 'object'
-  ) {
-    const branding = stored.branding as Record<string, unknown>;
-    for (const role of BRANDING_ROLES) {
-      const asset = branding[role];
-      if (asset && typeof asset === 'object' && !Array.isArray(asset)) {
-        const { base64, ...metadata } = asset as Record<string, unknown>;
-        if (
-          typeof base64 !== 'string' ||
-          base64.length > Math.ceil(BRANDING_LIMITS[role].length / 3) * 4
-        )
-          throw new StudioFailure('INVALID');
-        const bytes = Buffer.from(base64, 'base64');
-        if (bytes.toString('base64') !== base64) throw new StudioFailure('INVALID');
-        validateImage(role, bytes, decode, metadata as unknown as BrandingAssetMetadata);
-        branding[role] = metadata;
-        snapshots[role] = bytes;
-      }
-    }
-  }
-  return { input: stored, snapshots };
 }
 export function writerBranding(
   project: StudioProject,
