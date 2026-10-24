@@ -16,3 +16,14 @@ coverage/
 
 .testserver/
 .testfabricserver/
+
+# Local agent coordination files; keep product specifications and progress tracked.
+.claude/
+/docs/handoffs/
+/docs/*-task.md
+/docs/*-prompts.md
+/docs/work-distribution.md
+/docs/tool-handoff.md
+/docs/ui-handoff.md
+/docs/launcher-parallel-followups.md
+/docs/ui-production.md

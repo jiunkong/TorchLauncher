@@ -90,7 +90,6 @@ CI 구성은 실제 원격 실행 결과와 구분합니다.
 ## 설계 문서
 
 - [개발 진행·작업 배정·머지 현황](docs/progress.md)
-- [세션별 작업 지시문·병렬 개발 분배](docs/work-distribution.md)
 - [제품·아키텍처](docs/architecture.md)
 - [구현 순서](docs/implementation-plan.md)
 - [기여 가이드](AGENTS.md)
