@@ -3,9 +3,7 @@ import type { BrandingMediaType } from '../../branding/index.js';
 export * from '../../branding/index.js';
 export const DEPLOYMENT_MAGIC = 'TORCHDEP';
 export const DEPLOYMENT_HEADER_LENGTH = 64;
-export const DEPLOYMENT_BRANDING_FORMAT_VERSION = { major: 1, minor: 1 } as const;
-export const DEPLOYMENT_SIGNED_FORMAT_VERSION = { major: 1, minor: 2 } as const;
-export const DEPLOYMENT_FORMAT_VERSION = { major: 1, minor: 0 } as const;
+export const DEPLOYMENT_FORMAT_VERSION = { major: 1, minor: 2 } as const;
 /** v1.2 only: Ed25519 signature block placed directly after the 64-byte header. */
 export const DEPLOYMENT_SIGNATURE_LENGTH = 64;
 /** Domain-separation prefix of the signed message; the header bytes follow it. */
@@ -25,7 +23,7 @@ export const EMPTY_FILE_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b93
 
 export interface DeploymentFormatVersion {
   readonly major: 1;
-  readonly minor: 0 | 1 | 2;
+  readonly minor: 2;
 }
 
 /** Decoded header fields; binary decoding and digest verification belong to the reader. */
@@ -82,10 +80,10 @@ export interface DeploymentIndex {
   readonly deploymentId: string;
   readonly game: DeploymentGame;
   readonly files: readonly DeploymentFile[];
-  /** v1.2 only (required there, rejected in 1.0/1.1): safe integer >= 1, rises per deployment. */
-  readonly sequence?: number;
-  /** v1.1 and v1.2. Assets never belong to the game file namespace or ownership ledger. */
-  readonly branding?: DeploymentBranding;
+  /** Safe integer >= 1, rises per deployment. */
+  readonly sequence: number;
+  /** Assets never belong to the game file namespace or ownership ledger. */
+  readonly branding: DeploymentBranding;
 }
 
 export interface DeploymentValidationContext {
@@ -94,13 +92,13 @@ export interface DeploymentValidationContext {
 }
 
 /** Bytes before the index: header, plus the signature block in v1.2. */
-export function deploymentIndexStart(minor: number): number {
-  return DEPLOYMENT_HEADER_LENGTH + (minor === 2 ? DEPLOYMENT_SIGNATURE_LENGTH : 0);
+export function deploymentIndexStart(): number {
+  return DEPLOYMENT_HEADER_LENGTH + DEPLOYMENT_SIGNATURE_LENGTH;
 }
 
 /** Absolute position of the first payload byte; payload offsets are relative to it. */
 export function deploymentPayloadStart(header: DeploymentHeader): number {
-  return deploymentIndexStart(header.formatVersion.minor) + header.indexLength;
+  return deploymentIndexStart() + header.indexLength;
 }
 
 /** Inclusive HTTP byte range, in absolute container coordinates. */

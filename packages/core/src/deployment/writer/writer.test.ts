@@ -19,6 +19,7 @@ import { createInflateRaw, gunzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it, type TestContext } from 'vitest';
 import type { DeploymentIndex } from '../contracts/index.js';
 import { DEPLOYMENT_LIMITS } from '../contracts/index.js';
+import { testSigning } from '../fixtures/signing.js';
 import {
   DEPLOYMENT_WRITE_CHUNK_LENGTH,
   type DeploymentInputFile,
@@ -70,6 +71,7 @@ async function setup() {
   await writeFile(join(sourceRoot, plainInput.sourcePath), settings);
   const outputPath = join(root, 'server.torchpack');
   const options: WriteDeploymentOptions = {
+    ...testSigning,
     sourceRoot,
     outputPath,
     serverId: '11111111-1111-4111-8111-111111111111',
@@ -85,20 +87,20 @@ async function verifyContainer(path: string, expected: readonly Buffer[]) {
   const bytes = await readFile(path);
   expect(bytes.subarray(0, 8).toString('ascii')).toBe('TORCHDEP');
   expect(bytes.readUInt16LE(8)).toBe(1);
-  expect(bytes.readUInt16LE(10)).toBe(0);
+  expect(bytes.readUInt16LE(10)).toBe(2);
   expect(bytes.readUInt32LE(12)).toBe(0);
   const indexLength = Number(bytes.readBigUInt64LE(16));
   expect(bytes.readBigUInt64LE(24)).toBe(BigInt(bytes.length));
-  const indexBytes = bytes.subarray(64, 64 + indexLength);
+  const indexBytes = bytes.subarray(128, 128 + indexLength);
   expect(createHash('sha256').update(indexBytes).digest()).toEqual(bytes.subarray(32, 64));
   const index = JSON.parse(
     new TextDecoder('utf-8', { fatal: true }).decode(indexBytes),
   ) as DeploymentIndex;
-  expect(index.formatVersion).toEqual({ major: 1, minor: 0 });
+  expect(index.formatVersion).toEqual({ major: 1, minor: 2 });
   expect(index.files.length).toBe(expected.length);
-  let cursor = 64 + indexLength;
+  let cursor = 128 + indexLength;
   for (const [i, entry] of index.files.entries()) {
-    expect(entry.offset).toBe(cursor - 64 - indexLength);
+    expect(entry.offset).toBe(cursor - 128 - indexLength);
     const stored = bytes.subarray(cursor, cursor + entry.storedLength);
     expect(stored.length).toBe(entry.storedLength);
     const original = entry.compression === 'gzip' ? gunzipSync(stored) : stored;
@@ -165,7 +167,7 @@ describe('deployment writer bytes', () => {
     const { options } = await setup();
     const result = await writeDeployment({ ...options, files: [] });
     await verifyContainer(result.outputPath, []);
-    expect(result.header.totalLength).toBe(64 + result.header.indexLength);
+    expect(result.header.totalLength).toBe(128 + result.header.indexLength);
   });
 
   it('normalizes NFD disk names to NFC and preserves Unicode target spelling', async () => {
@@ -232,6 +234,7 @@ describe('deployment writer path and size rejection', () => {
       await writeFile(outputPath, 'old');
       await expect(
         writeDeployment({
+          ...testSigning,
           ...options,
           files: [first, second].map((path) => ({ ...plainInput, path })),
         }),
@@ -456,6 +459,7 @@ describe('deployment writer snapshots and rollback', () => {
       let changed = false;
       await expect(
         writeDeployment({
+          ...testSigning,
           ...options,
           onProgress: async () => {
             if (changed) return;
@@ -478,6 +482,7 @@ describe('deployment writer snapshots and rollback', () => {
       const controller = new AbortController();
       await expect(
         writeDeployment({
+          ...testSigning,
           ...options,
           signal: controller.signal,
           onProgress: (event) => {
@@ -561,7 +566,7 @@ describe('deployment writer snapshots and rollback', () => {
 });
 
 describe('branding writer snapshots', () => {
-  it('publishes v1.1 role bytes after game payload, frozen at invocation before the first await', async () => {
+  it('publishes current role bytes after game payload, frozen at invocation before the first await', async () => {
     const { tinyPng } = await import('../../branding/fixtures/images.js');
     const { options, settings, outputPath } = await setup();
     const original = tinyPng();
@@ -575,12 +580,12 @@ describe('branding writer snapshots', () => {
     request.branding.icon.mediaType = 'image/jpeg' as 'image/png';
     const result = await writing;
     const container = await readFile(outputPath);
-    const payloadStart = 64 + result.header.indexLength;
+    const payloadStart = 128 + result.header.indexLength;
     const asset = result.index.branding?.icon;
     expect(asset).toBeTruthy();
     if (!asset) throw new Error('Missing icon');
-    expect(container.readUInt16LE(10)).toBe(1);
-    expect(result.index.formatVersion).toEqual({ major: 1, minor: 1 });
+    expect(container.readUInt16LE(10)).toBe(2);
+    expect(result.index.formatVersion).toEqual({ major: 1, minor: 2 });
     expect(result.index.branding?.background).toBeNull();
     expect(asset).toMatchObject({
       offset: settings.length,
@@ -605,22 +610,22 @@ describe('branding writer snapshots', () => {
       },
     });
     const container = await readFile(outputPath);
-    const indexBytes = container.subarray(64, 64 + result.header.indexLength);
+    const indexBytes = container.subarray(128, 128 + result.header.indexLength);
     expect(createHash('sha256').update(indexBytes).digest()).toEqual(container.subarray(32, 64));
     expect(JSON.parse(indexBytes.toString('utf8'))).toEqual(result.index);
     expect(result.index.branding?.icon?.offset).toBe(settings.length);
     expect(result.index.branding?.background?.offset).toBe(settings.length + image.length);
-    expect(container.subarray(64 + result.header.indexLength)).toEqual(
+    expect(container.subarray(128 + result.header.indexLength)).toEqual(
       Buffer.concat([settings, image, image]),
     );
   });
-  it('emits v1.0 when absent and v1.1 for empty/update-removal metadata without payload', async () => {
+  it('always emits the current format for absent, empty and removal branding', async () => {
     const { options } = await setup();
-    expect((await writeDeployment(options)).header.formatVersion.minor).toBe(0);
+    expect((await writeDeployment(options)).header.formatVersion.minor).toBe(2);
     for (const branding of [{}, { icon: null, background: null }]) {
       const result = await writeDeployment({ ...options, files: [], branding });
-      expect(result.header.formatVersion.minor).toBe(1);
-      expect(result.header.totalLength).toBe(64 + result.header.indexLength);
+      expect(result.header.formatVersion.minor).toBe(2);
+      expect(result.header.totalLength).toBe(128 + result.header.indexLength);
       expect(result.index.branding).toEqual(branding);
     }
   });
@@ -643,6 +648,7 @@ describe('branding writer snapshots', () => {
     for (const branding of invalidInputs) {
       await expect(
         writeDeployment({
+          ...testSigning,
           ...options,
           branding: branding as NonNullable<WriteDeploymentOptions['branding']>,
         }),

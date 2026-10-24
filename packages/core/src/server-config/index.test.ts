@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { parseServerConfig, SERVER_CONFIG_FILENAME } from './index.js';
+import { testPublicKey } from '../deployment/fixtures/signing.js';
+import {
+  parseServerBranding,
+  parseServerConfig,
+  parseServerIdentity,
+  SERVER_CONFIG_FILENAME,
+} from './index.js';
 
 const config = {
   format: 'torchlauncher-server',
   version: 1,
+  signing: { algorithm: 'ed25519', publicKey: testPublicKey },
   serverId: '44444444-4444-4444-8444-444444444444',
   name: 'Server',
   address: 'localhost:25565',
@@ -60,7 +67,7 @@ describe('optional profile branding', () => {
     length: 100,
     mediaType: 'image/png',
   };
-  it('preserves legacy profiles and snapshots sidecar metadata without filesystem access', () => {
+  it('preserves optional branding and snapshots sidecar metadata without filesystem access', () => {
     const input = { ...config, branding: { appName: '운영자 런처', icon: { ...asset } } };
     const parsed = parseServerConfig(input);
     expect(parsed.branding).toEqual(input.branding);
@@ -111,10 +118,11 @@ describe('optional profile branding', () => {
 
 describe('server config signing', () => {
   const publicKey = Buffer.alloc(32, 7).toString('base64url');
-  it('accepts a strict ed25519 signing block and keeps old configs unchanged', () => {
+  it('requires a strict ed25519 signing block', () => {
     const signing = { algorithm: 'ed25519', publicKey };
     expect(parseServerConfig({ ...config, signing })).toEqual({ ...config, signing });
-    expect(parseServerConfig(config)).not.toHaveProperty('signing');
+    const { signing: _signing, ...missing } = config;
+    expect(() => parseServerConfig(missing)).toThrow('Invalid server configuration');
   });
   it.each([
     null,
@@ -130,10 +138,38 @@ describe('server config signing', () => {
     { algorithm: 'ed25519', publicKey: `${publicKey}=` },
     { algorithm: 'ed25519', publicKey: publicKey.slice(0, 42) },
     { algorithm: 'ed25519', publicKey: `${publicKey}A` },
-    { algorithm: 'ed25519', publicKey: Buffer.alloc(32, 7).toString('base64') + 'x' },
+    { algorithm: 'ed25519', publicKey: `${Buffer.alloc(32, 7).toString('base64')}x` },
     { algorithm: 'ed25519', publicKey: Buffer.alloc(33, 7).toString('base64url') },
     { algorithm: 'ed25519', publicKey: `${publicKey.slice(0, 42)}B` },
   ])('rejects malformed signing %j', (signing) => {
     expect(() => parseServerConfig({ ...config, signing })).toThrow('Invalid server configuration');
+  });
+});
+
+describe('server metadata validation without publisher trust', () => {
+  const { signing: _signing, ...identity } = config;
+  it('validates only identity fields without manufacturing a signing key', () => {
+    expect(parseServerIdentity(identity)).toEqual(identity);
+    expect(() => parseServerIdentity(config)).toThrow();
+    expect(() => parseServerConfig(identity)).toThrow();
+    expect(() =>
+      parseServerConfig(Object.assign(Object.create({ signing: config.signing }), identity)),
+    ).toThrow();
+    expect(parseServerBranding({ appName: 'Server Launcher' })).toEqual({
+      appName: 'Server Launcher',
+    });
+  });
+  it.each([
+    'http://example.com/pack',
+    'https://user:secret@example.com/pack',
+    'https://example.com/pack#fragment',
+    'https://example.com/pack bad',
+    '',
+  ])('rejects invalid metadata source %s', (sourceUrl) => {
+    expect(() => parseServerIdentity({ ...identity, sourceUrl })).toThrow();
+  });
+  it('rejects extra metadata fields and invalid branding', () => {
+    expect(() => parseServerIdentity({ ...identity, extra: true })).toThrow();
+    expect(() => parseServerBranding({ appName: '' })).toThrow();
   });
 });

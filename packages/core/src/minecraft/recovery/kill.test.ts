@@ -319,7 +319,7 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
       },
     );
 
-    it('detects PID reuse through the start identifier and keeps v1 locks uncertain', async () => {
+    it('detects PID reuse through the start identifier and protects invalid obsolete locks', async () => {
       const root = await tempDir('torch-kill-root-');
       const sleeper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
         stdio: 'ignore',
@@ -358,7 +358,7 @@ describe.runIf(process.platform === 'linux' || process.platform === 'win32')(
       );
       expect((await inspectServerEnvironment(root)).serverLock).toMatchObject({
         state: 'uncertain',
-        evidence: ['owner-v1'],
+        evidence: ['owner-invalid'],
       });
       expect((await recoverServerEnvironment(root)).status).toBe('blocked');
     });

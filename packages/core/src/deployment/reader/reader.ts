@@ -352,24 +352,18 @@ async function readIndex(
   const header = decodeHeader(headerBytes);
   if (!pinState.pin || header.totalLength !== pinState.pin.snapshot.totalLength)
     fail('invalid-header');
-  const signed = header.formatVersion.minor === 2;
-  // A required key means unsigned containers are refused before any further request.
-  if (trustedKey && !signed) fail('signature-required');
-  let signature: Uint8Array | undefined;
-  if (signed) {
-    signature = await getExactRange(
-      pinState,
-      source,
-      {
-        start: DEPLOYMENT_HEADER_LENGTH,
-        end: DEPLOYMENT_HEADER_LENGTH + DEPLOYMENT_SIGNATURE_LENGTH - 1,
-      },
-      DEPLOYMENT_SIGNATURE_LENGTH,
-      options.signal,
-    );
-    if (signature.byteLength !== DEPLOYMENT_SIGNATURE_LENGTH) fail('signature-malformed');
-  }
-  const indexStart = deploymentIndexStart(header.formatVersion.minor);
+  const signature = await getExactRange(
+    pinState,
+    source,
+    {
+      start: DEPLOYMENT_HEADER_LENGTH,
+      end: DEPLOYMENT_HEADER_LENGTH + DEPLOYMENT_SIGNATURE_LENGTH - 1,
+    },
+    DEPLOYMENT_SIGNATURE_LENGTH,
+    options.signal,
+  );
+  if (signature.byteLength !== DEPLOYMENT_SIGNATURE_LENGTH) fail('signature-malformed');
+  const indexStart = deploymentIndexStart();
   const indexBytes = new Uint8Array(header.indexLength);
   let offset = 0;
   while (offset < header.indexLength) {
@@ -384,11 +378,7 @@ async function readIndex(
   if (trustedKey && signature && !verifyDeploymentSignature(trustedKey, headerBytes, signature)) {
     fail('signature-invalid');
   }
-  const verification: DeploymentVerification = !signed
-    ? 'unsigned'
-    : trustedKey
-      ? 'verified'
-      : 'unverified';
+  const verification: DeploymentVerification = trustedKey ? 'verified' : 'unverified';
   const parsed = parseIndex(indexBytes);
   const index: DeploymentIndex = validateDeploymentIndex(parsed, header, {
     expectedServerId: options.expectedServerId,

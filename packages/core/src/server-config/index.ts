@@ -10,18 +10,21 @@ export * from '../branding/index.js';
 
 export const SERVER_CONFIG_FILENAME = 'torchlauncher-server.json';
 
-export interface ServerConfig {
+export interface ServerIdentity {
   readonly format: 'torchlauncher-server';
   readonly version: 1;
   readonly serverId: string;
   readonly name: string;
   readonly address: string;
   readonly sourceUrl: string;
+}
+
+export interface ServerConfig extends ServerIdentity {
   /** Optional hint so the launcher can show the game version before the deployment index is read. */
   readonly game?: ServerConfigGame;
   readonly branding?: ServerConfigBranding;
-  /** Trusted publisher key. When present the launcher rejects unsigned or badly signed deployments. */
-  readonly signing?: ServerConfigSigning;
+  /** Trusted publisher key used to verify every deployment. */
+  readonly signing: ServerConfigSigning;
 }
 
 export interface ServerConfigSigning {
@@ -57,7 +60,7 @@ export interface ServerConfigBranding {
   readonly background?: ServerConfigBrandingAsset;
 }
 
-function parseBranding(input: unknown): ServerConfigBranding {
+export function parseServerBranding(input: unknown): ServerConfigBranding {
   const fail = (): never => {
     throw new Error('Invalid server configuration');
   };
@@ -143,25 +146,19 @@ function parseGame(input: unknown): ServerConfigGame | null {
   };
 }
 
-export function parseServerConfig(input: unknown): ServerConfig {
+export function parseServerIdentity(input: unknown): ServerIdentity {
   const fail = (): never => {
     throw new Error('Invalid server configuration');
   };
   if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
   const value = input as Record<string, unknown>;
   const fields = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl'];
-  const hasGame = Object.hasOwn(value, 'game');
-  const hasBranding = Object.hasOwn(value, 'branding');
-  const hasSigning = Object.hasOwn(value, 'signing');
   if (
-    Object.keys(value).length !==
-      fields.length + (hasGame ? 1 : 0) + (hasBranding ? 1 : 0) + (hasSigning ? 1 : 0) ||
+    Object.keys(value).length !== fields.length ||
     fields.some((key) => !Object.hasOwn(value, key))
   ) {
     return fail();
   }
-  const game = hasGame ? parseGame(value.game) : undefined;
-  if (game === null) return fail();
   if (value.format !== 'torchlauncher-server' || value.version !== 1) return fail();
   if (
     typeof value.serverId !== 'string' ||
@@ -211,8 +208,25 @@ export function parseServerConfig(input: unknown): ServerConfig {
     name: value.name,
     address: value.address,
     sourceUrl: value.sourceUrl as string,
-    ...(game ? { game } : {}),
-    ...(hasBranding ? { branding: parseBranding(value.branding) } : {}),
-    ...(hasSigning ? { signing: parseSigning(value.signing) } : {}),
+  };
+}
+
+/** Validate the trusted launcher profile; publisher signing is always required. */
+export function parseServerConfig(input: unknown): ServerConfig {
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    throw new Error('Invalid server configuration');
+  const value = input as Record<string, unknown>;
+  if (!Object.hasOwn(value, 'signing')) throw new Error('Invalid server configuration');
+  const { game, branding, signing, ...identityInput } = value;
+  const hasGame = Object.hasOwn(value, 'game');
+  const hasBranding = Object.hasOwn(value, 'branding');
+  const identity = parseServerIdentity(identityInput);
+  const parsedGame = hasGame ? parseGame(game) : undefined;
+  if (parsedGame === null) throw new Error('Invalid server configuration');
+  return {
+    ...identity,
+    ...(parsedGame ? { game: parsedGame } : {}),
+    ...(hasBranding ? { branding: parseServerBranding(branding) } : {}),
+    signing: parseSigning(signing),
   };
 }

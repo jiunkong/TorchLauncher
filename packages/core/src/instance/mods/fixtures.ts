@@ -1,4 +1,5 @@
 import { crc32, deflateRawSync } from 'node:zlib';
+import { testSigning } from '../../deployment/fixtures/signing.js';
 
 export interface ZipItem {
   readonly name: string;
@@ -104,6 +105,7 @@ export async function deploy(root: string, files: readonly DeployInput[], deploy
     await writeFile(join(sourceRoot, file.path), file.data);
   }
   const result = await writeDeployment({
+    ...testSigning,
     sourceRoot,
     outputPath: join(sourceRoot, 'output.torchpack'),
     serverId,

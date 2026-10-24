@@ -21,6 +21,8 @@ export function createValidDeployment(kind: DeploymentLoaderKind = 'neoforge') {
   const compressedMod = gzipSync(mod);
   const index: DeploymentIndex = {
     formatVersion: { ...DEPLOYMENT_FORMAT_VERSION },
+    sequence: 1,
+    branding: {},
     serverId: SERVER_ID,
     deploymentId: DEPLOYMENT_ID,
     game: {
@@ -64,7 +66,7 @@ export function createValidDeployment(kind: DeploymentLoaderKind = 'neoforge') {
     formatVersion: { ...DEPLOYMENT_FORMAT_VERSION },
     flags: 0,
     indexLength: indexBytes.length,
-    totalLength: DEPLOYMENT_HEADER_LENGTH + indexBytes.length + payloadBytes.length,
+    totalLength: DEPLOYMENT_HEADER_LENGTH + 64 + indexBytes.length + payloadBytes.length,
     indexSha256: createHash('sha256').update(indexBytes).digest('hex'),
   };
   return {

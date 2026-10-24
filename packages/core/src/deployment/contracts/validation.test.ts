@@ -28,7 +28,7 @@ function withFiles(files: readonly DeploymentFile[]) {
     index: { ...fixture.index, files },
     header: {
       ...fixture.header,
-      totalLength: DEPLOYMENT_HEADER_LENGTH + fixture.header.indexLength + payloadLength,
+      totalLength: DEPLOYMENT_HEADER_LENGTH + 64 + fixture.header.indexLength + payloadLength,
     },
   };
 }
@@ -56,9 +56,9 @@ describe('deployment v1 contracts', () => {
         continue;
       }
       expect(range).toEqual({
-        start: DEPLOYMENT_HEADER_LENGTH + indexBytes.length + entry.offset,
+        start: DEPLOYMENT_HEADER_LENGTH + 64 + indexBytes.length + entry.offset,
         endInclusive:
-          DEPLOYMENT_HEADER_LENGTH + indexBytes.length + entry.offset + entry.storedLength - 1,
+          DEPLOYMENT_HEADER_LENGTH + 64 + indexBytes.length + entry.offset + entry.storedLength - 1,
       });
       const stored = payloadBytes.subarray(entry.offset, entry.offset + entry.storedLength);
       const original = entry.compression === 'gzip' ? gunzipSync(stored) : stored;
@@ -118,6 +118,8 @@ describe('deployment v1 contracts', () => {
   });
 
   it.each([
+    { major: 1, minor: 0 },
+    { major: 1, minor: 1 },
     { major: 2, minor: 0 },
     { major: 1, minor: 3 },
     { major: '1', minor: 0 },
@@ -238,7 +240,7 @@ describe('header boundaries', () => {
       () =>
         validateDeploymentHeader({
           ...header,
-          totalLength: DEPLOYMENT_HEADER_LENGTH + header.indexLength - 1,
+          totalLength: DEPLOYMENT_HEADER_LENGTH + 64 + header.indexLength - 1,
         }),
       'invalid-layout',
     );
