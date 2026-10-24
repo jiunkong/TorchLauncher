@@ -3,10 +3,10 @@ import type { Locale, LocalePreference } from '@torchlauncher/core/i18n';
 export type LanguageChoice = 'auto' | Locale;
 
 /** Each choice is written in its own language so it can be found when the UI is in the wrong one. */
-export const languageChoices: { value: LanguageChoice; label: string }[] = [
-  { value: 'auto', label: '자동 · Auto' },
-  { value: 'ko', label: '한국어' },
-  { value: 'en', label: 'English' },
+export const languageChoices: { value: LanguageChoice; label: string; short: string }[] = [
+  { value: 'auto', label: '자동 · Auto', short: 'Auto' },
+  { value: 'ko', label: '한국어', short: '한국어' },
+  { value: 'en', label: 'English', short: 'English' },
 ];
 
 export function activeChoice(preference: LocalePreference): LanguageChoice {
@@ -43,7 +43,7 @@ export function LanguageControl({
           data-choice={choice.value}
           onClick={() => onSelect(choice.value)}
         >
-          {choice.label}
+          {compact ? choice.short : choice.label}
         </button>
       ))}
     </div>

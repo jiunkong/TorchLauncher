@@ -41,6 +41,7 @@ const table = {
   'save.unsaved': ['Unsaved changes', '저장하지 않은 변경'],
   'save.save': ['Save', '저장'],
   'save.saveAs': ['Save as', '다른 이름으로 저장'],
+  'save.saveAsShort': ['Save as', '다른 이름'],
   'project.new': ['New project', '새 프로젝트'],
   'project.open': ['Open', '열기'],
   'unsaved.title': ['You have unsaved changes', '저장하지 않은 변경이 있습니다'],

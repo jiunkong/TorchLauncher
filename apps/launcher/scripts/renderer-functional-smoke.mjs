@@ -166,6 +166,20 @@ try {
   assert.equal(await choose('auto').getAttribute('aria-checked'), 'true');
   await choose('ko').click();
   await page.screenshot({ path: resolve('.cache/smoke/launcher-language-card.png') });
+  // The segmented control does not wrap or overflow its card at the narrowest window.
+  await page.setViewportSize({ width: 760, height: 600 });
+  const narrow = await page.evaluate(() => {
+    const seg = document.querySelector('[data-testid="language-card"] .seg');
+    const card = seg.closest('.card');
+    return {
+      fits: seg.getBoundingClientRect().right <= card.getBoundingClientRect().right,
+      oneLine: [...seg.querySelectorAll('button')].every(
+        (b) => b.getBoundingClientRect().height < 44,
+      ),
+    };
+  });
+  assert.deepEqual(narrow, { fits: true, oneLine: true });
+  await page.setViewportSize({ width: 1100, height: 760 });
 
   assert.equal(await page.getByText(dataRoot, { exact: true }).count(), 1);
   const syntheticWindowsRoot =

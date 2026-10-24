@@ -166,6 +166,29 @@ try {
   page.setDefaultTimeout(10000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  // Splash badge: the STUDIO text is optically centred (letter-spacing trails the last letter).
+  await page.locator('.splash .studio-tag').waitFor();
+  await page.waitForTimeout(1300);
+  const badge = await page.evaluate(() => {
+    const tag = document.querySelector('.splash .studio-tag');
+    if (!tag) return null;
+    const range = document.createRange();
+    range.selectNodeContents(tag);
+    const text = range.getBoundingClientRect();
+    const box = tag.getBoundingClientRect();
+    const spacing = Number.parseFloat(getComputedStyle(tag).letterSpacing) || 0;
+    return { left: text.left - box.left, right: box.right - text.right + spacing };
+  });
+  if (badge)
+    assert.ok(
+      Math.abs(badge.left - badge.right) < 1.5,
+      `badge off centre ${JSON.stringify(badge)}`,
+    );
+  await mkdir(join(cwd, '.cache/smoke'), { recursive: true });
+  await page
+    .locator('.splash .studio-tag')
+    .screenshot({ path: join(cwd, '.cache/smoke/studio-splash-badge.png') })
+    .catch(() => {});
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20000 });
   await page.getByTestId('application-info').filter({ hasText: process.platform }).waitFor();
   const nav = (label) => page.locator('nav.menu .mi').filter({ hasText: label });
@@ -654,6 +677,46 @@ try {
     [...document.querySelectorAll('nav.menu .mi svg')].map((svg) => svg.innerHTML),
   );
   assert.equal(new Set(icons).size, icons.length, 'menu icons are distinct');
+  // Small windows: no horizontal overflow, no clipped footer labels, thin dark scrollbar.
+  for (const [width, height] of [
+    [760, 560],
+    [900, 600],
+  ]) {
+    await page.setViewportSize({ width, height });
+    const small = await page.evaluate(() => {
+      const side = document.querySelector('.side');
+      const labels = [
+        ...side.querySelectorAll('.sidefoot button, .sidefoot .savest-text, .sidefoot .appinfo'),
+      ];
+      return {
+        horizontal: side.scrollWidth > side.clientWidth,
+        clipped: labels
+          .filter((element) => element.scrollWidth > element.clientWidth)
+          .map((element) => element.textContent.trim()),
+        scrollbarWidth: getComputedStyle(side).scrollbarWidth,
+        overflowY: getComputedStyle(side).overflowY,
+        documentOverflow: document.documentElement.scrollWidth > innerWidth,
+      };
+    });
+    assert.deepEqual(
+      small,
+      {
+        horizontal: false,
+        clipped: [],
+        scrollbarWidth: 'thin',
+        overflowY: 'auto',
+        documentOverflow: false,
+      },
+      `sidebar at ${width}x${height}`,
+    );
+    await page
+      .locator('.sidefoot')
+      .screenshot({ path: join(cwd, `.cache/smoke/studio-sidebar-footer-${width}x${height}.png`) });
+  }
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page
+    .locator('.sidefoot')
+    .screenshot({ path: join(cwd, '.cache/smoke/studio-sidebar-footer-1100x800.png') });
   // On a short window the sidebar scrolls instead of cutting content.
   await page.setViewportSize({ width: 1100, height: 580 });
   assert.equal(
