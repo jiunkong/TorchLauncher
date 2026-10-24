@@ -6,8 +6,9 @@
 - 작업 ID: `TESTRUN-UI-01b` (현재 배정인 TESTRUN-UI-01의 화면 구현 후속으로 식별).
 - Worktree / 브랜치: `/mnt/d/Projects/mclauncher/.agents/worktrees/agent-1`, `feat/testrun-ui-01b`.
 - 기준 커밋: `6dd1ca6` (`main`, TESTRUN-UI-01a 및 STUDIO-SMOKE-01 통합 후).
-- 최종 커밋: 최종 응답의 HEAD 참조. 이 파일을 포함하는 작업자 커밋이며 main에는 통합하지 않았다.
-- `git diff --stat 6dd1ca6...HEAD`: 최종 커밋 후 아래 경로 범위로 확인해 기록한다.
+- 구현 커밋: `82b037b` (`feat(studio): implement test run interface`).
+- 인계 문서 커밋: 이 파일을 포함하는 후속 커밋. 정확한 해시는 `git log -1 -- docs/handoffs/TESTRUN-UI-01b.md`로 확인한다. main에는 통합하지 않았다.
+- `git diff --stat 6dd1ca6...HEAD`: **8 files changed, 1,282 insertions(+), 14 deletions(-)** (renderer, Studio 기능 smoke 및 이 handoff).
 - 기존 미커밋 변경 없이 시작했다. 작업 중 생성된 빌드 출력과 스크린샷은 기존 ignore 규칙 아래 있으며 커밋 범위에 포함하지 않았다.
 
 ## 구현
