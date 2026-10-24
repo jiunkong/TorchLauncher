@@ -4,6 +4,21 @@ import { StudioService } from './fixtures/signing.js';
 import { handleStudioRequest } from './ipc.js';
 
 describe('Studio IPC trust boundary', () => {
+  it('rejects loader catalog requests outside the pinned game list or with extra fields', async () => {
+    const service = new StudioService({ open: vi.fn(), save: vi.fn() });
+    await expect(
+      service.request({ action: 'loaderVersions', minecraftVersion: '1.6.4', kind: 'fabric' }),
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID' });
+    await expect(
+      service.request({
+        action: 'loaderVersions',
+        minecraftVersion: '1.21.1',
+        kind: 'fabric',
+        url: 'https://example.org',
+      }),
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID' });
+  });
+
   it('accepts only an exact supported language command from the trusted main frame', async () => {
     const service = new StudioService({ open: vi.fn(), save: vi.fn() });
     const frame = { url: 'file:///studio/index.html' };

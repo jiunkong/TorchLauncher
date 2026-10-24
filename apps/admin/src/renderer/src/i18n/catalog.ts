@@ -160,6 +160,11 @@ const table = {
     '1–64자의 영문자, 숫자, 점, 밑줄, 더하기 또는 빼기를 입력하세요.',
   ],
 
+  'validation.gameVersion': [
+    'Choose a Minecraft release from the list (1.7.10 or newer).',
+    '목록에서 Minecraft 1.7.10 이상 정식 버전을 선택하세요.',
+  ],
+
   'overview.eyebrow': ['Project overview', '프로젝트 개요'],
   'overview.untitled': ['Unnamed project', '이름이 필요한 프로젝트'],
   'overview.stale.title': [
@@ -242,8 +247,23 @@ const table = {
     'host:port 형식으로 입력하세요. 예: play.example.org:25565',
   ],
   'server.minecraft': ['Minecraft version', 'Minecraft 버전'],
+  'server.chooseMinecraft': ['Choose a Minecraft release', 'Minecraft 정식 버전 선택'],
+  'server.minecraftHelp': [
+    'Stable releases from 1.7.10 onward. Only Minecraft 1.21.1 is currently installation-validated.',
+    '1.7.10부터 현재까지의 정식 버전입니다. 현재 설치 검증을 마친 버전은 Minecraft 1.21.1뿐입니다.',
+  ],
   'server.loader': ['Loader', '로더'],
   'server.loaderVersion': ['Loader version', '로더 버전'],
+  'server.chooseLoader': ['Choose a compatible loader version', '호환되는 로더 버전 선택'],
+  'server.loaderLoading': ['Loading compatible versions…', '호환 버전을 불러오는 중…'],
+  'server.loaderError': [
+    'Could not load loader versions. Check your connection and try again.',
+    '로더 버전을 불러오지 못했습니다. 연결을 확인하고 다시 시도하세요.',
+  ],
+  'server.noLoaderVersions': [
+    'No stable version of this loader is available for the selected Minecraft release.',
+    '선택한 Minecraft 버전에 사용할 수 있는 안정 로더 버전이 없습니다.',
+  ],
   'server.idSub': [
     'Generated automatically and cannot be changed.',
     '자동 생성되며 바꿀 수 없습니다.',

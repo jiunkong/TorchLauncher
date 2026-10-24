@@ -13,6 +13,7 @@ import {
   parseServerConfig,
   parseServerIdentity,
 } from '../../../../packages/core/src/server-config/index.js';
+import { minecraftVersions } from '../shared/minecraft-versions.js';
 import type {
   PackKind,
   StudioExport,
@@ -66,6 +67,7 @@ import {
   validPackOptionsName,
   writeGeneratedPolicy,
 } from './game-settings.js';
+import { getLoaderVersions } from './loader-versions.js';
 import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './project.js';
 import { decodeProjectFile, encodeProjectFile, PROJECT_FILE_LIMIT } from './project-file.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
@@ -302,6 +304,22 @@ export class StudioService {
     if (!input || typeof input !== 'object' || Array.isArray(input))
       return Promise.resolve({ ok: false, code: 'INVALID' });
     const value = input as Record<string, unknown>;
+    if (value.action === 'loaderVersions') {
+      if (
+        Object.keys(value).sort().join(',') !== 'action,kind,minecraftVersion' ||
+        typeof value.minecraftVersion !== 'string' ||
+        !(minecraftVersions as readonly string[]).includes(value.minecraftVersion) ||
+        (value.kind !== 'fabric' && value.kind !== 'neoforge')
+      )
+        return Promise.resolve({ ok: false, code: 'INVALID' });
+      return getLoaderVersions(value.minecraftVersion, value.kind)
+        .then<StudioReply>((loaderVersions) => ({
+          ok: true,
+          state: this.snapshot(),
+          loaderVersions,
+        }))
+        .catch<StudioReply>(() => ({ ok: false, code: 'IO' }));
+    }
     if (typeof value.action === 'string' && value.action.startsWith('test')) {
       if (
         ![

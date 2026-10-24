@@ -1,14 +1,76 @@
-import { useId } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { minecraftVersions } from '../../../shared/minecraft-versions.js';
 import { Note, PageHeader } from '../components/ui';
 import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
 import { type ServerField, validateServer } from './validation';
+
+const loaderCache = new Map<string, string[]>();
 
 export function ServerPage({ studio, draft }: PageProps) {
   const { t } = useStudioLocale();
   const { busy, edit } = studio;
   const errors = validateServer(draft);
   const id = useId();
+  const [loaderVersions, setLoaderVersions] = useState<string[]>([]);
+  const [loaderStatus, setLoaderStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [retryVersionLookup, setRetryVersionLookup] = useState(0);
+  const pendingLoaderVersion = useRef<{ key: string; version: string } | null>(null);
+  const lastRetryVersionLookup = useRef(0);
+  const latest = useRef({ draft, edit });
+  latest.current = { draft, edit };
+  const minecraftVersion = draft.game.minecraftVersion;
+  const loaderKind = draft.game.loader.kind;
+  const selectionKey = `${minecraftVersion}:${loaderKind}`;
+
+  useEffect(() => {
+    let active = true;
+    setLoaderVersions([]);
+    setLoaderStatus('loading');
+    const forceRefresh = lastRetryVersionLookup.current !== retryVersionLookup;
+    lastRetryVersionLookup.current = retryVersionLookup;
+    const cached = forceRefresh ? undefined : loaderCache.get(selectionKey);
+    const load = cached
+      ? Promise.resolve(cached)
+      : window.torchlauncher
+          .request({ action: 'loaderVersions', minecraftVersion, kind: loaderKind })
+          .then((reply) => {
+            if (!reply.ok) throw new Error(reply.code);
+            if (!reply.loaderVersions) throw new Error('Missing loader catalog');
+            loaderCache.set(selectionKey, reply.loaderVersions);
+            return reply.loaderVersions;
+          });
+    void load
+      .then((versions) => {
+        if (!active) return;
+        setLoaderVersions(versions);
+        setLoaderStatus('ready');
+        const current = latest.current.draft;
+        const candidate = pendingLoaderVersion.current;
+        const version =
+          candidate?.key === selectionKey ? candidate.version : current.game.loader.version;
+        if (candidate?.key === selectionKey) pendingLoaderVersion.current = null;
+        if (versions.includes(version)) {
+          if (current.game.loader.version !== version)
+            latest.current.edit({
+              ...current,
+              game: { ...current.game, loader: { ...current.game.loader, version } },
+            });
+        } else if (current.game.loader.version) {
+          latest.current.edit({
+            ...current,
+            game: { ...current.game, loader: { ...current.game.loader, version: '' } },
+          });
+        }
+      })
+      .catch(() => {
+        if (active) setLoaderStatus('error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [minecraftVersion, loaderKind, retryVersionLookup, selectionKey]);
+
   const patch = (values: Partial<typeof draft>) => edit({ ...draft, ...values });
   const field = (
     key: ServerField,
@@ -60,13 +122,50 @@ export function ServerPage({ studio, draft }: PageProps) {
           <section className="card">
             <h2>{t('server.card.game')}</h2>
             <div className="card-body">
-              {field(
-                'minecraftVersion',
-                t('server.minecraft'),
-                draft.game.minecraftVersion,
-                (minecraftVersion) => patch({ game: { ...draft.game, minecraftVersion } }),
-                { narrow: true },
-              )}
+              <div className="fld">
+                <label htmlFor={`${id}-minecraftVersion`}>{t('server.minecraft')}</label>
+                <select
+                  id={`${id}-minecraftVersion`}
+                  className={`inp narrow${errors.minecraftVersion ? ' bad' : ''}`}
+                  value={
+                    (minecraftVersions as readonly string[]).includes(draft.game.minecraftVersion)
+                      ? draft.game.minecraftVersion
+                      : ''
+                  }
+                  disabled={busy}
+                  aria-invalid={!!errors.minecraftVersion}
+                  aria-describedby={`${id}-minecraftVersion-d`}
+                  onChange={(event) => {
+                    const nextVersion = event.target.value;
+                    pendingLoaderVersion.current = {
+                      key: `${nextVersion}:${draft.game.loader.kind}`,
+                      version: draft.game.loader.version,
+                    };
+                    patch({
+                      game: {
+                        ...draft.game,
+                        minecraftVersion: nextVersion,
+                        loader: { ...draft.game.loader, version: '' },
+                      },
+                    });
+                  }}
+                >
+                  <option value="" disabled>
+                    {t('server.chooseMinecraft')}
+                  </option>
+                  {minecraftVersions.map((version) => (
+                    <option key={version} value={version}>
+                      {version}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  id={`${id}-minecraftVersion-d`}
+                  className={errors.minecraftVersion ? 'err' : 'help'}
+                >
+                  {errors.minecraftVersion ? t(errors.minecraftVersion) : t('server.minecraftHelp')}
+                </span>
+              </div>
               <div className="fld">
                 <span className="lbl" id={`${id}-loader`}>
                   {t('server.loader')}
@@ -81,23 +180,85 @@ export function ServerPage({ studio, draft }: PageProps) {
                       aria-checked={draft.game.loader.kind === kind}
                       className={draft.game.loader.kind === kind ? 'on' : undefined}
                       disabled={busy}
-                      onClick={() =>
-                        patch({ game: { ...draft.game, loader: { ...draft.game.loader, kind } } })
-                      }
+                      onClick={() => {
+                        pendingLoaderVersion.current = {
+                          key: `${draft.game.minecraftVersion}:${kind}`,
+                          version: draft.game.loader.version,
+                        };
+                        patch({
+                          game: {
+                            ...draft.game,
+                            loader: { ...draft.game.loader, kind, version: '' },
+                          },
+                        });
+                      }}
                     >
                       {kind === 'fabric' ? 'Fabric' : 'NeoForge'}
                     </button>
                   ))}
                 </div>
               </div>
-              {field(
-                'loaderVersion',
-                t('server.loaderVersion'),
-                draft.game.loader.version,
-                (version) =>
-                  patch({ game: { ...draft.game, loader: { ...draft.game.loader, version } } }),
-                { narrow: true },
-              )}
+              <div className="fld">
+                <label htmlFor={`${id}-loaderVersion`}>{t('server.loaderVersion')}</label>
+                <select
+                  id={`${id}-loaderVersion`}
+                  className={`inp narrow${errors.loaderVersion ? ' bad' : ''}`}
+                  value={
+                    loaderStatus === 'ready' && loaderVersions.includes(draft.game.loader.version)
+                      ? draft.game.loader.version
+                      : ''
+                  }
+                  disabled={busy || loaderStatus !== 'ready' || loaderVersions.length === 0}
+                  aria-invalid={!!errors.loaderVersion}
+                  aria-describedby={`${id}-loaderVersion-d`}
+                  onChange={(event) =>
+                    patch({
+                      game: {
+                        ...draft.game,
+                        loader: { ...draft.game.loader, version: event.target.value },
+                      },
+                    })
+                  }
+                >
+                  <option value="" disabled>
+                    {loaderStatus === 'ready'
+                      ? t('server.chooseLoader')
+                      : t('server.loaderVersion')}
+                  </option>
+                  {loaderVersions.map((version) => (
+                    <option key={version} value={version}>
+                      {version}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  id={`${id}-loaderVersion-d`}
+                  className={errors.loaderVersion ? 'err' : 'help'}
+                  aria-live="polite"
+                >
+                  {loaderStatus === 'loading' ? (
+                    t('server.loaderLoading')
+                  ) : loaderStatus === 'error' ? (
+                    <>
+                      {t('server.loaderError')}{' '}
+                      <button
+                        type="button"
+                        className="chip link"
+                        disabled={busy}
+                        onClick={() => setRetryVersionLookup((value) => value + 1)}
+                      >
+                        {t('common.retry')}
+                      </button>
+                    </>
+                  ) : loaderVersions.length === 0 ? (
+                    t('server.noLoaderVersions')
+                  ) : errors.loaderVersion ? (
+                    t(errors.loaderVersion)
+                  ) : (
+                    ''
+                  )}
+                </span>
+              </div>
             </div>
           </section>
         </div>
