@@ -10,6 +10,7 @@ import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
+import { PROJECT_FILE_NAME } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 
 const png = Buffer.from(
@@ -56,14 +57,17 @@ function source(bytes: Buffer): DownloadSource {
     },
   };
 }
-async function service() {
+async function service(dir?: string) {
   const d = dialogs();
   let pack: Buffer = Buffer.alloc(0);
   const s = new StudioService(d, () => source(pack), decode);
+  const projDir = dir ?? (await temp());
+  d.open.mockResolvedValueOnce([projDir]);
   await s.request({ action: 'new', discard: true });
   return {
     d,
     s,
+    projDir,
     setPack: (value: Buffer) => {
       pack = value;
     },
@@ -72,10 +76,11 @@ async function service() {
 
 describe('Studio durable branding', () => {
   it('preserves one snapshot across source replacement, save/reopen, writer and folder export', async () => {
-    const root = await temp();
-    const image = join(root, 'input.png');
+    const { s, d, projDir, setPack } = await service();
+    const root = projDir;
+    const outside = await temp();
+    const image = join(outside, 'input.png');
     await writeFile(image, png);
-    const { s, d, setPack } = await service();
     d.open.mockResolvedValueOnce([image]);
     expect((await s.request({ action: 'brandingSelect', role: 'icon' })).ok).toBe(true);
     await s.request({ action: 'brandingRemove', role: 'background' });
@@ -84,18 +89,15 @@ describe('Studio durable branding', () => {
     expect(JSON.stringify(summary)).not.toContain('base64');
     expect(summary?.branding?.icon).toMatchObject({ length: png.length });
     await writeFile(image, 'original replaced');
-    const projectPath = join(root, 'project.torchproj');
-    d.save.mockResolvedValueOnce(projectPath);
+    const projectPath = join(root, PROJECT_FILE_NAME);
     expect((await s.request({ action: 'save' })).ok).toBe(true);
     const savedFile = await readFile(projectPath);
     expect(savedFile.includes(Buffer.from(png.toString('base64')))).toBe(false);
     expect(savedFile.includes(png)).toBe(true);
     expect(decodeProjectFile(savedFile, decode).snapshots.icon?.equals(png)).toBe(true);
-    d.open.mockResolvedValueOnce([projectPath]);
+    d.open.mockResolvedValueOnce([root]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().project).toEqual(summary);
-    d.open.mockResolvedValueOnce([root]);
-    await s.request({ action: 'source' });
     const packPath = join(root, 'server.torchpack');
     d.save.mockResolvedValueOnce(packPath);
     expect((await s.request({ action: 'build' })).ok).toBe(true);
@@ -133,11 +135,9 @@ describe('Studio durable branding', () => {
     const root = await temp();
     const image = join(root, 'background.png');
     await writeFile(image, png);
-    const { s, d } = await service();
+    const { s, d, projDir } = await service();
     await s.request({ action: 'brandingName', appName: 'Local title' });
-    d.open.mockResolvedValueOnce([root]);
-    await s.request({ action: 'source' });
-    const nameOnlyPath = join(root, 'name-only.torchpack');
+    const nameOnlyPath = join(projDir, 'name-only.torchpack');
     d.save.mockResolvedValueOnce(nameOnlyPath);
     expect((await s.request({ action: 'build' })).ok).toBe(true);
     const nameOnly = await openDeploymentReader(source(await readFile(nameOnlyPath)), {

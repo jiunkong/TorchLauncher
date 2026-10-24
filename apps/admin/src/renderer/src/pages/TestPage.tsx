@@ -38,7 +38,7 @@ export function TestPage({
   const canStart =
     !studio.busy &&
     !!draft.serverId &&
-    !!studio.state?.sourceName &&
+    !!studio.state?.projectName &&
     !!account?.signedIn &&
     !!account.available &&
     !active;
@@ -541,7 +541,7 @@ export function TestStart({
   const last = run?.phase === 'failed' ? 'failed' : run?.report ? 'done' : 'none';
   const reason = !account?.signedIn
     ? t('test.start.loginRequired')
-    : !studio.state?.sourceName
+    : !studio.state?.projectName
       ? t('test.start.sourceRequired')
       : undefined;
   const rows: [string, string][] = [
@@ -555,7 +555,7 @@ export function TestStart({
         ? t('test.env.filesValue', { count: files.total, size: formatBytes(files.totalBytes) })
         : '—',
     ],
-    [t('test.env.source'), studio.state?.sourceName ?? t('test.env.sourceNone')],
+    [t('test.env.source'), studio.state?.projectName ?? t('test.env.sourceNone')],
     [t('test.env.last'), t(`test.env.last.${last}`)],
   ];
   return (

@@ -7,13 +7,12 @@ import { validateServer, validHttps } from './validation';
 
 export function DeployPage({ studio, draft, insights, go }: PageProps) {
   const { t, locale } = useStudioLocale();
-  const { busy, state, run, edit, command } = studio;
+  const { busy, run, edit, command } = studio;
   const { deploy, urlCheck } = insights;
   const urlId = useId();
-  const sourceReady = !!state?.sourceName;
   const serverReady = Object.keys(validateServer(draft)).length === 0;
   const urlValid = validHttps(draft.sourceUrl);
-  const canBuild = sourceReady && serverReady;
+  const canBuild = serverReady;
   const stateClass =
     deploy.status === 'upToDate' ? 'ok' : deploy.status === 'changed' ? 'warn' : undefined;
   const uiState =
@@ -66,15 +65,7 @@ export function DeployPage({ studio, draft, insights, go }: PageProps) {
                   </div>
                 </div>
               )}
-              {!sourceReady && (
-                <p className="err" role="status">
-                  {t('deploy.needSource')}{' '}
-                  <button type="button" className="textlink" onClick={() => go('files')}>
-                    {t('nav.files')}
-                  </button>
-                </p>
-              )}
-              {sourceReady && !serverReady && (
+              {!serverReady && (
                 <p className="err" role="status">
                   {t('deploy.needServer')}{' '}
                   <button type="button" className="textlink" onClick={() => go('server')}>

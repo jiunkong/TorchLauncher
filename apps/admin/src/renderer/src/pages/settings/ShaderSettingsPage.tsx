@@ -31,7 +31,7 @@ export function ShaderSettingsPage({ studio, draft }: PageProps) {
         labels={labels}
         send={send}
         busy={busy}
-        sourceReady={!!state?.sourceName}
+        disabled={busy || !state?.project}
       />
       <button className="btn sm" type="button" disabled={busy} onClick={() => setDialog(true)}>
         <FolderIcon />
@@ -55,13 +55,13 @@ function ShadersTab({
   labels,
   send,
   busy,
-  sourceReady,
+  disabled,
 }: {
   game: StudioGameSettings | undefined;
   labels: Labels;
   send: Send;
   busy: boolean;
-  sourceReady: boolean;
+  disabled: boolean;
 }) {
   const { t } = useStudioLocale();
   const [showOptions, setShowOptions] = useState(false);
@@ -89,10 +89,9 @@ function ShadersTab({
             sub={t('settings.shaders.sub')}
             add={t('settings.shaders.add')}
             busy={busy}
-            disabled={!sourceReady}
+            disabled={disabled}
             onAdd={() => send({ action: 'settingsPackAdd', kind: 'shaderpack' })}
           />
-          {!sourceReady && <p className="err">{t('settings.packs.needSource')}</p>}
           {packs.length === 0 && <p className="empty-row">{t('settings.shaders.empty')}</p>}
           <div className="packlist" role="radiogroup" aria-label={t('settings.shaders.title')}>
             {packs.map((pack) => {

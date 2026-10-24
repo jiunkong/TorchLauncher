@@ -11,27 +11,38 @@ describe('Studio native dialogs', () => {
     let locale: 'ko' | 'en' = 'ko';
     const dialogs = createStudioNativeDialogs(native, window, () => locale);
 
-    await dialogs.save('project');
+    await dialogs.open('project');
+    expect(showOpenDialog.mock.calls[0]?.[1]).toMatchObject({
+      title: '프로젝트 폴더 열기',
+      properties: ['openDirectory'],
+    });
+
+    await dialogs.open('projectnew');
+    expect(showOpenDialog.mock.calls[1]?.[1]).toMatchObject({
+      title: '새 프로젝트 폴더 선택',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+
+    await dialogs.save('pack');
     expect(showSaveDialog.mock.calls[0]?.[1]).toMatchObject({
-      title: '프로젝트 저장',
-      defaultPath: 'server-project.torchproj',
-      filters: [{ name: 'TorchLauncher Studio 파일', extensions: ['torchproj'] }],
+      title: 'torchpack 생성',
+      defaultPath: 'server.torchpack',
+      filters: [{ name: '배포 파일', extensions: ['torchpack'] }],
     });
 
     locale = 'en';
-    await dialogs.save('project');
-    expect(showSaveDialog.mock.calls[1]?.[1]).toMatchObject({
-      title: 'Save project',
-      defaultPath: 'server-project.torchproj',
-      filters: [{ name: 'TorchLauncher Studio file', extensions: ['torchproj'] }],
+    await dialogs.open('project');
+    expect(showOpenDialog.mock.calls[2]?.[1]).toMatchObject({
+      title: 'Open project folder',
+      properties: ['openDirectory'],
     });
     await dialogs.open('keybackup');
-    expect(showOpenDialog.mock.calls[0]?.[1]).toMatchObject({
+    expect(showOpenDialog.mock.calls[3]?.[1]).toMatchObject({
       title: 'Choose signing key backup file',
       filters: [{ name: 'Signing key backup', extensions: ['torchkey'] }],
     });
     await dialogs.open('mod');
-    expect(showOpenDialog.mock.calls[1]?.[1]).toMatchObject({
+    expect(showOpenDialog.mock.calls[4]?.[1]).toMatchObject({
       title: 'Choose a mod (.jar)',
       filters: [{ name: 'Java archive', extensions: ['jar'] }],
     });

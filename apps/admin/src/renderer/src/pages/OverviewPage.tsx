@@ -146,8 +146,8 @@ export function OverviewPage({ studio, draft, insights, go }: PageProps) {
               always: draft.files.length - initialOnly,
               initial: initialOnly,
             }),
-            state?.sourceName
-              ? t('overview.files.source', { name: state.sourceName })
+            state?.projectName
+              ? t('overview.files.source', { name: state.projectName })
               : t('overview.files.noSource'),
           ],
         )}

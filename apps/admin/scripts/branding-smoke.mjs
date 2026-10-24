@@ -35,13 +35,15 @@ try {
   assert.throws(()=>validateImage('icon',jpeg,decodeNativeImage));
   assert.throws(()=>validateImage('background',png.subarray(0,33),decodeNativeImage));
   const path=join(${JSON.stringify(root)},'native.png');await writeFile(path,png);
-  let selected=[path]; const projectPath=join(${JSON.stringify(root)},'project.torchproj');
-  const service=new StudioService({open:async()=>selected,save:async()=>projectPath,discard:async()=>true},undefined,decodeNativeImage,new SigningKeyStore(join(${JSON.stringify(root)},'keys'),safeStorage));
+  const projDir=join(${JSON.stringify(root)},'test-project');
+  let selected=[projDir];
+  const service=new StudioService({open:async()=>selected,save:async()=>projDir,discard:async()=>true},undefined,decodeNativeImage,new SigningKeyStore(join(${JSON.stringify(root)},'keys'),safeStorage));
   assert.equal((await service.request({action:'new'})).ok,true);
+  selected=[path];
   assert.equal((await service.request({action:'brandingSelect',role:'icon'})).ok,true);
   const before=service.snapshot().project;
   assert.equal((await service.request({action:'save'})).ok,true);
-  selected=[projectPath];assert.equal((await service.request({action:'open'})).ok,true);
+  selected=[projDir];assert.equal((await service.request({action:'open'})).ok,true);
   assert.deepEqual(service.snapshot().project,before);
   await writeFile(path,png.subarray(0,33));selected=[path];
   assert.deepEqual(await service.request({action:'brandingSelect',role:'icon'}),{ok:false,code:'INVALID'});

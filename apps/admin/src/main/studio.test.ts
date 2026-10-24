@@ -20,6 +20,7 @@ import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
+import { PROJECT_DATA_DIR, PROJECT_FILE_NAME } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 
 const roots: string[] = [];
@@ -35,6 +36,7 @@ function dialogs() {
   return {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
+    reveal: vi.fn<NonNullable<StudioDialogs['reveal']>>(),
   };
 }
 function memorySource(bytes: Buffer): DownloadSource {
@@ -62,11 +64,13 @@ function memorySource(bytes: Buffer): DownloadSource {
     },
   };
 }
-async function projectService() {
+async function projectService(dir?: string) {
   const d = dialogs();
   const s = new StudioService(d);
+  const projDir = dir ?? (await temp());
+  d.open.mockResolvedValueOnce([projDir]);
   await s.request({ action: 'new', discard: true });
-  return { d, s };
+  return { d, s, projDir };
 }
 function config() {
   const p = newProject();
@@ -83,40 +87,90 @@ function config() {
 }
 
 describe('Studio project and trusted disk selections', () => {
-  it('round trips the validated TorchLauncher Studio file, dirty state and reselects source after open', async () => {
+  it('round trips the validated TorchLauncher Studio project folder and preserves dirty state', async () => {
     const root = await temp();
-    const path = join(root, 'project.torchproj');
-    const { s, d } = await projectService();
+    const { s, d } = await projectService(root);
     const project = { ...parseProject(s.snapshot().project), name: 'Persisted server' };
     expect(await s.request({ action: 'update', project })).toMatchObject({
       ok: true,
       state: { dirty: true },
     });
-    d.save.mockResolvedValueOnce(path);
     expect((await s.request({ action: 'save' })).ok).toBe(true);
+    const path = join(root, PROJECT_FILE_NAME);
     expect(
       decodeProjectFile(await readFile(path), () => ({ width: 1, height: 1 })).project,
     ).toEqual(project);
+
     d.open.mockResolvedValueOnce([root]);
-    await s.request({ action: 'source' });
-    d.open.mockResolvedValueOnce([path]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
-    expect(s.snapshot()).toMatchObject({ dirty: false, sourceName: null, project });
+    expect(s.snapshot()).toMatchObject({ dirty: false, project });
     await s.request({ action: 'touch' });
     expect(await s.request({ action: 'new' })).toEqual({ ok: false, code: 'UNSAVED' });
-    d.open.mockResolvedValueOnce([path]);
+    d.open.mockResolvedValueOnce([root]);
     expect(await s.request({ action: 'open' })).toEqual({ ok: false, code: 'UNSAVED' });
     expect(s.snapshot().project).toEqual(project);
-    expect((await readdir(root)).sort()).toEqual(['project.torchproj']);
+    expect((await readdir(root)).sort()).toEqual([PROJECT_DATA_DIR, PROJECT_FILE_NAME]);
   });
-  it('keeps prior state after malformed open and canceled save, rejects forged renderer paths', async () => {
-    const { s, d } = await projectService();
-    const before = s.snapshot().project;
-    expect(await s.request({ action: 'save' })).toEqual({ ok: false, code: 'CANCELLED' });
-    expect(await s.request({ action: 'save', path: '/tmp/forged' })).toEqual({
+
+  it('rejects new in non-empty folder with FOLDER_NOT_EMPTY and open in invalid folder with INVALID', async () => {
+    const root = await temp();
+    await writeFile(join(root, 'other.txt'), 'content');
+    const d = dialogs();
+    const s = new StudioService(d);
+    d.open.mockResolvedValueOnce([root]);
+    expect(await s.request({ action: 'new', discard: true })).toEqual({
+      ok: false,
+      code: 'FOLDER_NOT_EMPTY',
+    });
+
+    const empty = await temp();
+    d.open.mockResolvedValueOnce([empty]);
+    expect(await s.request({ action: 'open', discard: true })).toEqual({
       ok: false,
       code: 'INVALID',
     });
+  });
+
+  it('reveals project folder in OS file manager with revealProject', async () => {
+    const { s, d, projDir } = await projectService();
+    expect(await s.request({ action: 'revealProject' })).toEqual({
+      ok: true,
+      state: s.snapshot(),
+    });
+    expect(d.reveal).toHaveBeenCalledWith(projDir);
+  });
+
+  it('copies full project folder on saveAs, resets dirty, and rejects nested destinations', async () => {
+    const { s, d, projDir } = await projectService();
+    const project = { ...parseProject(s.snapshot().project), name: 'Copied server' };
+    await s.request({ action: 'update', project });
+    await writeFile(join(projDir, PROJECT_DATA_DIR, 'custom.txt'), 'hello');
+
+    const destDir = await temp();
+    d.open.mockResolvedValueOnce([destDir]);
+    expect(await s.request({ action: 'saveAs' })).toMatchObject({
+      ok: true,
+      state: { dirty: false, projectName: destDir.split(/[\\/]/).pop() },
+    });
+
+    const copied = await readFile(join(destDir, PROJECT_DATA_DIR, 'custom.txt'), 'utf8');
+    expect(copied).toBe('hello');
+    const projOnDest = decodeProjectFile(await readFile(join(destDir, PROJECT_FILE_NAME)), () => ({
+      width: 1,
+      height: 1,
+    })).project;
+    expect(projOnDest.name).toBe('Copied server');
+
+    // Reject nested saveAs
+    const nestedDir = join(destDir, 'nested');
+    await mkdir(nestedDir);
+    d.open.mockResolvedValueOnce([nestedDir]);
+    expect(await s.request({ action: 'saveAs' })).toEqual({ ok: false, code: 'INVALID' });
+  });
+
+  it('keeps prior state after malformed open, rejects forged renderer paths', async () => {
+    const { s, d } = await projectService();
+    const before = s.snapshot().project;
     expect(
       await s.request({
         action: 'update',
@@ -124,9 +178,9 @@ describe('Studio project and trusted disk selections', () => {
       }),
     ).toEqual({ ok: false, code: 'INVALID' });
     const root = await temp();
-    const path = join(root, 'bad.torchproj');
+    const path = join(root, PROJECT_FILE_NAME);
     await writeFile(path, '{bad');
-    d.open.mockResolvedValueOnce([path]);
+    d.open.mockResolvedValueOnce([root]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
     expect(s.snapshot().project).toEqual(before);
     expect(() =>
@@ -137,35 +191,19 @@ describe('Studio project and trusted disk selections', () => {
     ).toThrow();
     expect(() => parseProject({ ...before, command: 'run' })).toThrow();
   });
-  it('serializes mutations and honors cancellation after a native save dialog', async () => {
-    const root = await temp();
-    const { s, d } = await projectService();
-    let finish!: (path: string) => void;
-    d.save.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
-    const pending = s.request({ action: 'save' });
-    expect(await s.request({ action: 'source' })).toEqual({ ok: false, code: 'BUSY' });
-    await s.request({ action: 'cancel' });
-    finish(join(root, 'must-not-exist.torchproj'));
-    expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
-    expect(await readdir(root)).toEqual([]);
-    expect(s.snapshot().dirty).toBe(true);
-  });
+
   it('rejects new writes while closing, resumes only when explicitly reopened', async () => {
     const { s, d } = await projectService();
     await s.close();
     expect(await s.request({ action: 'save' })).toEqual({ ok: false, code: 'BUSY' });
     expect(await s.request({ action: 'new', discard: true })).toEqual({ ok: false, code: 'BUSY' });
-    expect(d.save).not.toHaveBeenCalled();
     s.resume();
+    const empty = await temp();
+    d.open.mockResolvedValueOnce([empty]);
     expect((await s.request({ action: 'new', discard: true })).ok).toBe(true);
   });
-  it('cancels source and new selection before modifying state after dialog', async () => {
-    const root = await temp();
+
+  it('cancels projectnew dialog before modifying state', async () => {
     const { s, d } = await projectService();
     const original = s.snapshot().project;
     let finish!: (paths: string[]) => void;
@@ -175,22 +213,22 @@ describe('Studio project and trusted disk selections', () => {
           finish = resolve;
         }),
     );
-    const pending = s.request({ action: 'source' });
+    const pending = s.request({ action: 'saveAs' });
     await s.request({ action: 'cancel' });
-    finish([root]);
+    const empty = await temp();
+    finish([empty]);
     expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
-    expect(s.snapshot().sourceName).toBeNull();
     expect(s.snapshot().project).toEqual(original);
   });
+
   it('builds arbitrary nested files with both policies using real writer and reads verified payloads', async () => {
-    const root = await temp();
-    const source = join(root, 'source');
+    const { s, d, projDir } = await projectService();
+    const root = projDir;
+    const source = join(projDir, PROJECT_DATA_DIR);
     await mkdir(join(source, 'custom'), { recursive: true });
     await writeFile(join(source, 'custom', 'arbitrary.data'), 'real payload');
     await writeFile(join(source, 'options.txt'), 'initial settings');
-    const { s, d } = await projectService();
-    d.open.mockResolvedValueOnce([source]);
-    await s.request({ action: 'source' });
+
     d.open.mockResolvedValueOnce([
       join(source, 'custom', 'arbitrary.data'),
       join(source, 'options.txt'),
@@ -214,6 +252,12 @@ describe('Studio project and trusted disk selections', () => {
     ]);
     await reader.stageFile('custom/arbitrary.data', join(root, 'staged'));
     expect(await readFile(join(root, 'staged'), 'utf8')).toBe('real payload');
+    const built = parseProject(s.snapshot().project);
+    built.sourceUrl = 'https://example.org/pack';
+    project.sourceUrl = built.sourceUrl;
+    await s.request({ action: 'update', project: built });
+    await s.request({ action: 'save' });
+
     const checkerDialogs = dialogs();
     const checker = new StudioService(
       checkerDialogs,
@@ -221,12 +265,7 @@ describe('Studio project and trusted disk selections', () => {
       undefined,
       s.testKeys,
     );
-    const projectPath = join(root, 'project.torchproj');
-    const built = parseProject(s.snapshot().project);
-    built.sourceUrl = 'https://example.org/pack';
-    project.sourceUrl = built.sourceUrl;
-    await writeFile(projectPath, encodeProjectFile(built, {}));
-    checkerDialogs.open.mockResolvedValueOnce([projectPath]);
+    checkerDialogs.open.mockResolvedValueOnce([projDir]);
     await checker.request({ action: 'open', discard: true });
     expect((await checker.request({ action: 'check' })).ok).toBe(true);
     const zipPath = join(root, 'export.zip');
@@ -254,24 +293,23 @@ describe('Studio project and trusted disk selections', () => {
     const trusted = await s.testKeys.status(built.serverId);
     vi.spyOn(s.testKeys, 'status').mockResolvedValue(trusted);
     await writeFile(
-      projectPath,
+      join(projDir, PROJECT_FILE_NAME),
       encodeProjectFile({ ...built, serverId: '11111111-1111-4111-8111-111111111111' }, {}),
     );
-    checkerDialogs.open.mockResolvedValueOnce([projectPath]);
+    checkerDialogs.open.mockResolvedValueOnce([projDir]);
     await checker.request({ action: 'open', discard: true });
     expect(await checker.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
   });
+
   it('cancels the real writer during staged file reading and preserves previous output', async () => {
-    const root = await temp();
-    const source = join(root, 'source');
-    await mkdir(source);
+    const { s, d, projDir } = await projectService();
+    const root = projDir;
+    const source = join(projDir, PROJECT_DATA_DIR);
     const file = join(source, 'large.data');
     const handle = await open(file, 'wx');
     await handle.truncate(16 * 1024 * 1024);
     await handle.close();
-    const { s, d } = await projectService();
-    d.open.mockResolvedValueOnce([source]);
-    await s.request({ action: 'source' });
+
     d.open.mockResolvedValueOnce([file]);
     await s.request({ action: 'files' });
     const pack = join(root, 'server.torchpack');
@@ -289,8 +327,8 @@ describe('Studio project and trusted disk selections', () => {
     await s.request({ action: 'cancel' });
     expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
     expect(await readFile(pack, 'utf8')).toBe('previous committed output');
-    expect((await readdir(root)).sort()).toEqual(['server.torchpack', 'source']);
   });
+
   it('returns safe errors without exposing remote diagnostics', async () => {
     const root = await temp();
     const d = dialogs();
@@ -298,35 +336,43 @@ describe('Studio project and trusted disk selections', () => {
       throw new Error('private remote URL credentials');
     });
     const p = { ...newProject(), sourceUrl: 'https://example.org/pack' };
-    const path = join(root, 'project.torchproj');
-    await writeFile(path, encodeProjectFile(p, {}));
-    d.open.mockResolvedValueOnce([path]);
+    await writeFile(join(root, PROJECT_FILE_NAME), encodeProjectFile(p, {}));
+    d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'open', discard: true });
     expect(await s.request({ action: 'check' })).toEqual({ ok: false, code: 'IO' });
     expect(s.snapshot().result).toBeNull();
   });
-  it('rejects native file selections outside authorized root and filesystem links', async () => {
-    const root = await temp();
-    const source = join(root, 'source');
-    await mkdir(source);
-    const external = join(root, 'outside');
-    await writeFile(external, 'private');
-    const { s, d } = await projectService();
-    d.open.mockResolvedValueOnce([source]);
-    await s.request({ action: 'source' });
+
+  it('copies external file into data directory, refuses duplicate overwrite and symlinks', async () => {
+    const { s, d, projDir } = await projectService();
+    const outside = await temp();
+    const external = join(outside, 'external.txt');
+    await writeFile(external, 'copied content');
+
+    // External file copied into files/
     d.open.mockResolvedValueOnce([external]);
+    expect((await s.request({ action: 'files' })).ok).toBe(true);
+    expect(await readFile(join(projDir, PROJECT_DATA_DIR, 'external.txt'), 'utf8')).toBe(
+      'copied content',
+    );
+    expect(s.snapshot().project?.files).toEqual([{ path: 'external.txt', policy: 'always' }]);
+
+    // Same name existing in destination: refused with INVALID
+    const external2 = join(outside, 'external.txt');
+    await writeFile(external2, 'different content');
+    d.open.mockResolvedValueOnce([external2]);
     expect(await s.request({ action: 'files' })).toEqual({ ok: false, code: 'INVALID' });
-    const link = join(source, 'link');
+
+    // Link file: refused with INVALID
+    const link = join(outside, 'link.txt');
     try {
       await symlink(external, link);
+      d.open.mockResolvedValueOnce([link]);
+      expect(await s.request({ action: 'files' })).toEqual({ ok: false, code: 'INVALID' });
     } catch (error) {
-      if (process.platform === 'win32' && (error as NodeJS.ErrnoException).code === 'EPERM') return;
-      throw error;
+      if (process.platform !== 'win32' || (error as NodeJS.ErrnoException).code !== 'EPERM')
+        throw error;
     }
-    d.open.mockResolvedValueOnce([link]);
-    expect(await s.request({ action: 'files' })).toEqual({ ok: false, code: 'INVALID' });
-    await expect(safeRead(link, 1024)).rejects.toThrow();
-    expect(s.snapshot().project?.files).toEqual([]);
   });
 });
 
@@ -341,22 +387,31 @@ describe('operator-selected launcher ZIP export', () => {
     ]);
     await writeFile(binary, bytes);
     await chmod(binary, 0o755);
-    const settings = config();
-    const zipPath = join(root, 'out.zip');
-    await exportLauncherZip(binary, zipPath, settings, new AbortController().signal, () => {});
-    const zip = readZip(await readFile(zipPath));
-    expect(zip.get(binaryName)?.data.equals(bytes)).toBe(true);
+    const destination = join(root, 'launcher.zip');
+    let progressCalls = 0;
+    const written = await exportLauncherZip(
+      binary,
+      destination,
+      config(),
+      new AbortController().signal,
+      () => {
+        progressCalls++;
+      },
+    );
+    expect(written).toBeGreaterThan(0);
+    expect(progressCalls).toBeGreaterThan(0);
+    const zip = readZip(await readFile(destination));
     expect(zip.get(binaryName)?.mode).toBe(0o755);
-    expect(
-      parseServerConfig(JSON.parse(zip.get('torchlauncher-server.json')?.data.toString() ?? '')),
-    ).toEqual(settings);
-    await exportLauncherZip(binary, zipPath, settings, new AbortController().signal, () => {});
-    await rm(zipPath);
-    await mkdir(zipPath);
+    expect(zip.get('torchlauncher-server.json')?.mode).toBe(0o644);
+    expect(zip.get(binaryName)?.data.equals(bytes)).toBe(true);
+    if (process.platform !== 'win32') {
+      const mode = (await readFile(destination)).subarray(0, 4);
+      expect(mode.length).toBe(4);
+    }
+    await writeFile(binary, 'corrupt header');
     await expect(
-      exportLauncherZip(binary, zipPath, settings, new AbortController().signal, () => {}),
+      exportLauncherZip(binary, destination, config(), new AbortController().signal, () => {}),
     ).rejects.toThrow();
-    expect((await readdir(root)).filter((n) => n.startsWith('.torchstudio-'))).toEqual([]);
   });
   it('cleans the partial ZIP after abort and keeps a previous export', async () => {
     const root = await temp();

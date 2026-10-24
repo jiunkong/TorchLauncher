@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { lstat } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { BRANDING_LIMITS, BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
 import { DeploymentValidationError } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
@@ -69,7 +69,15 @@ import {
 } from './game-settings.js';
 import { getLoaderVersions } from './loader-versions.js';
 import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './project.js';
-import { decodeProjectFile, encodeProjectFile, PROJECT_FILE_LIMIT } from './project-file.js';
+import { encodeProjectFile } from './project-file.js';
+import {
+  copyIntoDataDir,
+  copyProjectFolder,
+  createProjectFolder,
+  PROJECT_DATA_DIR,
+  PROJECT_FILE_NAME,
+  readProjectFolder,
+} from './project-folder.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
 import type { SigningKeyStore } from './signing.js';
 import { emptyTestRun, type StudioTestRunner } from './test-run.js';
@@ -78,7 +86,7 @@ export interface StudioDialogs {
   open(
     kind:
       | 'project'
-      | 'source'
+      | 'projectnew'
       | 'files'
       | 'binary'
       | 'icon'
@@ -91,14 +99,13 @@ export interface StudioDialogs {
       | 'mod',
     root?: string,
   ): Promise<string[] | null>;
-  save(kind: 'project' | 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
+  save(kind: 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
   /** Shows a file in the OS file manager. Optional so tests can omit it. */
   reveal?(path: string): void;
   /** Writes text to the system clipboard (the sandboxed renderer cannot). Optional so tests can omit it. */
   copy?(text: string): void;
 }
 const RESCAN = new Set([
-  'source',
   'files',
   'filesPolicy',
   'rescan',
@@ -227,7 +234,6 @@ export class StudioService {
     testRun: emptyTestRun(),
     project: null,
     projectName: null,
-    sourceName: null,
     dirty: false,
     busy: null,
     progress: 0,
@@ -245,8 +251,10 @@ export class StudioService {
   private urlKey: string | null = null;
   private lastPackPath: string | null = null;
   private lastExportPath: string | null = null;
-  private projectPath: string | null = null;
-  private sourceRoot: string | null = null;
+  private projectDir: string | null = null;
+  private get sourceRoot(): string | null {
+    return this.projectDir ? join(this.projectDir, PROJECT_DATA_DIR) : null;
+  }
   private snapshots: BrandingSnapshots = {};
   private closing = false;
   private controller: AbortController | null = null;
@@ -378,7 +386,6 @@ export class StudioService {
       'open',
       'save',
       'saveAs',
-      'source',
       'files',
       'build',
       'check',
@@ -388,6 +395,7 @@ export class StudioService {
       'exportCheck',
       'revealPack',
       'revealExport',
+      'revealProject',
       'closeConfirm',
       'closeCancel',
       'exit',
@@ -721,11 +729,19 @@ export class StudioService {
         this.project();
         return;
       case 'revealPack':
-      case 'revealExport': {
+      case 'revealExport':
+      case 'revealProject': {
         this.project();
-        const path = command.action === 'revealPack' ? this.lastPackPath : this.lastExportPath;
+        const path =
+          command.action === 'revealProject'
+            ? this.projectDir
+            : command.action === 'revealPack'
+              ? this.lastPackPath
+              : this.lastExportPath;
         if (!path || !this.dialogs.reveal) throw new StudioFailure('INVALID');
-        if (!(await lstat(path)).isFile()) throw new StudioFailure('IO');
+        const st = await lstat(path);
+        if (command.action === 'revealProject' ? !st.isDirectory() : !st.isFile())
+          throw new StudioFailure('IO');
         this.dialogs.reveal(path);
         return;
       }
@@ -907,29 +923,38 @@ export class StudioService {
         this.project();
         this.state.dirty = true;
         return;
-      case 'new':
+      case 'new': {
+        if (this.state.dirty && !command.discard) throw new StudioFailure('UNSAVED');
+        signal.throwIfAborted();
+        const dir = (await this.selected('projectnew'))[0] ?? null;
+        if (!dir) throw new StudioFailure('CANCELLED');
+        await createProjectFolder(dir);
+        const project = newProject(this.defaultServerName());
+        signal.throwIfAborted();
+        await saveProject(join(dir, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
+        this.state.project = project;
+        this.tests?.clearResult();
+        this.snapshots = {};
+        this.projectDir = dir;
+        this.state.projectName = basename(dir);
+        this.state.dirty = false;
+        this.resetProjectState();
+        await this.refreshSigning();
+        return;
+      }
       case 'open': {
         if (this.state.dirty && !command.discard) throw new StudioFailure('UNSAVED');
         signal.throwIfAborted();
-        let path: string | null = null;
-        let project: StudioProject;
-        let snapshots: BrandingSnapshots = {};
-        if (command.action === 'open') {
-          path = (await this.selected('project'))[0] ?? null;
-          if (!path) throw new StudioFailure('CANCELLED');
-          const loaded = decodeProjectFile(await safeRead(path, PROJECT_FILE_LIMIT), this.decode);
-          project = loaded.project;
-          snapshots = loaded.snapshots;
-        } else project = newProject(this.defaultServerName());
+        const dir = (await this.selected('project'))[0] ?? null;
+        if (!dir) throw new StudioFailure('CANCELLED');
+        const loaded = await readProjectFolder(dir, this.decode);
         signal.throwIfAborted();
-        this.state.project = project;
+        this.state.project = loaded.project;
         this.tests?.clearResult();
-        this.snapshots = snapshots;
-        this.projectPath = path;
-        this.state.projectName = path ? basename(path) : null;
-        this.sourceRoot = null;
-        this.state.sourceName = null;
-        this.state.dirty = !path;
+        this.snapshots = loaded.snapshots;
+        this.projectDir = dir;
+        this.state.projectName = basename(dir);
+        this.state.dirty = false;
         this.resetProjectState();
         await this.refreshSigning();
         return;
@@ -941,10 +966,8 @@ export class StudioService {
         this.state.project = null;
         this.tests?.clearResult();
         this.snapshots = {};
-        this.projectPath = null;
+        this.projectDir = null;
         this.state.projectName = null;
-        this.sourceRoot = null;
-        this.state.sourceName = null;
         this.state.dirty = false;
         this.resetProjectState();
         await this.refreshSigning();
@@ -1005,47 +1028,55 @@ export class StudioService {
         }
         return;
       }
-      case 'save':
-      case 'saveAs': {
+      case 'save': {
         const project = this.project();
-        const path =
-          command.action === 'save' && this.projectPath
-            ? this.projectPath
-            : await this.dialogs.save('project');
-        if (!path) throw new StudioFailure('CANCELLED');
+        if (!this.projectDir) throw new StudioFailure('NO_PROJECT');
         signal.throwIfAborted();
-        await saveProject(path, encodeProjectFile(project, this.snapshots));
-        this.projectPath = path;
-        this.state.projectName = basename(path);
+        await saveProject(
+          join(this.projectDir, PROJECT_FILE_NAME),
+          encodeProjectFile(project, this.snapshots),
+        );
         this.state.dirty = false;
         this.state.result = { key: 'projectSaved' };
         return;
       }
-      case 'source': {
-        this.project();
-        const path = (await this.selected('source'))[0];
-        if (!path) throw new StudioFailure('CANCELLED');
-        await noLinks(path);
-        if (!(await lstat(path)).isDirectory()) throw new StudioFailure('INVALID');
+      case 'saveAs': {
+        const project = this.project();
+        if (!this.projectDir) throw new StudioFailure('NO_PROJECT');
+        const newDir = (await this.selected('projectnew'))[0] ?? null;
+        if (!newDir) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
-        this.sourceRoot = resolve(path);
-        this.state.sourceName = basename(path);
+        await copyProjectFolder(this.projectDir, newDir, signal);
+        await saveProject(
+          join(newDir, PROJECT_FILE_NAME),
+          encodeProjectFile(project, this.snapshots),
+        );
+        this.projectDir = newDir;
+        this.state.projectName = basename(newDir);
+        this.state.dirty = false;
         this.lastScan = null;
         this.hashes.clear();
+        this.state.result = { key: 'projectSaved' };
         return;
       }
       case 'files': {
         const project = this.project();
-        if (!this.sourceRoot) throw new StudioFailure('INVALID');
-        const paths = await this.selected('files', this.sourceRoot);
+        const root = this.sourceRoot;
+        if (!root) throw new StudioFailure('INVALID');
+        const paths = await this.selected('files');
         const files = new Map(project.files.map((f) => [f.path, f]));
         for (const path of paths) {
-          const rel = relative(this.sourceRoot, path).split(sep).join('/');
-          if (isAbsolute(rel) || rel === '..' || rel.startsWith('../'))
-            throw new StudioFailure('INVALID');
           await noLinks(path);
           if (!(await lstat(path)).isFile()) throw new StudioFailure('INVALID');
-          if (!files.has(rel)) files.set(rel, { path: rel, policy: 'always' });
+          const rel = relative(root, path).split(sep).join('/');
+          const inside = !isAbsolute(rel) && rel !== '..' && !rel.startsWith('../');
+          if (inside) {
+            if (!files.has(rel)) files.set(rel, { path: rel, policy: 'always' });
+          } else {
+            const name = basename(path);
+            await copyIntoDataDir(root, path, name, signal);
+            if (!files.has(name)) files.set(name, { path: name, policy: 'always' });
+          }
         }
         signal.throwIfAborted();
         this.state.project = parseProject({ ...project, files: [...files.values()] });

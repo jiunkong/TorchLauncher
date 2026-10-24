@@ -28,10 +28,9 @@ export function ModsPage(props: PageProps) {
           sub={t('mods.manage.sub')}
           add={t('mods.add')}
           busy={busy}
-          disabled={!state?.sourceName}
+          disabled={busy || !state?.project}
           onAdd={() => send({ action: 'settingsPackAdd', kind: 'mod' })}
         />
-        {!state?.sourceName && <p className="err">{t('mods.needSource')}</p>}
         {mods.length === 0 && <p className="empty-row">{t('mods.empty')}</p>}
         <div className="packlist">
           {mods.map((mod) => (

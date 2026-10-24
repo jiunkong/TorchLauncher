@@ -229,6 +229,11 @@ try {
         assert.deepEqual(invalid, { ok: false, code: 'INVALID' });
         // The start animation covers the app first; then the start screen offers a new project.
         await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
+        const projectDir = resolve(temp, 'project');
+        await mkdir(projectDir);
+        await app.evaluate(({ dialog }, dir) => {
+          dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] });
+        }, projectDir);
         await page.getByTestId('start-new').click();
         await page.getByTestId('project-card').waitFor();
       }
@@ -246,17 +251,14 @@ try {
           await page.getByRole('button', { name: '배포 파일 만들기', exact: true }).isDisabled(),
           true,
         );
-        const projectPath = resolve(temp, 'saved-project.torchproj');
-        await app.evaluate(({ dialog }, target) => {
-          dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
-        }, projectPath);
+        const projectFile = resolve(temp, 'project', 'project.torchproj');
         // Saving lives in the top menu bar (File > Save).
         await page.getByTestId('menu-file').click();
         await page.getByTestId('menu-item-save').click();
         await page.getByText(/프로젝트를 저장했습니다\.|Project saved\./).waitFor();
         // Reopening goes through native dialogs and is covered by the functional smoke; here the
         // binary container is verified (magic, hashes) and its META section is read.
-        const savedProject = readStudioFile(await readFile(projectPath));
+        const savedProject = readStudioFile(await readFile(projectFile));
         assert.equal(savedProject.format, 'torchlauncher-project');
         assert.equal(savedProject.version, 1);
         assert.match(savedProject.serverId, /^[0-9a-f-]{36}$/i);

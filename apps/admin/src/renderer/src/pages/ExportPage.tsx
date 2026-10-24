@@ -12,7 +12,7 @@ let dismissedDone: string | null = null;
 
 export function ExportPage({ studio, draft, insights, go }: PageProps) {
   const { t } = useStudioLocale();
-  const { busy, command, run, state } = studio;
+  const { busy, command, run } = studio;
   const { deploy } = insights;
   const status = insights.export;
   const [dismissed, setDismissedState] = useState<string | null>(dismissedDone);
@@ -20,7 +20,6 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
     dismissedDone = key;
     setDismissedState(key);
   };
-  const sourceReady = !!state?.sourceName;
   const serverReady = Object.keys(validateServer(draft)).length === 0;
   const game = `${draft.game.minecraftVersion} · ${loaderLabel(draft.game.loader.kind)} ${draft.game.loader.version}`;
   const done = status?.done ?? null;
@@ -29,7 +28,7 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
   // Re-evaluate the checks (rescans the source folder, no network) when the page opens.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per visit
   useEffect(() => {
-    if (sourceReady) void command({ action: 'exportCheck' });
+    void command({ action: 'exportCheck' });
   }, []);
 
   const rows: StudioExportCheck[] = status?.checks ?? [];
@@ -159,14 +158,6 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
               </CheckRow>
             ))}
           </section>
-          {!sourceReady && (
-            <Note tone="warn">
-              {t('export.needSource')}{' '}
-              <button type="button" className="textlink" onClick={() => go('files')}>
-                {t('nav.files')}
-              </button>
-            </Note>
-          )}
           {!serverReady && (
             <Note tone="warn">
               {t('export.needServer')}{' '}

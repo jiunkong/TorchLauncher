@@ -15,6 +15,7 @@ const actions = () => ({
   openProject: vi.fn(),
   save: vi.fn(),
   saveAs: vi.fn(),
+  revealProject: vi.fn(),
   closeProject: vi.fn(),
   exit: vi.fn(),
   language: vi.fn(),
@@ -36,6 +37,7 @@ describe('menus', () => {
       ['열기…', 'Ctrl+O'],
       ['저장', 'Ctrl+S'],
       ['다른 이름으로 저장', 'Ctrl+Shift+S'],
+      ['프로젝트 폴더 표시', undefined],
       ['프로젝트 닫기', 'Ctrl+W'],
       ['종료', undefined],
     ]);
@@ -46,9 +48,16 @@ describe('menus', () => {
       entries(menus[0]?.rows ?? [])
         .filter((e) => e.disabled)
         .map((e) => e.id);
-    expect(disabled(build(false))).toEqual(['save', 'saveAs', 'close']);
+    expect(disabled(build(false))).toEqual(['save', 'saveAs', 'revealProject', 'close']);
     expect(disabled(build(true))).toEqual([]);
-    expect(disabled(build(true, true))).toEqual(['new', 'open', 'save', 'saveAs', 'close']);
+    expect(disabled(build(true, true))).toEqual([
+      'new',
+      'open',
+      'save',
+      'saveAs',
+      'revealProject',
+      'close',
+    ]);
   });
 
   it('offers the language radio group in both languages with the active choice checked', () => {

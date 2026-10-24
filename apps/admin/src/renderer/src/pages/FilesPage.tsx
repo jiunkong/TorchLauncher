@@ -11,7 +11,7 @@ export function FilesPage({ studio, insights, go }: PageProps) {
   const { t } = useStudioLocale();
   const { busy, state, run, command } = studio;
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const sourceReady = !!state?.sourceName;
+  const hasProject = !!state?.project;
   const files = insights.files;
   const entries = files?.entries ?? [];
   const live = new Set(entries.map((entry) => entry.path));
@@ -50,21 +50,22 @@ export function FilesPage({ studio, insights, go }: PageProps) {
           <div className="srcname">
             <div className="fine">{t('files.source')}</div>
             <div className="mono" data-testid="source-name">
-              {state?.sourceName ?? t('files.sourceNone')}
+              {state?.projectName ?? t('files.sourceNone')}
             </div>
           </div>
           <button
             type="button"
             className="btn sm"
-            disabled={busy}
-            onClick={() => void run('source')}
+            disabled={busy || !hasProject}
+            data-testid="project-reveal"
+            onClick={() => void command({ action: 'revealProject' })}
           >
-            {t('files.sourceChange')}
+            {t('files.revealProject')}
           </button>
           <button
             type="button"
             className="btn sm"
-            disabled={busy || !sourceReady}
+            disabled={busy || !hasProject}
             onClick={() => void run('files')}
           >
             <PlusIcon />
@@ -73,7 +74,7 @@ export function FilesPage({ studio, insights, go }: PageProps) {
           <button
             type="button"
             className="btn sm"
-            disabled={busy || !sourceReady}
+            disabled={busy || !hasProject}
             data-testid="files-rescan"
             onClick={() => void command({ action: 'rescan' })}
           >
@@ -81,11 +82,6 @@ export function FilesPage({ studio, insights, go }: PageProps) {
             {t('files.rescan')}
           </button>
         </div>
-        {!sourceReady && (
-          <p className="err pad" role="status">
-            {t('files.needSource')}
-          </p>
-        )}
       </section>
       <div className="legend">
         <div className="lg">
@@ -226,9 +222,7 @@ export function FilesPage({ studio, insights, go }: PageProps) {
             </tbody>
           </table>
         </div>
-        {entries.length === 0 && (
-          <p className="empty-row">{sourceReady ? t('files.empty') : t('files.needSource')}</p>
-        )}
+        {entries.length === 0 && <p className="empty-row">{t('files.empty')}</p>}
         {files?.truncated && <p className="err pad">{t('files.truncated')}</p>}
         {(files?.skipped ?? 0) > 0 && (
           <p className="fine pad">{t('files.skipped', { count: files?.skipped ?? 0 })}</p>

@@ -10,6 +10,7 @@ export interface MenuActions {
   openProject(): void;
   save(): void;
   saveAs(): void;
+  revealProject(): void;
   closeProject(): void;
   exit(): void;
   language(choice: LanguageChoice): void;
@@ -58,6 +59,12 @@ export function buildMenus(options: {
           shortcut: 'Ctrl+Shift+S',
           disabled: busy || !hasProject,
           onSelect: actions.saveAs,
+        },
+        {
+          id: 'revealProject',
+          label: t('menu.revealProject'),
+          disabled: busy || !hasProject,
+          onSelect: actions.revealProject,
         },
         { separator: true },
         {

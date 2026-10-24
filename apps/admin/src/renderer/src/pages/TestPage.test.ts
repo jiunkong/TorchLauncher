@@ -46,17 +46,17 @@ describe('test run start screen', () => {
     expect(html).not.toContain('<p class="test-prerequisite"');
   });
 
-  it('enables the run button when signed in with a source folder', () => {
+  it('enables the run button when signed in with a project folder', () => {
     const { html } = page({ signedIn: true });
     expect(html).toContain('Player_Name');
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*data-testid="test-start-button"/);
     expect(html).toContain('data-testid="test-logout"');
   });
 
-  it('keeps the button disabled without a source folder and keeps the reset action small', () => {
-    const { html } = page({ signedIn: true, sourceName: null });
+  it('keeps the button disabled without a project folder and keeps the reset action small', () => {
+    const { html } = page({ signedIn: true, projectName: null });
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="test-start-button"/);
-    expect(html).toContain('title="먼저 파일에서 배포 소스 폴더를 선택하세요."');
+    expect(html).toContain('title="먼저 프로젝트 폴더를 여세요."');
     expect(html).toContain('btn sm ghost');
     expect(html).toContain('data-testid="test-reset-open"');
     expect(html).not.toContain('test-reset-card');
