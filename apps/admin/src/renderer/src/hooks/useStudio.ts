@@ -142,7 +142,7 @@ export function useStudio() {
       }
       return false;
     }
-    if (action === 'new' || action === 'open')
+    if (action === 'new' || action === 'open' || action === 'closeProject')
       return execute(options.discard ? { action, discard: true } : { action }, false);
     return execute({ action }, true);
   };

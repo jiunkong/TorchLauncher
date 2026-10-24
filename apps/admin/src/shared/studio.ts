@@ -360,6 +360,11 @@ export type StudioCommand =
       /** Must be true when the current project has unsaved changes, sent only after the renderer's own confirmation. */
       discard?: boolean;
     }
+  | {
+      action: 'closeProject';
+      /** Needed when the project has unsaved changes, sent only after the renderer's own confirmation. */
+      discard?: boolean;
+    }
   | { action: 'update'; project: StudioProject };
 /** Source folder, deploy and export commands added by STUDIO-MAIN-01. */
 export type StudioWorkCommand =

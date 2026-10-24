@@ -33,6 +33,7 @@ import {
   validateImage,
   writerBranding,
 } from './branding.js';
+import { sameContent } from './canonical.js';
 import {
   brandingKey,
   buildPlan,
@@ -368,6 +369,7 @@ export class StudioService {
       'closeConfirm',
       'closeCancel',
       'exit',
+      'closeProject',
     ];
     const extra =
       value.action === 'testReset'
@@ -403,7 +405,8 @@ export class StudioService {
           value.action,
         )) ||
       Object.keys(value).length !==
-        (extra ? 2 : 1) + (['new', 'open'].includes(value.action) && 'discard' in value ? 1 : 0) ||
+        (extra ? 2 : 1) +
+          (['new', 'open', 'closeProject'].includes(value.action) && 'discard' in value ? 1 : 0) ||
       ('discard' in value && typeof value.discard !== 'boolean') ||
       (extra && !Object.hasOwn(value, extra)) ||
       (extra === 'role' && value.role !== 'icon' && value.role !== 'background') ||
@@ -650,6 +653,23 @@ export class StudioService {
     }, true);
     this.state.preset = preview;
   }
+  /** Everything derived from the current project; shared by new, open and closeProject. */
+  private resetProjectState(): void {
+    this.state.signing = null;
+    this.state.files = null;
+    this.state.deploy = null;
+    this.state.urlCheck = null;
+    this.state.export = null;
+    this.state.preset = null;
+    this.state.policy = null;
+    this.policyRejected = null;
+    this.lastScan = null;
+    this.hashes.clear();
+    this.urlKey = null;
+    this.exportDone = null;
+    this.lastPackPath = null;
+    this.lastExportPath = null;
+  }
   private async execute(command: StudioRequest, signal: AbortSignal): Promise<void> {
     switch (command.action) {
       case 'testLogin':
@@ -884,20 +904,23 @@ export class StudioService {
         this.sourceRoot = null;
         this.state.sourceName = null;
         this.state.dirty = !path;
-        this.state.signing = null;
-        this.state.files = null;
-        this.state.deploy = null;
-        this.state.urlCheck = null;
-        this.state.export = null;
-        this.state.preset = null;
-        this.state.policy = null;
-        this.policyRejected = null;
-        this.lastScan = null;
-        this.hashes.clear();
-        this.urlKey = null;
-        this.exportDone = null;
-        this.lastPackPath = null;
-        this.lastExportPath = null;
+        this.resetProjectState();
+        await this.refreshSigning();
+        return;
+      }
+      case 'closeProject': {
+        if (!this.state.project) return;
+        if (this.state.dirty && !command.discard) throw new StudioFailure('UNSAVED');
+        signal.throwIfAborted();
+        this.state.project = null;
+        this.tests?.clearResult();
+        this.snapshots = {};
+        this.projectPath = null;
+        this.state.projectName = null;
+        this.sourceRoot = null;
+        this.state.sourceName = null;
+        this.state.dirty = false;
+        this.resetProjectState();
         await this.refreshSigning();
         return;
       }
@@ -941,16 +964,16 @@ export class StudioService {
         const current = this.project();
         const paths = new Set(current.files.map((f) => f.path));
         if (
-          JSON.stringify(project.branding) !== JSON.stringify(current.branding) ||
+          !sameContent(project.branding, current.branding) ||
           project.serverId !== current.serverId ||
           project.sequence !== current.sequence ||
-          JSON.stringify(project.lastBuild) !== JSON.stringify(current.lastBuild) ||
-          JSON.stringify(project.gameSettings) !== JSON.stringify(current.gameSettings) ||
+          !sameContent(project.lastBuild, current.lastBuild) ||
+          !sameContent(project.gameSettings, current.gameSettings) ||
           project.version !== current.version ||
           project.files.some((f) => !paths.has(f.path))
         )
           throw new StudioFailure('INVALID');
-        if (JSON.stringify(project) !== JSON.stringify(current)) {
+        if (!sameContent(project, current)) {
           this.state.project = project;
           this.state.dirty = true;
         }

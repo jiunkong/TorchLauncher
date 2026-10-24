@@ -715,3 +715,79 @@ it('only answers the copy command for the trusted main frame', async () => {
       ),
     ).toEqual({ ok: false, code: 'UNTRUSTED' });
 });
+
+it('closes the project for real: UNSAVED rule, full reset, no file or instance changes', async () => {
+  const h = await setup();
+  // A finished test run leaves results behind.
+  const pending = h.service.request({ action: 'testStart' });
+  await vi.waitFor(() => expect(h.runner.state.phase).toBe('running'));
+  await h.service.request({ action: 'testStop' });
+  await pending;
+  expect(h.runner.state.phase).toBe('done');
+  expect(await h.service.request({ action: 'closeProject' })).toEqual({
+    ok: false,
+    code: 'UNSAVED',
+  });
+  expect(h.service.snapshot().project).not.toBeNull();
+  const reply = await h.service.request({ action: 'closeProject', discard: true });
+  expect(reply).toMatchObject({ ok: true });
+  const state = h.service.snapshot();
+  expect(state).toMatchObject({
+    project: null,
+    projectName: null,
+    sourceName: null,
+    dirty: false,
+    files: null,
+    deploy: null,
+    urlCheck: null,
+    export: null,
+    preset: null,
+    policy: null,
+    signing: null,
+  });
+  expect(state.testRun).toMatchObject({ phase: 'idle', report: null, logs: [], mods: [] });
+  expect(state.account.signedIn).toBe(true);
+  // Nothing on disk was touched.
+  expect(await readFile(join(h.source, 'options.txt'), 'utf8')).toContain('gamma:0.5');
+  await expect(readFile(join(h.source, 'mods/example.jar'))).resolves.toBeDefined();
+  // Closing again is a harmless no-op.
+  expect(await h.service.request({ action: 'closeProject' })).toMatchObject({ ok: true });
+});
+
+it('closes a clean project without discard and refuses while busy or malformed', async () => {
+  const h = await setup();
+  await h.service.request({ action: 'new', discard: true });
+  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'clean.torchproj'));
+  expect((await h.service.request({ action: 'save' })).ok).toBe(true);
+  expect(h.service.snapshot().dirty).toBe(false);
+  for (const extra of [{ force: true }, { discard: 'yes' }, { path: '/tmp' }])
+    expect(await h.service.request({ action: 'closeProject', ...extra })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+  await h.service.close();
+  expect(await h.service.request({ action: 'closeProject' })).toEqual({ ok: false, code: 'BUSY' });
+  h.service.resume();
+  expect(await h.service.request({ action: 'closeProject' })).toMatchObject({ ok: true });
+  expect(h.service.snapshot().project).toBeNull();
+});
+
+it('only accepts closeProject from the trusted main frame', async () => {
+  const h = await setup();
+  const frame = { url: 'file:///studio/index.html' };
+  const contents = { mainFrame: frame } as unknown as WebContents;
+  for (const [sender, senderFrame] of [
+    [{}, frame],
+    [contents, { ...frame }],
+  ])
+    expect(
+      await handleStudioRequest(
+        { sender, senderFrame } as Pick<IpcMainInvokeEvent, 'sender' | 'senderFrame'>,
+        contents,
+        frame.url,
+        h.service,
+        { action: 'closeProject', discard: true },
+      ),
+    ).toEqual({ ok: false, code: 'UNTRUSTED' });
+  expect(h.service.snapshot().project).not.toBeNull();
+});
