@@ -149,6 +149,24 @@ try {
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('heading', { level: 2, name: '활성 리소스팩 순서' }).waitFor();
   await page.getByTestId('usage').filter({ hasText: '파일' }).waitFor();
+  // Language setting: explicit choices switch visible text immediately, automatic follows the system.
+  const pathButton = page.locator('.settings-data-path button[title]');
+  const pathTitle = () => pathButton.getAttribute('title');
+  const choose = (name) => page.getByTestId('language-card').locator(`[data-choice="${name}"]`);
+  await choose('en').click();
+  assert.equal(await pathTitle(), 'Copy path');
+  assert.equal(await choose('en').getAttribute('aria-checked'), 'true');
+  await choose('ko').click();
+  assert.equal(await pathTitle(), '경로 복사');
+  await choose('auto').click();
+  const systemKorean = await page.evaluate(() =>
+    (navigator.languages?.[0] ?? '').toLowerCase().startsWith('ko'),
+  );
+  assert.equal(await pathTitle(), systemKorean ? '경로 복사' : 'Copy path');
+  assert.equal(await choose('auto').getAttribute('aria-checked'), 'true');
+  await choose('ko').click();
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-language-card.png') });
+
   assert.equal(await page.getByText(dataRoot, { exact: true }).count(), 1);
   const syntheticWindowsRoot =
     'C:\\Users\\Smoke User\\AppData\\Roaming\\TorchLauncher\\servers\\44444444-4444-4444-8444-444444444444';

@@ -254,9 +254,23 @@ try {
 
   // Start screen -> new project.
   await page.getByTestId('start-page').waitFor();
+  // Language setting on the start screen: explicit choices switch text now, automatic follows --lang.
+  const language = (name) => page.locator(`[data-testid="start-page"] [data-choice="${name}"]`);
+  assert.equal(await language('auto').getAttribute('aria-checked'), 'true');
+  await language('en').click();
+  await page.getByTestId('start-new').filter({ hasText: 'New project' }).waitFor();
+  assert.equal(await language('en').getAttribute('aria-checked'), 'true');
+  await language('ko').click();
+  await page.getByTestId('start-new').filter({ hasText: '새 프로젝트' }).waitFor();
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-language-start.png') });
+  await language('auto').click();
+  await page.getByTestId('start-new').filter({ hasText: '새 프로젝트' }).waitFor();
+  assert.equal(await language('auto').getAttribute('aria-checked'), 'true');
   await page.getByTestId('start-new').click();
   await page.getByTestId('project-card').waitFor();
   assert.equal(await nav('개요').getAttribute('aria-current'), 'page');
+  // The language control is also in the sidebar footer while a project is open.
+  await page.locator('.side [data-testid="language-control"] [aria-checked="true"]').waitFor();
   assert.match(await page.title(), /TorchLauncher Studio/);
 
   // Server info: validation.

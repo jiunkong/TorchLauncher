@@ -1,13 +1,20 @@
 import torchUrl from '../assets/torch.png';
 import { FolderIcon, PlusIcon } from '../components/Icons';
+import { LanguageControl } from '../components/LanguageControl';
 import type { StudioController } from '../hooks/useStudio';
 import { useStudioLocale } from '../i18n';
 
 export function StartPage({ studio }: { studio: StudioController }) {
-  const { t } = useStudioLocale();
+  const { t, preference, setLocale, useAutomaticLocale: followSystem } = useStudioLocale();
   const { busy, run } = studio;
   return (
     <div className="hero" data-testid="start-page">
+      <div className="lang-corner">
+        <LanguageControl
+          preference={preference}
+          onSelect={(choice) => (choice === 'auto' ? followSystem() : setLocale(choice))}
+        />
+      </div>
       <div className="inner">
         <div className="head">
           <img src={torchUrl} alt="" width={72} height={72} />

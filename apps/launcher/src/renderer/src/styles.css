@@ -1626,3 +1626,28 @@ svg {
 .dialog-actions.between {
   justify-content: space-between;
 }
+
+/* 언어 설정 */
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 3px;
+  border-radius: 9px;
+  background: var(--bg-deep);
+  border: 1px solid var(--line-2);
+}
+.seg button {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+}
+.seg button.on {
+  background: var(--red-600);
+  color: #fff;
+  font-weight: 700;
+}
