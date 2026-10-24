@@ -14,6 +14,7 @@
 `feat/studio-mods-files` / `.agents/worktrees/studio-mods-files`, code baseline `570b0c4` (task checkout `42483a6`에서 docs commit fast-forward 후 수정 시작).
 한 명이 배정된 renderer/main/shared 범위를 맡고,
 #0은 문서·통합·검증을 담당한다. STUDIO-EXPORT-01은 아직 시작하지 않는다.
+`.jar` native picker filter/title locale에 필요한 Studio `main/index.ts`·`i18n.ts`·`native-dialogs.test.ts`를 배타 범위에 추가했다.
 사용자 결정: 개발 빌드는 로컬 런처 산출물, 릴리스는 캐시 우선 후 필요 시 최신 다운로드.
 미결: GitHub 릴리스 `owner/repo`(EXPORT 작업 전 결정 필요). 모드 설정 파일 편집기는 작업 배정서대로 모드 페이지의 하위 섹션에 둔다.
 

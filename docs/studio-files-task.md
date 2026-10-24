@@ -25,9 +25,10 @@
 ## STUDIO-FILES-01 — 모드 페이지·파일 페이지 (항목 1·2)
 
 - #1 `studio_mods_files`, `gpt-6-luna` low (사용자 요청; 범위·UI 동작이 이 배정서에 확정되어 있음).
-  브랜치 `feat/studio-mods-files`, worktree `.agents/worktrees/studio-mods-files`, baseline `42483a6`.
+  브랜치 `feat/studio-mods-files`, worktree `.agents/worktrees/studio-mods-files`, initial baseline `42483a6` (docs sync `570b0c4`).
 - 독점: `apps/admin/src/renderer/**`(**`pages/ExportPage.tsx`와 catalog의 `export.*` 키 제외**), `apps/admin/src/shared/studio.ts`의
   pack 관련 타입, `apps/admin/src/main/game-settings.ts`·`files-diff.ts`·`scan.ts`·`ipc` 중 pack 추가/정책/이동/삭제에 필요한 부분,
+  `.jar` 선택 필터/제목 번역에 필요한 `apps/admin/src/main/index.ts`·`i18n.ts`·`native-dialogs.test.ts`,
   관련 테스트, `scripts/` 중 Studio 기능 smoke, `docs/handoffs/STUDIO-FILES-01.md`.
 - 할 일:
   - `PackKind`에 모드를 추가하거나 동등한 모드 관리 경로를 만든다. 리소스팩과 같은 UI(추가·정책 항상/최초/제외·순서 불필요 시 생략·삭제·크기 표시).
