@@ -111,7 +111,11 @@ function createWindow(): void {
   });
 
   void window.loadURL(rendererUrl).catch((error: unknown) => {
-    console.error('Could not load application window', error);
+    // One clear line (the message carries Chromium's code, e.g. ERR_UNSAFE_PORT) and a failing exit code.
+    const reason = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`Could not load the application window from ${rendererUrl}: ${reason}\n`);
+    // Normal shutdown first, then a failing exit code so this never looks like a clean exit.
+    app.once('quit', () => process.exit(1));
     app.quit();
   });
 }

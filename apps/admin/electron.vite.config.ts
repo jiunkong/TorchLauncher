@@ -3,6 +3,12 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
+/** Ports Chromium refuses to load (ERR_UNSAFE_PORT) that are 1024 or higher. */
+const unsafePorts = new Set([
+  1719, 1720, 1723, 2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679,
+  6697, 10080,
+]);
+
 /** Renderer dev-server port: `TORCH_STUDIO_DEV_PORT` (integer 1024-65535), default 5174; invalid values fail fast. */
 function devPort(): number {
   const raw = process.env.TORCH_STUDIO_DEV_PORT;
@@ -11,6 +17,10 @@ function devPort(): number {
   if (!/^\d+$/.test(raw) || port < 1024 || port > 65535)
     throw new Error(
       `TORCH_STUDIO_DEV_PORT must be an integer from 1024 to 65535 (got "${raw}"). Unset it to use 5174.`,
+    );
+  if (unsafePorts.has(port))
+    throw new Error(
+      `TORCH_STUDIO_DEV_PORT: port ${port} is blocked by Chromium as unsafe; pick another, e.g. 6100.`,
     );
   return port;
 }
