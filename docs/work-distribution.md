@@ -4,7 +4,7 @@
 
 2026-10-24 STUDIO-FILES-01 시작: 사용자 지시로 배정서의 모드·기타 파일 페이지 작업만 착수한다.
 #1 `studio_mods_files`, `gpt-6-luna` low, `feat/studio-mods-files`, `.agents/worktrees/studio-mods-files`,
-baseline `42483a6`. 독점 범위와 완료 조건은 [studio-files-task.md](studio-files-task.md). 개발 빌드 모드도 따르는 가운데
+initial baseline `42483a6`, docs fast-forward `570b0c4`. 독점 범위와 완료 조건은 [studio-files-task.md](studio-files-task.md). 개발 빌드 모드도 따르는 가운데
 기존 모드 설정 편집기를 모드 페이지 두 번째 섹션으로 유지한다. #0만 tracker·통합·통합 검증을 맡는다.
 STUDIO-EXPORT-01은 병렬로 시작하지 않는다. GitHub owner/repo 결정이 필요하고 사용자 지시가 아직 없다.
 
