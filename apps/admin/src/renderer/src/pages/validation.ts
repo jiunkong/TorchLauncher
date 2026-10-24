@@ -34,9 +34,7 @@ export function validateServer(project: StudioProject): ServerErrors {
   } catch {
     errors.address = 'validation.address';
   }
-  if (!versionToken.test(project.game.minecraftVersion))
-    errors.minecraftVersion = 'validation.version';
-  else if (!(minecraftVersions as readonly string[]).includes(project.game.minecraftVersion))
+  if (!(minecraftVersions as readonly string[]).includes(project.game.minecraftVersion))
     errors.minecraftVersion = 'validation.gameVersion';
   if (!versionToken.test(project.game.loader.version)) errors.loaderVersion = 'validation.version';
   return errors;

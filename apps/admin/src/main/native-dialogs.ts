@@ -41,7 +41,7 @@ export function createStudioNativeDialogs(
           ? kind === 'projectparent'
             ? ['openDirectory', 'createDirectory']
             : ['openDirectory']
-          : kind === 'files'
+          : kind === 'files' || kind === 'mod' || kind === 'resourcepack' || kind === 'shaderpack'
             ? ['openFile', 'multiSelections']
             : ['openFile'],
         ...(!directory && kind !== 'files'

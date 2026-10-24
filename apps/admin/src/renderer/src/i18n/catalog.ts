@@ -100,7 +100,7 @@ const table = {
   'op.new': ['Preparing a new project…', '새 프로젝트를 준비하는 중…'],
   'op.open': ['Opening the project…', '프로젝트를 여는 중…'],
   'op.save': ['Saving the project…', '프로젝트를 저장하는 중…'],
-  'op.source': ['Choosing the source folder…', '소스 폴더를 선택하는 중…'],
+  'op.source': ['Choosing files…', '파일을 선택하는 중…'],
   'op.files': ['Adding files…', '파일을 추가하는 중…'],
   'op.build': ['Building the torchpack…', 'torchpack을 생성하는 중…'],
   'op.check': ['Checking the deployment address…', '배포 주소를 확인하는 중…'],
@@ -256,8 +256,8 @@ const table = {
     '이번 실행에서 아직 배포 파일을 만들지 않았습니다',
   ],
   'overview.unknown.body': [
-    'Build the deployment file after choosing the source folder and files. Studio compares against it from then on.',
-    '소스 폴더와 파일을 고른 뒤 배포 파일을 만드세요. 이후 변경 여부를 이 파일과 비교합니다.',
+    'Build the deployment file after adding files. Studio compares against it from then on.',
+    '파일을 추가한 뒤 배포 파일을 만드세요. 이후 변경 여부를 이 파일과 비교합니다.',
   ],
   'overview.unknown.cta': ['Build deployment file', '배포 파일 만들기'],
   'overview.lastDeploy': [
@@ -292,7 +292,7 @@ const table = {
     '{count}개 파일 · 항상 적용 {always} · 최초 설치만 {initial}',
   ],
   'overview.files.source': ['Project folder · {name}', '프로젝트 폴더 · {name}'],
-  'overview.files.noSource': ['No source folder selected', '소스 폴더를 선택하지 않았습니다'],
+  'overview.files.noSource': ['No project folder open', '열린 프로젝트 폴더가 없습니다'],
   'overview.export.last': ['Last export · {name}', '마지막 내보내기 · {name}'],
   'overview.export.none': ['Not exported in this session.', '이번 실행에서 내보낸 적이 없습니다.'],
   'overview.export.hint': [
@@ -317,10 +317,6 @@ const table = {
   ],
   'server.minecraft': ['Minecraft version', 'Minecraft 버전'],
   'server.chooseMinecraft': ['Choose a Minecraft release', 'Minecraft 정식 버전 선택'],
-  'server.minecraftHelp': [
-    'Stable releases from 1.14 onward. Only Minecraft 1.21.1 is currently installation-validated.',
-    '1.14부터 현재까지의 정식 버전입니다. 현재 설치 검증을 마친 버전은 Minecraft 1.21.1뿐입니다.',
-  ],
   'server.loader': ['Loader', '로더'],
   'server.loaderVersion': ['Loader version', '로더 버전'],
   'server.chooseLoader': ['Choose a compatible loader version', '호환되는 로더 버전 선택'],
@@ -384,7 +380,7 @@ const table = {
   'files.sourceNone': ['Not selected', '선택되지 않음'],
   'files.sourceChange': ['Change folder', '폴더 변경'],
   'files.revealProject': ['Show in folder', '폴더 표시'],
-  'files.add': ['Add files (copy to project)', '파일 추가(프로젝트에 복사)'],
+  'files.add': ['Add files', '파일 추가'],
   'files.rescan': ['Rescan', '다시 읽기'],
   'files.policy.always': ['Always apply', '항상 적용'],
   'files.policy.initial': ['First install only', '최초 설치만'],
@@ -403,12 +399,12 @@ const table = {
   'files.chg.removed': ['Removed', '삭제됨'],
   'files.missing': ['{count} missing', '누락 {count}'],
   'files.missingRow': [
-    'The source folder no longer has this file; a build would fail.',
-    '소스 폴더에 이 파일이 없습니다. 이대로는 배포 파일을 만들 수 없습니다.',
+    'The project’s files folder no longer has this file; a build would fail.',
+    '프로젝트의 files 폴더에 이 파일이 없습니다. 이대로는 배포 파일을 만들 수 없습니다.',
   ],
   'files.truncated': [
-    'The source folder has more files than can be listed. Only the first ones are shown.',
-    '소스 폴더에 표시할 수 있는 수보다 많은 파일이 있습니다. 앞쪽 일부만 표시합니다.',
+    'The project’s files folder has more files than can be listed. Only the first ones are shown.',
+    '프로젝트의 files 폴더에 표시할 수 있는 수보다 많은 파일이 있습니다. 앞쪽 일부만 표시합니다.',
   ],
   'files.skipped': [
     '{count} links or special files were skipped.',
@@ -530,8 +526,8 @@ const table = {
   'settings.packs.down': ['Move {name} down', '{name} 아래로'],
   'settings.packs.remove': ['Remove {name}', '{name} 제거'],
   'settings.packs.removeNote': [
-    'Removing a pack only removes it from the preset; the file stays in the source folder.',
-    '팩을 제거해도 프리셋에서만 빠지고 소스 폴더의 파일은 지워지지 않습니다.',
+    'Removing a pack only removes it from the preset; the file stays in the project’s files folder.',
+    '팩을 제거해도 프리셋에서만 빠지고 프로젝트 files 폴더의 파일은 지워지지 않습니다.',
   ],
   'settings.packs.hint': [
     '“Not set” does not ship the pack. “Initial default” ships it and adds it to the list once. A pack set to “Always fixed” cannot be turned off and keeps its order.',
@@ -889,8 +885,8 @@ const table = {
   'test.reset.open': ['Reset test instance', '테스트 인스턴스 초기화'],
   'test.reset.title': ['Reset the test instance?', '테스트 인스턴스를 초기화할까요?'],
   'test.reset.body': [
-    'Files created in this project’s test folder will be deleted. The source folder and other projects are not affected.',
-    '이 프로젝트의 테스트 폴더에 있는 파일을 삭제합니다. 소스 폴더와 다른 프로젝트에는 영향이 없습니다.',
+    'Files created in this project’s test folder will be deleted. The project’s files and other projects are not affected.',
+    '이 프로젝트의 테스트 폴더에 있는 파일을 삭제합니다. 프로젝트의 파일과 다른 프로젝트에는 영향이 없습니다.',
   ],
   'test.reset.confirm': ['Reset instance', '인스턴스 초기화'],
   'test.exit.exited': ['Game closed', '게임 종료'],
@@ -926,8 +922,8 @@ const table = {
     '만든 시각 {date} · {count}개 파일 · {size}',
   ],
   'deploy.unknownSource': [
-    'A deployment file was built before. Choose the source folder to compare it with the current files.',
-    '이전에 만든 배포 파일이 있습니다. 소스 폴더를 선택하면 현재 파일과 비교합니다.',
+    'A deployment file was built before. Open the project folder to compare it with the current files.',
+    '이전에 만든 배포 파일이 있습니다. 프로젝트 폴더를 열면 현재 파일과 비교합니다.',
   ],
   'deploy.reveal': ['Show in folder', '폴더에서 보기'],
   'deploy.reason.files': ['Files changed', '파일 변경'],
@@ -1106,6 +1102,17 @@ const table = {
     'The public deployment file matches the project server ID, Minecraft version and loader.',
     '공개 배포 파일의 서버 ID · Minecraft · 로더가 프로젝트와 일치합니다.',
   ],
+  'result.packsAdded': ['Added {count}.', '{count}개를 추가했습니다.'],
+  'result.packsSkipped': ['Skipped {count}:', '{count}개는 건너뛰었습니다:'],
+  'result.packsMore': ['and {count} more', '외 {count}개'],
+  'result.packSkip.invalid': [
+    'not a valid file or name, or a different file with that name exists',
+    '올바르지 않은 파일·이름이거나 같은 이름의 다른 파일이 있음',
+  ],
+  'result.packSkip.too-large': ['too large', '크기 초과'],
+  'result.packSkip.duplicate': ['selected twice', '중복 선택'],
+  'result.packSkip.limit': ['too many files', '개수 한도 초과'],
+  'result.packSkip.failed': ['could not be read or copied', '읽거나 복사하지 못함'],
   'result.launcherZipCreated': [
     'The shared launcher and server settings were saved in one ZIP file.',
     '공통 런처와 서버 설정을 ZIP 파일 하나로 만들었습니다.',

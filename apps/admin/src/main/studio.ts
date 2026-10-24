@@ -16,6 +16,7 @@ import {
 import { minecraftVersions } from '../shared/minecraft-versions.js';
 import type {
   PackKind,
+  PackSkipReason,
   StudioExport,
   StudioExportCheck,
   StudioPack,
@@ -901,21 +902,79 @@ export class StudioService {
       case 'settingsPackAdd': {
         this.project();
         if (!this.sourceRoot) throw new StudioFailure('INVALID');
-        const picked = (await this.selected(command.kind))[0];
-        if (!picked) throw new StudioFailure('CANCELLED');
-        const pack = await addPack(this.sourceRoot, command.kind, picked, signal);
+        const picks = await this.selected(command.kind);
+        const settings = this.project().gameSettings;
+        const current =
+          (command.kind === 'resourcepack'
+            ? settings?.resourcePacks
+            : command.kind === 'shaderpack'
+              ? settings?.shaderPacks
+              : settings?.mods) ?? [];
+        const known = new Set(current.map((p) => p.name.toLowerCase()));
+        const seen = new Set<string>();
+        const added: StudioPack[] = [];
+        const skipped: { name: string; reason: PackSkipReason }[] = [];
+        let fresh = 0;
+        for (const [index, picked] of picks.entries()) {
+          signal.throwIfAborted();
+          const name = basename(picked);
+          const key = name.toLowerCase();
+          if (index >= MAX_PACKS) skipped.push({ name, reason: 'limit' });
+          else if (seen.has(key)) skipped.push({ name, reason: 'duplicate' });
+          else {
+            seen.add(key);
+            if (!known.has(key) && current.length + fresh >= MAX_PACKS) {
+              skipped.push({ name, reason: 'limit' });
+              continue;
+            }
+            try {
+              added.push(await addPack(this.sourceRoot, command.kind, picked, signal));
+              if (!known.has(key)) fresh += 1;
+            } catch (error) {
+              signal.throwIfAborted();
+              skipped.push({
+                name,
+                reason:
+                  error instanceof StudioFailure && error.code === 'TOO_LARGE'
+                    ? 'too-large'
+                    : error instanceof StudioFailure && error.code === 'INVALID'
+                      ? 'invalid'
+                      : 'failed',
+              });
+            }
+          }
+        }
         signal.throwIfAborted();
+        if (added.length === 0) {
+          // Nothing was added: report the common cause through the ordinary error codes.
+          const reasons = new Set(skipped.map((x) => x.reason));
+          throw new StudioFailure(
+            reasons.size === 1 && reasons.has('too-large')
+              ? 'TOO_LARGE'
+              : reasons.size === 1 && reasons.has('failed')
+                ? 'IO'
+                : 'INVALID',
+          );
+        }
         this.updatePack(
           command.kind,
           (list) => {
-            const index = list.findIndex((p) => p.name.toLowerCase() === pack.name.toLowerCase());
-            const existing = list[index];
-            if (existing) list[index] = { ...pack, policy: existing.policy };
-            else if (list.length >= MAX_PACKS) throw new StudioFailure('TOO_LARGE');
-            else list.push({ ...pack, policy: 'initial' });
+            for (const pack of added) {
+              const index = list.findIndex((p) => p.name.toLowerCase() === pack.name.toLowerCase());
+              const existing = list[index];
+              if (existing) list[index] = { ...pack, policy: existing.policy };
+              else if (list.length >= MAX_PACKS) throw new StudioFailure('TOO_LARGE');
+              else list.push({ ...pack, policy: 'initial' });
+            }
           },
           true,
         );
+        this.state.result = {
+          key: 'packsAdded',
+          added: added.length,
+          skippedCount: skipped.length,
+          skipped: skipped.slice(0, 5),
+        };
         return;
       }
       case 'settingsPackPolicy':

@@ -46,5 +46,12 @@ describe('Studio native dialogs', () => {
       title: 'Choose a mod (.jar)',
       filters: [{ name: 'Java archive', extensions: ['jar'] }],
     });
+    await dialogs.open('resourcepack');
+    await dialogs.open('shaderpack');
+    for (const call of [4, 5, 6])
+      expect(showOpenDialog.mock.calls[call]?.[1].properties).toEqual([
+        'openFile',
+        'multiSelections',
+      ]);
   });
 });

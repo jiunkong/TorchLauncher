@@ -527,6 +527,94 @@ describe('service: game settings preset', () => {
     ]);
     expect(await readdir(join(h.source, 'resourcepacks'))).toContain('a.zip');
   });
+  describe('multi-file add', () => {
+    const pick = async (h: Awaited<ReturnType<typeof harness>>, files: [string, string][]) => {
+      const dir = join(h.root, 'multi');
+      await mkdir(dir, { recursive: true });
+      const paths: string[] = [];
+      for (const [name, content] of files) {
+        await writeFile(join(dir, name), content === 'plain' ? 'plain text' : zipBytes(content));
+        paths.push(join(dir, name));
+      }
+      return paths;
+    };
+    it('adds every picked mod', async () => {
+      const h = await harness();
+      h.d.open.mockResolvedValueOnce(
+        await pick(h, [
+          ['a.jar', '1'],
+          ['b.jar', '2'],
+        ]),
+      );
+      const reply = await h.s.request({ action: 'settingsPackAdd', kind: 'mod' });
+      expect(reply).toMatchObject({
+        ok: true,
+        state: { result: { key: 'packsAdded', added: 2, skippedCount: 0, skipped: [] } },
+      });
+      expect(h.s.snapshot().project?.gameSettings?.mods?.map((p) => p.name)).toEqual([
+        'a.jar',
+        'b.jar',
+      ]);
+      expect((await readdir(join(h.source, 'mods'))).sort()).toEqual(['a.jar', 'b.jar']);
+    });
+    it('adds the valid files and reports the invalid ones', async () => {
+      const h = await harness();
+      h.d.open.mockResolvedValueOnce(
+        await pick(h, [
+          ['good.zip', '1'],
+          ['bad.zip', 'plain'],
+          ['bad name?.zip', '3'],
+        ]),
+      );
+      const reply = await h.s.request({ action: 'settingsPackAdd', kind: 'resourcepack' });
+      expect(reply).toMatchObject({
+        ok: true,
+        state: {
+          result: {
+            key: 'packsAdded',
+            added: 1,
+            skippedCount: 2,
+            skipped: [
+              { name: 'bad.zip', reason: 'invalid' },
+              { name: 'bad name?.zip', reason: 'invalid' },
+            ],
+          },
+        },
+      });
+      expect(await readdir(join(h.source, 'resourcepacks'))).toEqual(['good.zip']);
+    });
+    it('fails with the ordinary error code when nothing can be added', async () => {
+      const h = await harness();
+      h.d.open.mockResolvedValueOnce(await pick(h, [['bad.zip', 'plain']]));
+      expect(await h.s.request({ action: 'settingsPackAdd', kind: 'shaderpack' })).toEqual({
+        ok: false,
+        code: 'INVALID',
+      });
+      expect(h.s.snapshot().project?.gameSettings?.shaderPacks ?? []).toEqual([]);
+    });
+    it('skips a name picked twice (case-insensitive)', async () => {
+      const h = await harness();
+      const [a] = await pick(h, [['a.jar', '1']]);
+      const other = join(h.root, 'multi', 'sub');
+      await mkdir(other);
+      await writeFile(join(other, 'A.jar'), zipBytes('2'));
+      h.d.open.mockResolvedValueOnce([a as string, join(other, 'A.jar')]);
+      expect(await h.s.request({ action: 'settingsPackAdd', kind: 'mod' })).toMatchObject({
+        ok: true,
+        state: { result: { added: 1, skipped: [{ name: 'A.jar', reason: 'duplicate' }] } },
+      });
+      expect(await readdir(join(h.source, 'mods'))).toEqual(['a.jar']);
+    });
+    it('changes nothing when the dialog is cancelled', async () => {
+      const h = await harness();
+      h.d.open.mockResolvedValueOnce(null);
+      expect(await h.s.request({ action: 'settingsPackAdd', kind: 'mod' })).toEqual({
+        ok: false,
+        code: 'CANCELLED',
+      });
+      await expect(readdir(join(h.source, 'mods'))).rejects.toBeDefined();
+    });
+  });
   it('refuses a pack that changed on disk after it was added, before writing anything', async () => {
     const h = await harness();
     await h.addPackFile('resourcepack', 'a.zip', '1');

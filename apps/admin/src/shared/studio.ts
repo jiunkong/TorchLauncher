@@ -354,7 +354,15 @@ export type StudioResult =
         | 'remoteMatches';
     }
   | { key: 'packCreated'; sequence: number; signed: true; keyCreated: boolean }
-  | { key: 'launcherZipCreated'; keyCreated: boolean };
+  | { key: 'launcherZipCreated'; keyCreated: boolean }
+  | {
+      /** Mods or packs added from one pick; `skipped` lists the first few rejected files. */
+      key: 'packsAdded';
+      added: number;
+      skippedCount: number;
+      skipped: { name: string; reason: PackSkipReason }[];
+    };
+export type PackSkipReason = 'invalid' | 'too-large' | 'duplicate' | 'limit' | 'failed';
 export type StudioCommand =
   | { action: 'export'; target?: LauncherTarget; allowCached?: boolean; cachedVersion?: string }
   | {
