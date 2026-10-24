@@ -7,6 +7,16 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-VERSION-SELECT-01 완료
+
+작업자 `studio_version_select_low`의 `7536aee`를 main `02918a0`으로 통합했다. Studio는 2026-10-24 기준
+공식 Mojang 안정 릴리스 76개(1.7.10 이상)를 고정 목록으로 제공하며 게임 버전 목록을 런타임에 조회하지 않는다.
+Fabric/NeoForge 로더 목록은 게임·종류 조합에 따라 공식 온라인 메타데이터를 조회한다. 변경 후 선택이 호환 목록에 없으면
+비우고 다시 선택하게 한다. 실제 설치 검증 대상은 계속 Minecraft 1.21.1 · Windows/Linux x64다.
+통합 검사: 관련 Vitest 4 files/12 tests, Studio typecheck/build, Studio 기능 smoke 모두 통과.
+작업자 scoped Biome도 오류 없이 통과(기존 CSS 경고 31개). 전체 `pnpm check`, 새 버전/로더 실설치는 실행하지 않았다.
+세부 출처·범위·검사 내용은 [인계](handoffs/STUDIO-VERSION-SELECT-01.md).
+
 CURRENT-FORMAT 정리 완료(2026-10-24 사용자 승인): 과거 형식 reader/writer·무서명 우회·호환 export 제거.
 - #1 `current_formats_core` Sol medium `01291c4`/`a4d28e4` → `f7845c8`, 후속 `42dc247` → `79055d7`.
   torchpack1.2만 생성/판독, sign/sequence 필수·index branding/sequence 필수, config signing 필수.

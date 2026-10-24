@@ -2,6 +2,18 @@
 
 ## 역할과 현재 배정
 
+2026-10-24 STUDIO-VERSION-SELECT-01: Studio 서버 설정의 게임/로더 버전 드롭다운.
+#1 `studio_version_select`, `gpt-6-luna` low, `.agents/worktrees/studio-version-select`,
+`feat/studio-version-select`, baseline `0a966ac`. 모델은 고정 메타데이터 목록과 온라인 로더 카탈로그의 범위가
+명확한 Studio UI/IPC 작업이라 최소 모델 Luna·low로 배정했다. 최초 Luna·medium 배정은 사용자 피드백에 따라
+파일 변경 전 중단했고, 실제 구현은 Luna·low 작업자가 완료했다. 독점 `apps/admin/**` 및
+`docs/handoffs/STUDIO-VERSION-SELECT-01.md`; #0만 `docs/progress.md`와 이 문서를 수정하고 통합한다.
+안정 Minecraft 릴리스는 공식 manifest에서 1.7.10 이상을 1회 가져와 저장하고 런타임 Minecraft 목록 요청은 하지 않는다.
+선택한 게임/로더 조합에 맞는 Fabric/NeoForge 버전은 공식 온라인 메타데이터에서 가져온다.
+선택 변경 때 호환되지 않는 로더 버전을 유지하지 않는다. 드롭다운 제공 범위와 실제 설치 검증 범위를 혼동하지 않는다.
+- 완료: `7536aee` → main `02918a0`. 관련 Vitest 4 files/12 tests, Studio typecheck/build/기능 smoke 통과;
+  작업자 Biome 오류0(기존 CSS warning31). 전체 `pnpm check`와 새 버전 조합 실설치는 미실행. [인계](handoffs/STUDIO-VERSION-SELECT-01.md).
+
 2026-10-24 CURRENT-FORMAT 정리 사용자 승인: 개발 중 과거 호환 reader/writer/전환 경로 삭제, 현재 규격만 유지.
 - #1 `current_formats_core`, gpt-6.1-sol medium, agent-1 `feat/current-formats-core`, baseline `66ed90b`.
   독점 `packages/**` 및 `docs/handoffs/CURRENT-FORMAT-CORE-01.md`. torchpack1.2 단일화, sign/sequence 필수,
