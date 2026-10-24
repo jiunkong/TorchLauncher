@@ -18,12 +18,15 @@
   "serverId": "44444444-4444-4444-8444-444444444444",
   "name": "Example server",
   "address": "localhost:25565",
-  "sourceUrl": "https://example.org/server.torchpack"
+  "sourceUrl": "https://example.org/server.torchpack",
+  "signing": { "algorithm": "ed25519", "publicKey": "<Studio가 내보낸 공개키>" }
 }
 ```
 
+예시의 공개키 placeholder는 Studio가 내보낸 실제 32바이트 정규 base64url 공개키로 대체한다.
+`signing`은 필수이며 구형/무서명 배포를 수락하지 않는다. [현재 형식](current-formats.md)을 따른다.
 UUID v4, 제한된 이름·주소·HTTPS 공개 URL만 허용한다. 자격 증명 URL·임의 경로·실행 명령은 허용하지 않는다.
-배포 reader의 serverId·게임 버전·로더가 진실의 기준이다. 서버 구성에 게임 설정을 중복 저장하지 않는다.
+서명 검증된 배포 reader의 serverId·게임 버전·로더가 실행 기준이다. 서버 구성의 선택 `game`은 시작 전 표시 hint다.
 계약 구현은 Studio 작업자가 `packages/core/src/server-config/**`에 작성하고 런처가 같은 모듈을 가져온다.
 공개 package export·의존성 변경 없이 기존 내부 상대 import 방식을 사용한다.
 

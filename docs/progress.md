@@ -7,14 +7,27 @@
 
 ## 현재 상태와 다음 작업
 
-CURRENT-FORMAT 정리 진행(2026-10-24 사용자 승인): torchpack1.0/1.1·무서명 출력/런처 우회·lockv1 판독을 제거한다.
-현재 1.2 sign/sequence/branding 및 서버 구성 signing을 필수로 통일한다. 구조 검사 도구의 key 없는 unverified는 유지하되
-런처는 항상 verified만 사용한다. 현재 단일 schema1 프로젝트/백업/정책, 선택적 사용자 값과 Minecraft 외부 포맷은 유지한다.
-#1 `current_formats_core`/agent-1 `feat/current-formats-core`, #2 `current_formats_apps`/agent-2 `feat/current-formats-apps`,
-둘 다 Sol medium, baseline `66ed90b`. #0 명세 갱신·검토·통합·검증 담당. 아직 전체 통합 검증 전이다.
-현행 기준은 [현재 형식](current-formats.md), [배포 규격](deployment-format.md), [서명](deployment-signing.md)이다.
-이전 인계/날짜별 기록은 역사적 증거로 보존하며, 현재 형식 설명과 충돌하면 현행 문서를 우선한다.
-
+CURRENT-FORMAT 정리 완료(2026-10-24 사용자 승인): 과거 형식 reader/writer·무서명 우회·호환 export 제거.
+- #1 `current_formats_core` Sol medium `01291c4`/`a4d28e4` → `f7845c8`, 후속 `42dc247` → `79055d7`.
+  torchpack1.2만 생성/판독, sign/sequence 필수·index branding/sequence 필수, config signing 필수.
+  lockv1을 해석하지 않고 invalid/uncertain으로 보호(자동 회수 없음). DEFAULT_PACKS 호환 export 삭제.
+- #2 `current_formats_apps` Sol medium `41cc46f` → `6bd67a2`. 런처는 항상 구성키 검증+롤백 판정,
+  Studio는 키 저장소 필수·항상 서명·URL 검사도 프로젝트 키로 검증. 무서명 export 업그레이드 경로 삭제.
+  현재 lastBuild/result는 numeric sequence; game-smoke launch는 `--signing-public-key` 필수.
+- 현재 schema1 프로젝트/백업/정책, 선택적 사용자 값과 Minecraft 외부 포맷 지원은 유지한다.
+  key 없는 코어 reader unverified는 현재 형식 구조 검사 도구용이며 런처 우회 경로는 아니다.
+- main 영어 `pnpm check` 성공: **1477개 통과/9 skip**, 전체 타입·두 앱 빌드·Biome(43 warnings/2 infos, 오류0).
+  공통 두 앱 smoke, Studio/런처 기능 smoke, 양쪽 branding smoke 모두 main 성공.
+  로그 `/tmp/torch-current-formats-check.log`, `/tmp/torch-current-formats-{smoke,studio-smoke,launcher-smoke,studio-branding,launcher-branding}.log`.
+- 작업자 core945/9skip·API집중57·감사138, apps442·최종집중36 및 타입/빌드/smoke 성공.
+  검증 중 구형 fixture offset/verification/키 저장소 및 locale 시작 가정을 갱신했다. 실패와 최종 결과는 해당 인계 참조.
+- 별도 기존 UI 한계: 760px에서 경로를 화면 하단 가까이 최소 스크롤하면 toast가 겹칠 수 있다.
+  branding smoke는 복사 대상을 중앙으로 맞춘 상태의 overlap만 검증한다. 제품 UI 수정은 이번 범위에서 제외했고 미해결로 기록한다.
+- 실제 호스팅/실계정·게임·Windows 신규 검증은 없음. 기존 ignored 비공개 config/pack은 수정하지 않았다.
+  구형 개발 배포물은 현재 Studio에서 다시 생성/내보내야 한다(자동 migration 없음).
+- 작업자 종료·병합 브랜치 정리. 현행 기준 [현재 형식](current-formats.md), [배포 규격](deployment-format.md),
+  [서명](deployment-signing.md). 이전 인계/날짜별 기록은 역사적 증거이며 현행 문서를 우선한다.
+  [코어 인계](handoffs/CURRENT-FORMAT-CORE-01.md), [앱 인계](handoffs/CURRENT-FORMAT-APPS-01.md).
 
 STUDIO-START-LINE-01 완료(2026-10-24): 시작화면 메뉴 아래 검은 띠는 `.page` 상단 28px 여백이
 hero 배경 밖에 드러난 것이 원인. #1 gpt-6-luna medium `b0c032d` → `bcf7e1e` 통합.
@@ -203,7 +216,7 @@ Linux/WSLg 두 앱 root smoke(760/1100px·IPC/격리/탐색), Studio 기능 smok
 ### 남은 작업과 권장 순서
 
 2026-10-24 기준. 브랜딩·Studio UI/게임 설정·서명/롤백 방지·ZIP·인앱 로그인 코드·영어 번역은
-구현·통합됐다. CURRENT-FORMAT 정리는 사용자 승인으로 진행 중이며, 완료 후 아래 QA를 진행한다.
+구현·통합됐다. CURRENT-FORMAT 정리도 완료했다. 후속 승인/배정 시 아래 QA를 진행한다.
 이전 날짜의 구현/미구현 서술과 handoff는 역사적 기록이며 [현재 형식](current-formats.md)을 우선한다.
 
 1. **QA-01 종단 검증:** 현재 Studio 구성→서명된 1.2 생성/호스팅→ZIP 내보내기→새 환경 설치/접속→동일 URL 교체.

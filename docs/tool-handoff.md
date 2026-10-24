@@ -5,19 +5,36 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
-## Active CURRENT-FORMAT cleanup (2026-10-24, #0)
+## Completed CURRENT-FORMAT cleanup (2026-10-24, #0)
 
-User authorized removing historical compatibility and updating docs. Two workers, both Sol medium:
-core agent-1 feat/current-formats-core (packages/** + own handoff), apps agent-2 feat/current-formats-apps
-(apps/** + scripts/** + own handoff), baseline66ed90b. Coordinator owns all active specs/README/AGENTS/tracker.
-Only torchpack1.2, writer sign+sequence required, index branding+sequence required; config signing required.
-Remove unsigned launcher/Studio fallback and lockv1 reader; keep unknown locks protected, current schema1 formats,
-optional branding/game hint/preferences and third-party Minecraft data support. Reader keyless unverified mode is
-current-format inspection only, launcher always verified. See docs/current-formats.md.
-Core focused270 tests and types passed; full packages checks in flight. Apps consumers/fixtures being updated.
-No integration/full-workspace success claimed yet. Next: review/integrate core, apps rebase/update baseline,
-apps focused validation, integrate apps, main pnpm check and relevant Electron smokes, record completion.
-No live server/private config/user credential changes. Old ignored packs/config must be regenerated later, not auto migrated.
+This supersedes pending status in older sections. User authorized removal of past-format compatibility.
+Two workers used exactly gpt-6.1-sol medium (core agent-1, apps agent-2), no higher-model escalation.
+Core01291c4+a4d28e4 integrated f7845c8; core audit42dc247 integrated79055d7;
+apps41cc46f integrated6bd67a2. Both finished, no task process remains. Coordinator docs commit follows.
+
+Only torchpack1.2 accepted/emitted; writer sign/sequence required, index branding/sequence required,
+config signing required. Removed unsigned runtime/Studio fallbacks, lockv1 parsing, DEFAULT_PACKS alias.
+Unknown/obsolete locks stay uncertain/protected; no automatic old-lock recovery.
+Studio checks remote packs with project publickey and never exports an obsolete/unauthenticated pack.
+Current schema1 formats, optional memory/game hint/branding and third-party Minecraft formats remain valid.
+Reader keyless unverified is structural inspection only; launcher always verifies configured publisher.
+New scripts/game-smoke launch requires --signing-public-key. Do not reuse old commands without that key.
+
+Main English pnpm check PASSED1477tests/9skip, full types/both builds/Biome0errors(43warnings/2infos).
+Main root both-app smoke, Studio+launcher functional smoke, both native branding smokes PASSED.
+Logs /tmp/torch-current-formats-check.log and /tmp/torch-current-formats-{smoke,studio-smoke,
+launcher-smoke,studio-branding,launcher-branding}.log. Environment-specific, no Windows/live evidence added.
+Existing branding harness locale assumptions fixed. Centered-copy geometry setup made deterministic;
+known separate UI limitation:760px path near viewport bottom can still be overlaid by toast. No product fix
+in this task, overlap assertion covers centered target only. Retain this limitation for future UI work.
+
+See docs/current-formats.md and both CURRENT-FORMAT handoffs. README/AGENTS/current specs and remaining-work
+section refreshed. Historical handoffs remain dated evidence, not current compatibility guarantees.
+Old ignored private packs/configs were not edited; regenerate/re-export in current Studio, no migration helper.
+No account/server action requested or executed. Agent-1/2 clean detached at integrated main after cleanup;
+agent-3/4 and unrelated branches preserved. Node24.21.0/corepack pnpm10.34.7, DISPLAY=:0 verified.
+Use PATH=/tmp/main-i18n-bin:$PATH for nested pnpm scripts; default pnpm points at Windows shim.
+No further implementation assigned. Remaining: full deployment/native QA, auto-updater, own Microsoft app/release.
 
 ## Latest UI follow-up (2026-10-24, #0)
 

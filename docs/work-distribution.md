@@ -14,6 +14,9 @@
 - 선택적 브랜딩/게임 표시 hint/메모리 값은 현재 기능이며 유지. Minecraft·외부 포맷 지원은 과거 앱 호환과 구분.
 - #0은 명세·현행 안내 갱신/검토/통합·전체 검증. manifest/lockfile 변경은 배정하지 않음. core 통합 후 apps 검증.
   cross-package 계약 변경 규모 때문에 Sol medium 두 명; 추가 에이전트/고사양 상향 없음.
+- 완료: core `01291c4`/`a4d28e4`/`42dc247`, apps `41cc46f`를 #0이 `f7845c8`/`79055d7`/`6bd67a2`로 통합.
+  main check1477passed/9skip·전체 타입/두 빌드·공통+두 기능+두 branding smoke 성공. 작업자 종료/브랜치 정리.
+  Windows/live 신규 검증 없음. 760px 하단 경로 toast 겹침은 별도 기존 UI 한계로 progress에 기록(중앙 target smoke만 검증).
 
 
 2026-10-24 STUDIO-START-LINE-01: 사용자 시작페이지 상단 검은 선 보고. #1 `studio_start_line`, gpt-6-luna medium,
