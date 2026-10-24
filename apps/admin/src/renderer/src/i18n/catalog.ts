@@ -161,8 +161,8 @@ const table = {
   ],
 
   'validation.gameVersion': [
-    'Choose a Minecraft release from the list (1.7.10 or newer).',
-    '목록에서 Minecraft 1.7.10 이상 정식 버전을 선택하세요.',
+    'Choose a Minecraft release from the list (1.14 or newer).',
+    '목록에서 Minecraft 1.14 이상 정식 버전을 선택하세요.',
   ],
 
   'overview.eyebrow': ['Project overview', '프로젝트 개요'],
@@ -249,8 +249,8 @@ const table = {
   'server.minecraft': ['Minecraft version', 'Minecraft 버전'],
   'server.chooseMinecraft': ['Choose a Minecraft release', 'Minecraft 정식 버전 선택'],
   'server.minecraftHelp': [
-    'Stable releases from 1.7.10 onward. Only Minecraft 1.21.1 is currently installation-validated.',
-    '1.7.10부터 현재까지의 정식 버전입니다. 현재 설치 검증을 마친 버전은 Minecraft 1.21.1뿐입니다.',
+    'Stable releases from 1.14 onward. Only Minecraft 1.21.1 is currently installation-validated.',
+    '1.14부터 현재까지의 정식 버전입니다. 현재 설치 검증을 마친 버전은 Minecraft 1.21.1뿐입니다.',
   ],
   'server.loader': ['Loader', '로더'],
   'server.loaderVersion': ['Loader version', '로더 버전'],
