@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cancelClose, finishClose, onCloseRequest, runConfirmedSwitch } from './adapters/discard';
 import { deriveInsights } from './adapters/insights';
+import { LoginCodeDialog } from './components/LoginCodeDialog';
 import { Sidebar } from './components/Sidebar';
 import { Splash } from './components/Splash';
 import { UnsavedDialog } from './components/UnsavedDialog';
@@ -130,6 +131,13 @@ export function App() {
           </main>
         </div>
       </div>
+      {state?.account.login && (
+        <LoginCodeDialog
+          code={state.account.login.code}
+          onCopy={() => studio.testCommand({ action: 'testLoginCopyCode' })}
+          onCancel={() => void studio.run('cancel')}
+        />
+      )}
       {confirm && (
         <UnsavedDialog
           busy={busy}

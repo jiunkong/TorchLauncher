@@ -5,7 +5,16 @@ import {
   applicationNames,
   isTrustedRendererUrl,
 } from '@torchlauncher/core/desktop';
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  safeStorage,
+  session,
+  shell,
+} from 'electron';
 import { brandingDialogText, studioChannel, studioCloseChannel } from '../shared/studio.js';
 import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
@@ -122,11 +131,12 @@ function createWindow(): void {
         return result.canceled ? null : (result.filePath ?? null);
       },
       reveal: (path) => shell.showItemInFolder(path),
+      copy: (text) => clipboard.writeText(text),
     },
     undefined,
     decodeNativeImage,
     new SigningKeyStore(join(app.getPath('userData'), 'signing-keys'), safeStorage),
-    createStudioTestRunner(window),
+    createStudioTestRunner(),
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>

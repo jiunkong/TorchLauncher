@@ -9,7 +9,6 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { zip } from '../../../../packages/core/src/diagnostics/fixtures/zip.js';
 import type { Installation } from '../../../../packages/core/src/minecraft/installer.js';
 import type { GameExit, RunningGame } from '../../../../packages/core/src/minecraft/process.js';
-import { testAuthText } from '../shared/test-auth-text.js';
 import { handleStudioRequest } from './ipc.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 import { StudioTestRunner, TEST_LOG_LIMIT, type TestRunHost } from './test-run.js';
@@ -85,6 +84,7 @@ async function setup() {
   const dialogs = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
+    copy: vi.fn<NonNullable<StudioDialogs['copy']>>(),
   };
   const service = new StudioService(dialogs, undefined, undefined, null, runner);
   await service.request({ action: 'new' });
@@ -386,9 +386,6 @@ it.skipIf(process.platform === 'win32')('refuses reset through an instance symli
   });
   expect(await readFile(join(h.source, 'options.txt'), 'utf8')).toContain('gamma:0.5');
 });
-it('keeps main authentication text keys in parity', () => {
-  expect(Object.keys(testAuthText.ko).sort()).toEqual(Object.keys(testAuthText.en).sort());
-});
 
 it('finishes analysis after a requested normal stop and clears old results on project replacement', async () => {
   const h = await setup();
@@ -627,3 +624,94 @@ it.skipIf(process.platform === 'win32')(
     expect(h.service.snapshot().project).toEqual(project);
   },
 );
+
+const loginCode = 'ABCD-1234';
+/** A login that publishes its device code like the real host and ends when told to. */
+function pendingLogin(h: Awaited<ReturnType<typeof setup>>, end: 'abort' | 'success' | 'fail') {
+  h.auth.login.mockImplementationOnce(async (signal) => {
+    const release = h.runner.publishLoginCode(loginCode);
+    try {
+      if (end === 'success') return account;
+      if (end === 'fail') throw new HostAuthenticationError('browser_failed');
+      await new Promise<void>((resolve) => {
+        signal?.addEventListener('abort', () => resolve(), { once: true });
+      });
+      throw new AuthenticationError('cancelled', 'browser');
+    } finally {
+      if (end !== 'success') release();
+    }
+  });
+}
+
+it('publishes the device code in state only while the login waits', async () => {
+  const h = await setup();
+  expect(h.service.snapshot().account.login).toBeNull();
+  pendingLogin(h, 'abort');
+  const pending = h.service.request({ action: 'testLogin' });
+  await vi.waitFor(() => expect(h.service.snapshot().account.login).toEqual({ code: loginCode }));
+  expect(await h.service.request({ action: 'cancel' })).toMatchObject({ ok: true });
+  expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
+  expect(h.service.snapshot().account.login).toBeNull();
+});
+
+it('clears the published code after success, failure and logout', async () => {
+  const h = await setup();
+  pendingLogin(h, 'success');
+  expect(await h.service.request({ action: 'testLogin' })).toMatchObject({ ok: true });
+  // Even a host that forgets to release leaves nothing behind.
+  expect(h.service.snapshot().account.login).toBeNull();
+  pendingLogin(h, 'fail');
+  expect(await h.service.request({ action: 'testLogin' })).toEqual({ ok: false, code: 'IO' });
+  expect(h.service.snapshot().account.login).toBeNull();
+  pendingLogin(h, 'abort');
+  const pending = h.service.request({ action: 'testLogin' });
+  await vi.waitFor(() => expect(h.service.snapshot().account.login).not.toBeNull());
+  await h.service.request({ action: 'testLogout' });
+  await pending;
+  expect(h.service.snapshot().account.login).toBeNull();
+});
+
+it('copies the pending code through main and rejects when none is waiting', async () => {
+  const h = await setup();
+  expect(await h.service.request({ action: 'testLoginCopyCode' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+  });
+  expect(h.dialogs.copy).not.toHaveBeenCalled();
+  pendingLogin(h, 'abort');
+  const pending = h.service.request({ action: 'testLogin' });
+  await vi.waitFor(() => expect(h.service.snapshot().account.login).not.toBeNull());
+  for (const extra of [{ code: loginCode }, { text: 'x' }])
+    expect(await h.service.request({ action: 'testLoginCopyCode', ...extra })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+  expect(await h.service.request({ action: 'testLoginCopyCode' })).toMatchObject({ ok: true });
+  expect(h.dialogs.copy).toHaveBeenCalledExactlyOnceWith(loginCode);
+  await h.service.request({ action: 'cancel' });
+  await pending;
+  expect(await h.service.request({ action: 'testLoginCopyCode' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+  });
+  expect(h.dialogs.copy).toHaveBeenCalledOnce();
+});
+
+it('only answers the copy command for the trusted main frame', async () => {
+  const h = await setup();
+  const frame = { url: 'file:///studio/index.html' };
+  const contents = { mainFrame: frame } as unknown as WebContents;
+  for (const [sender, senderFrame] of [
+    [{}, frame],
+    [contents, { ...frame }],
+  ])
+    expect(
+      await handleStudioRequest(
+        { sender, senderFrame } as Pick<IpcMainInvokeEvent, 'sender' | 'senderFrame'>,
+        contents,
+        frame.url,
+        h.service,
+        { action: 'testLoginCopyCode' },
+      ),
+    ).toEqual({ ok: false, code: 'UNTRUSTED' });
+});

@@ -381,6 +381,16 @@ try {
   await page.getByTestId('test-page').waitFor();
   await page.getByRole('heading', { name: '테스트 실행' }).waitFor();
   await page.getByTestId('test-start').waitFor();
+  // No login in progress: no code dialog, no extra window, and copying has nothing to copy.
+  assert.equal(await page.getByTestId('login-dialog').count(), 0);
+  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
+  assert.deepEqual(
+    await page.evaluate(() => window.torchlauncher.request({ action: 'testLoginCopyCode' })),
+    {
+      ok: false,
+      code: 'INVALID',
+    },
+  );
   assert.equal(await page.getByTestId('test-login').isDisabled(), false);
   // Start screen: environment and account cards side by side, login inside the account card,
   // primary run button bottom-left below them, no explanatory body sentences.
