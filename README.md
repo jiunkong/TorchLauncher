@@ -21,7 +21,9 @@ pnpm install --frozen-lockfile
 pnpm dev:launcher
 ```
 
-Studio는 다른 터미널에서 실행합니다. 두 앱의 개발 서버 포트는 각각 5173, 5174입니다(`TORCH_LAUNCHER_DEV_PORT`, `TORCH_STUDIO_DEV_PORT` 환경 변수로 바꿀 수 있습니다).
+Studio는 다른 터미널에서 실행합니다. 두 앱의 개발 서버 포트는 각각 5173, 5174입니다(`TORCH_LAUNCHER_DEV_PORT`, `TORCH_STUDIO_DEV_PORT` 환경 변수로 바꿀 수 있습니다. 예: PowerShell `$env:TORCH_STUDIO_DEV_PORT=6100; pnpm dev:studio`, `$env:TORCH_LAUNCHER_DEV_PORT=6101; pnpm dev:launcher`).
+
+Windows 문제 해결: `listen EACCES 127.0.0.1:5173/5174`는 보통 해당 포트가 Windows 제외 포트 범위에 들어 있기 때문입니다(`netsh interface ipv4 show excludedportrange protocol=tcp`). 나열된 범위 밖이면서 Chromium이 막는 포트가 아닌 값(예: 6100/6101)을 고르세요. 6000, 6665-6669 등은 Chromium이 안전하지 않은 포트로 막으므로 개발 서버가 거부합니다.
 
 ```sh
 pnpm dev:studio

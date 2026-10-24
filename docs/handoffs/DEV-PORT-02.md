@@ -1,0 +1,7 @@
+# DEV-PORT-02
+
+Worker agent-1, branch `fix/dev-port-diagnostics`. Follow-up to DEV-PORT-01 after a Windows diagnosis.
+- Windows excluded TCP ranges (`netsh interface ipv4 show excludedportrange protocol=tcp`) cover the default 5173/5174 (and 5290/5291), hence `listen EACCES`. Docs and the DEV-PORT-01 handoff now use 6100/6101: `$env:TORCH_STUDIO_DEV_PORT=6100; pnpm dev:studio`, `$env:TORCH_LAUNCHER_DEV_PORT=6101; pnpm dev:launcher`; bash: `TORCH_STUDIO_DEV_PORT=6100 pnpm dev:studio`. README has a short Windows troubleshooting note.
+- Both `devPort()` helpers also reject Chromium-unsafe ports >= 1024 (1719, 1720, 1723, 2049, 3659, 4045, 5060, 5061, 6000, 6566, 6665-6669, 6679, 6697, 10080) with "port N is blocked by Chromium as unsafe; pick another, e.g. 6100." (Chromium blocks 6000 and 6665-6669, not the whole 6000-6063 range.)
+- loadURL failure in both apps now writes one line `Could not load the application window from <url>: <ERR_... (-n) loading '<url>'>` to stderr and exits with code 1 after the normal quit (`app.once('quit', () => process.exit(1))`; `process.exitCode`/`console.error` alone left exit 0 and no output).
+- Checked: `TORCH_STUDIO_DEV_PORT=6000`, `6667`, `10080` fail with the message, `6100` serves on 127.0.0.1:6100. Built apps started with `ELECTRON_RENDERER_URL=http://127.0.0.1:6199/` (ERR_CONNECTION_REFUSED) and `...:6000/` (ERR_UNSAFE_PORT): both apps print the line and exit 1. Not run on Windows.
