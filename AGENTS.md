@@ -8,7 +8,7 @@ TorchLauncher is a server-specific Minecraft launcher built with Electron, TypeS
 
 The user-designated **#0 agent** (currently `launcher develop #0`) is the project coordinator. Other sessions act as implementation workers unless the user changes their role.
 
-#0 manages planning, documentation, review, Git integration, and integrated validation; product implementation belongs to other sessions. Read `docs/work-distribution.md` for assignments. Shared-file implementation must be assigned to one worker rather than implemented by #0.
+#0 manages planning, documentation, review, Git integration, and integrated validation; product implementation belongs to other sessions. Read local `docs/work-distribution.md` for assignments when present; otherwise use the coordinator’s explicit assignment. Shared-file implementation must be assigned to one worker rather than implemented by #0.
 
 - Only #0 updates `docs/progress.md`, assigns tasks and exclusive file scopes, and records integration results.
 - Only #0 integrates work into `main` or another designated integration branch, including merges, cherry-picks, integration conflict resolution, and completion decisions.
@@ -16,13 +16,22 @@ The user-designated **#0 agent** (currently `launcher develop #0`) is the projec
 - Workers may update their own branches from the integration baseline. Shared configuration, manifests, lockfile, exports, and IPC changes must be coordinated with #0.
 - #0 reviews handoffs, integrates in dependency order, and marks tasks complete only after integrated verification.
 
+Coordination documents (worker handoffs, assignments, prompts, and tool-switch notes) are local-only
+and ignored by Git. Keep them on disk; do not force-add them. Share worker results through a PR or
+transfer the relevant local handoff when another checkout or tool needs it. Product specifications
+and `docs/progress.md` remain tracked. Shared local copies are available in the coordinator checkout
+at `.agents/local-docs/docs/`; workers can read that directory regardless of their branch. Use it when
+a worktree copy is absent. Before integrating the tracking removal in another checkout, preserve its
+local records and restore them afterward if Git removes the previously tracked copies.
+
 ## Resuming in Another Tool
 
 These repository rules apply equally to Codex, Claude Code, and other development tools. Chat history,
 session IDs, model names, and tool-specific messaging are not required to resume the work.
 
-- Start by reading this file, `docs/progress.md`, `docs/work-distribution.md`, and the latest
-  `docs/tool-handoff.md` if present. Then read the relevant specifications and `docs/handoffs/` reports.
+- Start by reading this file and `docs/progress.md`, then local `docs/work-distribution.md` and
+  the latest `docs/tool-handoff.md` when present. Read relevant specifications and available local
+  `docs/handoffs/` reports.
 - Inspect `git status --short --branch`, `git worktree list`, and recent commits in both the coordinator
   checkout and the assigned worker checkout. Preserve uncommitted and untracked work; never reset,
   clean, or recreate a worktree simply because the previous tool stopped.
