@@ -128,11 +128,7 @@ try {
       await readFile(resolve(applicationDirectory, 'package.json'), 'utf8'),
     );
     const app = await electron.launch({
-      args: [
-        applicationDirectory,
-        `--user-data-dir=${resolve(temp, directory)}`,
-        ...(directory === 'admin' ? ['--lang=ko'] : []),
-      ],
+      args: [applicationDirectory, `--user-data-dir=${resolve(temp, directory)}`, '--lang=ko'],
       env: appCase.env,
       timeout: 30_000,
     });

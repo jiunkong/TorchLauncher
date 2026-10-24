@@ -41,7 +41,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 let app;
 try {
   app = await electron.launch({
-    args: [resolve('apps/launcher'), `--user-data-dir=${resolve(temp, 'user-data')}`],
+    args: [resolve('apps/launcher'), `--user-data-dir=${resolve(temp, 'user-data')}`, '--lang=ko'],
     env,
     timeout: 30_000,
   });
