@@ -255,21 +255,48 @@ svg {
   font-size: 12px;
   color: var(--text-3);
 }
-.foot-row {
+.foot-save {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.savest {
+  min-width: 0;
+}
+.savest-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.foot-save .btn {
+  flex: none;
+}
+.foot-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
 }
 .foot-row .btn.sm {
   height: 28px;
   font-size: 12px;
 }
 .foot-row .btn {
-  padding: 0 8px;
+  padding: 0 4px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  line-height: 26px;
 }
 .appinfo {
   font-size: 11px;
   color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .appinfo.center {
   text-align: center;
@@ -2481,4 +2508,52 @@ button.big.dlgbtn {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+}
+
+/* 좁은 창: 사이드바 하단이 단어 중간에서 줄바꿈되지 않도록 */
+.seg.lang.compact {
+  display: flex;
+  width: 100%;
+}
+.seg.lang.compact button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn {
+  white-space: nowrap;
+}
+@media (max-width: 960px) {
+  .foot-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .foot-row .saveas {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 어두운 테마의 가는 스크롤바 (사이드바, 본문, 로그, 대화상자 공통) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
