@@ -19,6 +19,7 @@ import {
   SunIcon,
   UploadIcon,
 } from './Icons';
+import { LanguageControl } from './LanguageControl';
 
 const icons: Record<PageId, ReactNode> = {
   overview: <OverviewIcon />,
@@ -60,7 +61,7 @@ export function Sidebar({
   onProject(action: 'new' | 'open'): void;
   info: string;
 }) {
-  const { t } = useStudioLocale();
+  const { t, preference, setLocale, useAutomaticLocale: followSystem } = useStudioLocale();
   const { draft, state, busy, run } = studio;
   if (!draft) return null;
   const tags: Partial<Record<PageId, { text: string; tone: 'w' | 'k' }>> = {};
@@ -141,8 +142,15 @@ export function Sidebar({
             {t('save.saveAs')}
           </button>
         </div>
-        <div className="appinfo" data-testid="application-info">
-          {info}
+        <div className="foot-lang">
+          <div className="appinfo" data-testid="application-info">
+            {info}
+          </div>
+          <LanguageControl
+            compact
+            preference={preference}
+            onSelect={(choice) => (choice === 'auto' ? followSystem() : setLocale(choice))}
+          />
         </div>
       </div>
     </aside>
