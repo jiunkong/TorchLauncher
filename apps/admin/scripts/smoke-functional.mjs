@@ -379,8 +379,15 @@ try {
   assert.equal(await page.locator('[data-testid="settings-empty"] .srcc').count(), 2);
   assert.equal(await page.getByRole('button', { name: '불러오기' }).first().isDisabled(), true);
   await page.getByRole('button', { name: '테스트 실행으로 이동' }).click();
-  await page.getByTestId('test-placeholder').waitFor();
+  await page.getByTestId('test-page').waitFor();
   await page.getByRole('heading', { name: '테스트 실행' }).waitFor();
+  await page.getByTestId('test-start').waitFor();
+  assert.equal(await page.getByTestId('test-login').isDisabled(), false);
+  assert.equal(await page.getByTestId('test-start-button').isDisabled(), true);
+  await page.getByTestId('test-reset-open').click();
+  await page.getByTestId('test-reset-dialog').waitFor();
+  await page.getByTestId('test-reset-dialog').getByRole('button', { name: '취소' }).click();
+  await page.getByTestId('test-reset-dialog').waitFor({ state: 'detached' });
   await goto('단축키 · 옵션');
   await page.getByRole('button', { name: '파일 선택' }).click();
   await page.getByTestId('settings-keys').waitFor();
