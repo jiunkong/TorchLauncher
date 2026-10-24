@@ -44,3 +44,13 @@ URLs, downloads or native Windows validation. No user action pending. No persist
 Next: coordinator reviews/integrates this commit, then apps/script workers consume the current
 contracts; coordinator performs integrated workspace validation. Temporary logs/toolchains are
 environment-specific and should be regenerated only if needed.
+
+Review followup: added `ServerIdentity` / `parseServerIdentity(input)` for strict identity
+metadata validation (exactly format/version/serverId/name/address/sourceUrl), plus
+`parseServerBranding(input)` for branding-only validation. `parseServerConfig` composes these
+validators and still requires its own valid signing property. Studio project/renderer validation
+can use metadata functions without manufacturing a trusted signing key. Focused tests cover
+strict metadata keys, invalid source URLs, missing/inherited signing, and invalid branding.
+Validation: server-config Vitest 57 passed; core TypeScript and focused Biome passed. Logs:
+`/tmp/current-formats-core-metadata{,-types,-lint}.log`. Full 945-test suite was not repeated
+for this focused extraction, per coordinator instruction.

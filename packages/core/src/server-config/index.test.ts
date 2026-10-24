@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { testPublicKey } from '../deployment/fixtures/signing.js';
-import { parseServerConfig, SERVER_CONFIG_FILENAME } from './index.js';
+import {
+  parseServerBranding,
+  parseServerConfig,
+  parseServerIdentity,
+  SERVER_CONFIG_FILENAME,
+} from './index.js';
 
 const config = {
   format: 'torchlauncher-server',
@@ -138,5 +143,33 @@ describe('server config signing', () => {
     { algorithm: 'ed25519', publicKey: `${publicKey.slice(0, 42)}B` },
   ])('rejects malformed signing %j', (signing) => {
     expect(() => parseServerConfig({ ...config, signing })).toThrow('Invalid server configuration');
+  });
+});
+
+describe('server metadata validation without publisher trust', () => {
+  const { signing: _signing, ...identity } = config;
+  it('validates only identity fields without manufacturing a signing key', () => {
+    expect(parseServerIdentity(identity)).toEqual(identity);
+    expect(() => parseServerIdentity(config)).toThrow();
+    expect(() => parseServerConfig(identity)).toThrow();
+    expect(() =>
+      parseServerConfig(Object.assign(Object.create({ signing: config.signing }), identity)),
+    ).toThrow();
+    expect(parseServerBranding({ appName: 'Server Launcher' })).toEqual({
+      appName: 'Server Launcher',
+    });
+  });
+  it.each([
+    'http://example.com/pack',
+    'https://user:secret@example.com/pack',
+    'https://example.com/pack#fragment',
+    'https://example.com/pack bad',
+    '',
+  ])('rejects invalid metadata source %s', (sourceUrl) => {
+    expect(() => parseServerIdentity({ ...identity, sourceUrl })).toThrow();
+  });
+  it('rejects extra metadata fields and invalid branding', () => {
+    expect(() => parseServerIdentity({ ...identity, extra: true })).toThrow();
+    expect(() => parseServerBranding({ appName: '' })).toThrow();
   });
 });
