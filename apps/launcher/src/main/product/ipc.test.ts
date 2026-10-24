@@ -1,6 +1,10 @@
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
 import { expect, it, vi } from 'vitest';
-import { copyServerDataPathChannel, parseProductCommand } from '../../shared/product';
+import {
+  copyServerDataPathChannel,
+  parseProductCommand,
+  productChannel,
+} from '../../shared/product';
 import { bindProductIpc, trustedProductSender } from './ipc';
 import type { ProductService } from './service';
 
@@ -51,6 +55,51 @@ it('accepts only the boolean personal setting command', () => {
     type: 'set-close-on-launch',
     value: true,
   });
+});
+it('validates the exact language command and updates locale only for a trusted frame', async () => {
+  expect(parseProductCommand({ type: 'set-language', language: 'ko' })).toEqual({
+    type: 'set-language',
+    language: 'ko',
+  });
+  for (const invalid of [
+    { type: 'set-language', language: 'fr' },
+    { type: 'set-language', language: 'en', extra: true },
+    { type: 'set-language' },
+  ])
+    expect(() => parseProductCommand(invalid)).toThrow('invalid-request');
+
+  const frame = { url: 'file:///application/index.html' };
+  const contents = { mainFrame: frame };
+  const window = { isDestroyed: () => false, webContents: contents } as unknown as BrowserWindow;
+  const handle = vi.fn();
+  const setLanguage = vi.fn();
+  const service = { snapshot: () => ({}) } as ProductService;
+  bindProductIpc(
+    { handle, removeHandler: vi.fn() } as unknown as IpcMain,
+    window,
+    frame.url,
+    service,
+    undefined,
+    setLanguage,
+  );
+  const invoke = handle.mock.calls.find(([channel]) => channel === productChannel)?.[1] as (
+    event: IpcMainInvokeEvent,
+    command: unknown,
+  ) => unknown;
+  expect(
+    invoke({ sender: contents, senderFrame: frame } as IpcMainInvokeEvent, {
+      type: 'set-language',
+      language: 'en',
+    }),
+  ).toMatchObject({ ok: true });
+  expect(setLanguage).toHaveBeenCalledExactlyOnceWith('en');
+  expect(() =>
+    invoke({ sender: {}, senderFrame: frame } as IpcMainInvokeEvent, {
+      type: 'set-language',
+      language: 'ko',
+    }),
+  ).toThrow('Untrusted');
+  expect(setLanguage).toHaveBeenCalledOnce();
 });
 it('accepts only integer MiB game memory settings', () => {
   expect(parseProductCommand({ type: 'set-game-memory', maxMemoryMiB: 4096 })).toEqual({

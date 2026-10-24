@@ -8,8 +8,12 @@ import type {
 } from '../../../shared/studio.js';
 import { useStudioLocale } from '../i18n';
 import { detailMessageKey } from './errors';
+import { studioResultMessage } from './result';
 
-export type StudioAction = Exclude<StudioCommand['action'], 'update' | 'touch' | 'state'>;
+export type StudioAction = Exclude<
+  StudioCommand['action'],
+  'update' | 'touch' | 'state' | 'setLanguage'
+>;
 
 /** The outcome of the latest user-started operation; adapters derive deploy/export status from it. */
 export interface StudioRun {
@@ -103,7 +107,7 @@ export function useStudio() {
         ok = true;
         setState(reply.state);
         setDraft(reply.state.project);
-        setMessage(reply.state.result ?? '');
+        setMessage(studioResultMessage(reply.state.result, t));
       } else {
         code = reply.code;
         detailCode = reply.detail?.code ?? null;
@@ -156,7 +160,7 @@ export function useStudio() {
       if (reply.ok) {
         setState(reply.state);
         setDraft(reply.state.project);
-        setMessage(reply.state.result ?? '');
+        setMessage(studioResultMessage(reply.state.result, t));
         return true;
       }
       setMessage(errorMessage(reply.code));

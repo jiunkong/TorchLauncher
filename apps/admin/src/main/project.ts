@@ -156,12 +156,12 @@ export function parseLastBuild(input: unknown): StudioLastBuild {
   }
   return b as unknown as StudioLastBuild;
 }
-export function newProject(): StudioProject {
+export function newProject(name = 'New server'): StudioProject {
   return {
     format: 'torchlauncher-project',
     version: 1,
     serverId: randomUUID(),
-    name: '새 서버',
+    name,
     address: 'localhost:25565',
     sourceUrl: '',
     game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } },

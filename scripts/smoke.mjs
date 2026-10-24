@@ -256,7 +256,7 @@ try {
         // Saving lives in the top menu bar (File > Save).
         await page.getByTestId('menu-file').click();
         await page.getByTestId('menu-item-save').click();
-        await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
+        await page.getByText(/프로젝트를 저장했습니다\.|Project saved\./).waitFor();
         // Reopening goes through native dialogs and is covered by the functional smoke; here the
         // binary container is verified (magic, hashes) and its META section is read.
         const savedProject = readStudioFile(await readFile(projectPath));

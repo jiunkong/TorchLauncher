@@ -127,15 +127,21 @@ try {
         ];
         return { canceled, filePaths: canceled ? [] : (answers[options.title] ?? [paths.file]) };
       };
-      dialog.showSaveDialog = async (_window, options) => ({
-        canceled: false,
-        filePath:
-          options.title === '프로젝트 저장'
-            ? paths.project
-            : options.title === '런처 내보내기 ZIP 저장'
-              ? paths.exported
-              : paths.pack,
-      });
+      dialog.showSaveDialog = async (_window, options) => {
+        globalThis.__studioSmokeSaveTitles = [
+          ...(globalThis.__studioSmokeSaveTitles ?? []),
+          options.title,
+        ];
+        return {
+          canceled: false,
+          filePath:
+            options.title === '프로젝트 저장' || options.title === 'Save project'
+              ? paths.project
+              : options.title === '런처 내보내기 ZIP 저장' || options.title === 'Save launcher ZIP'
+                ? paths.exported
+                : paths.pack,
+        };
+      };
       // Studio must never show a native message box; count any attempt.
       dialog.showMessageBox = async () => {
         globalThis.__studioSmokeNativeBoxes = (globalThis.__studioSmokeNativeBoxes ?? 0) + 1;
@@ -428,9 +434,19 @@ try {
     'Functional Studio smoke',
   );
   // Ctrl+S saves even while a text input has focus.
-  await page.getByLabel('서버 이름', { exact: true }).focus();
+  await page.getByTestId('menu-view').click();
+  await page.getByTestId('menu-item-lang-en').click();
+  await nav('Overview').waitFor();
+  await page.getByLabel('Server name', { exact: true }).focus();
   await page.keyboard.press('Control+s');
-  await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
+  await page.getByText(/프로젝트를 저장했습니다\.|Project saved\./).waitFor();
+  assert.equal(
+    (await app.evaluate(() => globalThis.__studioSmokeSaveTitles ?? [])).at(-1),
+    'Save project',
+  );
+  await page.getByTestId('menu-view').click();
+  await page.getByTestId('menu-item-lang-ko').click();
+  await nav('개요').waitFor();
   assert.equal(readStudioFile(await readFile(project)).name, 'Functional Studio smoke');
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke 2');
   await menuAction('file', 'open');
@@ -663,8 +679,13 @@ try {
   await page.getByTestId('build-button').click();
   await page
     .getByTestId('studio-message')
-    .filter({ hasText: 'torchpack 배포 파일을 생성했습니다' })
+    .filter({
+      hasText: /torchpack 배포 파일을 생성했습니다|The torchpack deployment file was created/,
+    })
     .waitFor();
+  assert.ok(
+    (await app.evaluate(() => globalThis.__studioSmokeSaveTitles ?? [])).includes('torchpack 생성'),
+  );
   assert.equal((await readFile(pack)).subarray(0, 8).toString(), 'TORCHDEP');
   await page.locator('[data-testid="deploy-card"][data-state="current"]').waitFor();
   await page.getByTestId('deploy-lastbuild').filter({ hasText: 'server.torchpack' }).waitFor();
@@ -726,7 +747,7 @@ try {
 
   // Persistence: save, reopen the saved project.
   await menuAction('file', 'save');
-  await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
+  await page.getByText(/프로젝트를 저장했습니다\.|Project saved\./).waitFor();
   const saved = readStudioFile(await readFile(project));
   assert.equal(saved.version, 1);
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
@@ -885,11 +906,16 @@ try {
   );
 } finally {
   // A dirty project answers a window close with its in-app dialog; never wait on it forever.
+  const child = app?.process();
   await Promise.race([app?.close().catch(() => {}), new Promise((done) => setTimeout(done, 5000))]);
-  try {
-    app?.process().kill('SIGKILL');
-  } catch {
-    // already gone
+  if (child && child.exitCode === null) {
+    const exited = new Promise((resolve) => child.once('exit', resolve));
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+    await Promise.race([exited, new Promise((done) => setTimeout(done, 5000))]);
   }
   await rm(root, { recursive: true, force: true });
 }

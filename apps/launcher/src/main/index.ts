@@ -20,6 +20,8 @@ import { productStateChannel } from '../shared/product';
 import { createPublicJavaAuthenticator, loginDeviceCode } from './auth/public-java-electron';
 import { type BrandingService, createBrandingService } from './branding';
 import { bindBrandingIpc } from './branding/ipc';
+import { resolveMainLocale } from './i18n';
+import { createLauncherNativeDialogs } from './native-dialogs';
 import { readServerConfig, serverConfigPath } from './product/bootstrap';
 import { openServerDeployment } from './product/deployment-trust';
 import { bindProductIpc } from './product/ipc';
@@ -27,6 +29,7 @@ import { ProductService } from './product/service';
 import { createPlayerSkinService } from './skins';
 
 const applicationName = applicationNames.launcher;
+let mainLocale = resolveMainLocale(app.getLocale());
 app.setName(applicationName);
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
@@ -70,7 +73,16 @@ function createWindow(): void {
   const icon = branding?.snapshot().icon;
   if (icon) window.setIcon(nativeImage.createFromDataURL(icon));
   const unbind = product
-    ? bindProductIpc(ipcMain, window, rendererUrl, product, (text) => clipboard.writeText(text))
+    ? bindProductIpc(
+        ipcMain,
+        window,
+        rendererUrl,
+        product,
+        (text) => clipboard.writeText(text),
+        (locale) => {
+          mainLocale = locale;
+        },
+      )
     : () => {};
   ipcMain.removeHandler(applicationInfoChannel);
   ipcMain.handle(applicationInfoChannel, (event) => {
@@ -133,11 +145,7 @@ app.on('before-quit', (event) => {
   void shutdown.catch(() => {
     // Keep the host alive if child cleanup cannot be verified; allow a later close to retry.
     shutdown = undefined;
-    void dialog.showMessageBox({
-      type: 'error',
-      message: '게임 종료를 확인하지 못했습니다. 잠시 후 런처를 다시 닫아 주세요.',
-      buttons: ['확인'],
-    });
+    void createLauncherNativeDialogs(dialog, () => mainLocale).showShutdownFailure();
   });
 });
 
@@ -199,14 +207,7 @@ if (primaryInstance)
       observeDeployment: (reader) => branding?.observe(reader),
       quit: () => app.quit(),
       openLogs: (path) => shell.openPath(path),
-      chooseMod: async () => {
-        const result = await dialog.showOpenDialog({
-          title: '사용자 모드 추가',
-          properties: ['openFile'],
-          filters: [{ name: 'Minecraft mod', extensions: ['jar'] }],
-        });
-        return result.canceled ? null : (result.filePaths[0] ?? null);
-      },
+      chooseMod: createLauncherNativeDialogs(dialog, () => mainLocale).chooseMod,
       publish: (state) => {
         if (mainWindow && !mainWindow.isDestroyed())
           mainWindow.webContents.send(productStateChannel, state);

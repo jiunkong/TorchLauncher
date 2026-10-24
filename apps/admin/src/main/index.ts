@@ -15,14 +15,17 @@ import {
   session,
   shell,
 } from 'electron';
-import { brandingDialogText, studioChannel, studioCloseChannel } from '../shared/studio.js';
+import { studioChannel, studioCloseChannel } from '../shared/studio.js';
+import { resolveMainLocale, studioMainText } from './i18n.js';
 import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
+import { createStudioNativeDialogs } from './native-dialogs.js';
 import { SigningKeyStore } from './signing.js';
 import { StudioService } from './studio.js';
 import { createStudioTestRunner } from './test-auth.js';
 
 const applicationName = applicationNames.studio;
+let mainLocale = resolveMainLocale(app.getLocale());
 app.setName(applicationName);
 const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
@@ -54,84 +57,7 @@ function createWindow(): void {
 
   const service = new StudioService(
     {
-      open: async (kind, root) => {
-        const directory = kind === 'source' || kind === 'gamefolder';
-        const result = await dialog.showOpenDialog(window, {
-          title: {
-            project: '프로젝트 열기',
-            source: '배포 소스 폴더',
-            files: '소스 폴더 안의 파일 선택',
-            binary: '기존 공통 런처 선택',
-            icon: brandingDialogText.icon,
-            background: brandingDialogText.background,
-            keybackup: '서명 키 백업 파일 선택',
-            optionsfile: 'options.txt 선택',
-            gamefolder: '게임을 한 번 실행한 폴더 선택',
-            resourcepack: '리소스팩(.zip) 선택',
-            shaderpack: '셰이더팩(.zip) 선택',
-          }[kind],
-          ...(root ? { defaultPath: root } : {}),
-          properties: directory
-            ? ['openDirectory']
-            : kind === 'files'
-              ? ['openFile', 'multiSelections']
-              : ['openFile'],
-          ...(!directory && kind !== 'files'
-            ? {
-                filters:
-                  kind === 'icon' || kind === 'background'
-                    ? [
-                        {
-                          name: brandingDialogText.filter,
-                          extensions: kind === 'icon' ? ['png'] : ['png', 'jpg', 'jpeg'],
-                        },
-                      ]
-                    : kind === 'binary'
-                      ? [{ name: '공통 런처', extensions: ['exe', 'AppImage'] }]
-                      : kind === 'keybackup'
-                        ? [{ name: '서명 키 백업', extensions: ['torchkey'] }]
-                        : kind === 'optionsfile'
-                          ? [{ name: 'options.txt', extensions: ['txt'] }]
-                          : kind === 'resourcepack' || kind === 'shaderpack'
-                            ? [{ name: 'ZIP', extensions: ['zip'] }]
-                            : [{ name: 'TorchLauncher Studio 파일', extensions: ['torchproj'] }],
-              }
-            : {}),
-        });
-        return result.canceled ? null : result.filePaths;
-      },
-      save: async (kind) => {
-        const result = await dialog.showSaveDialog(window, {
-          title: {
-            project: '프로젝트 저장',
-            pack: 'torchpack 생성',
-            keybackup: '서명 키 백업 저장',
-            zip: '런처 내보내기 ZIP 저장',
-          }[kind],
-          defaultPath: {
-            project: 'server-project.torchproj',
-            pack: 'server.torchpack',
-            keybackup: 'signing-key.torchkey',
-            zip: 'launcher.zip',
-          }[kind],
-          filters: [
-            {
-              name: {
-                project: 'TorchLauncher Studio 파일',
-                pack: '배포 파일',
-                keybackup: '서명 키 백업',
-                zip: 'ZIP',
-              }[kind],
-              extensions: [
-                { project: 'torchproj', pack: 'torchpack', keybackup: 'torchkey', zip: 'zip' }[
-                  kind
-                ],
-              ],
-            },
-          ],
-        });
-        return result.canceled ? null : (result.filePath ?? null);
-      },
+      ...createStudioNativeDialogs(dialog, window, () => mainLocale),
       reveal: (path) => shell.showItemInFolder(path),
       copy: (text) => clipboard.writeText(text),
     },
@@ -139,10 +65,13 @@ function createWindow(): void {
     decodeNativeImage,
     new SigningKeyStore(join(app.getPath('userData'), 'signing-keys'), safeStorage),
     createStudioTestRunner(),
+    () => studioMainText(mainLocale)('defaultServerName'),
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>
-    handleStudioRequest(event, window.webContents, rendererUrl, service, input),
+    handleStudioRequest(event, window.webContents, rendererUrl, service, input, (locale) => {
+      mainLocale = locale;
+    }),
   );
 
   ipcMain.removeHandler(applicationInfoChannel);

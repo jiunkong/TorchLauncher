@@ -318,7 +318,7 @@ describe('Studio signing integration', () => {
       lastOperation: { keyCreated: true, sequence: 1 },
     });
     expect(state.project?.sequence).toBe(1);
-    expect(state.result).toContain('sequence 1');
+    expect(state.result).toMatchObject({ key: 'packCreated', sequence: 1, signed: true });
     const bytes = await readFile(pack);
     const serverId = state.project?.serverId as string;
     const reader = await openDeploymentReader(memorySource(bytes), {
@@ -478,7 +478,7 @@ describe('Studio signing integration', () => {
     expect(cfg.signing).toEqual({ algorithm: 'ed25519', publicKey: pub });
     expect(cfg.game).toEqual(project.game);
     expect(s.snapshot().signing?.lastOperation).toEqual({ keyCreated: true, sequence: null });
-    expect(s.snapshot().result).toContain('새 서명 키');
+    expect(s.snapshot().result).toMatchObject({ key: 'launcherZipCreated', keyCreated: true });
     await expectNoSecrets([out], rawSecrets(store, await store.load(project.serverId)));
     // next deploy: sequence 1 and verifies against the exported key
     d.open.mockResolvedValueOnce([sourceDir]);

@@ -2,9 +2,11 @@ import { isTrustedRendererUrl } from '@torchlauncher/core/desktop';
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron';
 import {
   copyServerDataPathChannel,
+  parseProductCommand,
   productChannel,
   productStateChannel,
 } from '../../shared/product';
+import type { LauncherMainLocale } from '../i18n';
 import type { ProductService } from './service';
 
 export function trustedProductSender(
@@ -26,6 +28,7 @@ export function bindProductIpc(
   rendererUrl: string,
   service: ProductService,
   copyText?: (text: string) => void | Promise<void>,
+  setLanguage?: (locale: LauncherMainLocale) => void,
 ): () => void {
   const check = (event: IpcMainInvokeEvent) => {
     if (!trustedProductSender(event, window, rendererUrl))
@@ -33,6 +36,15 @@ export function bindProductIpc(
   };
   ipc.handle(productChannel, (event, command: unknown) => {
     check(event);
+    if (command && typeof command === 'object' && !Array.isArray(command)) {
+      const value = command as Record<string, unknown>;
+      if (value.type === 'set-language') {
+        const parsed = parseProductCommand(command);
+        if (parsed.type !== 'set-language') throw new Error('Invalid language command');
+        setLanguage?.(parsed.language);
+        return { ok: true, state: service.snapshot() };
+      }
+    }
     return service.command(command);
   });
   ipc.handle(productStateChannel, (event, ...args: unknown[]) => {

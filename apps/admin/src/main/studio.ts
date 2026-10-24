@@ -254,6 +254,7 @@ export class StudioService {
     /** Production always injects a store; without one (tests only) builds stay unsigned. */
     private readonly keys: SigningKeyStore | null = null,
     private readonly tests: StudioTestRunner | null = null,
+    private readonly defaultServerName: () => string = () => 'New server',
   ) {}
   snapshot(): StudioState {
     return structuredClone({
@@ -894,7 +895,7 @@ export class StudioService {
           const loaded = decodeProjectFile(await safeRead(path, PROJECT_FILE_LIMIT), this.decode);
           project = loaded.project;
           snapshots = loaded.snapshots;
-        } else project = newProject();
+        } else project = newProject(this.defaultServerName());
         signal.throwIfAborted();
         this.state.project = project;
         this.tests?.clearResult();
@@ -992,7 +993,7 @@ export class StudioService {
         this.projectPath = path;
         this.state.projectName = basename(path);
         this.state.dirty = false;
-        this.state.result = '프로젝트를 저장했습니다.';
+        this.state.result = { key: 'projectSaved' };
         return;
       }
       case 'source': {
@@ -1036,7 +1037,7 @@ export class StudioService {
         const keys = this.keys ?? this.noKeys();
         await keys.create(project.serverId);
         await this.refreshSigning({ keyCreated: true, sequence: null });
-        this.state.result = '새 서명 키를 만들었습니다.';
+        this.state.result = { key: 'signingKeyCreated' };
         return;
       }
       case 'keyExport': {
@@ -1047,7 +1048,7 @@ export class StudioService {
         signal.throwIfAborted();
         await noLinks(dirname(path));
         await saveProject(path, await keys.exportBackup(project.serverId, command.passphrase));
-        this.state.result = '서명 키 백업 파일을 저장했습니다.';
+        this.state.result = { key: 'signingKeyBackupSaved' };
         return;
       }
       case 'keyImport': {
@@ -1061,7 +1062,7 @@ export class StudioService {
           replace: command.replace,
         });
         await this.refreshSigning();
-        this.state.result = '서명 키를 복원했습니다.';
+        this.state.result = { key: 'signingKeyRestored' };
         return;
       }
       case 'build': {
@@ -1134,11 +1135,12 @@ export class StudioService {
         this.state.dirty = true;
         this.lastPackPath = path;
         await this.refreshSigning({ keyCreated, sequence: signing?.sequence ?? null });
-        this.state.result = `torchpack 배포 파일을 생성했습니다${
-          signing
-            ? ` (서명됨, sequence ${signing.sequence}${keyCreated ? ', 새 서명 키 생성' : ''})`
-            : ''
-        }. 공개 호스팅에 직접 업로드한 뒤 URL을 검사하세요.`;
+        this.state.result = {
+          key: 'packCreated',
+          sequence: signing?.sequence ?? null,
+          signed: !!signing,
+          keyCreated,
+        };
         return;
       }
       case 'check': {
@@ -1146,7 +1148,7 @@ export class StudioService {
         if (check.serverId === 'mismatch' || check.game === 'mismatch' || brandingMismatch)
           throw new StudioFailure('MISMATCH');
         if (check.fileList.state !== 'ok') throw new StudioFailure('IO');
-        this.state.result = '공개 배포 파일의 서버 ID · Minecraft · 로더가 프로젝트와 일치합니다.';
+        this.state.result = { key: 'remoteMatches' };
         return;
       }
       case 'export': {
@@ -1190,9 +1192,7 @@ export class StudioService {
         this.exportDone = { fileName: basename(destination), size };
         this.lastExportPath = destination;
         await this.refreshSigning({ keyCreated, sequence: null });
-        this.state.result = `공통 런처와 서버 설정을 ZIP 파일 하나로 만들었습니다${
-          keyCreated ? ' (새 서명 키 생성: 이전 런처 사용자는 새 런처가 필요합니다)' : ''
-        }.`;
+        this.state.result = { key: 'launcherZipCreated', keyCreated };
         return;
       }
     }
