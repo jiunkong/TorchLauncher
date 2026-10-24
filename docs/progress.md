@@ -7,6 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
+### 작업 문서 로컬 전용 전환 (2026-10-25, 사용자 결정)
+
+`chore/ignore-agent-docs` `cdab0fc`를 main에 병합했다. 인계(`docs/handoffs/`), 배정(`*-task.md`, `*-prompts.md`, `work-distribution.md`, `tool-handoff.md` 등)은
+Git에서 제외하고 디스크에만 둔다. 제품 명세와 이 `progress.md`는 계속 추적한다. 병합 전 새 백업 `.cache/local-agent-docs-20261025-023640.tar.gz`와
+`.agents/local-docs/docs/` 사본을 최신으로 갱신했고 병합 후 코디네이터 checkout의 `docs/`에 복원했다(`git status` clean, 모두 ignored).
+병합 뒤에도 추적에 남은 `docs/handoffs/STUDIO-EXPORT-01.md`는 추적에서 제외했다. 이때 `*.log` 패턴 때문에 진단 픽스처 로그 3개가 함께 제외되어 즉시 다시 추적했다.
+worker에게 필요한 문서만 주려면 `node scripts/copy-agent-docs.mjs <worktree> <docs 기준 경로>...`를 쓴다(코디네이터 `docs/`에서 복사, 경로 이탈 거부).
+기존 작업자 worktree의 옛 추적 사본은 건드리지 않았고, 해당 브랜치를 갱신할 때 Git이 지우면 같은 스크립트로 복원한다.
+
 ### STUDIO-EXPORT-01 + 릴리스 workflow 통합 (2026-10-25)
 
 GPT 작업자 `studio_export_launcher`의 두 브랜치를 main에 병합했다. 현행 인계는 로컬 전용 `docs/handoffs/STUDIO-EXPORT-RELEASE-01.md`.

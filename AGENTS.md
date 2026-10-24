@@ -23,6 +23,9 @@ and `docs/progress.md` remain tracked. Shared local copies are available in the 
 at `.agents/local-docs/docs/`; workers can read that directory regardless of their branch. Use it when
 a worktree copy is absent. Before integrating the tracking removal in another checkout, preserve its
 local records and restore them afterward if Git removes the previously tracked copies.
+To give a worker only the documents it needs, run
+`node scripts/copy-agent-docs.mjs <worktree> <docs-relative-path>...` from any checkout; it copies from
+the coordinator checkout's `docs/` into the worker's `docs/`. The copies stay ignored by Git.
 
 ## Resuming in Another Tool
 
