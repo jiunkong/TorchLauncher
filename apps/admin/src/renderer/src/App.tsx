@@ -4,6 +4,7 @@ import { deriveInsights } from './adapters/insights';
 import { AboutDialog } from './components/AboutDialog';
 import { LoginCodeDialog } from './components/LoginCodeDialog';
 import { MenuBar } from './components/MenuBar';
+import { ProjectNameDialog } from './components/ProjectNameDialog';
 import { Sidebar } from './components/Sidebar';
 import { Splash } from './components/Splash';
 import { UnsavedDialog } from './components/UnsavedDialog';
@@ -26,6 +27,8 @@ export function App() {
   const [page, setPageState] = useState<PageId>('overview');
   const [splashDone, setSplashDone] = useState(false);
   const [confirm, setConfirm] = useState<'new' | 'open' | 'close' | 'project' | null>(null);
+  /** The in-app name prompt shown before the native parent-folder picker (New project / Save as). */
+  const [naming, setNaming] = useState<'new' | 'saveAs' | null>(null);
   useEffect(() => onCloseRequest(() => setConfirm('close')), []);
   const finishSplash = useCallback(() => setSplashDone(true), []);
   const { draft, state, busy, message, clearMessage } = studio;
@@ -45,7 +48,27 @@ export function App() {
       : 'TorchLauncher Studio';
   }, [draft]);
 
-  const switchTo = (action: 'new' | 'open') => runConfirmedSwitch(rawStudio, action);
+  const askName = (mode: 'new' | 'saveAs') => {
+    clearMessage();
+    setNaming(mode);
+  };
+  const switchTo = (action: 'new' | 'open') => {
+    if (action === 'new') {
+      askName('new');
+      return Promise.resolve(true);
+    }
+    return runConfirmedSwitch(rawStudio, action);
+  };
+  const submitName = async (name: string) => {
+    const mode = naming;
+    if (!mode) return;
+    // A cancelled picker or a failed create keeps the prompt open so the name can be fixed.
+    const ok =
+      mode === 'new'
+        ? await runConfirmedSwitch(rawStudio, 'new', name)
+        : await rawStudio.run('saveAs', { name });
+    if (ok) setNaming(null);
+  };
   /** Unsaved changes are confirmed in the app before a project is replaced or closed. */
   const switchProject = (action: 'new' | 'open') => {
     if (state?.dirty) setConfirm(action);
@@ -85,7 +108,7 @@ export function App() {
     newProject: () => switchProject('new'),
     openProject: () => switchProject('open'),
     save: () => void studio.run('save'),
-    saveAs: () => void studio.run('saveAs'),
+    saveAs: () => askName('saveAs'),
     revealProject: () => void studio.command({ action: 'revealProject' }),
     closeProject: () => (state?.dirty ? setConfirm('project') : void closeProject(false)),
     // Main closes the window through its normal close handler, so the unsaved flow applies
@@ -162,6 +185,7 @@ export function App() {
                 insights={insights}
                 settings={settings}
                 go={setPage}
+                onNew={() => switchProject('new')}
               />
               {!draft && (
                 <p className="appinfo center" data-testid="application-info">
@@ -192,6 +216,20 @@ export function App() {
           onSave={() => void confirmSave()}
           onDiscard={confirmDiscard}
           onCancel={confirmCancel}
+        />
+      )}
+      {naming && (
+        <ProjectNameDialog
+          mode={naming}
+          initialName={
+            naming === 'saveAs'
+              ? (state?.projectName ?? draft?.name ?? '')
+              : t('projectName.defaultName')
+          }
+          busy={busy}
+          failure={busy ? '' : message}
+          onSubmit={(name) => void submitName(name)}
+          onCancel={() => setNaming(null)}
         />
       )}
       {!splashDone && (

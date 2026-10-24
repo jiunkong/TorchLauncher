@@ -7,8 +7,8 @@ import type { StudioAction, StudioController } from '../hooks/useStudio';
 
 export type SwitchAction = Extract<StudioAction, 'new' | 'open'>;
 
-export function runConfirmedSwitch(studio: StudioController, action: SwitchAction) {
-  return studio.run(action, { discard: true });
+export function runConfirmedSwitch(studio: StudioController, action: SwitchAction, name?: string) {
+  return studio.run(action, name === undefined ? { discard: true } : { discard: true, name });
 }
 
 /** Main asks to close the window while the project has unsaved changes. */

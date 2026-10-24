@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { validateImage } from './branding.js';
+import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
@@ -62,8 +63,7 @@ async function service(dir?: string) {
   let pack: Buffer = Buffer.alloc(0);
   const s = new StudioService(d, () => source(pack), decode);
   const projDir = dir ?? (await temp());
-  d.open.mockResolvedValueOnce([projDir]);
-  await s.request({ action: 'new', discard: true });
+  await createProjectAt(s, d, projDir);
   return {
     d,
     s,

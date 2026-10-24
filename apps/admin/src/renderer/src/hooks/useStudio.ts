@@ -136,7 +136,7 @@ export function useStudio() {
   };
   const run = async (
     action: StudioAction,
-    options: { discard?: boolean } = {},
+    options: { discard?: boolean; name?: string } = {},
   ): Promise<boolean> => {
     if (action === 'cancel') {
       try {
@@ -146,7 +146,13 @@ export function useStudio() {
       }
       return false;
     }
-    if (action === 'new' || action === 'open' || action === 'closeProject')
+    if (action === 'new')
+      return execute(
+        { action, name: options.name ?? '', ...(options.discard ? { discard: true } : {}) },
+        false,
+      );
+    if (action === 'saveAs') return execute({ action, name: options.name ?? '' }, true);
+    if (action === 'open' || action === 'closeProject')
       return execute(options.discard ? { action, discard: true } : { action }, false);
     return execute({ action }, true);
   };

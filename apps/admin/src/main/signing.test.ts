@@ -13,6 +13,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import { deriveEd25519PublicKey } from '../../../../packages/core/src/deployment/signing/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
+import { createProjectAt } from './fixtures/projects.js';
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
 import { encodeProjectFile } from './project-file.js';
@@ -82,8 +83,7 @@ async function setup(storage = fakeStorage()) {
   const s = new StudioService(d, undefined, undefined, store);
   const projDir = join(root, 'proj');
   await mkdir(projDir);
-  d.open.mockResolvedValueOnce([projDir]);
-  await s.request({ action: 'new', discard: true });
+  await createProjectAt(s, d, projDir);
   const source = join(projDir, PROJECT_DATA_DIR);
   await writeFile(join(source, 'a.txt'), 'payload');
   d.open.mockResolvedValueOnce([join(source, 'a.txt')]);
@@ -496,8 +496,7 @@ describe('Studio signing integration', () => {
     const s4 = new StudioService(d4, undefined, undefined, store2);
     const projDir4 = join(ctx.root, 'proj4');
     await mkdir(projDir4);
-    d4.open.mockResolvedValueOnce([projDir4]);
-    await s4.request({ action: 'new', discard: true });
+    await createProjectAt(s4, d4, projDir4);
     d4.open.mockResolvedValueOnce([backup]);
     expect(await s4.request({ action: 'keyImport', passphrase: PASS, replace: false })).toEqual({
       ok: false,

@@ -4,7 +4,7 @@ import { LanguageControl } from '../components/LanguageControl';
 import type { StudioController } from '../hooks/useStudio';
 import { useStudioLocale } from '../i18n';
 
-export function StartPage({ studio }: { studio: StudioController }) {
+export function StartPage({ studio, onNew }: { studio: StudioController; onNew(): void }) {
   const { t, preference, setLocale, useAutomaticLocale: followSystem } = useStudioLocale();
   const { busy, run } = studio;
   return (
@@ -32,7 +32,7 @@ export function StartPage({ studio }: { studio: StudioController }) {
             className="big p"
             disabled={busy}
             data-testid="start-new"
-            onClick={() => void run('new')}
+            onClick={onNew}
           >
             <span className="ic">
               <PlusIcon />

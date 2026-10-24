@@ -24,14 +24,7 @@ export class StudioService extends Service {
   readonly testKeys: SigningKeyStore;
   constructor(...args: Partial<ConstructorParameters<typeof Service>>) {
     const keys = args[3] ?? testSigningKeys();
-    super(
-      args[0] as ConstructorParameters<typeof Service>[0],
-      args[1],
-      args[2],
-      keys,
-      args[4],
-      args[5],
-    );
+    super(args[0] as ConstructorParameters<typeof Service>[0], args[1], args[2], keys, args[4]);
     this.testKeys = keys;
   }
 }

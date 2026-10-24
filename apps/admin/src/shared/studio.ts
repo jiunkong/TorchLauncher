@@ -356,20 +356,18 @@ export type StudioCommand =
       kind: 'fabric' | 'neoforge';
     }
   | {
-      action:
-        | 'state'
-        | 'touch'
-        | 'save'
-        | 'saveAs'
-        | 'files'
-        | 'build'
-        | 'check'
-        | 'export'
-        | 'cancel';
+      action: 'state' | 'touch' | 'save' | 'files' | 'build' | 'check' | 'export' | 'cancel';
     }
   | { action: 'setLanguage'; language: 'ko' | 'en' }
   | {
-      action: 'new' | 'open';
+      action: 'new' | 'saveAs';
+      /** Project name: also the folder created inside the parent folder chosen afterwards. */
+      name: string;
+      /** Must be true when `new` would replace unsaved changes (the renderer confirmed it itself). */
+      discard?: boolean;
+    }
+  | {
+      action: 'open';
       /** Must be true when the current project has unsaved changes, sent only after the renderer's own confirmation. */
       discard?: boolean;
     }
@@ -476,8 +474,12 @@ export type StudioError =
   | 'BLOCKED'
   /** A chosen file or pack is larger than the limit. */
   | 'TOO_LARGE'
-  /** A directory chosen for a new or copied project is not empty. */
-  | 'FOLDER_NOT_EMPTY';
+  /** A directory chosen for a copied project is not empty. */
+  | 'FOLDER_NOT_EMPTY'
+  /** The project name cannot be used as a folder name. */
+  | 'FOLDER_NAME_INVALID'
+  /** A file or folder with the project name already exists in the chosen parent folder. */
+  | 'FOLDER_EXISTS';
 export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
 export type StudioReply =
   | { ok: true; state: StudioState; loaderVersions?: string[] }
@@ -486,4 +488,23 @@ export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;
   /** Subscribes to window-close requests while the project has unsaved changes. Returns an unsubscribe function. */
   onCloseRequest(listener: () => void): () => void;
+}
+
+export const PROJECT_NAME_MAX = 64;
+export type ProjectNameProblem = 'empty' | 'long' | 'characters' | 'reserved' | 'ending';
+const RESERVED_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/**
+ * Checks a project name as a single folder-name segment (portable to Windows). The name is
+ * trimmed first; returns null when usable. Main enforces it, the renderer mirrors it for feedback.
+ */
+export function projectNameProblem(raw: string): ProjectNameProblem | null {
+  const name = raw.trim();
+  if (name.length === 0) return 'empty';
+  if (name.length > PROJECT_NAME_MAX) return 'long';
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is rejected
+  if (/[<>:"/\\|?*\u0000-\u001f\u007f]/.test(name)) return 'characters';
+  if (name.endsWith('.')) return 'ending';
+  if (RESERVED_DEVICE.test((name.split('.')[0] ?? name).trimEnd())) return 'reserved';
+  return null;
 }

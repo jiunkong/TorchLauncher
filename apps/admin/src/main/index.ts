@@ -16,7 +16,7 @@ import {
   shell,
 } from 'electron';
 import { studioChannel, studioCloseChannel } from '../shared/studio.js';
-import { resolveMainLocale, studioMainText } from './i18n.js';
+import { resolveMainLocale } from './i18n.js';
 import { handleStudioRequest } from './ipc.js';
 import { decodeNativeImage } from './native-branding.js';
 import { createStudioNativeDialogs } from './native-dialogs.js';
@@ -65,7 +65,6 @@ function createWindow(): void {
     decodeNativeImage,
     new SigningKeyStore(join(app.getPath('userData'), 'signing-keys'), safeStorage),
     createStudioTestRunner(),
-    () => studioMainText(mainLocale)('defaultServerName'),
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>

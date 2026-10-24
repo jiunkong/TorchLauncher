@@ -9,6 +9,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { zip } from '../../../../packages/core/src/diagnostics/fixtures/zip.js';
 import type { Installation } from '../../../../packages/core/src/minecraft/installer.js';
 import type { GameExit, RunningGame } from '../../../../packages/core/src/minecraft/process.js';
+import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import { handleStudioRequest } from './ipc.js';
 import { PROJECT_DATA_DIR } from './project-folder.js';
@@ -89,8 +90,7 @@ async function setup() {
     copy: vi.fn<NonNullable<StudioDialogs['copy']>>(),
   };
   const service = new StudioService(dialogs, undefined, undefined, undefined, runner);
-  dialogs.open.mockResolvedValueOnce([projDir]);
-  await service.request({ action: 'new' });
+  await createProjectAt(service, dialogs, projDir, {});
   await writeFile(join(source, 'options.txt'), 'version:3955\ngamma:0.5\n');
   dialogs.open.mockResolvedValueOnce([mod]);
   expect(await service.request({ action: 'settingsPackAdd', kind: 'mod' })).toMatchObject({
@@ -133,7 +133,7 @@ it('keeps completed test extraction read-only until options are explicitly impor
   h.install.mockImplementationOnce(async (options) => {
     phases.push(h.runner.state.phase);
     expect(options.version).toBe('1.21.1');
-    await expect(h.service.request({ action: 'new', discard: true })).resolves.toEqual({
+    await expect(h.service.request({ action: 'new', name: 'n', discard: true })).resolves.toEqual({
       ok: false,
       code: 'BUSY',
     });
@@ -217,8 +217,7 @@ it('preserves chosen settings policies when importing test-run files', async () 
     save: vi.fn<StudioDialogs['save']>(),
   };
   const service = new StudioService(d, undefined, undefined, undefined, h.runner);
-  d.open.mockResolvedValueOnce([projDir2]);
-  await service.request({ action: 'new' });
+  await createProjectAt(service, d, projDir2, {});
   d.open.mockResolvedValueOnce([h.source]);
   await service.request({ action: 'settingsImport', source: 'folder' });
   await service.request({
@@ -412,8 +411,7 @@ it('finishes analysis after a requested normal stop and clears old results on pr
   expect(h.runner.state.report?.items).toEqual([]);
   const newDir = join(h.base, 'new-proj');
   await mkdir(newDir);
-  h.dialogs.open.mockResolvedValueOnce([newDir]);
-  await h.service.request({ action: 'new', discard: true });
+  await createProjectAt(h.service, h.dialogs, newDir);
   expect(h.runner.state).toMatchObject({ phase: 'idle', report: null, serverId: null });
 });
 it('fails before installation on refresh failure and never publishes the provider exception', async () => {
@@ -489,8 +487,7 @@ it('returns explicit errors without a last result and after clearing/resetting t
   });
   const newDir = join(h.base, 'new-proj');
   await mkdir(newDir);
-  h.dialogs.open.mockResolvedValueOnce([newDir]);
-  await h.service.request({ action: 'new', discard: true });
+  await createProjectAt(h.service, h.dialogs, newDir);
   expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
     ok: false,
     code: 'INVALID',
@@ -777,8 +774,7 @@ it('closes a clean project without discard and refuses while busy or malformed',
   const h = await setup();
   const newDir = join(h.base, 'new-proj');
   await mkdir(newDir);
-  h.dialogs.open.mockResolvedValueOnce([newDir]);
-  await h.service.request({ action: 'new', discard: true });
+  await createProjectAt(h.service, h.dialogs, newDir);
   h.dialogs.save.mockResolvedValueOnce(join(h.base, 'clean.torchproj'));
   expect((await h.service.request({ action: 'save' })).ok).toBe(true);
   expect(h.service.snapshot().dirty).toBe(false);

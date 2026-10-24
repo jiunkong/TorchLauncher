@@ -16,6 +16,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseSettingsPolicy } from '../../../../packages/core/src/instance/settings/index.js';
 import type { StudioGameSettings } from '../shared/studio.js';
+import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import {
   addPack,
@@ -336,8 +337,7 @@ async function harness() {
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
   };
   const s = new StudioService(d);
-  d.open.mockResolvedValueOnce([root]);
-  await s.request({ action: 'new', discard: true });
+  await createProjectAt(s, d, root);
   const source = join(root, PROJECT_DATA_DIR);
   const game = join(root, 'game');
   await mkdir(game);

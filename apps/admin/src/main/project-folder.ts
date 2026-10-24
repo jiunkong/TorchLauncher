@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, readdir, realpath, rename, rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve, sep } from 'node:path';
-import type { StudioProject } from '../shared/studio.js';
+import { projectNameProblem, type StudioProject } from '../shared/studio.js';
 import type { BrandingSnapshots, ImageDecoder } from './branding.js';
 import { noLinks, safeRead, saveProject } from './filesystem.js';
 import { PACK_LIMIT } from './game-settings.js';
@@ -14,18 +14,76 @@ export const PROJECT_FILE_NAME = 'project.torchproj';
 export const PROJECT_DATA_DIR = 'files';
 
 /**
- * Validates that `dir` exists, has no symlinks in its ancestry, is a directory,
- * and is completely empty. Then creates the `<dir>/files` data directory.
+ * Creates the empty project folder `<parent>/<name>` and returns its path. The parent must exist
+ * without symlinks in its ancestry; the leaf is made with a non-recursive mkdir, so an existing
+ * file or folder of that name fails atomically (FOLDER_EXISTS) and is never written into.
  */
-export async function createProjectFolder(dir: string): Promise<void> {
-  await noLinks(dir);
-  const info = await lstat(dir);
-  if (!info.isDirectory()) throw new StudioFailure('INVALID');
-  const entries = await readdir(dir);
-  if (entries.length > 0) throw new StudioFailure('FOLDER_NOT_EMPTY');
-  const dataDir = join(dir, PROJECT_DATA_DIR);
-  await mkdir(dataDir, { recursive: true, mode: 0o700 });
-  await noLinks(dataDir);
+export async function createNamedFolder(parent: string, rawName: string): Promise<string> {
+  const name = rawName.trim();
+  if (projectNameProblem(name) !== null) throw new StudioFailure('FOLDER_NAME_INVALID');
+  await noLinks(parent);
+  if (!(await lstat(parent)).isDirectory()) throw new StudioFailure('INVALID');
+  const dir = join(parent, name);
+  try {
+    await mkdir(dir, { mode: 0o700 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+      throw new StudioFailure('FOLDER_EXISTS');
+    throw error;
+  }
+  return dir;
+}
+
+/**
+ * Creates a new project folder `<parent>/<name>` with its `files/` data directory and runs
+ * `finish` (which writes project.torchproj). Anything created is removed again on failure.
+ */
+export async function createProjectFolder(
+  parent: string,
+  name: string,
+  finish: (dir: string) => Promise<void>,
+): Promise<string> {
+  const dir = await createNamedFolder(parent, name);
+  try {
+    const dataDir = join(dir, PROJECT_DATA_DIR);
+    await mkdir(dataDir, { mode: 0o700 });
+    await noLinks(dataDir);
+    await finish(dir);
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    throw error;
+  }
+  return dir;
+}
+
+/** True when the two paths are the same folder or one lies inside the other. */
+export function foldersNested(a: string, b: string): boolean {
+  const x = resolve(a);
+  const y = resolve(b);
+  return x === y || x.startsWith(y + sep) || y.startsWith(x + sep);
+}
+
+/**
+ * Creates `<parent>/<name>` and copies the project folder `from` into it (Save As). The target
+ * must not lie inside the source (checked before anything is created); the created folder is
+ * removed again if the copy fails.
+ */
+export async function copyProjectFolderInto(
+  from: string,
+  parent: string,
+  name: string,
+  signal: AbortSignal,
+): Promise<string> {
+  signal.throwIfAborted();
+  if (foldersNested(from, join(parent, name.trim()))) throw new StudioFailure('INVALID');
+  const dir = await createNamedFolder(parent, name);
+  try {
+    await copyProjectFolder(from, dir, signal);
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    throw error;
+  }
+  return dir;
 }
 
 /**
