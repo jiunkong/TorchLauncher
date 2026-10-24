@@ -260,6 +260,12 @@ const ko = {
   'logs.region': '로그 내용',
   'logs.empty': '표시할 로그가 없습니다.',
   'footer.version': 'v{version} · {platform}',
+  'login.title': '로그인',
+  'login.lead': '열린 브라우저 창에서 아래 코드를 입력하고 로그인하세요.',
+  'login.codeLabel': '로그인 코드',
+  'login.waiting': '로그인을 기다리는 중',
+  'login.copy': '코드 복사',
+  'login.copied': '코드를 복사했습니다',
 } as const;
 
 export const launcherTranslations = defineTranslations(
@@ -275,6 +281,12 @@ export const launcherTranslations = defineTranslations(
     'launcher.syncing': 'Updating server files…',
     'launcher.welcome': 'Welcome, {player}',
     'launcher.lastUpdated': 'Last updated {date}',
+    'login.title': 'Sign in',
+    'login.lead': 'Enter the code below in the browser window that opened and sign in.',
+    'login.codeLabel': 'Sign-in code',
+    'login.waiting': 'Waiting for sign-in',
+    'login.copy': 'Copy code',
+    'login.copied': 'Code copied',
     'settings.copyPath': 'Copy path',
     'settings.pathCopied': 'Path copied.',
     'settings.pathCopyFailed': 'Could not copy the path. Select it and copy it manually.',

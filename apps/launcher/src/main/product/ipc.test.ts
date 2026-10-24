@@ -94,6 +94,14 @@ it('limits log opening to no arguments and unregistered removal to exact mods pa
   ).toThrow('invalid-request');
 });
 
+it('accepts the login code copy command only without arguments', () => {
+  expect(parseProductCommand({ type: 'copy-login-code' })).toEqual({ type: 'copy-login-code' });
+  for (const extra of [{ code: 'ABCD-1234' }, { text: 'x' }, { path: '/tmp' }])
+    expect(() => parseProductCommand({ type: 'copy-login-code', ...extra })).toThrow(
+      'invalid-request',
+    );
+});
+
 it('copies only the current main-process data root through trusted no-argument IPC', async () => {
   const frame = { url: 'file:///application/index.html' };
   const contents = { mainFrame: frame };

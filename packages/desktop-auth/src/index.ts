@@ -4,6 +4,11 @@ export {
   createDesktopPublicJavaAuthenticator,
   type DesktopPublicJavaOptions,
 } from './desktop';
+export {
+  DEVICE_CODE_LINK_URL,
+  DeviceCodePresenter,
+  type DeviceCodePresenterOptions,
+} from './device-code';
 export type { EncryptedAuthStoreOptions, SafeStorageBoundary } from './encrypted-store';
 export { type HostAuthErrorCode, HostAuthenticationError } from './errors';
 export { PublicJavaAuthenticator, type PublicJavaOptions } from './public-java';

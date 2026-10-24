@@ -548,3 +548,50 @@ it.skipIf(process.platform === 'win32')(
     expect(await readFile(join(outside, 'readme.txt'), 'utf8')).toBe('preserve fixture');
   },
 );
+
+function fakeDeviceCode() {
+  const listeners = new Set<() => void>();
+  const copy = vi.fn(() => device.code !== null);
+  const device = {
+    code: null as string | null,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    copy,
+    set(code: string | null) {
+      device.code = code;
+      for (const listener of listeners) listener();
+    },
+  };
+  return device;
+}
+
+it('mirrors the pending device code into state only while it waits and copies it through main', async () => {
+  const device = fakeDeviceCode();
+  const { service, host } = await setup({ deviceCode: device });
+  expect(service.snapshot().loginCode).toBeUndefined();
+  expect(await service.command({ type: 'copy-login-code' })).toMatchObject({
+    ok: false,
+    error: 'invalid-request',
+  });
+  device.set('ABCD-1234');
+  expect(service.snapshot().loginCode).toBe('ABCD-1234');
+  expect(vi.mocked(host.publish).mock.lastCall?.[0].loginCode).toBe('ABCD-1234');
+  // Copying works while a login is pending (it is not an operation), and the code never enters logs.
+  expect(await service.command({ type: 'copy-login-code' })).toMatchObject({ ok: true });
+  expect(device.copy.mock.results.map((result) => result.value)).toEqual([false, true]);
+  expect(JSON.stringify(service.snapshot().logs)).not.toContain('ABCD-1234');
+  device.set(null);
+  expect(Object.hasOwn(service.snapshot(), 'loginCode')).toBe(false);
+  expect(vi.mocked(host.publish).mock.lastCall?.[0].loginCode).toBeUndefined();
+  expect(await service.command({ type: 'copy-login-code' })).toMatchObject({ ok: false });
+});
+
+it('rejects copy-login-code without a device code source', async () => {
+  const { service } = await setup();
+  expect(await service.command({ type: 'copy-login-code' })).toMatchObject({
+    ok: false,
+    error: 'invalid-request',
+  });
+});

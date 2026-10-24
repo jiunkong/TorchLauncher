@@ -1,13 +1,11 @@
 import { join } from 'node:path';
 import {
   createDesktopPublicJavaAuthenticator,
+  DeviceCodePresenter,
   EncryptedMicrosoftTokenStorage,
-  HostAuthenticationError,
 } from '@torchlauncher/desktop-auth';
-import { app, safeStorage, shell } from 'electron';
+import { app, clipboard, safeStorage, shell } from 'electron';
 import { StudioTestRunner } from './test-run.js';
-
-export const loginPageUrl = 'https://www.microsoft.com/link';
 
 /**
  * The device code is shown by the Studio window itself (an in-app modal fed by `account.login`),
@@ -27,27 +25,22 @@ export function createStudioTestRunner() {
       return false;
     }
   };
-  let runner: StudioTestRunner | null = null;
+  const deviceCode = new DeviceCodePresenter({
+    open: (url) => shell.openExternal(url),
+    copy: (text) => clipboard.writeText(text),
+  });
   const auth = createDesktopPublicJavaAuthenticator({
     cacheDirectory: join(userData, 'public-java'),
     workerPath: join(__dirname, 'public-java-worker.cjs'),
     safeStorage,
-    async showCode(code, signal) {
-      if (!/^[A-Z0-9-]{4,16}$/.test(code)) throw new HostAuthenticationError('browser_failed');
-      if (signal.aborted || !runner) return;
-      const release = runner.publishLoginCode(code);
-      try {
-        await shell.openExternal(loginPageUrl);
-        // Wait until the login finishes, is cancelled, fails or the app closes.
-        await new Promise<void>((resolve) => {
-          if (signal.aborted) resolve();
-          else signal.addEventListener('abort', () => resolve(), { once: true });
-        });
-      } finally {
-        release();
-      }
-    },
+    showCode: (code, signal) => deviceCode.show(code, signal),
   });
-  runner = new StudioTestRunner({ userData, available, auth, launcherVersion: app.getVersion() });
+  const runner = new StudioTestRunner({
+    userData,
+    available,
+    auth,
+    launcherVersion: app.getVersion(),
+  });
+  deviceCode.subscribe(() => runner.setLoginCode(deviceCode.code));
   return runner;
 }

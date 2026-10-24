@@ -29,8 +29,8 @@ export function useProduct() {
     };
   }, []);
   const command = useCallback(async (request: ProductCommand): Promise<boolean> => {
-    if (request.type === 'open-logs') {
-      // Read-only shell action may run while launch owns the normal command slot.
+    if (request.type === 'open-logs' || request.type === 'copy-login-code') {
+      // Read-only shell actions (open logs, copy the login code) may run while launch owns the normal command slot.
       // Do not replay its snapshot over newer game/auth events.
       try {
         return (await window.torchlauncher.command(request)).ok;

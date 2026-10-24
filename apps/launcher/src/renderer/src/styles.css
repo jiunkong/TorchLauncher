@@ -1594,3 +1594,35 @@ svg {
   width: 16px;
   height: 16px;
 }
+
+/* Microsoft 로그인 코드 창 */
+.login-code {
+  display: block;
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--bg-deep);
+  border: 1px solid var(--line-2);
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+  user-select: text;
+}
+.login-wait {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.login-copied {
+  min-height: 20px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ok);
+}
+.dialog-actions.between {
+  justify-content: space-between;
+}

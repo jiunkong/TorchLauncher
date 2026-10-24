@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrandingVisual } from './components/BrandingVisual';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { DeleteDialog } from './components/DeleteDialog';
+import { LoginCodeDialog } from './components/LoginCodeDialog';
 import { Menu, type PageId } from './components/Menu';
 import { RecoveryDialog } from './components/RecoveryDialog';
 import { RemoveUnregisteredDialog } from './components/RemoveUnregisteredDialog';
@@ -131,7 +132,14 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
       <main
         className="app"
         data-testid="app-shell"
-        inert={!splashDone || stopOpen || deleteOpen || recoveryOpen || removeFile !== null}
+        inert={
+          !splashDone ||
+          stopOpen ||
+          deleteOpen ||
+          recoveryOpen ||
+          removeFile !== null ||
+          !!state?.loginCode
+        }
       >
         <Menu
           open={menuOpen}
@@ -246,6 +254,13 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
             setRemoveFile(null);
             void command({ type: 'remove-unregistered', path });
           }}
+        />
+      )}
+      {state?.loginCode && (
+        <LoginCodeDialog
+          code={state.loginCode}
+          onCopy={() => command({ type: 'copy-login-code' })}
+          onCancel={() => void command({ type: 'cancel' })}
         />
       )}
       {logoutOpen && (

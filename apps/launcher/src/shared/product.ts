@@ -20,7 +20,9 @@ export type ProductCommand =
         | 'packs'
         | 'usage'
         | 'preview-delete'
-        | 'open-logs';
+        | 'open-logs'
+        /** Copies the pending Microsoft login code through main (the renderer cannot use the clipboard). */
+        | 'copy-login-code';
     }
   | { type: 'remove-mod' | 'adopt-mod' | 'remove-unregistered'; path: string }
   | { type: 'set-packs'; packs: string[] }
@@ -73,6 +75,11 @@ export interface ProductState {
   configuration: 'ready' | 'unavailable';
   supported: boolean;
   account: { name: string; expiresAt: number; skin?: string } | null;
+  /**
+   * The Microsoft device code, present only while a login waits for the user (typed by the user into
+   * the Microsoft page). Cleared on success, cancel, failure, logout and quit; never logged.
+   */
+  loginCode?: string;
   status: {
     state: 'unknown' | 'online' | 'unavailable';
     online?: number;
@@ -147,6 +154,7 @@ export function parseProductCommand(input: unknown): ProductCommand {
     'usage',
     'preview-delete',
     'open-logs',
+    'copy-login-code',
   ];
   if (typeof value.type !== 'string') return fail();
   if (
