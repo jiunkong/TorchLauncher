@@ -54,3 +54,9 @@ strict metadata keys, invalid source URLs, missing/inherited signing, and invali
 Validation: server-config Vitest 57 passed; core TypeScript and focused Biome passed. Logs:
 `/tmp/current-formats-core-metadata{,-types,-lint}.log`. Full 945-test suite was not repeated
 for this focused extraction, per coordinator instruction.
+
+Final audit followup: removed the unused compatibility-only `DEFAULT_PACKS` export;
+kept Minecraft missing-version profile selection unchanged and documented its current default.
+Reader branding staging directly accesses required `index.branding`, while absent/null role
+semantics remain unchanged. Focused reader/settings verification: 5 files, 138 tests passed;
+scoped Biome 3 files passed, diff check passed. Logs `/tmp/current-formats-core-audit{,-lint}.log`.

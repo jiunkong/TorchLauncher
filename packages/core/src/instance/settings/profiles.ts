@@ -92,7 +92,7 @@ export const OPTIONS_PROFILES: readonly OptionsFormatProfile[] = [
   },
 ];
 
-/** Used when neither a `version:` line nor a Minecraft version is available (legacy behavior). */
+/** Current default when neither a `version:` line nor a Minecraft version is available. */
 export const FALLBACK_PROFILE: OptionsFormatProfile = OPTIONS_PROFILES[0] as OptionsFormatProfile;
 
 export type VersionPolicy = 'verified-only' | 'allow-researched' | 'allow-any';
