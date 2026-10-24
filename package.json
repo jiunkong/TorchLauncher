@@ -2,6 +2,7 @@
   "name": "torchlauncher",
   "version": "0.1.0",
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "module",
   "description": "Portable server-specific Minecraft launchers and an administrator studio.",
   "packageManager": "pnpm@10.34.7",

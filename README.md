@@ -89,6 +89,18 @@ GitHub Actions의 지원 대상과 작업은 `.github/workflows/`를 따릅니�
 생성해 게시합니다. 버전·체크섬·실행 조건은 [GitHub 자동 릴리스](docs/github-releases.md)를 따릅니다.
 CI 구성은 실제 원격 실행 결과와 구분합니다.
 
+## 라이선스
+
+이 저장소의 코드는 [GNU General Public License v3.0 only](LICENSE) (`GPL-3.0-only`)로 배포합니다.
+수정본이나 파생물을 배포하려면 같은 라이선스로 소스를 공개해야 합니다.
+서버 운영자가 수정하지 않은 런처에 자신의 서버 설정과 브랜딩 이미지를 넣어 전달하는 것은 이 조건에 영향을 주지 않습니다.
+
+"TorchLauncher"와 "TorchLauncher Studio"라는 이름, 로고와 아이콘은 코드 라이선스에 포함되지 않습니다.
+Minecraft는 Mojang Studios의 상표이며 이 프로젝트는 Mojang 또는 Microsoft와 관련이 없습니다.
+
+포함한 서드파티 코드와 글꼴의 고지는 `third-party/`에 있습니다: gdown (MIT), prismarine-auth (MIT),
+Pretendard (OFL-1.1), Pixelify Sans (OFL-1.1). 설치한 의존성의 라이선스는 각 패키지를 따릅니다.
+
 ## 설계 문서
 
 - [개발 진행·작업 배정·머지 현황](docs/progress.md)
