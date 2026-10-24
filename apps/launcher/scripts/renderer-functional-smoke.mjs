@@ -375,14 +375,20 @@ try {
   };
   await app.evaluate(({ BrowserWindow, ipcMain }, state) => {
     globalThis.recordedCommands = [];
+    globalThis.languageCommands = [];
     ipcMain.removeHandler('torchlauncher:product');
     ipcMain.handle('torchlauncher:product', (_event, command) => {
-      globalThis.recordedCommands.push(command.type);
+      if (command.type === 'set-language') {
+        globalThis.languageCommands.push(command.language);
+      } else {
+        globalThis.recordedCommands.push(command.type);
+      }
       return { ok: true, state };
     });
     BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', state);
   }, confirmState);
   const recorded = () => app.evaluate(() => globalThis.recordedCommands.join(','));
+  const languages = () => app.evaluate(() => globalThis.languageCommands);
   const openMenu = async () => {
     if ((await menu.getAttribute('data-open')) !== 'true') await toggle.click();
   };
@@ -390,6 +396,7 @@ try {
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await choose('en').click();
   assert.equal(await pathTitle(), 'Copy path');
+  assert.ok((await languages()).includes('en'));
   // Logout: cancel button, Escape, then confirm; no command until confirmed.
   for (const size of [760, 1100]) {
     await page.setViewportSize({ width: size, height: 900 });
