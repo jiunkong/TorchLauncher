@@ -476,6 +476,10 @@ p.fine {
 input.inp {
   display: block;
 }
+select.inp {
+  display: block;
+  cursor: pointer;
+}
 .inp.mono {
   font-family: var(--font-mono);
   font-size: 13px;

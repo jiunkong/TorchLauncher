@@ -1,4 +1,5 @@
 import { parseServerIdentity } from '../../../../../../packages/core/src/server-config/index.js';
+import { minecraftVersions } from '../../../shared/minecraft-versions.js';
 import type { StudioProject } from '../../../shared/studio.js';
 
 const baselineConfig = {
@@ -12,7 +13,10 @@ const baselineConfig = {
 
 export type ServerField = 'name' | 'address' | 'minecraftVersion' | 'loaderVersion';
 export type ServerErrors = Partial<
-  Record<ServerField, 'validation.name' | 'validation.address' | 'validation.version'>
+  Record<
+    ServerField,
+    'validation.name' | 'validation.address' | 'validation.version' | 'validation.gameVersion'
+  >
 >;
 
 const versionToken = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
@@ -32,6 +36,8 @@ export function validateServer(project: StudioProject): ServerErrors {
   }
   if (!versionToken.test(project.game.minecraftVersion))
     errors.minecraftVersion = 'validation.version';
+  else if (!(minecraftVersions as readonly string[]).includes(project.game.minecraftVersion))
+    errors.minecraftVersion = 'validation.gameVersion';
   if (!versionToken.test(project.game.loader.version)) errors.loaderVersion = 'validation.version';
   return errors;
 }

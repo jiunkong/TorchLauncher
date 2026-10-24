@@ -12,7 +12,7 @@ import { studioResultMessage } from './result';
 
 export type StudioAction = Exclude<
   StudioCommand['action'],
-  'update' | 'touch' | 'state' | 'setLanguage'
+  'update' | 'touch' | 'state' | 'setLanguage' | 'loaderVersions'
 >;
 
 /** The outcome of the latest user-started operation; adapters derive deploy/export status from it. */

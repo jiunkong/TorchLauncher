@@ -349,6 +349,12 @@ export type StudioResult =
   | { key: 'launcherZipCreated'; keyCreated: boolean };
 export type StudioCommand =
   | {
+      /** Fetch compatible stable loader versions for a catalog game release. */
+      action: 'loaderVersions';
+      minecraftVersion: string;
+      kind: 'fabric' | 'neoforge';
+    }
+  | {
       action:
         | 'state'
         | 'touch'
@@ -470,7 +476,7 @@ export type StudioError =
   | 'TOO_LARGE';
 export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
 export type StudioReply =
-  | { ok: true; state: StudioState }
+  | { ok: true; state: StudioState; loaderVersions?: string[] }
   | { ok: false; code: StudioError; detail?: { code: StudioTestSettingsError } };
 export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;

@@ -45,4 +45,20 @@ describe('Studio field validation', () => {
     expect(validHttps(`https://example.org/${'a'.repeat(4090)}`)).toBe(false);
     expect(validHttps('http://example.org/pack')).toBe(false);
   });
+
+  it('requires Minecraft releases from the pinned list', () => {
+    const value = project();
+    expect(
+      validateServer({
+        ...value,
+        game: { ...value.game, minecraftVersion: '1.6.4' },
+      }),
+    ).toHaveProperty('minecraftVersion', 'validation.gameVersion');
+    expect(
+      validateServer({
+        ...value,
+        game: { ...value.game, minecraftVersion: '1.21.1/evil' },
+      }),
+    ).toHaveProperty('minecraftVersion', 'validation.version');
+  });
 });
