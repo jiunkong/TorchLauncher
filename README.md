@@ -85,6 +85,8 @@ OS별 패키지는 해당 OS에서 빌드하는 것을 기본으로 합니다. �
 
 GitHub Actions의 지원 대상과 작업은 `.github/workflows/`를 따릅니다.
 워크플로를 수동 실행하면 현재 러너의 아키텍처로 포터블 패키지도 생성하고 아티팩트로 보관합니다.
+`release` 브랜치의 자동 릴리스는 별도 워크플로로 Windows x64 portable EXE와 Linux x64 AppImage를
+생성해 게시합니다. 버전·체크섬·실행 조건은 [GitHub 자동 릴리스](docs/github-releases.md)를 따릅니다.
 CI 구성은 실제 원격 실행 결과와 구분합니다.
 
 ## 설계 문서
