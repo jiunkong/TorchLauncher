@@ -197,7 +197,7 @@ describe('files diff against the last build', () => {
     const h = await harness();
     await h.include(['a.txt'], 'always');
     await h.build();
-    const projectPath = join(h.root, 'p.json');
+    const projectPath = join(h.root, 'p.tlstudio');
     h.d.save.mockResolvedValueOnce(projectPath);
     await h.s.request({ action: 'save' });
     h.d.open.mockResolvedValueOnce([projectPath]);
@@ -470,7 +470,7 @@ describe('in-app discard confirmation', () => {
       code: 'INVALID',
     });
     expect((await h.s.request({ action: 'new', discard: true })).ok).toBe(true);
-    const saved = join(h.root, 'p.json');
+    const saved = join(h.root, 'p.tlstudio');
     h.d.save.mockResolvedValueOnce(saved);
     await h.s.request({ action: 'save' });
     expect(h.s.snapshot().dirty).toBe(false);
@@ -505,7 +505,7 @@ describe('in-app discard confirmation', () => {
     h.s.resume();
     await h.s.close();
     expect(h.s.beginClose()).toBe(false);
-    h.d.save.mockResolvedValueOnce(join(h.root, 'p.json'));
+    h.d.save.mockResolvedValueOnce(join(h.root, 'p.tlstudio'));
     expect((await h.s.request({ action: 'save' })).ok).toBe(true);
     expect(h.s.snapshot().dirty).toBe(false);
     expect((await h.s.request({ action: 'closeConfirm' })).ok).toBe(true);

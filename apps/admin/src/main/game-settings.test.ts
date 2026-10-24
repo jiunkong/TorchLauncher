@@ -16,7 +16,6 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseSettingsPolicy } from '../../../../packages/core/src/instance/settings/index.js';
 import type { StudioGameSettings } from '../shared/studio.js';
-import { decodeProject, encodeProject } from './branding.js';
 import {
   addPack,
   generatePolicy,
@@ -28,6 +27,7 @@ import {
   validatePackName,
 } from './game-settings.js';
 import { parseProject } from './project.js';
+import { decodeProjectFile, encodeProjectFile } from './project-file.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
 const roots: string[] = [];
@@ -314,8 +314,8 @@ async function harness() {
   const reopenWithFiles = async (files: { path: string; policy: 'always' | 'initial-only' }[]) => {
     const project = parseProject(s.snapshot().project);
     project.files = files;
-    const path = join(root, 'legacy.json');
-    await writeFile(path, JSON.stringify(project));
+    const path = join(root, 'legacy.tlstudio');
+    await writeFile(path, encodeProjectFile(project, {}));
     d.open.mockResolvedValueOnce([path]);
     await s.request({ action: 'open', discard: true });
     d.open.mockResolvedValueOnce([source]);
@@ -581,7 +581,7 @@ describe('service: game settings preset', () => {
       ok: false,
       code: 'INVALID',
     });
-    const saved = join(h.root, 'p.json');
+    const saved = join(h.root, 'p.tlstudio');
     h.d.save.mockResolvedValueOnce(saved);
     await h.s.request({ action: 'save' });
     const before = h.s.snapshot().project;
@@ -594,8 +594,8 @@ describe('service: game settings preset', () => {
 
 describe('project schema', () => {
   const v1 = () => {
-    const raw = JSON.parse(
-      encodeProject(
+    const raw = decodeProjectFile(
+      encodeProjectFile(
         parseProject({
           format: 'torchlauncher-project',
           version: 1,
@@ -608,13 +608,13 @@ describe('project schema', () => {
         }),
         {},
       ),
-    );
+      () => ({ width: 1, height: 1 }),
+    ).project;
     return raw;
   };
   it('reads the current schema and rejects earlier or unknown versions', () => {
     const raw = v1();
-    const loaded = decodeProject(raw, () => ({ width: 1, height: 1 }));
-    expect(parseProject(loaded.input).version).toBe(1);
+    expect(parseProject(raw).version).toBe(1);
     expect(() => parseProject({ ...v1(), version: 2 })).toThrow(
       expect.objectContaining({ code: 'INVALID' }),
     );
@@ -887,14 +887,16 @@ describe('service: mod configs and shaders', () => {
     const g = h.s.snapshot().project?.gameSettings;
     expect(g?.shader?.pack).toEqual({ policy: 'required', value: 'BSL.zip' });
     expect(g?.configFiles?.[0]?.items.find((i) => i.key === 'fog')?.policy).toBe('initial');
-    const saved = join(h.root, 'p.json');
+    const saved = join(h.root, 'p.tlstudio');
     h.d.save.mockResolvedValueOnce(saved);
     await h.s.request({ action: 'save' });
     const before = h.s.snapshot().project;
     h.d.open.mockResolvedValueOnce([saved]);
     await h.s.request({ action: 'open', discard: true });
     expect(h.s.snapshot().project).toEqual(before);
-    const old = JSON.parse(await readFile(saved, 'utf8'));
+    const old = structuredClone(
+      decodeProjectFile(await readFile(saved), () => ({ width: 1, height: 1 })).project,
+    ) as Record<string, any>;
     delete old.gameSettings.configFiles;
     delete old.gameSettings.shader;
     expect(() => parseProject(old)).not.toThrow();

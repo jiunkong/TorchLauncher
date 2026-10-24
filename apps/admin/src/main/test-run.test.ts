@@ -113,7 +113,7 @@ async function setup() {
 }
 it('keeps completed test extraction read-only until options are explicitly imported', async () => {
   const h = await setup();
-  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.json'));
+  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.tlstudio'));
   expect(await h.service.request({ action: 'saveAs' })).toMatchObject({ ok: true });
   const before = h.service.snapshot();
   expect(before.dirty).toBe(false);
@@ -535,7 +535,7 @@ it('routes file options import through the existing picker and merge path', asyn
 });
 it('refreshes config candidates without importing, including when options.txt is invalid', async () => {
   const h = await setup();
-  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.json'));
+  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.tlstudio'));
   await h.service.request({ action: 'saveAs' });
   const before = h.service.snapshot();
   await completeTest(h, 'invalid\u0000options');

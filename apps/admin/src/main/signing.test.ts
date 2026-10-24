@@ -15,6 +15,7 @@ import type { DownloadSource } from '../../../../packages/core/src/download/sour
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
+import { encodeProjectFile } from './project-file.js';
 import { type SafeStorageLike, SigningKeyStore } from './signing.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
@@ -362,8 +363,8 @@ describe('Studio signing integration', () => {
     const project = parseProject(ctx.s.snapshot().project);
     delete project.sequence;
     const fresh = new StudioService(dialogs(), undefined, undefined, ctx.store);
-    const path = join(ctx.root, 'p.json');
-    await writeFile(path, JSON.stringify(project));
+    const path = join(ctx.root, 'p.tlstudio');
+    await writeFile(path, encodeProjectFile(project, {}));
     const fd = dialogs();
     const f2 = new StudioService(fd, undefined, undefined, ctx.store);
     fd.open.mockResolvedValueOnce([path]);
@@ -376,7 +377,7 @@ describe('Studio signing integration', () => {
     expect(await read(d)).toBeGreaterThan(sequences[2] as number);
     // a project carrying a higher sequence than the key store (restored key on a new machine)
     const high = { ...project, sequence: 500 };
-    await writeFile(path, JSON.stringify(high));
+    await writeFile(path, encodeProjectFile(high, {}));
     fd.open.mockResolvedValueOnce([path]);
     await f2.request({ action: 'open', discard: true });
     fd.open.mockResolvedValueOnce([ctx.source]);
@@ -403,7 +404,7 @@ describe('Studio signing integration', () => {
   it('keeps private key material out of project, deploy output and reply state', async () => {
     const ctx = await setup();
     const { pack } = await build(ctx, 'o.torchpack');
-    const projectPath = join(ctx.root, 'project.json');
+    const projectPath = join(ctx.root, 'project.tlstudio');
     ctx.d.save.mockResolvedValueOnce(projectPath);
     await ctx.s.request({ action: 'save' });
     const serverId = ctx.s.snapshot().project?.serverId as string;
@@ -434,9 +435,9 @@ describe('Studio signing integration', () => {
     const d0 = dialogs();
     const legacy = new StudioService(d0);
     d0.open.mockResolvedValueOnce([sourceDir]);
-    await writeFile(join(root, 'proj.json'), JSON.stringify(project));
+    await writeFile(join(root, 'proj.tlstudio'), encodeProjectFile(project, {}));
     d0.open.mockReset();
-    d0.open.mockResolvedValueOnce([join(root, 'proj.json')]);
+    d0.open.mockResolvedValueOnce([join(root, 'proj.tlstudio')]);
     await legacy.request({ action: 'open', discard: true });
     d0.open.mockResolvedValueOnce([sourceDir]);
     await legacy.request({ action: 'source' });
@@ -445,7 +446,10 @@ describe('Studio signing integration', () => {
     expect((await legacy.request({ action: 'build' })).ok).toBe(true);
     const oldBytes = await readFile(oldPack);
     // The project file as a pre-upgrade Studio saved it, plus the build record the current one keeps.
-    await writeFile(join(root, 'proj.json'), JSON.stringify(legacy.snapshot().project));
+    await writeFile(
+      join(root, 'proj.tlstudio'),
+      encodeProjectFile(parseProject(legacy.snapshot().project), {}),
+    );
     expect(
       (await openDeploymentReader(memorySource(oldBytes), { expectedServerId: project.serverId }))
         .header.formatVersion.minor,
@@ -454,7 +458,7 @@ describe('Studio signing integration', () => {
     const d = dialogs();
     let remote = oldBytes;
     const s = new StudioService(d, () => memorySource(remote), undefined, store);
-    d.open.mockResolvedValueOnce([join(root, 'proj.json')]);
+    d.open.mockResolvedValueOnce([join(root, 'proj.tlstudio')]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().signing).toMatchObject({ keyExists: false, publicKey: null });
     const out = join(root, 'out.zip');
@@ -527,8 +531,8 @@ describe('Studio signing integration', () => {
     const store2 = new SigningKeyStore(join(ctx.root, 'm2'), fakeStorage(), FAST);
     const d2 = dialogs();
     const s2 = new StudioService(d2, undefined, undefined, store2);
-    const projectFile = join(ctx.root, 'proj.json');
-    await writeFile(projectFile, JSON.stringify(project));
+    const projectFile = join(ctx.root, 'proj.tlstudio');
+    await writeFile(projectFile, encodeProjectFile(project, {}));
     d2.open.mockResolvedValueOnce([projectFile]);
     await s2.request({ action: 'open', discard: true });
     d2.open.mockResolvedValueOnce([backup]);

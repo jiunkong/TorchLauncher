@@ -27,10 +27,7 @@ import type {
 import { shaderConfigPaths } from '../shared/studio.js';
 import {
   type BrandingSnapshots,
-  decodeProject,
-  encodeProject,
   type ImageDecoder,
-  PROJECT_READ_LIMIT,
   parseBranding,
   profileBranding,
   validateImage,
@@ -66,6 +63,7 @@ import {
   writeGeneratedPolicy,
 } from './game-settings.js';
 import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './project.js';
+import { decodeProjectFile, encodeProjectFile, PROJECT_FILE_LIMIT } from './project-file.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
 import type { SigningKeyStore } from './signing.js';
 import { emptyTestRun, type StudioTestRunner } from './test-run.js';
@@ -863,11 +861,8 @@ export class StudioService {
         if (command.action === 'open') {
           path = (await this.selected('project'))[0] ?? null;
           if (!path) throw new StudioFailure('CANCELLED');
-          const loaded = decodeProject(
-            JSON.parse((await safeRead(path, PROJECT_READ_LIMIT)).toString('utf8')),
-            this.decode,
-          );
-          project = parseProject(loaded.input);
+          const loaded = decodeProjectFile(await safeRead(path, PROJECT_FILE_LIMIT), this.decode);
+          project = loaded.project;
           snapshots = loaded.snapshots;
         } else project = newProject();
         signal.throwIfAborted();
@@ -960,7 +955,7 @@ export class StudioService {
             : await this.dialogs.save('project');
         if (!path) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
-        await saveProject(path, encodeProject(project, this.snapshots));
+        await saveProject(path, encodeProjectFile(project, this.snapshots));
         this.projectPath = path;
         this.state.projectName = basename(path);
         this.state.dirty = false;

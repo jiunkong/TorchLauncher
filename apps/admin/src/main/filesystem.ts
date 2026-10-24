@@ -73,7 +73,7 @@ export async function safeRead(path: string, limit: number): Promise<Buffer> {
     await handle.close();
   }
 }
-export async function saveProject(path: string, content: string): Promise<void> {
+export async function saveProject(path: string, content: string | Uint8Array): Promise<void> {
   await noLinks(dirname(path));
   try {
     const stat = await lstat(path);
@@ -84,7 +84,7 @@ export async function saveProject(path: string, content: string): Promise<void> 
   const temporary = join(dirname(path), `.torchstudio-${randomUUID()}.tmp`);
   const handle = await open(temporary, 'wx', 0o600);
   try {
-    await handle.writeFile(content, 'utf8');
+    await handle.writeFile(content);
     await handle.sync();
   } catch (error) {
     await handle.close();

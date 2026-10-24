@@ -94,7 +94,7 @@ function createWindow(): void {
                           ? [{ name: 'options.txt', extensions: ['txt'] }]
                           : kind === 'resourcepack' || kind === 'shaderpack'
                             ? [{ name: 'ZIP', extensions: ['zip'] }]
-                            : [{ name: 'Studio 프로젝트', extensions: ['json'] }],
+                            : [{ name: 'TorchLauncher Studio 파일', extensions: ['tlstudio'] }],
               }
             : {}),
         });
@@ -109,7 +109,7 @@ function createWindow(): void {
             zip: '런처 내보내기 ZIP 저장',
           }[kind],
           defaultPath: {
-            project: 'server-project.json',
+            project: 'server-project.tlstudio',
             pack: 'server.torchpack',
             keybackup: 'signing-key.tlkey',
             zip: 'launcher.zip',
@@ -117,13 +117,13 @@ function createWindow(): void {
           filters: [
             {
               name: {
-                project: 'Studio 프로젝트',
+                project: 'TorchLauncher Studio 파일',
                 pack: '배포 파일',
                 keybackup: '서명 키 백업',
                 zip: 'ZIP',
               }[kind],
               extensions: [
-                { project: 'json', pack: 'torchpack', keybackup: 'tlkey', zip: 'zip' }[kind],
+                { project: 'tlstudio', pack: 'torchpack', keybackup: 'tlkey', zip: 'zip' }[kind],
               ],
             },
           ],

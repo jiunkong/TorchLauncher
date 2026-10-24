@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
-import { decodeProject, encodeProject, validateImage } from './branding.js';
+import { validateImage } from './branding.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
+import { decodeProjectFile, encodeProjectFile } from './project-file.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
 const png = Buffer.from(
@@ -82,12 +83,13 @@ describe('Studio durable branding', () => {
     expect(JSON.stringify(summary)).not.toContain('base64');
     expect(summary?.branding?.icon).toMatchObject({ length: png.length });
     await writeFile(image, 'original replaced');
-    const projectPath = join(root, 'project.json');
+    const projectPath = join(root, 'project.tlstudio');
     d.save.mockResolvedValueOnce(projectPath);
     expect((await s.request({ action: 'save' })).ok).toBe(true);
-    expect(JSON.parse(await readFile(projectPath, 'utf8')).branding.icon.base64).toBe(
-      png.toString('base64'),
-    );
+    const savedFile = await readFile(projectPath);
+    expect(savedFile.includes(Buffer.from(png.toString('base64')))).toBe(false);
+    expect(savedFile.includes(png)).toBe(true);
+    expect(decodeProjectFile(savedFile, decode).snapshots.icon?.equals(png)).toBe(true);
     d.open.mockResolvedValueOnce([projectPath]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().project).toEqual(summary);
@@ -211,17 +213,10 @@ describe('Studio durable branding', () => {
   it('rejects malformed/corrupt snapshots, metadata, bounds and actual decoder disagreement', () => {
     const metadata = validateImage('icon', png, decode);
     const project = { ...newProject(), branding: { icon: metadata } };
-    const saved = JSON.parse(encodeProject(project, { icon: png }));
-    expect(parseProject(decodeProject(saved, decode).input)).toEqual(project);
-    for (const bad of [
-      { ...saved, branding: { icon: { ...saved.branding.icon, sha256: '0'.repeat(64) } } },
-      {
-        ...saved,
-        branding: { icon: { ...saved.branding.icon, base64: `${png.toString('base64')}\n` } },
-      },
-      { ...saved, branding: { icon: { ...saved.branding.icon, base64: 'A'.repeat(1400004) } } },
-    ])
-      expect(() => decodeProject(bad, decode)).toThrow();
+    const saved = encodeProjectFile(project, { icon: png });
+    expect(decodeProjectFile(saved, decode).project).toEqual(project);
+    expect(() => encodeProjectFile(project, {})).toThrow();
+    expect(() => decodeProjectFile(saved, () => ({ width: 2, height: 1 }))).toThrow();
     expect(() => validateImage('icon', png, () => ({ width: 2, height: 1 }))).toThrow();
     expect(() =>
       validateImage('icon', png, () => {
@@ -261,15 +256,17 @@ describe('Studio durable branding', () => {
         code: 'INVALID',
       });
     }
-    const bad = join(root, 'project.json');
+    const bad = join(root, 'project.tlstudio');
     await writeFile(
       bad,
-      JSON.stringify({
-        ...newProject(),
-        branding: {
-          icon: { sha256: '0'.repeat(64), length: 1, mediaType: 'image/png', base64: 'YQ==' },
-        },
-      }),
+      Buffer.from(
+        JSON.stringify({
+          ...newProject(),
+          branding: {
+            icon: { sha256: '0'.repeat(64), length: 1, mediaType: 'image/png', base64: 'YQ==' },
+          },
+        }),
+      ),
     );
     d.open.mockResolvedValueOnce([bad]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
