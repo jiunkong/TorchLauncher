@@ -79,7 +79,7 @@
 ## L3 브랜딩 통합 (2026-10-23)
 
 [혼합 전달 명세](operator-branding-hybrid.md)대로 초기 이미지는 서버 JSON 옆에 동봉하고,
-변경 이미지는 torchpack v1.1 역할별 payload로 갱신한다. 기존 이미지 유지 후 검증·디코드 성공 때
+변경 이미지는 서명된 torchpack v1.2 역할별 payload로 갱신한다. 기존 이미지 유지 후 검증·디코드 성공 때
 220ms 교차 페이드, reduced-motion 즉시 전환. 원격 null 제거는 캐시에 보존한다.
 창 제목/창 아이콘/메뉴 이름·아이콘/홈 배경에만 반영하며 시작 TorchLauncher 로고와 exe는 고정이다.
 Studio 기능 API는 통합했지만 설정 화면은 사용자 요청으로 변경하지 않았다.

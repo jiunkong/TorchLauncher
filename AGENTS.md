@@ -2,7 +2,7 @@
 
 ## Project Status & Architecture
 
-TorchLauncher is a server-specific Minecraft launcher built with Electron, TypeScript, and React. The pnpm monorepo contains independent player and Studio apps with shared contracts. Support Windows and Linux (macOS is deferred by user decision, 2026-10-22; Linux ARM64 is not supported), with both Fabric and NeoForge; validate Minecraft 1.21.1 first. Desktop shells and shared download, deployment, synchronization, authentication, and base game-installation code are implemented. Product UI wiring, loader installation and full end-to-end validation remain pending; consult `docs/progress.md` for current evidence.
+TorchLauncher is a server-specific Minecraft launcher built with Electron, TypeScript, and React. The pnpm monorepo contains independent player and Studio apps with shared contracts. Support Windows and Linux (macOS is deferred by user decision, 2026-10-22; Linux ARM64 is not supported), with both Fabric and NeoForge; validate Minecraft 1.21.1 first. Desktop shells, product UI wiring, loader installation, deployment signing, Studio ZIP export, synchronization and authentication are implemented. Full end-to-end validation of the latest build and native verification remain pending; consult `docs/progress.md` for current evidence.
 
 ## Agent Coordination & Merge Ownership
 
@@ -85,3 +85,5 @@ Never commit tokens, credentials, or private configuration. Keep game data in se
 ## Development-Phase Compatibility
 
 Until the first release, backward compatibility is not required (user decision, 2026-10-23). Do not add or keep migration paths, legacy format readers, or version-negotiation shims for earlier project, deployment, or settings-policy formats; change formats directly and update the specs and tests. Revisit this rule before the first public release.
+
+Current format inventory is in `docs/current-formats.md`. Only signed torchpack 1.2 and server configurations with `signing` are supported; keep old-format rejection tests rather than compatibility readers or migration helpers.

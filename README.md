@@ -1,13 +1,17 @@
 # TorchLauncher
 
 서버 전용 Minecraft 런처와 운영자용 **TorchLauncher Studio**를 만드는 프로젝트입니다.
-Windows·macOS·Linux, Fabric·NeoForge를 지원하는 것을 목표로 합니다.
+Windows x64·Linux x64, Minecraft 1.21.1의 Fabric·NeoForge가 현재 검증 대상입니다.
+macOS는 보류했고 Linux ARM64는 지원하지 않습니다.
 
-두 Electron 앱의 초기 화면과 개발·검증·패키징 기반, 배포 파일 생성기,
-일반 HTTPS·공개 Drive 다운로드 소스, Microsoft 인증 코어와 브라우저·암호화 저장 어댑터,
-Minecraft 설치·프로세스·로그 관리가 있습니다.
-Linux에서 실제 1.21.1 설치·Java 실행과 공개 Drive 파일의 부분 다운로드·같은 링크의 버전 교체를 확인했습니다.
-실계정 로그인·게임 접속·로더 설치, 제품 UI 연결·모드 동기화·Studio 배포 흐름은 후속 검증·구현입니다.
+두 Electron 앱의 UI, Microsoft 인증, 게임·로더 설치와 실행, 모드 동기화,
+Studio 프로젝트·게임 설정·브랜딩·서명된 배포 생성·런처 ZIP 내보내기가 구현되어 있습니다.
+Windows 실제 게임 접속과 Linux 자동/GUI 검증 기록이 있으며, 최신 기능 전체의 배포 종단 QA는 남아 있습니다.
+정확한 완료·미검증 범위는 [진행표](docs/progress.md)를 따릅니다.
+
+개발 중 이전 프로젝트·배포·설정 형식의 하위 호환은 유지하지 않습니다.
+배포는 서명된 torchpack1.2만 사용하고, 서버 구성에 `signing` 공개키가 필수입니다.
+옛 개발 배포물은 현재 Studio에서 다시 생성·내보내세요. 형식별 기준은 [현재 형식](docs/current-formats.md)을 참고하세요.
 
 ## 개발 환경
 
@@ -72,14 +76,14 @@ pnpm 워크스페이스 모노레포이며 두 앱은 서로를 import하지 않
 
 ## 패키징과 CI
 
-electron-builder가 Windows portable EXE, macOS ZIP, Linux tar.gz를 생성합니다.
+electron-builder가 Windows portable EXE와 Linux tar.gz를 생성합니다.
 각 앱의 결과는 `apps/<앱>/dist/`에 저장됩니다. 소스 빌드는 `out/`에 저장됩니다.
-이 단계의 패키지는 공통 앱 자체이며 서버 설정을 넣는 Studio 내보내기는 후속 구현입니다.
+각 패키지는 공통 앱이며, Studio는 운영자가 고른 런처 바이너리·서버 구성·브랜딩 자산을 ZIP으로 내보냅니다.
 
 OS별 패키지는 해당 OS에서 빌드하는 것을 기본으로 합니다. 서명 자격 증명과 자동 업데이트는
 아직 구성하지 않았습니다. 배포 파일을 사용자에게 제공하기 전 OS별 실행과 서명 정책을 확인해야 합니다.
 
-GitHub Actions는 세 OS에서 검사·Electron smoke test를 실행하도록 구성했습니다.
+GitHub Actions의 지원 대상과 작업은 `.github/workflows/`를 따릅니다.
 워크플로를 수동 실행하면 현재 러너의 아키텍처로 포터블 패키지도 생성하고 아티팩트로 보관합니다.
 CI 구성은 실제 원격 실행 결과와 구분합니다.
 

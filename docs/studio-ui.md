@@ -1,6 +1,6 @@
 # Studio UI 재작성과 신규 기능 명세
 
-2026-10-23 사용자 지시: Studio 시안 적용과 시안에 새로 생긴 기능 구현을 **동시에** 진행한다. 시안 소스는 [`docs/design/studio/`](design/studio/README.md)(런처 시안과 같은 토큰). 기존 계약(저장 형식, 서명, 브랜딩, 빌드)은 깨지 않고 확장만 한다. 계약 변경은 #0과 조정한다.
+2026-10-23 사용자 지시: Studio 시안 적용과 시안에 새로 생긴 기능 구현을 **동시에** 진행한다. 시안 소스는 [`docs/design/studio/`](design/studio/README.md)(런처 시안과 같은 토큰). 현재 계약(저장 형식, 서명, 브랜딩, 빌드)을 따른다. 개발 중 과거 형식 호환은 유지하지 않으며 계약 변경은 #0과 조정한다.
 
 ## 신규 기능 (현재 Studio에 없음)
 
@@ -22,7 +22,7 @@
 | ID | 내용 | 독점 범위 | 브랜치 |
 | --- | --- | --- | --- |
 | STUDIO-UI-01 | 시안 적용: 앱 셸/사이드바/스타일 토큰/Splash, 서버 정보·브랜딩·파일·배포·내보내기·개요·확인 창을 **기존 API**로 시안대로 재작성. 게임 설정 페이지는 레이아웃과 로컬 상태까지(서비스 연결은 후속). 시안의 신규 기능 중 API가 아직 없는 곳은 숨기지 말고 `fixtures` 기반 표시. | `apps/admin/src/renderer/**`, `apps/admin/scripts/*smoke*`(renderer 관련), `docs/handoffs/STUDIO-UI-01.md` | `feat/studio-ui-shell` |
-| SET-CORE-01 | 설정 정책 확장: 셰이더 설정(선택 팩/사용/팩별 옵션)과 모드 설정 파일 항목을 정책으로 표현·적용(하위 호환, v1 파일 계속 유효), `options.txt` 편집용 파서 재사용 API(키 목록, 단축키 판별, 정렬)와 [설정 정책](settings-policy.md) 갱신. | `packages/core/src/instance/settings/**`, `docs/settings-policy.md`, `docs/handoffs/SET-CORE-01.md` | `feat/settings-core-shaders` |
+| SET-CORE-01 | 설정 정책 확장: 셰이더 설정(선택 팩/사용/팩별 옵션)과 모드 설정 파일 항목을 현재 단일 version1 정책으로 표현·적용(구형 형식 reader 없음), `options.txt` 편집용 파서 재사용 API(키 목록, 단축키 판별, 정렬)와 [설정 정책](settings-policy.md) 갱신. | `packages/core/src/instance/settings/**`, `docs/settings-policy.md`, `docs/handoffs/SET-CORE-01.md` | `feat/settings-core-shaders` |
 | STUDIO-MAIN-01 | Studio 메인/IPC: 프리셋 불러오기(options.txt 읽기·모드 설정 파일 탐지), 리소스팩/셰이더팩 추가, 정책 저장(프로젝트 파일)과 배포 시 `settings-policy.json` 생성, 파일 diff(마지막 배포 대비)와 소스 다시 읽기, 배포 상태/주소 검사 세분화, 런처 내보내기 ZIP. SET-CORE-01 통합 전에는 파일 diff/ZIP/배포 상태부터 진행한다. | `apps/admin/src/main/**`, `apps/admin/src/shared/**`, `apps/admin/src/preload/**`, `docs/handoffs/STUDIO-MAIN-01.md` | `feat/studio-main-features` |
 
 후속(위 셋 통합 후, #0 배정): STUDIO-UI-02 — 게임 설정/파일/배포/내보내기 페이지를 실제 API에 연결, 통합 smoke.

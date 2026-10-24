@@ -5,6 +5,20 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## Active CURRENT-FORMAT cleanup (2026-10-24, #0)
+
+User authorized removing historical compatibility and updating docs. Two workers, both Sol medium:
+core agent-1 feat/current-formats-core (packages/** + own handoff), apps agent-2 feat/current-formats-apps
+(apps/** + scripts/** + own handoff), baseline66ed90b. Coordinator owns all active specs/README/AGENTS/tracker.
+Only torchpack1.2, writer sign+sequence required, index branding+sequence required; config signing required.
+Remove unsigned launcher/Studio fallback and lockv1 reader; keep unknown locks protected, current schema1 formats,
+optional branding/game hint/preferences and third-party Minecraft data support. Reader keyless unverified mode is
+current-format inspection only, launcher always verified. See docs/current-formats.md.
+Core focused270 tests and types passed; full packages checks in flight. Apps consumers/fixtures being updated.
+No integration/full-workspace success claimed yet. Next: review/integrate core, apps rebase/update baseline,
+apps focused validation, integrate apps, main pnpm check and relevant Electron smokes, record completion.
+No live server/private config/user credential changes. Old ignored packs/config must be regenerated later, not auto migrated.
+
 ## Latest UI follow-up (2026-10-24, #0)
 
 STUDIO-START-LINE-01 integrated: worker #1 gpt-6-luna medium, `b0c032d` → `bcf7e1e`.

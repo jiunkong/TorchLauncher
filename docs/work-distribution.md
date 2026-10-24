@@ -2,6 +2,20 @@
 
 ## 역할과 현재 배정
 
+2026-10-24 CURRENT-FORMAT 정리 사용자 승인: 개발 중 과거 호환 reader/writer/전환 경로 삭제, 현재 규격만 유지.
+- #1 `current_formats_core`, gpt-6.1-sol medium, agent-1 `feat/current-formats-core`, baseline `66ed90b`.
+  독점 `packages/**` 및 `docs/handoffs/CURRENT-FORMAT-CORE-01.md`. torchpack1.2 단일화, sign/sequence 필수,
+  server signing 필수, lockv1 판독 제거와 unknown fail-closed 유지, 관련 packages 소비자/fixture/tests.
+- #2 `current_formats_apps`, gpt-6.1-sol medium, agent-2 `feat/current-formats-apps`, 같은 baseline.
+  독점 `apps/**`, `scripts/**`, `docs/handoffs/CURRENT-FORMAT-APPS-01.md`. 새 core 계약 연결,
+  무서명 launcher/Studio fallback·옛 형식 fixture 제거, 앱/스크립트 회귀 검증.
+- 현재 torchpack1.2: index branding/sequence 필수, writer sign/sequence 필수; reader key 없는 구조 검사는
+  도구용 unverified로 유지하되 launcher는 항상 구성 키로 verified만 사용. server config signing 필수.
+- 선택적 브랜딩/게임 표시 hint/메모리 값은 현재 기능이며 유지. Minecraft·외부 포맷 지원은 과거 앱 호환과 구분.
+- #0은 명세·현행 안내 갱신/검토/통합·전체 검증. manifest/lockfile 변경은 배정하지 않음. core 통합 후 apps 검증.
+  cross-package 계약 변경 규모 때문에 Sol medium 두 명; 추가 에이전트/고사양 상향 없음.
+
+
 2026-10-24 STUDIO-START-LINE-01: 사용자 시작페이지 상단 검은 선 보고. #1 `studio_start_line`, gpt-6-luna medium,
 agent-1 `fix/studio-start-top-line`, baseline `9b61d66`. 실제 Electron 재현/paint/layout 원인 확인 후 최소 수정.
 독점: admin renderer styles.css/App.tsx/components/MenuBar.tsx/pages/StartPage.tsx, 필요시 앱 로컬 smoke의 해당 화면 검증,
