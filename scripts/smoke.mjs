@@ -107,10 +107,10 @@ const appCases = [
       ['개요', '새 서버'],
       ['서버 정보', '서버 정보'],
       ['브랜딩', '플레이어가 보게 될 런처'],
-      ['모드 설정', '모드 설정'],
+      ['모드', '모드'],
       ['리소스팩', '리소스팩'],
       ['셰이더', '셰이더'],
-      ['파일', '배포할 파일'],
+      ['파일', '파일'],
       ['테스트 실행', '테스트 실행'],
       ['단축키 · 옵션', '단축키 · 옵션'],
       ['배포', '배포'],
@@ -249,7 +249,7 @@ try {
         await page.getByRole('button', { name: '배포', exact: true }).click();
         assert.equal(
           await page.getByRole('button', { name: '배포 파일 만들기', exact: true }).isDisabled(),
-          true,
+          false, // A project folder always has its files/ directory; a valid default server is buildable.
         );
         const projectFile = resolve(temp, 'project', 'project.torchproj');
         // Saving lives in the top menu bar (File > Save).

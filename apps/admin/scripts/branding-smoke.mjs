@@ -16,7 +16,7 @@ try {
     `
 import assert from 'node:assert/strict';
 import { app, nativeImage, safeStorage } from 'electron';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { decodeNativeImage } from ${JSON.stringify(resolve('apps/admin/src/main/native-branding.ts'))};
 import { validateImage } from ${JSON.stringify(resolve('apps/admin/src/main/branding.ts'))};
@@ -36,6 +36,7 @@ try {
   assert.throws(()=>validateImage('background',png.subarray(0,33),decodeNativeImage));
   const path=join(${JSON.stringify(root)},'native.png');await writeFile(path,png);
   const projDir=join(${JSON.stringify(root)},'test-project');
+  await mkdir(projDir);
   let selected=[projDir];
   const service=new StudioService({open:async()=>selected,save:async()=>projDir,discard:async()=>true},undefined,decodeNativeImage,new SigningKeyStore(join(${JSON.stringify(root)},'keys'),safeStorage));
   assert.equal((await service.request({action:'new'})).ok,true);

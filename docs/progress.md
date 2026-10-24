@@ -7,6 +7,17 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-PROJECT-FOLDER-01 통합 (2026-10-25)
+
+프로젝트를 단일 `.torchproj`에서 `project.torchproj` + `files/` 폴더 구조로 전환한 작업(`a3f2256`, 인계 문서의 `d1ffb59`는 이후 재작성된 커밋)을
+main `0f2d1ad`로 병합했다. 이전 STUDIO-FILES-01(모드/파일 페이지)도 이미 main에 통합되어 있다.
+main 검증: `pnpm check` 성공(115 files/**1499 passed**, 9 skip, 타입·두 앱 빌드), 공통 `pnpm smoke` 두 앱, Studio 기능 smoke 성공.
+통합 중 발견한 작업자 미실행 검증 불일치 두 건을 #0이 스크립트 기대값만 수정했다(제품 코드 변경 없음):
+`scripts/smoke.mjs`의 이전 사이드바 라벨('모드 설정'/'배포할 파일')과 새 프로젝트 배포 버튼 비활성 기대(소스 폴더 개념이 사라져 서버 기본값이 유효하면 활성),
+`branding-smoke.mjs` 프로브가 `new` 전에 빈 폴더를 만들지 않던 문제. branding smoke 성공.
+미검증: Windows 네이티브 폴더 선택창, 패키지 앱. 기존 `.torchproj` 단일 파일 프로젝트는 호환하지 않는다(개발 단계 정책).
+STUDIO-EXPORT-01(런처 자동 수급)은 아직 미착수.
+
 ### Studio 실행 피드백 (2026-10-24, 사용자)
 
 모드 관리 UI·기타 파일 페이지 개선을 요청해 [배정 문서](studio-files-task.md) 기준 STUDIO-FILES-01을 완료했다.
