@@ -9,8 +9,9 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { zip } from '../../../../packages/core/src/diagnostics/fixtures/zip.js';
 import type { Installation } from '../../../../packages/core/src/minecraft/installer.js';
 import type { GameExit, RunningGame } from '../../../../packages/core/src/minecraft/process.js';
+import { StudioService } from './fixtures/signing.js';
 import { handleStudioRequest } from './ipc.js';
-import { type StudioDialogs, StudioService } from './studio.js';
+import type { StudioDialogs } from './studio.js';
 import { StudioTestRunner, TEST_LOG_LIMIT, type TestRunHost } from './test-run.js';
 
 const roots: string[] = [];
@@ -86,7 +87,7 @@ async function setup() {
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
     copy: vi.fn<NonNullable<StudioDialogs['copy']>>(),
   };
-  const service = new StudioService(dialogs, undefined, undefined, null, runner);
+  const service = new StudioService(dialogs, undefined, undefined, undefined, runner);
   await service.request({ action: 'new' });
   dialogs.open.mockResolvedValueOnce([source]);
   await service.request({ action: 'source' });
@@ -202,7 +203,7 @@ it('preserves chosen settings policies when importing test-run files', async () 
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue([h.source]),
     save: vi.fn<StudioDialogs['save']>(),
   };
-  const service = new StudioService(d, undefined, undefined, null, h.runner);
+  const service = new StudioService(d, undefined, undefined, undefined, h.runner);
   await service.request({ action: 'new' });
   await service.request({ action: 'source' });
   await service.request({ action: 'settingsImport', source: 'folder' });

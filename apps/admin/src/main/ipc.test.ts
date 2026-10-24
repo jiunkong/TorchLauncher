@@ -1,7 +1,7 @@
 import type { IpcMainInvokeEvent, WebContents } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
+import { StudioService } from './fixtures/signing.js';
 import { handleStudioRequest } from './ipc.js';
-import { StudioService } from './studio.js';
 
 describe('Studio IPC trust boundary', () => {
   it('accepts only an exact supported language command from the trusted main frame', async () => {

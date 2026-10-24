@@ -34,7 +34,7 @@ const key = newKey();
 const otherKey = newKey();
 const roots: string[] = [];
 let base: string;
-const config = (publicKey?: string) =>
+const config = (publicKey = key.publicKey) =>
   parseServerConfig({
     format: 'torchlauncher-server',
     version: 1,
@@ -42,7 +42,7 @@ const config = (publicKey?: string) =>
     name: 'Fixture',
     address: 'localhost:25565',
     sourceUrl: 'https://example.invalid/never-leak',
-    ...(publicKey ? { signing: { algorithm: 'ed25519', publicKey } } : {}),
+    signing: { algorithm: 'ed25519', publicKey },
   });
 const serve = (bytes: Uint8Array) => {
   served.bytes = bytes;
@@ -70,10 +70,10 @@ describe('signature requirements', () => {
     expect(reader.verification).toBe('verified');
     expect(reader.index.sequence).toBe(3);
   });
-  it('rejects unsigned 1.0 when a key is configured', async () => {
-    serve(await buildDeployment());
+  it.each([0, 1])('rejects historical 1.%s before applying files', async (minor) => {
+    serve(await buildDeployment({ minor }));
     await expect(openServerDeployment(base, config(key.publicKey))).rejects.toMatchObject({
-      code: 'signature-required',
+      code: 'invalid-header',
     });
   });
   it('rejects a different key', async () => {
@@ -92,20 +92,6 @@ describe('signature requirements', () => {
         name: 'DeploymentReaderError',
       });
     }
-  });
-  it('treats a signed file without a configured key as unverified and never records it', async () => {
-    serve(await buildDeployment({ signer: key.privateKey, sequence: 9 }));
-    const reader = await openServerDeployment(base, config());
-    expect(reader.verification).toBe('unverified');
-    await recordAppliedDeployment(base, config(), reader);
-    expect(await readRollbackState(base, serverId)).toBeNull();
-  });
-  it('keeps accepting legacy unsigned deployments without a configured key', async () => {
-    serve(await buildDeployment());
-    const reader = await openServerDeployment(base, config());
-    expect(reader.verification).toBe('unsigned');
-    await recordAppliedDeployment(base, config(), reader);
-    expect(await readRollbackState(base, serverId)).toBeNull();
   });
 });
 
@@ -195,11 +181,6 @@ describe('corrupt state fails closed', () => {
     });
     // The state file is left untouched rather than silently reset.
     expect(await readFile(statePath(), 'utf8')).toBe(text);
-  });
-  it('does not consult the state at all without a configured key', async () => {
-    await writeFile(statePath(), '{');
-    serve(await buildDeployment());
-    await expect(openServerDeployment(base, config())).resolves.toBeDefined();
   });
 });
 

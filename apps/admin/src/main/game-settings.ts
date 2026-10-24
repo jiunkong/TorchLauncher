@@ -315,8 +315,8 @@ export function policyConfigPaths(settings: StudioGameSettings): string[] {
   return paths;
 }
 /**
- * The `settings-policy.json` for the preset, or null when nothing is set. Version 1 unless a
- * config file item is set (then 2, which launchers without v2 reject). Throws PolicyFailure.
+ * The current version 1 `settings-policy.json`, or null when nothing is set.
+ * Throws PolicyFailure for invalid settings.
  */
 export function generatePolicy(
   settings: StudioGameSettings,

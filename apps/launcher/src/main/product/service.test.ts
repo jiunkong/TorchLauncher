@@ -29,6 +29,7 @@ async function setup(overrides: Partial<ProductHost> = {}) {
     version: 'test',
     config: parseServerConfig({
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId,
       name: 'Fixture',
@@ -56,6 +57,7 @@ it('shows the configured game before login and without a game', async () => {
   const withGame = await setup({
     config: parseServerConfig({
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId,
       name: 'Fixture',

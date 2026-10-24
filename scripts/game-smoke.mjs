@@ -17,7 +17,7 @@ import { build } from 'vite';
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let scriptPhase = 'configuration';
 const usage =
-  'node scripts/game-smoke.mjs install|launch --data-dir <absolute-private-directory> --game-dir <absolute-game-directory> --loader neoforge|fabric --loader-version <exact-version> --server-id <expected-uuid> [--source-file <absolute-private-url-file> --server <address:port>] [--duration-seconds 300]';
+  'node scripts/game-smoke.mjs install|launch --data-dir <absolute-private-directory> --game-dir <absolute-game-directory> --loader neoforge|fabric --loader-version <exact-version> --server-id <expected-uuid> [--source-file <absolute-private-url-file> --server <address:port> --signing-public-key <base64url-ed25519-key>] [--duration-seconds 300]';
 const inside = (path, root) => {
   const child = relative(root, path);
   return child === '' || (!child.startsWith(`..${sep}`) && child !== '..' && !isAbsolute(child));
@@ -42,6 +42,7 @@ async function main() {
         '--source-file',
         '--server-id',
         '--server',
+        '--signing-public-key',
         '--duration-seconds',
       ].includes(flag) ||
       !value ||
@@ -108,9 +109,12 @@ async function main() {
     mode === 'launch' &&
     (!isAbsolute(options.get('--source-file') ?? '') ||
       !options.get('--server-id') ||
-      !options.get('--server'))
+      !options.get('--server') ||
+      !/^[A-Za-z0-9_-]{43}$/.test(options.get('--signing-public-key') ?? ''))
   )
-    throw new Error('Launch requires source file, expected server ID and server address.');
+    throw new Error(
+      'Launch requires source file, expected server ID, server address and signing public key.',
+    );
   const config = {
     mode,
     dataDirectory,
@@ -120,6 +124,7 @@ async function main() {
     sourceFile: options.get('--source-file'),
     serverId: options.get('--server-id'),
     server: options.get('--server'),
+    signingPublicKey: options.get('--signing-public-key'),
   };
   const harnessLock = join(dataDirectory, '.game-smoke-lock');
   await mkdir(harnessLock);

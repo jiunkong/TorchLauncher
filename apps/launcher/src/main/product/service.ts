@@ -121,7 +121,6 @@ const safeCodes = new Set([
   'EINSTALLIDENTITY',
   'ESYNCGUARD',
   'EAUTHEXPIRED',
-  'signature-required',
   'signature-invalid',
   'signature-malformed',
   'invalid-signing-key',

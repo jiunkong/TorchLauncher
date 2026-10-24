@@ -26,7 +26,6 @@ const failureKeys = {
   'limit-exceeded': 'failure.limit-exceeded',
   'confirmation-expired': 'failure.confirmation-expired',
   'confirmation-invalid': 'failure.confirmation-invalid',
-  'signature-required': 'failure.signature-required',
   'signature-invalid': 'failure.signature-invalid',
   'signature-malformed': 'failure.signature-malformed',
   'signature-unverified': 'failure.signature-invalid',

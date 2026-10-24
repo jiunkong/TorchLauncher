@@ -15,12 +15,13 @@ try {
     probe,
     `
 import assert from 'node:assert/strict';
-import { app, nativeImage } from 'electron';
+import { app, nativeImage, safeStorage } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { decodeNativeImage } from ${JSON.stringify(resolve('apps/admin/src/main/native-branding.ts'))};
 import { validateImage } from ${JSON.stringify(resolve('apps/admin/src/main/branding.ts'))};
 import { StudioService } from ${JSON.stringify(resolve('apps/admin/src/main/studio.ts'))};
+import { SigningKeyStore } from ${JSON.stringify(resolve('apps/admin/src/main/signing.ts'))};
 app.setPath('userData', ${JSON.stringify(root)});
 app.setPath('sessionData', ${JSON.stringify(root)});
 console.log('Native branding probe starting');
@@ -35,7 +36,7 @@ try {
   assert.throws(()=>validateImage('background',png.subarray(0,33),decodeNativeImage));
   const path=join(${JSON.stringify(root)},'native.png');await writeFile(path,png);
   let selected=[path]; const projectPath=join(${JSON.stringify(root)},'project.torchproj');
-  const service=new StudioService({open:async()=>selected,save:async()=>projectPath,discard:async()=>true},undefined,decodeNativeImage);
+  const service=new StudioService({open:async()=>selected,save:async()=>projectPath,discard:async()=>true},undefined,decodeNativeImage,new SigningKeyStore(join(${JSON.stringify(root)},'keys'),safeStorage));
   assert.equal((await service.request({action:'new'})).ok,true);
   assert.equal((await service.request({action:'brandingSelect',role:'icon'})).ok,true);
   const before=service.snapshot().project;

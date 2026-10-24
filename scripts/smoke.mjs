@@ -70,6 +70,7 @@ await writeFile(
   configPath,
   `${JSON.stringify({
     format: 'torchlauncher-server',
+    signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
     version: 1,
     serverId,
     name: 'Smoke fixture',

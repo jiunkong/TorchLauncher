@@ -20,7 +20,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 it('observes an already validated reader without waiting for branding or propagating observer rejection', async () => {
-  const reader = { index: { files: [] } } as unknown as BrandingDeploymentReader;
+  const reader = {
+    verification: 'verified',
+    header: { indexSha256: 'a'.repeat(64) },
+    index: { files: [], sequence: 1, deploymentId: 'fixture' },
+  } as unknown as BrandingDeploymentReader;
   vi.mocked(openDeploymentReader).mockResolvedValue(reader);
   vi.mocked(launchDeployment).mockImplementation(async (options) => {
     expect(await options.current()).toBe(reader);
@@ -39,6 +43,7 @@ it('observes an already validated reader without waiting for branding or propaga
       version: 'fixture',
       config: {
         format: 'torchlauncher-server',
+        signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
         version: 1,
         serverId: '11111111-1111-4111-8111-111111111111',
         name: 'Home name',

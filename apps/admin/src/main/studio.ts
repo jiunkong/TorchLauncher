@@ -9,7 +9,10 @@ import { writeDeployment } from '../../../../packages/core/src/deployment/writer
 import { RangeNotSupportedError } from '../../../../packages/core/src/download/http/range-client.js';
 import { createDownloadSource } from '../../../../packages/core/src/download/source/factory.js';
 import { SETTINGS_LIMITS } from '../../../../packages/core/src/instance/settings/index.js';
-import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
+import {
+  parseServerConfig,
+  parseServerIdentity,
+} from '../../../../packages/core/src/server-config/index.js';
 import type {
   PackKind,
   StudioExport,
@@ -251,8 +254,7 @@ export class StudioService {
     private readonly decode: ImageDecoder = () => {
       throw new StudioFailure('INVALID');
     },
-    /** Production always injects a store; without one (tests only) builds stay unsigned. */
-    private readonly keys: SigningKeyStore | null = null,
+    private readonly keys: SigningKeyStore,
     private readonly tests: StudioTestRunner | null = null,
     private readonly defaultServerName: () => string = () => 'New server',
   ) {}
@@ -1034,7 +1036,7 @@ export class StudioService {
         return;
       case 'keyCreate': {
         const project = this.project();
-        const keys = this.keys ?? this.noKeys();
+        const keys = this.keys;
         await keys.create(project.serverId);
         await this.refreshSigning({ keyCreated: true, sequence: null });
         this.state.result = { key: 'signingKeyCreated' };
@@ -1042,7 +1044,7 @@ export class StudioService {
       }
       case 'keyExport': {
         const project = this.project();
-        const keys = this.keys ?? this.noKeys();
+        const keys = this.keys;
         const path = await this.dialogs.save('keybackup');
         if (!path) throw new StudioFailure('CANCELLED');
         signal.throwIfAborted();
@@ -1053,7 +1055,7 @@ export class StudioService {
       }
       case 'keyImport': {
         const project = this.project();
-        const keys = this.keys ?? this.noKeys();
+        const keys = this.keys;
         const path = (await this.selected('keybackup'))[0];
         if (!path) throw new StudioFailure('CANCELLED');
         const content = await safeRead(path, 16 * 1024);
@@ -1082,22 +1084,17 @@ export class StudioService {
         }
         if (plan.policyText) await writeGeneratedPolicy(this.sourceRoot, plan.policyText);
         const branding = writerBranding(project, this.snapshots);
-        let signing: { sequence: number; sign: ReturnType<typeof createEd25519Signer> } | null =
-          null;
-        let keyCreated = false;
-        if (this.keys) {
-          keyCreated = await this.ensureKey(this.keys, project.serverId);
-          const key = await this.keys.load(project.serverId);
-          // Reserved (persisted) before writing: a failed build burns the number, never reuses it.
-          const sequence = await this.keys.reserveSequence(project.serverId, project.sequence ?? 0);
-          this.state.project = { ...project, sequence };
-          this.state.dirty = true;
-          signing = { sequence, sign: createEd25519Signer(key) };
-        }
+        const keyCreated = await this.ensureKey(this.keys, project.serverId);
+        const key = await this.keys.load(project.serverId);
+        // Reserve before writing: failed builds burn their sequence number.
+        const sequence = await this.keys.reserveSequence(project.serverId, project.sequence ?? 0);
+        this.state.project = { ...project, sequence };
+        this.state.dirty = true;
+        const signing = { sequence, sign: createEd25519Signer(key) };
         const deploymentId = randomUUID();
         const written = await writeDeployment({
           ...(branding ? { branding } : {}),
-          ...(signing ? signing : {}),
+          ...signing,
           sourceRoot: this.sourceRoot,
           outputPath: path,
           serverId: project.serverId,
@@ -1121,7 +1118,7 @@ export class StudioService {
             builtAt: Date.now(),
             fileName: basename(path),
             totalLength: written.header.totalLength,
-            sequence: signing?.sequence ?? null,
+            sequence: signing.sequence,
             game: structuredClone(project.game),
             brandingKey: brandingKey(project),
             files: written.index.files.map((f) => ({
@@ -1134,11 +1131,11 @@ export class StudioService {
         };
         this.state.dirty = true;
         this.lastPackPath = path;
-        await this.refreshSigning({ keyCreated, sequence: signing?.sequence ?? null });
+        await this.refreshSigning({ keyCreated, sequence: signing.sequence });
         this.state.result = {
           key: 'packCreated',
-          sequence: signing?.sequence ?? null,
-          signed: !!signing,
+          sequence: signing.sequence,
+          signed: true,
           keyCreated,
         };
         return;
@@ -1162,12 +1159,8 @@ export class StudioService {
         const binary = (await this.selected('binary'))[0];
         const destination = await this.dialogs.save('zip');
         if (!binary || !destination) throw new StudioFailure('CANCELLED');
-        let keyCreated = false;
-        let publicKey: string | null = null;
-        if (this.keys) {
-          keyCreated = await this.ensureKey(this.keys, project.serverId);
-          publicKey = (await this.keys.status(project.serverId)).publicKey;
-        }
+        const keyCreated = await this.ensureKey(this.keys, project.serverId);
+        const publicKey = (await this.keys.status(project.serverId)).publicKey;
         const config = parseServerConfig({
           format: 'torchlauncher-server',
           version: 1,
@@ -1177,7 +1170,7 @@ export class StudioService {
           sourceUrl: project.sourceUrl,
           game: project.game,
           ...(project.branding ? { branding: profileBranding(project) } : {}),
-          ...(publicKey ? { signing: { algorithm: 'ed25519', publicKey } } : {}),
+          signing: { algorithm: 'ed25519', publicKey },
         });
         const size = await exportLauncherZip(
           binary,
@@ -1197,9 +1190,6 @@ export class StudioService {
       }
     }
   }
-  private noKeys(): never {
-    throw new StudioFailure('ENCRYPTION_UNAVAILABLE');
-  }
   /** Creates the project's key if missing (explicit, reported by the caller). */
   private async ensureKey(keys: SigningKeyStore, serverId: string): Promise<boolean> {
     if ((await keys.status(serverId)).keyExists) return false;
@@ -1208,7 +1198,7 @@ export class StudioService {
   }
   private async refreshSigning(lastOperation?: StudioSigning['lastOperation']): Promise<void> {
     const project = this.state.project;
-    if (!project || !this.keys) {
+    if (!project) {
       this.state.signing = null;
       return;
     }
@@ -1226,7 +1216,7 @@ export class StudioService {
     signal: AbortSignal,
   ): Promise<{ check: StudioUrlCheck; brandingMismatch: boolean }> {
     const project = this.project();
-    const config = parseServerConfig({
+    const identity = parseServerIdentity({
       format: 'torchlauncher-server',
       version: 1,
       serverId: project.serverId,
@@ -1236,7 +1226,7 @@ export class StudioService {
     });
     const check: StudioUrlCheck = {
       checkedAt: Date.now(),
-      url: config.sourceUrl,
+      url: identity.sourceUrl,
       serverId: 'unknown',
       game: 'unknown',
       remoteGame: null,
@@ -1246,10 +1236,13 @@ export class StudioService {
       stale: false,
     };
     let brandingMismatch = false;
-    const source = this.sourceFactory(config.sourceUrl);
+    const source = this.sourceFactory(identity.sourceUrl);
     try {
+      const publicKey = (await this.keys.status(project.serverId)).publicKey;
+      if (!publicKey) throw new Error('signature-unverified');
       const reader = await openDeploymentReader(source, {
         expectedServerId: project.serverId,
+        trustedPublicKey: publicKey,
         signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
       });
       reader.assertCurrent();
@@ -1268,7 +1261,7 @@ export class StudioService {
       for (const role of BRANDING_ROLES) {
         const expected = project.branding?.[role];
         if (expected === undefined) continue;
-        const actual = reader.index.branding?.[role];
+        const actual = reader.index.branding[role];
         if (
           expected === null
             ? actual !== null

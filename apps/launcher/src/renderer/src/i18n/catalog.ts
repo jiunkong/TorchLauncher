@@ -98,8 +98,6 @@ const ko = {
     '확인 시간이 지나 삭제 확인이 만료되었습니다. 서버 데이터 삭제를 다시 여세요.',
   'failure.confirmation-invalid':
     '삭제 확인이 만료되었거나 올바르지 않습니다. 서버 데이터 삭제를 다시 여세요.',
-  'failure.signature-required':
-    '이 서버는 서명된 배포만 허용하지만 받은 배포에 서명이 없습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
   'failure.signature-invalid':
     '배포의 서명을 확인하지 못했습니다. 파일을 적용하지 않았습니다. 운영자에게 문의하세요.',
   'failure.signature-malformed':
@@ -367,8 +365,6 @@ export const launcherTranslations = defineTranslations(
       'The deletion confirmation expired. Open server data deletion again.',
     'failure.confirmation-invalid':
       'The deletion confirmation expired or is invalid. Open server data deletion again.',
-    'failure.signature-required':
-      'This server accepts only signed deployments, but this deployment is unsigned. No files were applied. Contact the operator.',
     'failure.signature-invalid':
       'The deployment signature could not be verified. No files were applied. Contact the operator.',
     'failure.signature-malformed':

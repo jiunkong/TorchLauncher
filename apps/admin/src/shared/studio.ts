@@ -41,7 +41,7 @@ export interface StudioLastBuild {
   builtAt: number;
   fileName: string;
   totalLength: number;
-  sequence: number | null;
+  sequence: number;
   game: DeploymentGame;
   /** sha256 of "<icon sha>|<background sha>|<appName>" at build time. */
   brandingKey: string;
@@ -152,7 +152,7 @@ export interface StudioDeploy {
     builtAt: number;
     fileCount: number;
     totalLength: number;
-    sequence: number | null;
+    sequence: number;
   } | null;
   /** Added/modified/removed against the last build (same numbers as `files.counts`). */
   changes: { added: number; modified: number; removed: number };
@@ -345,7 +345,7 @@ export type StudioResult =
         | 'signingKeyRestored'
         | 'remoteMatches';
     }
-  | { key: 'packCreated'; sequence: number | null; signed: boolean; keyCreated: boolean }
+  | { key: 'packCreated'; sequence: number; signed: true; keyCreated: boolean }
   | { key: 'launcherZipCreated'; keyCreated: boolean };
 export type StudioCommand =
   | {

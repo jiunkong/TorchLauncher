@@ -16,6 +16,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseSettingsPolicy } from '../../../../packages/core/src/instance/settings/index.js';
 import type { StudioGameSettings } from '../shared/studio.js';
+import { StudioService } from './fixtures/signing.js';
 import {
   addPack,
   generatePolicy,
@@ -28,7 +29,7 @@ import {
 } from './game-settings.js';
 import { parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
-import { type StudioDialogs, StudioService } from './studio.js';
+import type { StudioDialogs } from './studio.js';
 
 const roots: string[] = [];
 async function temp() {
@@ -310,11 +311,11 @@ async function harness() {
     join(game, 'options.txt'),
     'renderDistance:12\nmusicVolume:0.5\nkey_key.inventory:key.keyboard.e\nfov:70.0\n',
   );
-  /** Reopens the project with a hand-written file list, as an older Studio would have saved it. */
+  /** Reopens a current project with an explicit file list. */
   const reopenWithFiles = async (files: { path: string; policy: 'always' | 'initial-only' }[]) => {
     const project = parseProject(s.snapshot().project);
     project.files = files;
-    const path = join(root, 'legacy.torchproj');
+    const path = join(root, 'files.torchproj');
     await writeFile(path, encodeProjectFile(project, {}));
     d.open.mockResolvedValueOnce([path]);
     await s.request({ action: 'open', discard: true });
@@ -373,7 +374,7 @@ async function harness() {
 describe('service: game settings preset', () => {
   it('imports, edits policies, and builds settings-policy.json plus pack files without options.txt', async () => {
     const h = await harness();
-    // legacy: options.txt shipped as a plain file before game settings are used
+    // Plain options.txt remains an ordinary payload until a settings preset owns it.
     await writeFile(join(h.source, 'options.txt'), 'old');
     expect((await h.importFolder()).ok).toBe(true);
     expect(h.s.snapshot().preset).toMatchObject({ source: 'folder', optionCount: 4 });
@@ -447,7 +448,7 @@ describe('service: game settings preset', () => {
   it('keeps plain options.txt entries working for projects that never used game settings', async () => {
     const h = await harness();
     await writeFile(join(h.source, 'options.txt'), 'old');
-    // legacy project JSON lists options.txt as a plain file
+    // Current projects can list options.txt as a plain file.
     await h.reopenWithFiles([{ path: 'options.txt', policy: 'initial-only' }]);
     expect(h.s.snapshot().files?.entries[0]).toMatchObject({
       path: 'options.txt',

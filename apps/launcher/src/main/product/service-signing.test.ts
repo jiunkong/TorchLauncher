@@ -78,15 +78,15 @@ it('surfaces signature and rollback failures as safe codes without raw text', as
     await options.current();
     throw new Error('should not be reached');
   });
-  served.bytes = await buildDeployment(); // unsigned
-  const unsigned = await service.command({ type: 'launch' });
-  expect(unsigned).toMatchObject({ ok: false, error: 'signature-required' });
+  served.bytes = await buildDeployment({ minor: 0 }); // historical header
+  const historical = await service.command({ type: 'launch' });
+  expect(historical).toMatchObject({ ok: false, error: 'operation-failed' });
   served.bytes = await buildDeployment({ signer: newKey().privateKey, sequence: 1 });
   expect(await service.command({ type: 'launch' })).toMatchObject({
     ok: false,
     error: 'signature-invalid',
   });
-  expect(JSON.stringify(unsigned)).not.toContain(key.publicKey);
+  expect(JSON.stringify(historical)).not.toContain(key.publicKey);
   await service.close();
 });
 

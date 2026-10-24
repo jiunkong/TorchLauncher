@@ -270,7 +270,7 @@ export class BrandingService {
     if (reader.index.serverId !== this.options.config?.serverId) return;
     for (const role of BRANDING_ROLES) {
       this.check(generation, signal);
-      const asset = reader.index.branding?.[role];
+      const asset = reader.index.branding[role];
       if (asset === undefined) continue;
       try {
         reader.assertCurrent();

@@ -62,7 +62,6 @@ describe('labels moved to the dictionary', () => {
     expect(failureMessage(t, 'required-pack-reordered')).toContain('순서를 유지');
     expect(failureMessage(t, 'confirmation-expired')).toContain('만료');
     for (const code of [
-      'signature-required',
       'signature-invalid',
       'signature-malformed',
       'signature-unverified',
