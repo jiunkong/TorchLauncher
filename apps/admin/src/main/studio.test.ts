@@ -388,3 +388,19 @@ describe('operator-selected launcher ZIP export', () => {
     expect(await readdir(root)).not.toContain('out.zip');
   });
 });
+
+it('asks main to close the window for exit and accepts no extra fields', async () => {
+  const service = new StudioService({
+    open: vi.fn(async () => null),
+    save: vi.fn(async () => null),
+  } as never);
+  const exit = vi.fn();
+  service.onExit(exit);
+  expect(await service.request({ action: 'exit', path: 'x' })).toEqual({
+    ok: false,
+    code: 'INVALID',
+  });
+  expect(exit).not.toHaveBeenCalled();
+  expect(await service.request({ action: 'exit' })).toMatchObject({ ok: true });
+  expect(exit).toHaveBeenCalledOnce();
+});

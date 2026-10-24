@@ -171,6 +171,7 @@ function createWindow(): void {
     if (closeTimer) clearTimeout(closeTimer);
     closeTimer = null;
   };
+  service.onExit(() => window.close());
   service.onCloseAnswer({
     confirm: () => {
       settle();

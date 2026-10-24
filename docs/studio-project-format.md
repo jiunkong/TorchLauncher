@@ -1,10 +1,12 @@
-# Studio 프로젝트 파일 형식 (`.tlstudio`)
+# Studio 프로젝트 파일 형식 (`.torchproj`)
 
 2026-10-24 사용자 결정: Studio 프로젝트는 JSON이 아니라 전용 확장자의 **바이너리** 파일로 저장한다. 사용자에게 보이는 파일 형식 이름은 **TorchLauncher Studio 파일**이다. 개발 중이므로 기존 `.json` 프로젝트를 읽는 경로는 두지 않는다(열면 `INVALID`, "지원하지 않는 형식").
 
-- 확장자: `.tlstudio`(키 백업 `.tlkey`, 배포 `.torchpack`과 같은 방식). 기본 파일 이름 `server-project.tlstudio`.
-- 저장/열기 대화상자 필터 이름: `TorchLauncher Studio 파일`, 확장자 `tlstudio`. 문서·문구의 "Studio 프로젝트 JSON" 표현은 "TorchLauncher Studio 파일"로 바꾼다.
+- 확장자: `.torchproj`(키 백업 `.torchkey`, 배포 `.torchpack`과 같은 방식). 기본 파일 이름 `server-project.torchproj`.
+- 저장/열기 대화상자 필터 이름: `TorchLauncher Studio 파일`, 확장자 `torchproj`. 문서·문구의 "Studio 프로젝트 JSON" 표현은 "TorchLauncher Studio 파일"로 바꾼다.
 - 목적: 브랜딩 이미지를 base64 JSON 대신 원본 바이트로 담아 크기를 줄이고, 손상/잘림을 확실히 감지한다. 암호화·서명은 하지 않는다(서명 키는 프로젝트 파일에 들어가지 않고 앱 userData에 따로 보관).
+
+- 키 백업 파일 확장자도 `.tlkey`에서 `.torchkey`로 바꾼다(내용 형식 `v1`과 암호화는 그대로, 기본 이름 `signing-key.torchkey`, 대화상자 필터 `torchkey`). 옛 `.tlkey`는 확장자 필터에서 빠지며 별도 호환 코드는 두지 않는다.
 
 ## 컨테이너 v1
 
@@ -38,5 +40,5 @@
 
 - 코덱 모듈(순수 함수): `encodeProjectFile(project) -> Buffer`, `decodeProjectFile(bytes) -> StudioProject`. 위치 `apps/admin/src/main/project-file.ts`.
 - 기존 JSON 직렬화 지점(`studio.ts`의 저장/열기, `index.ts` 대화상자 필터와 기본 이름, `filesystem.ts` 쓰기)을 코덱으로 교체. 프로젝트 모델(`StudioProject`)과 내부 검증(`parseProject`)은 유지한다.
-- 테스트·스모크·fixtures의 `.json` 프로젝트 저장/열기를 `.tlstudio`로 교체. 루트 `scripts/smoke.mjs`의 저장 검증은 JSON 파싱 대신 magic 헤더와 재열기 확인으로 바꾼다.
+- 테스트·스모크·fixtures의 `.json` 프로젝트 저장/열기를 `.torchproj`로 교체. 루트 `scripts/smoke.mjs`의 저장 검증은 JSON 파싱 대신 magic 헤더와 재열기 확인으로 바꾼다.
 - 추후(범위 밖): Windows 파일 연결(더블클릭으로 열기), 최근 파일 목록.
