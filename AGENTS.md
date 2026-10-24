@@ -58,7 +58,7 @@ Keep tests beside their modules as `*.test.ts`; place reusable fixtures in dedic
 Use Node.js 24 and pnpm 10.34.7 with the committed lockfile.
 
 - `pnpm install --frozen-lockfile`: install workspace dependencies.
-- `pnpm dev:launcher` / `pnpm dev:studio`: run either application.
+- `pnpm dev:launcher` / `pnpm dev:studio`: run either application. Renderer dev ports default to 5173/5174; override with `TORCH_LAUNCHER_DEV_PORT` / `TORCH_STUDIO_DEV_PORT` (integer 1024-65535, invalid values fail fast).
 - `pnpm check`: Biome, TypeScript, Vitest, then both app builds.
 - `pnpm format`: apply lint fixes and formatting.
 - `pnpm smoke`: build and launch both apps to check IPC and isolation; requires a display or Xvfb.

@@ -1,0 +1,5 @@
+# DEV-PORT-01
+
+Worker agent-1, branch `fix/dev-server-port`. Renderer dev-server ports are configurable: `TORCH_STUDIO_DEV_PORT` (default 5174, `apps/admin/electron.vite.config.ts`) and `TORCH_LAUNCHER_DEV_PORT` (default 5173, `apps/launcher/electron.vite.config.ts`). Values must be integers 1024-65535; anything else throws at startup naming the variable and the range (no silent fallback). Host `127.0.0.1` and `strictPort: true` are unchanged. Nothing else hardcodes the port: the main processes derive the URL (and the trusted-frame check) from `ELECTRON_RENDERER_URL`; README and AGENTS.md mention the variables.
+PowerShell: `$env:TORCH_STUDIO_DEV_PORT=5290; pnpm dev:studio` (launcher: `$env:TORCH_LAUNCHER_DEV_PORT=5291; pnpm dev:launcher`). bash: `TORCH_STUDIO_DEV_PORT=5290 pnpm dev:studio`.
+Checked: with 5290 the dev server logs `http://127.0.0.1:5290/`; `80`, `abc` (Studio) and `99999` (launcher) fail with the message. `pnpm check`, `pnpm build`, `node scripts/smoke.mjs` pass. The cause of EACCES on 5174 on the user's machine is still unknown (not in the excluded port ranges); the variable is the workaround.

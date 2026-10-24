@@ -21,7 +21,7 @@ pnpm install --frozen-lockfile
 pnpm dev:launcher
 ```
 
-Studio는 다른 터미널에서 실행합니다. 두 앱의 개발 서버 포트는 각각 5173, 5174입니다.
+Studio는 다른 터미널에서 실행합니다. 두 앱의 개발 서버 포트는 각각 5173, 5174입니다(`TORCH_LAUNCHER_DEV_PORT`, `TORCH_STUDIO_DEV_PORT` 환경 변수로 바꿀 수 있습니다).
 
 ```sh
 pnpm dev:studio

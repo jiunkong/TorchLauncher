@@ -3,6 +3,18 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
+/** Renderer dev-server port: `TORCH_STUDIO_DEV_PORT` (integer 1024-65535), default 5174; invalid values fail fast. */
+function devPort(): number {
+  const raw = process.env.TORCH_STUDIO_DEV_PORT;
+  if (raw === undefined || raw === '') return 5174;
+  const port = Number(raw);
+  if (!/^\d+$/.test(raw) || port < 1024 || port > 65535)
+    throw new Error(
+      `TORCH_STUDIO_DEV_PORT must be an integer from 1024 to 65535 (got "${raw}"). Unset it to use 5174.`,
+    );
+  return port;
+}
+
 export default defineConfig({
   main: {
     plugins: [
@@ -53,7 +65,7 @@ export default defineConfig({
     },
   },
   renderer: {
-    server: { host: '127.0.0.1', strictPort: true, port: 5174 },
+    server: { host: '127.0.0.1', strictPort: true, port: devPort() },
     plugins: [
       react(),
       {
