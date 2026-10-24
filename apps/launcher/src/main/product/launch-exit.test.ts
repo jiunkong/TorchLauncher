@@ -23,6 +23,7 @@ async function setup() {
     version: 'test',
     config: {
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId: '11111111-1111-4111-8111-111111111111',
       name: 'Fixture',

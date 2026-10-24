@@ -27,6 +27,7 @@ async function fixture() {
   await writeFile(join(profile, 'branding', 'icon.png'), png);
   const config: ServerConfig = {
     format: 'torchlauncher-server',
+    signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
     version: 1,
     serverId: '11111111-1111-4111-8111-111111111111',
     name: 'Home server stays',
@@ -106,7 +107,7 @@ describe('hybrid branding service', () => {
     ]);
     await service.close();
   });
-  it('prefers reverified cache over shipped image and persists null across legacy restart', async () => {
+  it('prefers reverified cache over shipped image and persists null across restart', async () => {
     const f = await fixture();
     const service = await start(f.options);
     service.observe(reader(f.config, { icon: null, background: descriptor() }));
@@ -116,12 +117,11 @@ describe('hybrid branding service', () => {
     const restarted = await start(f.options);
     expect(restarted.snapshot().icon).toBeNull();
     expect(restarted.snapshot().background).toContain('data:image/png');
-    const legacy = reader(f.config, {});
-    delete (legacy.index as { branding?: unknown }).branding;
-    restarted.observe(legacy);
+    const unchanged = reader(f.config, {});
+    restarted.observe(unchanged);
     await restarted.settled();
     expect(restarted.snapshot().icon).toBeNull();
-    expect(legacy.stageBrandingAsset).not.toHaveBeenCalled();
+    expect(unchanged.stageBrandingAsset).not.toHaveBeenCalled();
     await restarted.close();
   });
   it('rejects corrupt cache and falls back to shipped image; decode/hash failure retains previous display', async () => {

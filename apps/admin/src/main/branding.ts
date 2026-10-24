@@ -7,7 +7,7 @@ import {
   inspectBrandingImage,
   isBrandingAssetMetadata,
 } from '../../../../packages/core/src/branding/index.js';
-import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
+import { parseServerBranding } from '../../../../packages/core/src/server-config/index.js';
 import type { StudioBranding, StudioProject } from '../shared/studio.js';
 import { StudioFailure } from './project.js';
 
@@ -49,15 +49,7 @@ export function parseBranding(input: unknown): StudioBranding {
     throw new StudioFailure('INVALID');
   if (Object.hasOwn(b, 'appName')) {
     try {
-      parseServerConfig({
-        format: 'torchlauncher-server',
-        version: 1,
-        serverId: '11111111-1111-4111-8111-111111111111',
-        name: 'Server',
-        address: 'localhost:25565',
-        sourceUrl: 'https://example.org/pack',
-        branding: { appName: b.appName },
-      });
+      parseServerBranding({ appName: b.appName });
     } catch {
       throw new StudioFailure('INVALID');
     }

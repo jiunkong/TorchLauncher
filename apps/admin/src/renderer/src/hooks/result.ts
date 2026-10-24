@@ -20,9 +20,7 @@ export function studioResultMessage(result: StudioResult | null, t: Translate): 
     case 'packCreated':
       return [
         t('result.packCreated'),
-        ...(result.signed && result.sequence !== null
-          ? [t('result.packSigned', { sequence: result.sequence })]
-          : []),
+        t('result.packSigned', { sequence: result.sequence }),
         ...(result.keyCreated ? [t('result.packKeyCreated')] : []),
         t('result.packUploadHelp'),
       ].join(' ');

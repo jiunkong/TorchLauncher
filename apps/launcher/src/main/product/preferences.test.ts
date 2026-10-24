@@ -21,7 +21,7 @@ it('defaults off and persists exact personal preferences across reads', async ()
   await writePreferences(root, { closeOnLaunch: false });
   expect(await readPreferences(root)).toEqual({ closeOnLaunch: false });
 });
-it('reads legacy close-only files and normalizes optional memory values', async () => {
+it('reads close-only preferences and normalizes optional memory values', async () => {
   const root = await base();
   await writeFile(join(root, 'launcher-preferences.json'), '{"closeOnLaunch":true}');
   expect(await readPreferences(root)).toEqual({ closeOnLaunch: true });

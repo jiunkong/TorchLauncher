@@ -14,9 +14,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RangeNotSupportedError } from '../../../../packages/core/src/download/http/range-client.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import type { StudioFileEntry, StudioState } from '../shared/studio.js';
+import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
-import { type StudioDialogs, StudioService } from './studio.js';
+import type { StudioDialogs } from './studio.js';
 import { writeZip } from './zip.js';
 
 const roots: string[] = [];
@@ -272,6 +273,10 @@ describe('url check and export', () => {
     const other = await harness();
     await other.include(['a.txt'], 'always');
     await other.build();
+    // Keep the key trusted so this exercises server identity rejection, not a key mismatch.
+    const otherProject = parseProject(other.s.snapshot().project);
+    const trusted = await other.s.testKeys.status(otherProject.serverId);
+    vi.spyOn(h.s.testKeys, 'status').mockResolvedValue(trusted);
     h.remote.value = other.remote.value;
     await h.s.request({ action: 'check' });
     expect(h.s.snapshot().urlCheck).toMatchObject({ serverId: 'mismatch', game: 'unknown' });
@@ -347,6 +352,10 @@ describe('url check and export', () => {
     const other = await harness();
     await other.include(['a.txt'], 'always');
     await other.build();
+    // Keep the key trusted so this exercises server identity rejection, not a key mismatch.
+    const otherProject = parseProject(other.s.snapshot().project);
+    const trusted = await other.s.testKeys.status(otherProject.serverId);
+    vi.spyOn(h.s.testKeys, 'status').mockResolvedValue(trusted);
     h.remote.value = other.remote.value;
     await attempt();
     expect(reasons(h.s).serverId).toEqual(['server-id']);

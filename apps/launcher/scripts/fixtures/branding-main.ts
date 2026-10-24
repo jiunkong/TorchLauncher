@@ -42,6 +42,7 @@ void app.whenReady().then(async () => {
   await writeFile(join(directory, 'initial.png'), red);
   const config = parseServerConfig({
     format: 'torchlauncher-server',
+    signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
     version: 1,
     serverId: '11111111-1111-4111-8111-111111111111',
     name: 'Home server fixed',

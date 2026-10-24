@@ -3,7 +3,7 @@ import {
   EMPTY_FILE_SHA256,
   validateDeploymentIndex,
 } from '../../../../packages/core/src/deployment/contracts/index.js';
-import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
+import { parseServerIdentity } from '../../../../packages/core/src/server-config/index.js';
 import type { StudioLastBuild, StudioProject } from '../shared/studio.js';
 import { parseBranding } from './branding.js';
 import { parseGameSettings } from './game-settings.js';
@@ -56,7 +56,7 @@ export function parseProject(input: unknown): StudioProject {
       throw new StudioFailure('INVALID');
     if (Object.hasOwn(p, 'lastBuild')) parseLastBuild(p.lastBuild);
     if (Object.hasOwn(p, 'gameSettings')) parseGameSettings(p.gameSettings);
-    parseServerConfig({
+    parseServerIdentity({
       format: 'torchlauncher-server',
       version: 1,
       serverId: p.serverId,
@@ -82,18 +82,20 @@ export function parseProject(input: unknown): StudioProject {
     });
     validateDeploymentIndex(
       {
-        formatVersion: { major: 1, minor: 0 },
+        formatVersion: { major: 1, minor: 2 },
         serverId: p.serverId,
         deploymentId: p.serverId,
         game: p.game,
+        sequence: 1,
+        branding: {},
         files,
       },
       {
         magic: 'TORCHDEP',
-        formatVersion: { major: 1, minor: 0 },
+        formatVersion: { major: 1, minor: 2 },
         flags: 0,
         indexLength: 1,
-        totalLength: 65,
+        totalLength: 129,
         indexSha256: EMPTY_FILE_SHA256,
       },
       { expectedServerId: p.serverId as string },
@@ -125,7 +127,8 @@ export function parseLastBuild(input: unknown): StudioLastBuild {
     /[\\/]/.test(b.fileName) ||
     !Number.isSafeInteger(b.totalLength) ||
     (b.totalLength as number) < 0 ||
-    (b.sequence !== null && (!Number.isSafeInteger(b.sequence) || (b.sequence as number) < 1)) ||
+    !Number.isSafeInteger(b.sequence) ||
+    (b.sequence as number) < 1 ||
     typeof b.brandingKey !== 'string' ||
     !SHA.test(b.brandingKey) ||
     !game ||

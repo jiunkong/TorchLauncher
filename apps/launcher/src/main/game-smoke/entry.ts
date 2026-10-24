@@ -20,7 +20,7 @@ interface Config {
   loader: LoaderSelection;
   sourceFile?: string;
   serverId?: string;
-  /** Optional Ed25519 key; when set, only a verified signed deployment is accepted. */
+  /** Trusted Ed25519 public key, required in launch mode. */
   signingPublicKey?: string;
   server?: string;
   durationSeconds: number;
@@ -77,17 +77,16 @@ async function main() {
       authenticatedConnection: false,
     };
   }
-  if (!config.sourceFile || !config.serverId || !config.server)
+  if (!config.sourceFile || !config.serverId || !config.server || !config.signingPublicKey)
     throw new Error('Invalid launch configuration');
   const sourceUrl = (await readFile(config.sourceFile, 'utf8')).trim();
   const current = async (signal?: AbortSignal) => {
     const reader = await openDeploymentReader(createDownloadSource(sourceUrl), {
       expectedServerId: config.serverId as string,
-      ...(config.signingPublicKey ? { trustedPublicKey: config.signingPublicKey } : {}),
+      trustedPublicKey: config.signingPublicKey as string,
       ...(signal ? { signal } : {}),
     });
-    if (config.signingPublicKey && reader.verification !== 'verified')
-      throw new Error('signature-unverified');
+    if (reader.verification !== 'verified') throw new Error('signature-unverified');
     return reader;
   };
   const authenticator = await createPublicJavaAuthenticator({

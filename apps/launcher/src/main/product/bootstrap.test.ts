@@ -10,6 +10,7 @@ afterEach(async () => {
 });
 const config = {
   format: 'torchlauncher-server',
+  signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
   version: 1,
   serverId: '44444444-4444-4444-8444-444444444444',
   name: 'Fixture',
@@ -46,6 +47,9 @@ it('reads the bounded real config and rejects oversized/malformed/link files', a
   const file = join(root, 'config.json');
   await writeFile(file, JSON.stringify(config));
   expect(await readServerConfig(file)).toEqual(config);
+  const { signing: _signing, ...withoutKey } = config;
+  await writeFile(file, JSON.stringify(withoutKey));
+  await expect(readServerConfig(file)).rejects.toThrow();
   await writeFile(file, 'x'.repeat(16385));
   await expect(readServerConfig(file)).rejects.toThrow();
   await writeFile(file, '{}');

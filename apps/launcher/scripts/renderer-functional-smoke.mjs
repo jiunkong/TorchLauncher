@@ -27,6 +27,7 @@ await writeFile(
   configPath,
   `${JSON.stringify({
     format: 'torchlauncher-server',
+    signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
     version: 1,
     serverId: '44444444-4444-4444-8444-444444444444',
     name: 'TorchLauncher 접속 검증',

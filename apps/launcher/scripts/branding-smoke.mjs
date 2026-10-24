@@ -25,7 +25,10 @@ try {
   });
   const env = { ...process.env, BRANDING_FIXTURE_ROOT: root };
   delete env.ELECTRON_RUN_AS_NODE;
-  app = await electron.launch({ args: ['--no-sandbox', resolve(root, 'bundle/main.cjs')], env });
+  app = await electron.launch({
+    args: ['--no-sandbox', '--lang=ko', resolve(root, 'bundle/main.cjs')],
+    env,
+  });
   const page = await app.firstWindow();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -278,8 +281,10 @@ try {
       ({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, 760),
       width,
     );
+    await page.waitForFunction((expected) => window.innerWidth === expected, width);
     const copy = page.getByTestId('copy-data-path');
-    await copy.scrollIntoViewIfNeeded();
+    // Keep geometry stable across the preceding settings scroll and window resize.
+    await copy.evaluate((button) => button.scrollIntoView({ block: 'center' }));
     assert.equal(await copy.isEnabled(), true);
     assert.equal(await page.locator('.settings-data-path .path').getAttribute('title'), exactPath);
     assert.equal(await page.locator('.settings-data-path .path').textContent(), exactPath);
@@ -345,7 +350,10 @@ try {
   assert.equal(await page.getByTestId('copy-data-path').isEnabled(), true);
   await app.close();
   app = undefined;
-  app = await electron.launch({ args: ['--no-sandbox', resolve(root, 'bundle/main.cjs')], env });
+  app = await electron.launch({
+    args: ['--no-sandbox', '--lang=ko', resolve(root, 'bundle/main.cjs')],
+    env,
+  });
   const restarted = await app.firstWindow();
   await restarted.getByTestId('app-shell').waitFor();
   await app.evaluate(async () => {

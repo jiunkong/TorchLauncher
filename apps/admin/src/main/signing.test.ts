@@ -327,6 +327,12 @@ describe('Studio signing integration', () => {
     });
     expect(reader.verification).toBe('verified');
     expect(reader.index.sequence).toBe(1);
+    expect(() =>
+      parseProject({
+        ...state.project,
+        lastBuild: { ...state.project?.lastBuild, sequence: null },
+      }),
+    ).toThrow();
     expect(reader.header.formatVersion).toEqual({ major: 1, minor: 2 });
     const wrong = generateKeyPairSync('ed25519').privateKey;
     await expect(
@@ -423,50 +429,28 @@ describe('Studio signing integration', () => {
     for (const secret of secrets) expect(snapshot).not.toContain(secret.toString('latin1'));
     expect(snapshot).not.toContain((secrets[1] as Buffer).toString('base64'));
   });
-  it('exports signing into the server config and creates a key for legacy projects', async () => {
-    const root = await temp();
-    const store = new SigningKeyStore(join(root, 'k'), fakeStorage(), FAST);
-    // legacy: a project file without sequence, no key yet, existing unsigned (1.0) public pack
-    const base = (await import('./project.js')).newProject();
-    const project = { ...base, sourceUrl: 'https://example.org/pack' };
-    expect('sequence' in project).toBe(false);
-    const sourceDir = join(root, 'source');
-    await mkdir(sourceDir);
-    const d0 = dialogs();
-    const legacy = new StudioService(d0);
-    d0.open.mockResolvedValueOnce([sourceDir]);
-    await writeFile(join(root, 'proj.torchproj'), encodeProjectFile(project, {}));
-    d0.open.mockReset();
-    d0.open.mockResolvedValueOnce([join(root, 'proj.torchproj')]);
-    await legacy.request({ action: 'open', discard: true });
-    d0.open.mockResolvedValueOnce([sourceDir]);
-    await legacy.request({ action: 'source' });
-    const oldPack = join(root, 'old.torchpack');
-    d0.save.mockResolvedValueOnce(oldPack);
-    expect((await legacy.request({ action: 'build' })).ok).toBe(true);
-    const oldBytes = await readFile(oldPack);
-    // The project file as a pre-upgrade Studio saved it, plus the build record the current one keeps.
-    await writeFile(
-      join(root, 'proj.torchproj'),
-      encodeProjectFile(parseProject(legacy.snapshot().project), {}),
-    );
-    expect(
-      (await openDeploymentReader(memorySource(oldBytes), { expectedServerId: project.serverId }))
-        .header.formatVersion.minor,
-    ).toBeLessThan(2);
-    // upgraded Studio opens the legacy project and exports
+  it('exports only a verified current deployment using the project key', async () => {
+    const ctx = await setup();
+    const { reply, pack } = await build(ctx, 'signed.torchpack');
+    expect(reply.ok).toBe(true);
+    const bytes = await readFile(pack);
     const d = dialogs();
-    let remote = oldBytes;
-    const s = new StudioService(d, () => memorySource(remote), undefined, store);
-    d.open.mockResolvedValueOnce([join(root, 'proj.torchproj')]);
-    expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
-    expect(s.snapshot().signing).toMatchObject({ keyExists: false, publicKey: null });
-    const out = join(root, 'out.zip');
-    const bin = join(root, 'Torch.exe');
-    await writeFile(bin, 'MZ fixture');
-    d.open.mockResolvedValueOnce([bin]);
+    let remote = bytes;
+    const service = new StudioService(d, () => memorySource(remote), undefined, ctx.store);
+    const project = parseProject(ctx.s.snapshot().project);
+    project.sourceUrl = 'https://example.org/pack';
+    const path = join(ctx.root, 'signed.torchproj');
+    await writeFile(path, encodeProjectFile(project, {}));
+    d.open.mockResolvedValueOnce([path]);
+    expect((await service.request({ action: 'open' })).ok).toBe(true);
+    d.open.mockResolvedValueOnce([ctx.source]);
+    expect((await service.request({ action: 'source' })).ok).toBe(true);
+    const binary = join(ctx.root, 'Torch.exe');
+    await writeFile(binary, 'MZ fixture');
+    const out = join(ctx.root, 'out.zip');
+    d.open.mockResolvedValueOnce([binary]);
     d.save.mockResolvedValueOnce(out);
-    expect((await s.request({ action: 'export' })).ok).toBe(true);
+    expect((await service.request({ action: 'export' })).ok).toBe(true);
     const cfg = parseServerConfig(
       JSON.parse(
         readZip(await readFile(out))
@@ -474,39 +458,18 @@ describe('Studio signing integration', () => {
           ?.data.toString('utf8') ?? '',
       ),
     );
-    const pub = (await store.status(project.serverId)).publicKey;
-    expect(cfg.signing).toEqual({ algorithm: 'ed25519', publicKey: pub });
-    expect(cfg.game).toEqual(project.game);
-    expect(s.snapshot().signing?.lastOperation).toEqual({ keyCreated: true, sequence: null });
-    expect(s.snapshot().result).toMatchObject({ key: 'launcherZipCreated', keyCreated: true });
-    await expectNoSecrets([out], rawSecrets(store, await store.load(project.serverId)));
-    // next deploy: sequence 1 and verifies against the exported key
-    d.open.mockResolvedValueOnce([sourceDir]);
-    await s.request({ action: 'source' });
-    const pack = join(root, 'new.torchpack');
-    d.save.mockResolvedValueOnce(pack);
-    expect((await s.request({ action: 'build' })).ok).toBe(true);
-    const reader = await openDeploymentReader(memorySource(await readFile(pack)), {
-      expectedServerId: project.serverId,
-      trustedPublicKey: cfg.signing?.publicKey as string,
-    });
-    expect(reader.index.sequence).toBe(1);
-    // second export reuses the same key once the new pack is the public one
-    remote = await readFile(pack);
-    const out2 = join(root, 'out2.zip');
-    d.open.mockResolvedValueOnce([bin]);
-    d.save.mockResolvedValueOnce(out2);
-    expect((await s.request({ action: 'export' })).ok).toBe(true);
-    expect(s.snapshot().signing?.lastOperation?.keyCreated).toBe(false);
-    expect(
-      parseServerConfig(
-        JSON.parse(
-          readZip(await readFile(out2))
-            .get('torchlauncher-server.json')
-            ?.data.toString('utf8') ?? '',
-        ),
-      ).signing?.publicKey,
-    ).toBe(pub);
+    expect(cfg.signing.publicKey).toBe((await ctx.store.status(project.serverId)).publicKey);
+    expect(service.snapshot().signing?.lastOperation?.keyCreated).toBe(false);
+    await expectNoSecrets([out], rawSecrets(ctx.store, await ctx.store.load(project.serverId)));
+    remote = Buffer.from(bytes);
+    remote[64] = (remote[64] ?? 0) ^ 1;
+    expect((await service.request({ action: 'check' })).ok).toBe(false);
+    expect((await service.request({ action: 'export' })).ok).toBe(false);
+    for (const minor of [0, 1]) {
+      remote = Buffer.from(bytes);
+      remote.writeUInt16LE(minor, 10);
+      expect((await service.request({ action: 'export' })).ok).toBe(false);
+    }
   });
   it('validates key commands and drives create/export/import through the service', async () => {
     const ctx = await setup();

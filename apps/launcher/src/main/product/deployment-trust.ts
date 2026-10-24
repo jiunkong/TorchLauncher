@@ -139,8 +139,8 @@ async function writeRollbackState(
 function candidate(reader: DeploymentReader): DeploymentRollbackState {
   const sequence = reader.index.sequence;
   if (
-    (reader as { verification?: string }).verification !== 'verified' ||
-    sequence === undefined ||
+    !('verification' in reader) ||
+    reader.verification !== 'verified' ||
     !Number.isSafeInteger(sequence) ||
     sequence < 1
   )
@@ -160,12 +160,7 @@ function assertAcceptable(
   if (decision === 'reject-conflict') throw new DeploymentTrustError('rollback-conflict');
 }
 
-/**
- * Opens the server deployment. With `config.signing` the reader is bound to the configured key and
- * must report `verified`, and the rollback decision is made here (read-only), before any caller
- * stages or applies a file. Without `signing` this is the legacy unsigned behavior and a 1.2 file
- * is not trusted as signed. Never writes state: only recordAppliedDeployment does.
- */
+/** Verify the configured server key and rollback state before staging any files. */
 export async function openServerDeployment(
   base: string,
   config: ServerConfig,
@@ -173,13 +168,11 @@ export async function openServerDeployment(
 ): Promise<OpenedDeployment> {
   const reader = await openDeploymentReader(createDownloadSource(config.sourceUrl), {
     expectedServerId: config.serverId,
-    ...(config.signing ? { trustedPublicKey: config.signing.publicKey } : {}),
+    trustedPublicKey: config.signing.publicKey,
     ...(signal ? { signal } : {}),
   });
-  if (config.signing) {
-    const incoming = candidate(reader);
-    assertAcceptable(await readRollbackState(base, config.serverId), incoming);
-  }
+  const incoming = candidate(reader);
+  assertAcceptable(await readRollbackState(base, config.serverId), incoming);
   return reader;
 }
 
@@ -189,7 +182,6 @@ export async function recordAppliedDeployment(
   config: ServerConfig,
   reader: DeploymentReader,
 ): Promise<void> {
-  if (!config.signing) return;
   const incoming = candidate(reader);
   const seen = await readRollbackState(base, config.serverId);
   assertAcceptable(seen, incoming);

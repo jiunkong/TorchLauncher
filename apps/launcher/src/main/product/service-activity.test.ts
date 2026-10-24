@@ -51,6 +51,7 @@ it.each(['success', 'failure', 'cancelled'] as const)(
       version: 'test',
       config: parseServerConfig({
         format: 'torchlauncher-server',
+        signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
         version: 1,
         serverId: '11111111-1111-4111-8111-111111111111',
         name: 'Test',

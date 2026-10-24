@@ -6,10 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { validateImage } from './branding.js';
+import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
-import { type StudioDialogs, StudioService } from './studio.js';
+import type { StudioDialogs } from './studio.js';
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
@@ -103,7 +104,7 @@ describe('Studio durable branding', () => {
     const reader = await openDeploymentReader(source(pack), {
       expectedServerId: parseProject(summary).serverId,
     });
-    expect(reader.header.formatVersion.minor).toBe(1);
+    expect(reader.header.formatVersion.minor).toBe(2);
     expect(reader.index.files).toEqual([]);
     await reader.stageBrandingAsset('icon', join(root, 'staged.png'));
     expect(await readFile(join(root, 'staged.png'))).toEqual(png);
@@ -128,7 +129,7 @@ describe('Studio durable branding', () => {
     await s.request({ action: 'brandingRemove', role: 'icon' });
     expect(await s.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
   });
-  it('supports background snapshots, unchanged renderer edits, appName-only legacy packs and cancelled selection', async () => {
+  it('supports background snapshots, unchanged renderer edits, appName-only signed packs and cancelled selection', async () => {
     const root = await temp();
     const image = join(root, 'background.png');
     await writeFile(image, png);
@@ -136,13 +137,13 @@ describe('Studio durable branding', () => {
     await s.request({ action: 'brandingName', appName: 'Local title' });
     d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'source' });
-    const legacyPath = join(root, 'legacy.torchpack');
-    d.save.mockResolvedValueOnce(legacyPath);
+    const nameOnlyPath = join(root, 'name-only.torchpack');
+    d.save.mockResolvedValueOnce(nameOnlyPath);
     expect((await s.request({ action: 'build' })).ok).toBe(true);
-    const legacy = await openDeploymentReader(source(await readFile(legacyPath)), {
+    const nameOnly = await openDeploymentReader(source(await readFile(nameOnlyPath)), {
       expectedServerId: parseProject(s.snapshot().project).serverId,
     });
-    expect(legacy.header.formatVersion.minor).toBe(0);
+    expect(nameOnly.header.formatVersion.minor).toBe(2);
     d.open.mockResolvedValueOnce([image]);
     expect((await s.request({ action: 'brandingSelect', role: 'background' })).ok).toBe(true);
     const before = parseProject(s.snapshot().project);
@@ -284,6 +285,7 @@ describe('Studio durable branding', () => {
     const p = newProject();
     const config = parseServerConfig({
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId: p.serverId,
       name: p.name,

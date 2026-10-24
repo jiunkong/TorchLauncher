@@ -48,9 +48,15 @@ export function newKey(): TestKey {
   const { privateKey } = generateKeyPairSync('ed25519');
   return { privateKey, publicKey: deriveEd25519PublicKey(privateKey) };
 }
-/** Bytes of a deployment container; signed with `signer` and `sequence` when both are given. */
+/** Current signed fixture; minor overrides construct rejected historical headers. */
 export async function buildDeployment(
-  options: { signer?: KeyObject; sequence?: number; deploymentId?: string; payload?: string } = {},
+  options: {
+    signer?: KeyObject;
+    sequence?: number;
+    deploymentId?: string;
+    payload?: string;
+    minor?: number;
+  } = {},
 ): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'launcher-trust-build-'));
   try {
@@ -62,11 +68,12 @@ export async function buildDeployment(
       deploymentId: options.deploymentId ?? deploymentA,
       game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.16.9' } },
       files: [{ sourcePath: 'a.dat', policy: 'always', compression: 'none' }],
-      ...(options.signer
-        ? { sign: createEd25519Signer(options.signer), sequence: options.sequence ?? 1 }
-        : {}),
+      sign: createEd25519Signer(options.signer ?? newKey().privateKey),
+      sequence: options.sequence ?? 1,
     });
-    return await readFile(result.outputPath);
+    const bytes = await readFile(result.outputPath);
+    if (options.minor !== undefined) bytes.writeUInt16LE(options.minor, 10);
+    return bytes;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

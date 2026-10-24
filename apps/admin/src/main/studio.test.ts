@@ -16,10 +16,11 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseServerConfig } from '../../../../packages/core/src/server-config/index.js';
 import { exportLauncherZip, safeRead } from './filesystem.js';
+import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { newProject, parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
-import { type StudioDialogs, StudioService } from './studio.js';
+import type { StudioDialogs } from './studio.js';
 
 const roots: string[] = [];
 async function temp() {
@@ -71,6 +72,7 @@ function config() {
   const p = newProject();
   return parseServerConfig({
     format: 'torchlauncher-server',
+    signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
     version: 1,
     serverId: p.serverId,
     name: p.name,
@@ -213,7 +215,12 @@ describe('Studio project and trusted disk selections', () => {
     await reader.stageFile('custom/arbitrary.data', join(root, 'staged'));
     expect(await readFile(join(root, 'staged'), 'utf8')).toBe('real payload');
     const checkerDialogs = dialogs();
-    const checker = new StudioService(checkerDialogs, () => memorySource(bytes));
+    const checker = new StudioService(
+      checkerDialogs,
+      () => memorySource(bytes),
+      undefined,
+      s.testKeys,
+    );
     const projectPath = join(root, 'project.torchproj');
     const built = parseProject(s.snapshot().project);
     built.sourceUrl = 'https://example.org/pack';
@@ -244,6 +251,8 @@ describe('Studio project and trusted disk selections', () => {
       ).ok,
     ).toBe(true);
     expect(await checker.request({ action: 'check' })).toEqual({ ok: false, code: 'MISMATCH' });
+    const trusted = await s.testKeys.status(built.serverId);
+    vi.spyOn(s.testKeys, 'status').mockResolvedValue(trusted);
     await writeFile(
       projectPath,
       encodeProjectFile({ ...built, serverId: '11111111-1111-4111-8111-111111111111' }, {}),

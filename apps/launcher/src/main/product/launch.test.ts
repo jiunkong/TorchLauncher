@@ -52,7 +52,11 @@ it('holds product ownership through game reaping and applies policy before handi
     expect(options.server).toBe('localhost:25565');
     expect(options.launcherVersion).toBe('product-test');
     await options.authenticate();
-    await options.afterSynchronization?.({} as never);
+    await options.afterSynchronization?.({
+      verification: 'verified',
+      header: { indexSha256: 'a'.repeat(64) },
+      index: { sequence: 1, deploymentId: '22222222-2222-4222-8222-222222222222' },
+    } as never);
     expect(await readFile(join(root, 'options.txt'), 'utf8')).toContain('renderDistance:12');
     options.signal?.addEventListener('abort', () => {
       void stop();
@@ -78,6 +82,7 @@ it('holds product ownership through game reaping and applies policy before handi
     version: 'product-test',
     config: {
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId,
       name: 'Fixture',
@@ -139,6 +144,7 @@ it('uses a launch-time memory snapshot and accepts a concurrent save for the nex
     version: 'product-test',
     config: {
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId,
       name: 'Fixture',
@@ -186,6 +192,7 @@ it('keeps the 2048 MiB unset default and stops low-RAM launch before installatio
     version: 'product-test',
     config: {
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId,
       name: 'Fixture',
@@ -216,6 +223,7 @@ it('preserves stored preferences when the current machine has less RAM than the 
     version: 'product-test',
     config: {
       format: 'torchlauncher-server',
+      signing: { algorithm: 'ed25519', publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' },
       version: 1,
       serverId,
       name: 'Fixture',
