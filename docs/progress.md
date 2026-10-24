@@ -7,6 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-PROJECT-FOLDER-02 통합 (2026-10-25)
+
+새 프로젝트/다른 이름으로 저장이 이름 입력(앱 내 모달) + 상위 폴더 선택으로 `<상위>/<이름>/`을 직접 만든다.
+Sonnet 작업자 `41017d1` → main `9972596`. 이름 검증은 main(권위)·renderer(즉시 피드백) 공통, 기존 폴더는 `FOLDER_EXISTS`로 거부, 실패 시 생성 폴더 제거.
+`projectnew`/빈 폴더 선택 경로 제거. main 검증: `pnpm check` 116 files/**1516 passed**(9 skip), 타입·두 앱 빌드, 공통 `pnpm smoke`, Studio 기능 smoke, branding smoke.
+통합 중 `.claude/worktrees` 내 중첩 Biome 설정으로 첫 check가 실패해 병합된 작업자 worktree를 제거한 뒤 재실행했다(제품 문제 아님).
+미검증: Windows 네이티브 폴더 선택/예약어 실제 동작, Save As 전체 흐름(단위 테스트만, smoke는 모달까지). [인계](handoffs/STUDIO-PROJECT-FOLDER-02.md).
+다음: STUDIO-EXPORT-01(GPT 작업자) 시작 가능, 기준은 이 커밋 이후 main.
+
 ### STUDIO-PROJECT-FOLDER-01 통합 (2026-10-25)
 
 프로젝트를 단일 `.torchproj`에서 `project.torchproj` + `files/` 폴더 구조로 전환한 작업(`a3f2256`, 인계 문서의 `d1ffb59`는 이후 재작성된 커밋)을
