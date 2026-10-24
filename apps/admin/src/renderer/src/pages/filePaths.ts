@@ -1,3 +1,5 @@
+import type { PageId } from './types';
+
 export type ManagedBy = 'options' | 'resourcepack' | 'shaderpack';
 
 /**
@@ -10,4 +12,13 @@ export function managedBy(path: string): ManagedBy | null {
   if (normalized.startsWith('resourcepacks/')) return 'resourcepack';
   if (normalized.startsWith('shaderpacks/')) return 'shaderpack';
   return null;
+}
+
+/** The settings page that owns a managed file (where its "managed in game settings" link goes). */
+export function managedPage(path: string): PageId {
+  const owner = managedBy(path);
+  if (owner === 'resourcepack') return 'packs';
+  if (owner === 'shaderpack') return 'shaders';
+  if (path.replaceAll('\\', '/').toLowerCase().startsWith('config/')) return 'mods';
+  return 'playerSettings';
 }

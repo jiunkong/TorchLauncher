@@ -1,7 +1,9 @@
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import type { StudioProject, StudioTestRun } from '../../../shared/studio.js';
+import { PersonIcon, PlayIcon, StopIcon } from '../components/Icons';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/ui';
+import { formatBytes, loaderLabel } from '../format';
 import type { StudioController } from '../hooks/useStudio';
 import { useStudioLocale } from '../i18n';
 import type { PageId } from './types';
@@ -64,35 +66,12 @@ export function TestPage({
           title={t('nav.test')}
           lead={t('test.lead')}
           actions={
-            active ? undefined : (
-              <div className="test-head-actions">
-                {account?.signedIn ? (
-                  <>
-                    <span className="test-account" data-testid="test-account">
-                      {account.name ?? t('test.account.signedIn')}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      disabled={studio.busy}
-                      onClick={() => send('testLogout')}
-                    >
-                      {t('test.account.logout')}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={!account?.available || studio.busy || active}
-                    data-testid="test-login"
-                    onClick={() => send('testLogin')}
-                  >
-                    {t('test.account.login')}
-                  </button>
-                )}
-              </div>
-            )
+            run?.phase === 'running' ? (
+              <span className="pill run" data-testid="test-running-pill">
+                <i />
+                {t('test.running.pill')}
+              </span>
+            ) : undefined
           }
         />
 
@@ -108,64 +87,36 @@ export function TestPage({
         )}
 
         {(!run || run.phase === 'idle') && (
-          <section className="card test-start-card" data-testid="test-start">
-            <div className="test-start-copy">
-              <span className="test-play-icon" aria-hidden="true">
-                ▶
-              </span>
-              <div>
-                <h2>{t('test.start.title')}</h2>
-                <p className="sub">
-                  {t('test.start.game', {
-                    minecraft: draft.game.minecraftVersion,
-                    loader: draft.game.loader.kind,
-                    version: draft.game.loader.version,
-                  })}
-                </p>
-                <p className="sub">
-                  {t('test.start.source', {
-                    source: studio.state?.sourceName ?? t('test.start.noSource'),
-                  })}
-                </p>
-              </div>
-            </div>
-            {!account?.signedIn && (
-              <p className="test-prerequisite">{t('test.start.loginRequired')}</p>
-            )}
-            {!studio.state?.sourceName && (
-              <p className="test-prerequisite">{t('test.start.sourceRequired')}</p>
-            )}
-            <div className="test-start-actions">
-              <button
-                type="button"
-                className="btn primary"
-                disabled={!canStart}
-                data-testid="test-start-button"
-                onClick={() => send('testStart')}
-              >
-                {t('test.start.run')}
-              </button>
-            </div>
-          </section>
+          <TestStart
+            studio={studio}
+            draft={draft}
+            canStart={canStart}
+            onStart={() => send('testStart')}
+            onLogin={() => send('testLogin')}
+            onLogout={() => send('testLogout')}
+            onReset={() => setConfirm('reset')}
+          />
         )}
 
         {run && active && (
           <section className="card test-progress" data-testid="test-progress" aria-live="polite">
-            <div className="test-progress-heading">
-              <span className="test-spinner" aria-hidden="true" />
-              <div>
-                <h2>{phaseLabel(run.phase, t)}</h2>
-                <p className="sub">{progressText ?? t('test.progress.waiting')}</p>
+            {run.phase !== 'running' && (
+              <div className="test-progress-heading">
+                <span className="test-spinner" aria-hidden="true" />
+                <div>
+                  <h2>{phaseLabel(run.phase, t)}</h2>
+                  <p className="sub">{progressText ?? t('test.progress.waiting')}</p>
+                </div>
+                {run.progress?.total != null && run.progress.total > 0 && (
+                  <progress
+                    className="test-progress-bar"
+                    max={run.progress.total}
+                    value={Math.min(run.progress.completed, run.progress.total)}
+                    aria-label={t('test.progress.label')}
+                  />
+                )}
               </div>
-              {run.progress?.total != null && run.progress.total > 0 && (
-                <progress
-                  className="test-progress-bar"
-                  max={run.progress.total}
-                  value={Math.min(run.progress.completed, run.progress.total)}
-                  aria-label={t('test.progress.label')}
-                />
-              )}
-            </div>
+            )}
             {run.phase !== 'running' && (
               <p className="test-phase-hint">{t('test.progress.detail')}</p>
             )}
@@ -173,10 +124,11 @@ export function TestPage({
             <div className="test-start-actions">
               <button
                 type="button"
-                className="btn"
+                className="btn lg"
                 data-testid="test-stop-open"
                 onClick={() => setConfirm('stop')}
               >
+                {run.phase === 'running' && <StopIcon />}
                 {t(run.phase === 'running' ? 'test.stop' : 'test.cancel')}
               </button>
             </div>
@@ -219,19 +171,10 @@ export function TestPage({
           />
         )}
 
-        {(!run || run.phase === 'idle' || run.phase === 'done' || run.phase === 'failed') && (
-          <section className="card test-reset-card">
-            <span className="test-reset-copy">{t('test.reset.help')}</span>
-            <button
-              type="button"
-              className="btn ghost"
-              disabled={studio.busy}
-              data-testid="test-reset-open"
-              onClick={() => setConfirm('reset')}
-            >
-              {t('test.reset.open')}
-            </button>
-          </section>
+        {(run?.phase === 'done' || run?.phase === 'failed') && (
+          <div className="test-reset-row">
+            <ResetButton busy={studio.busy} onClick={() => setConfirm('reset')} />
+          </div>
         )}
 
         {run?.phase === 'done' && !report && (
@@ -556,4 +499,133 @@ function phaseLabel(phase: StudioTestRun['phase'], t: Translator) {
     default:
       return t('test.phase.preparing');
   }
+}
+
+function ResetButton({ busy, onClick }: { busy: boolean; onClick(): void }) {
+  const { t } = useStudioLocale();
+  return (
+    <button
+      type="button"
+      className="btn sm ghost"
+      disabled={busy}
+      data-testid="test-reset-open"
+      onClick={onClick}
+    >
+      {t('test.reset.open')}
+    </button>
+  );
+}
+
+/** Start screen: the environment the test will use next to the test account, run button below. */
+export function TestStart({
+  studio,
+  draft,
+  canStart,
+  onStart,
+  onLogin,
+  onLogout,
+  onReset,
+}: {
+  studio: StudioController;
+  draft: StudioProject;
+  canStart: boolean;
+  onStart(): void;
+  onLogin(): void;
+  onLogout(): void;
+  onReset(): void;
+}) {
+  const { t } = useStudioLocale();
+  const account = studio.state?.account;
+  const files = studio.state?.files?.counts;
+  const run = studio.state?.testRun;
+  const last = run?.phase === 'failed' ? 'failed' : run?.report ? 'done' : 'none';
+  const reason = !account?.signedIn
+    ? t('test.start.loginRequired')
+    : !studio.state?.sourceName
+      ? t('test.start.sourceRequired')
+      : undefined;
+  const rows: [string, string][] = [
+    [
+      t('test.env.game'),
+      `Minecraft ${draft.game.minecraftVersion} · ${loaderLabel(draft.game.loader.kind)} ${draft.game.loader.version}`,
+    ],
+    [
+      t('test.env.files'),
+      files
+        ? t('test.env.filesValue', { count: files.total, size: formatBytes(files.totalBytes) })
+        : '—',
+    ],
+    [t('test.env.source'), studio.state?.sourceName ?? t('test.env.sourceNone')],
+    [t('test.env.last'), t(`test.env.last.${last}`)],
+  ];
+  return (
+    <div data-testid="test-start" className="test-start">
+      <div className="two">
+        <section className="card" data-testid="test-env">
+          <h2>{t('test.env.title')}</h2>
+          {rows.map(([name, value]) => (
+            <div className="kv" key={name}>
+              <span>{name}</span>
+              <span>{value}</span>
+            </div>
+          ))}
+          <div className="row-actions start">
+            <ResetButton busy={studio.busy} onClick={onReset} />
+          </div>
+        </section>
+        <section className="card" data-testid="test-account-card">
+          <h2>{t('test.account.title')}</h2>
+          <div className="acct">
+            <span className="av">
+              <PersonIcon />
+            </span>
+            <span className="g">
+              <strong data-testid="test-account">
+                {account?.signedIn
+                  ? (account.name ?? t('test.account.signedIn'))
+                  : t('test.account.out')}
+              </strong>
+              <small>{t('test.account.use')}</small>
+            </span>
+          </div>
+          <div className="row-actions start">
+            {account?.signedIn ? (
+              <button
+                type="button"
+                className="btn"
+                disabled={studio.busy}
+                data-testid="test-logout"
+                onClick={onLogout}
+              >
+                {t('test.account.logout')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn"
+                disabled={!account?.available || studio.busy}
+                data-testid="test-login"
+                onClick={onLogin}
+              >
+                {t('test.account.login')}
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+      <div className="test-start-actions">
+        <button
+          type="button"
+          className="btn primary lg"
+          disabled={!canStart}
+          title={canStart ? undefined : reason}
+          data-testid="test-start-button"
+          onClick={onStart}
+        >
+          <PlayIcon />
+          {t('test.start.run')}
+        </button>
+      </div>
+    </div>
+  );
 }

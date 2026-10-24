@@ -377,12 +377,39 @@ try {
   await goto('단축키 · 옵션');
   await page.getByTestId('settings-empty').waitFor();
   assert.equal(await page.locator('[data-testid="settings-empty"] .srcc').count(), 2);
-  assert.equal(await page.getByRole('button', { name: '불러오기' }).first().isDisabled(), true);
   await page.getByRole('button', { name: '테스트 실행으로 이동' }).click();
   await page.getByTestId('test-page').waitFor();
   await page.getByRole('heading', { name: '테스트 실행' }).waitFor();
   await page.getByTestId('test-start').waitFor();
   assert.equal(await page.getByTestId('test-login').isDisabled(), false);
+  // Start screen: environment and account cards side by side, login inside the account card,
+  // primary run button bottom-left below them, no explanatory body sentences.
+  const startLayout = await page.evaluate(() => {
+    const box = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    const env = box('[data-testid="test-env"]');
+    const account = box('[data-testid="test-account-card"]');
+    const run = box('[data-testid="test-start-button"]');
+    const login = document.querySelector(
+      '[data-testid="test-account-card"] [data-testid="test-login"]',
+    );
+    return {
+      sideBySide: Math.abs(env.top - account.top) < 2 && account.left > env.right - 1,
+      runBelow: run.top > Math.max(env.bottom, account.bottom) - 1,
+      runLeft: run.left < env.left + 40,
+      loginInCard: !!login,
+      sentences: document.body.textContent.includes(
+        '게임을 시작하려면 Microsoft 로그인이 필요합니다.',
+      ),
+    };
+  });
+  assert.deepEqual(startLayout, {
+    sideBySide: true,
+    runBelow: true,
+    runLeft: true,
+    loginInCard: true,
+    sentences: false,
+  });
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-polish-test-start.png') });
   assert.equal(await page.getByTestId('test-start-button').isDisabled(), true);
   await page.getByTestId('test-reset-open').click();
   await page.getByTestId('test-reset-dialog').waitFor();
@@ -394,10 +421,30 @@ try {
   assert.equal(await page.getByTestId('settings-key-row').count(), 3);
   await page.getByRole('tab', { name: '테스트 실행 결과', exact: true }).click();
   await page.getByRole('button', { name: '다시 가져오기' }).click();
-  await page
-    .getByTestId('studio-message')
-    .filter({ hasText: '가져올 테스트 실행 결과가 없습니다.' })
-    .waitFor();
+  // The failure shows once, on the page that ran the import (not as a page-top banner).
+  await page.getByText('가져올 테스트 실행 결과가 없습니다.', { exact: true }).waitFor();
+  assert.equal(await page.getByTestId('studio-message').count(), 0);
+  // One-row import bar: segmented toggle, details, a plain (non-primary) import-again button.
+  const bar = await page.evaluate(() => {
+    const row = document.querySelector('[data-testid="settings-imported"]').getBoundingClientRect();
+    const seg = document
+      .querySelector('[data-testid="settings-imported"] .seg')
+      .getBoundingClientRect();
+    const again = [...document.querySelectorAll('[data-testid="settings-imported"] button')].find(
+      (b) => b.textContent.includes('다시 가져오기'),
+    );
+    return {
+      oneRow: row.height < 90 && Math.abs(seg.top - again.getBoundingClientRect().top) < 40,
+      plain: !again.classList.contains('primary'),
+    };
+  });
+  assert.deepEqual(bar, { oneRow: true, plain: true });
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-polish-player-settings.png') });
+  // A command message belongs to its page: it is gone after navigating away.
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByTestId('studio-message').waitFor();
+  await goto('개요');
+  assert.equal(await page.getByTestId('studio-message').count(), 0);
 
   // Folder import remains a helper for the mod and shader settings candidates.
   await goto('모드 설정');
@@ -406,6 +453,16 @@ try {
   await page.getByTestId('import-folder').click();
   await page.getByTestId('preset-dialog').waitFor({ state: 'detached' });
   await page.getByTestId('settings-config').waitFor();
+  assert.equal(await page.locator('[data-testid="settings-config"] > section').count(), 2);
+  await page.getByTestId('config-file').filter({ hasText: 'example.properties' }).click();
+  await page.getByTestId('config-items').getByText('alpha', { exact: true }).waitFor();
+  await page.getByRole('searchbox', { name: '항목 검색' }).fill('bet');
+  assert.equal(
+    await page.getByTestId('config-items').getByText('alpha', { exact: true }).count(),
+    0,
+  );
+  await page.getByRole('searchbox', { name: '항목 검색' }).fill('');
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-polish-mods.png') });
   await goto('단축키 · 옵션');
   await page.getByTestId('settings-keys').waitFor();
   assert.equal(await page.getByTestId('settings-key-row').count(), 3);
@@ -423,6 +480,7 @@ try {
     .getByRole('radio', { name: '최초 기본값' })
     .click();
   await goto('모드 설정');
+  await page.getByTestId('config-file').filter({ hasText: 'example.properties' }).click();
   await page
     .getByRole('radiogroup', { name: 'alpha 적용 방식' })
     .getByRole('radio', { name: '최초 기본값' })
@@ -533,6 +591,18 @@ try {
   await mkdir(join(cwd, '.cache/smoke'), { recursive: true });
   for (const width of [760, 1100]) {
     await page.setViewportSize({ width, height: width === 760 ? 760 : 800 });
+    // The whole sidebar fits (no scrollbar, nothing cut) at 800 px height.
+    const fit = await page.evaluate(() => {
+      const side = document.querySelector('.side');
+      const first = side.firstElementChild.getBoundingClientRect();
+      const foot = side.lastElementChild.getBoundingClientRect();
+      return {
+        overflow: side.scrollHeight - side.clientHeight,
+        topVisible: first.top >= 0,
+        footVisible: foot.bottom <= innerHeight + 1,
+      };
+    });
+    if (width === 1100) assert.deepEqual(fit, { overflow: 0, topVisible: true, footVisible: true });
     assert.equal(await page.evaluate(() => innerWidth), width);
     for (const label of [
       '개요',
@@ -554,6 +624,19 @@ try {
       });
     }
   }
+
+  // Every menu entry has its own icon.
+  const icons = await page.evaluate(() =>
+    [...document.querySelectorAll('nav.menu .mi svg')].map((svg) => svg.innerHTML),
+  );
+  assert.equal(new Set(icons).size, icons.length, 'menu icons are distinct');
+  // On a short window the sidebar scrolls instead of cutting content.
+  await page.setViewportSize({ width: 1100, height: 580 });
+  assert.equal(
+    await page.evaluate(() => getComputedStyle(document.querySelector('.side')).overflowY),
+    'auto',
+  );
+  await page.setViewportSize({ width: 1100, height: 800 });
 
   const isolation = await page.evaluate(() => ({
     require: 'require' in window,
@@ -590,6 +673,12 @@ try {
     'Studio Electron smoke passed: shell and splash, in-app unsaved dialog, split game/player settings pages, explicit options imports, server/branding/files/test/deploy/export pages, persistence, painted layout at 760 and 1100 px and isolation',
   );
 } finally {
-  await app?.close().catch(() => {});
+  // A dirty project answers a window close with its in-app dialog; never wait on it forever.
+  await Promise.race([app?.close().catch(() => {}), new Promise((done) => setTimeout(done, 5000))]);
+  try {
+    app?.process().kill('SIGKILL');
+  } catch {
+    // already gone
+  }
   await rm(root, { recursive: true, force: true });
 }

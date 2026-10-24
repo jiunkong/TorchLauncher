@@ -115,10 +115,35 @@ export const PlayIcon = () => (
   </Svg>
 );
 export const ModsIcon = PackageIcon;
+export const KeyboardIcon = GamepadIcon;
 export const SettingsIcon = () => (
   <Svg>
     <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
     <circle cx="16" cy="7" r="2" />
     <circle cx="8" cy="17" r="2" />
+  </Svg>
+);
+export const SlidersIcon = SettingsIcon;
+export const LayersIcon = () => (
+  <Svg>
+    <path d="M12 4l8 4-8 4-8-4z" />
+    <path d="M4 12l8 4 8-4M4 16l8 4 8-4" />
+  </Svg>
+);
+export const SunIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
+  </Svg>
+);
+export const PersonIcon = () => (
+  <Svg>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6" />
+  </Svg>
+);
+export const StopIcon = () => (
+  <Svg>
+    <rect x="6" y="6" width="12" height="12" rx="1.5" />
   </Svg>
 );

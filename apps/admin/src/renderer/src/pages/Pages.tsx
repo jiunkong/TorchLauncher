@@ -7,8 +7,11 @@ import { ExportPage } from './ExportPage';
 import { FilesPage } from './FilesPage';
 import { OverviewPage } from './OverviewPage';
 import { ServerPage } from './ServerPage';
-import { SettingsPage } from './SettingsPage';
 import { StartPage } from './StartPage';
+import { ModSettingsPage } from './settings/ModSettingsPage';
+import { PackSettingsPage } from './settings/PackSettingsPage';
+import { PlayerSettingsPage } from './settings/PlayerSettingsPage';
+import { ShaderSettingsPage } from './settings/ShaderSettingsPage';
 import { TestPage } from './TestPage';
 import type { PageId } from './types';
 
@@ -40,13 +43,13 @@ export function PageContent({
     case 'files':
       return <FilesPage {...props} />;
     case 'mods':
-      return <SettingsPage {...props} settings={settings} view="config" />;
+      return <ModSettingsPage {...props} />;
     case 'packs':
-      return <SettingsPage {...props} settings={settings} view="packs" />;
+      return <PackSettingsPage {...props} />;
     case 'shaders':
-      return <SettingsPage {...props} settings={settings} view="shaders" />;
+      return <ShaderSettingsPage {...props} />;
     case 'playerSettings':
-      return <SettingsPage {...props} settings={settings} view="player" />;
+      return <PlayerSettingsPage {...props} settings={settings} />;
     case 'test':
       return <TestPage studio={studio} draft={draft} go={go} />;
     case 'deploy':

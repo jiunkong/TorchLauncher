@@ -4,6 +4,7 @@ import { ArrowIcon, FolderIcon, PlusIcon, RefreshIcon } from '../components/Icon
 import { Checkbox, Chip, Note, PageHeader } from '../components/ui';
 import { formatBytes } from '../format';
 import { useStudioLocale } from '../i18n';
+import { managedPage } from './filePaths';
 import type { PageProps } from './types';
 
 export function FilesPage({ studio, insights, go }: PageProps) {
@@ -195,15 +196,7 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                       <button
                         type="button"
                         className="chip link"
-                        onClick={() =>
-                          go(
-                            entry.path.toLowerCase().startsWith('resourcepacks/')
-                              ? 'packs'
-                              : entry.path.toLowerCase().startsWith('shaderpacks/')
-                                ? 'shaders'
-                                : 'playerSettings',
-                          )
-                        }
+                        onClick={() => go(managedPage(entry.path))}
                       >
                         {t('files.managed')}
                       </button>
