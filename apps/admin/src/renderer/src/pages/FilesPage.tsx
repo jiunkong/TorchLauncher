@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FilePolicyChoice, StudioFileEntry } from '../../../shared/studio.js';
-import { ArrowIcon, FolderIcon, PlusIcon, RefreshIcon } from '../components/Icons';
+import { FolderIcon, PlusIcon, RefreshIcon } from '../components/Icons';
 import { Checkbox, Chip, Note, PageHeader } from '../components/ui';
 import { formatBytes } from '../format';
 import { useStudioLocale } from '../i18n';
@@ -43,17 +43,7 @@ export function FilesPage({ studio, insights, go }: PageProps) {
 
   return (
     <>
-      <PageHeader
-        eyebrow={t('files.eyebrow')}
-        title={t('files.title')}
-        lead={t('files.lead')}
-        actions={
-          <button type="button" className="btn primary" onClick={() => go('deploy')}>
-            {t('files.rebuild')}
-            <ArrowIcon />
-          </button>
-        }
-      />
+      <PageHeader eyebrow={t('files.eyebrow')} title={t('files.title')} lead={t('files.lead')} />
       <section className="card slim">
         <div className="srcrow">
           <FolderIcon />
@@ -203,7 +193,6 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                     ) : (
                       <span
                         className="pol"
-                        // biome-ignore lint/a11y/useSemanticElements: segmented control of toggle buttons
                         role="radiogroup"
                         aria-label={t('files.policyOf', { path: entry.path })}
                       >
@@ -247,6 +236,10 @@ export function FilesPage({ studio, insights, go }: PageProps) {
       </section>
       <Note>
         <b>{t('files.managedNote.title')}</b> {t('files.managedNote.body')}{' '}
+        <button type="button" className="textlink" onClick={() => go('mods')}>
+          {t('nav.mods')}
+        </button>
+        {' · '}
         <button type="button" className="textlink" onClick={() => go('playerSettings')}>
           {t('nav.playerSettings')}
         </button>

@@ -159,6 +159,10 @@ describe('pack names and files', () => {
       expect(() => validatePackName(bad), bad).toThrow();
     for (const good of ['Faithful 32x.zip', '서버 팩 v1.2.zip', 'pack(1)+x.zip', 'a.zip'])
       expect(() => validatePackName(good), good).not.toThrow();
+    for (const bad of ['a.zip', 'a.jar.exe', '../a.jar'])
+      expect(() => validatePackName(bad, 'mod'), bad).toThrow();
+    for (const good of ['fabric-api.jar', '모드 1.2.jar'])
+      expect(() => validatePackName(good, 'mod'), good).not.toThrow();
   });
   it('copies a pack into the source folder, verifies the hash, and never overwrites a different file', async () => {
     const source = await temp();
@@ -192,6 +196,37 @@ describe('pack names and files', () => {
       code: 'INVALID',
     });
     expect(await readFile(join(source, 'resourcepacks', 'pack.zip'))).toEqual(bytes);
+  });
+  it('copies jar mods to mods and applies their selected deployment policy', async () => {
+    const h = await harness();
+    const picked = join(h.root, 'fabric-api.jar');
+    const jar = zipBytes('mod');
+    await writeFile(picked, jar);
+    h.d.open.mockResolvedValueOnce([picked]);
+    expect(await h.s.request({ action: 'settingsPackAdd', kind: 'mod' })).toMatchObject({
+      ok: true,
+    });
+    expect(await readFile(join(h.source, 'mods', 'fabric-api.jar'))).toEqual(jar);
+    expect(h.s.snapshot().project?.gameSettings?.mods).toMatchObject([
+      { name: 'fabric-api.jar', policy: 'initial' },
+    ]);
+    expect([...(await h.readPack()).keys()]).toContain('mods/fabric-api.jar|initial-only');
+    await h.s.request({
+      action: 'settingsPackPolicy',
+      kind: 'mod',
+      name: 'fabric-api.jar',
+      policy: 'required',
+    });
+    expect([...(await h.readPack()).keys()]).toContain('mods/fabric-api.jar|always');
+    await h.s.request({
+      action: 'settingsPackPolicy',
+      kind: 'mod',
+      name: 'fabric-api.jar',
+      policy: 'none',
+    });
+    expect([...(await h.readPack()).keys()]).not.toContain('mods/fabric-api.jar|always');
+    await h.reopenWithFiles([{ path: 'mods/fabric-api.jar', policy: 'always' }]);
+    expect([...(await h.readPack()).keys()]).not.toContain('mods/fabric-api.jar|always');
   });
   it('rejects non-zip, oversized, badly named and linked packs and leaves no files', async () => {
     const source = await temp();
@@ -520,7 +555,7 @@ describe('service: game settings preset', () => {
         action: 'settingsOptions',
         changes: Array.from({ length: 513 }, () => ({ key: 'a', policy: 'none' })),
       },
-      { action: 'settingsPackAdd', kind: 'mod' },
+      { action: 'settingsPackAdd', kind: 'unsupported' },
       { action: 'settingsPackPolicy', kind: 'resourcepack', name: 'a.zip' },
       { action: 'settingsPackMove', kind: 'resourcepack', name: 'a.zip', index: 1.5 },
       { action: 'settingsPackRemove', kind: 'resourcepack', name: 'a.zip', path: 'x' },

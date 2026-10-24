@@ -48,7 +48,7 @@ export interface StudioLastBuild {
   files: { path: string; sha256: string; length: number; policy: DeploymentFilePolicy }[];
 }
 export type SettingPolicyChoice = 'none' | 'initial' | 'required';
-export type PackKind = 'resourcepack' | 'shaderpack';
+export type PackKind = 'resourcepack' | 'shaderpack' | 'mod';
 export type SettingValueType = 'boolean' | 'number' | 'json' | 'text';
 export interface StudioGameOption {
   key: string;
@@ -84,7 +84,7 @@ export interface StudioShaderSettings {
   packOptions: { pack: string; items: StudioConfigItem[] }[];
 }
 export interface StudioPack {
-  /** File name inside `resourcepacks/` or `shaderpacks/` of the source folder, e.g. `server.zip`. */
+  /** File name inside `resourcepacks/`, `shaderpacks/`, or `mods/` of the source folder. */
   name: string;
   sha256: string;
   length: number;
@@ -96,6 +96,8 @@ export interface StudioGameSettings {
   /** Order is the operator's pack order (later = higher priority in Minecraft's list). */
   resourcePacks: StudioPack[];
   shaderPacks: StudioPack[];
+  /** Imported `.jar` mods; `none` excludes, `initial` ships for first install, `required` is always applied. */
+  mods?: StudioPack[];
   /** Mod config files (schema 2, optional). Needs a launcher that reads policy v2 when any item is set. */
   configFiles?: StudioConfigFile[];
   /** Shader selection and per-pack options (optional). Needs policy v2 when any item is set. */
@@ -116,7 +118,7 @@ export interface StudioFileEntry {
   path: string;
   /** Bytes in the source folder; null when the file is not (or no longer) there. */
   size: number | null;
-  /** `managed` = options.txt, resourcepacks/, shaderpacks/ and the generated policy (game settings). */
+  /** `managed` = options.txt, mods/*.jar, resourcepacks/, shaderpacks/ and generated policy. */
   policy: FilePolicyChoice | 'managed';
   /** Change versus the last build; null when the project has no last build. */
   change: FileChange | null;

@@ -72,6 +72,7 @@ const packs = join(root, 'packs');
 await mkdir(packs);
 await writeFile(join(packs, 'server-pack.zip'), zipBytes);
 await writeFile(join(packs, 'Test.zip'), zipBytes);
+await writeFile(join(packs, 'example-mod.jar'), zipBytes);
 const launcher = join(root, 'TorchLauncher-test.AppImage');
 await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
   mode: 0o755,
@@ -113,6 +114,7 @@ try {
         'options.txt 선택': [join(paths.game, 'options.txt')],
         '리소스팩(.zip) 선택': [join(paths.packs, 'server-pack.zip')],
         '셰이더팩(.zip) 선택': [join(paths.packs, 'Test.zip')],
+        '모드(.jar) 선택': [join(paths.packs, 'example-mod.jar')],
         '기존 공통 런처 선택': [paths.launcher],
       };
       function join(...parts) {
@@ -643,7 +645,15 @@ try {
   assert.equal(await page.getByTestId('studio-message').count(), 0);
 
   // Folder import remains a helper for the mod and shader settings candidates.
-  await goto('모드 설정');
+  await goto('모드');
+  await page.getByTestId('pack-add').click();
+  await page.getByTestId('mod-row').filter({ hasText: 'example-mod.jar' }).waitFor();
+  await page
+    .getByRole('radiogroup', { name: 'example-mod.jar 적용 방식' })
+    .getByRole('radio', { name: '항상', exact: true })
+    .click();
+  await page.getByTestId('settings-config').waitFor();
+  assert.equal(await page.getByTestId('mod-row').count(), 1);
   await page.getByRole('button', { name: '폴더에서 불러오기' }).click();
   await page.getByTestId('preset-dialog').waitFor();
   await page.getByTestId('import-folder').click();
@@ -675,7 +685,7 @@ try {
     .getByRole('radiogroup', { name: 'renderDistance 적용 방식' })
     .getByRole('radio', { name: '최초 기본값' })
     .click();
-  await goto('모드 설정');
+  await goto('모드');
   await page.getByTestId('config-file').filter({ hasText: 'example.properties' }).click();
   await page
     .getByRole('radiogroup', { name: 'alpha 적용 방식' })
@@ -697,13 +707,23 @@ try {
     .click();
   await page.getByRole('button', { name: '항목 보기' }).waitFor();
   assert.equal(await page.getByTestId('settings-policy-error').count(), 0);
-  // The generated policy file is a managed file now.
+  // The generated policy and imported mod are managed files.
   await goto('파일');
   await page
     .getByRole('row')
     .filter({ hasText: 'resourcepacks/server-pack.zip' })
     .getByRole('button', { name: '설정 화면에서 관리' })
     .waitFor();
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'mods/example-mod.jar' })
+    .getByRole('button', { name: '설정 화면에서 관리' })
+    .click();
+  assert.equal(await page.getByRole('button', { name: '배포 파일 다시 만들기' }).count(), 0);
+  await page.getByTestId('mod-row').waitFor();
+  // Return to the file list through the side navigation.
+  await page.getByRole('button', { name: '파일' }).click();
+  await page.getByTestId('files-rescan').waitFor();
 
   // Deploy: build, status from the main process.
   await goto('배포');
@@ -783,6 +803,7 @@ try {
   const saved = readStudioFile(await readFile(project));
   assert.equal(saved.version, 1);
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
+  assert.equal(saved.gameSettings.mods[0].name, 'example-mod.jar');
   assert.equal(saved.gameSettings.shader.pack.value, 'Test.zip');
   // File > Close project returns to the start screen (clean project: no question).
   await menuAction('file', 'close');
@@ -814,7 +835,7 @@ try {
       '개요',
       '서버 정보',
       '브랜딩',
-      '모드 설정',
+      '모드',
       '리소스팩',
       '셰이더',
       '파일',
@@ -949,5 +970,5 @@ try {
     }
     await Promise.race([exited, new Promise((done) => setTimeout(done, 5000))]);
   }
-  await rm(root, { recursive: true, force: true });
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

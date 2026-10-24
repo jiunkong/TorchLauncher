@@ -87,7 +87,8 @@ export interface StudioDialogs {
       | 'optionsfile'
       | 'gamefolder'
       | 'resourcepack'
-      | 'shaderpack',
+      | 'shaderpack'
+      | 'mod',
     root?: string,
   ): Promise<string[] | null>;
   save(kind: 'project' | 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
@@ -163,7 +164,7 @@ function validSpecial(value: Record<string, unknown>): boolean {
   }
   const fields = SPECIAL_FIELDS[value.action as string] ?? [];
   if (Object.keys(value).sort().join(',') !== ['action', ...fields].sort().join(',')) return false;
-  const isKind = (v: unknown) => v === 'resourcepack' || v === 'shaderpack';
+  const isKind = (v: unknown) => v === 'resourcepack' || v === 'shaderpack' || v === 'mod';
   switch (value.action) {
     case 'filesPolicy':
       return (
@@ -601,10 +602,14 @@ export class StudioService {
   }
   private exportDone: StudioExport['done'] = null;
   private updatePack(kind: PackKind, mutate: (list: StudioPack[]) => void, create = false): void {
-    this.updateSettings(
-      (g) => mutate(kind === 'resourcepack' ? g.resourcePacks : g.shaderPacks),
-      create,
-    );
+    this.updateSettings((g) => {
+      if (kind === 'resourcepack') mutate(g.resourcePacks);
+      else if (kind === 'shaderpack') mutate(g.shaderPacks);
+      else {
+        g.mods ??= [];
+        mutate(g.mods);
+      }
+    }, create);
   }
   private updateSettings(
     mutate: (settings: import('../shared/studio.js').StudioGameSettings) => void,
@@ -880,7 +885,7 @@ export class StudioService {
       case 'settingsPackPolicy':
       case 'settingsPackMove':
       case 'settingsPackRemove': {
-        validatePackName(command.name);
+        validatePackName(command.name, command.kind);
         this.updatePack(command.kind, (list) => {
           const index = list.findIndex((p) => p.name === command.name);
           const pack = list[index];

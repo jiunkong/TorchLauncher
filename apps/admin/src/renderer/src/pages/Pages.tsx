@@ -8,7 +8,7 @@ import { FilesPage } from './FilesPage';
 import { OverviewPage } from './OverviewPage';
 import { ServerPage } from './ServerPage';
 import { StartPage } from './StartPage';
-import { ModSettingsPage } from './settings/ModSettingsPage';
+import { ModsPage } from './settings/ModsPage';
 import { PackSettingsPage } from './settings/PackSettingsPage';
 import { PlayerSettingsPage } from './settings/PlayerSettingsPage';
 import { ShaderSettingsPage } from './settings/ShaderSettingsPage';
@@ -43,7 +43,7 @@ export function PageContent({
     case 'files':
       return <FilesPage {...props} />;
     case 'mods':
-      return <ModSettingsPage {...props} />;
+      return <ModsPage {...props} />;
     case 'packs':
       return <PackSettingsPage {...props} />;
     case 'shaders':
