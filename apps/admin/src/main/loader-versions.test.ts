@@ -33,10 +33,10 @@ describe('loader version catalogs', () => {
     </versions></versioning></metadata>`;
     expect(parseNeoForgeVersions(xml, '1.21.1')).toEqual(['21.1.264', '21.1.9']);
     expect(parseNeoForgeVersions(xml, '1.21')).toEqual(['21.0.167']);
-    expect(parseNeoForgeVersions(xml, '1.7.10')).toEqual([]);
+    expect(parseNeoForgeVersions(xml, '1.14')).toEqual([]);
   });
 
-  it('reads the official NeoForge version metadata and leaves old Minecraft releases empty', async () => {
+  it('reads the official NeoForge version metadata and leaves allowed unsupported releases empty', async () => {
     const fetcher = vi.fn(
       async () => new Response('<metadata><version>21.1.264</version></metadata>'),
     );
@@ -45,12 +45,12 @@ describe('loader version catalogs', () => {
       'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    await expect(getLoaderVersions('1.7.10', 'neoforge', fetcher)).resolves.toEqual([]);
+    await expect(getLoaderVersions('1.14', 'neoforge', fetcher)).resolves.toEqual([]);
   });
 
   it('does not query metadata for a Minecraft version outside the pinned release list', async () => {
     const fetcher = vi.fn();
-    await expect(getLoaderVersions('1.6.4', 'fabric', fetcher)).rejects.toThrow(
+    await expect(getLoaderVersions('1.7.10', 'neoforge', fetcher)).rejects.toThrow(
       'Unsupported Minecraft version',
     );
     expect(fetcher).not.toHaveBeenCalled();
