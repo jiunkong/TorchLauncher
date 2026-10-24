@@ -83,7 +83,7 @@ describe('Studio durable branding', () => {
     expect(JSON.stringify(summary)).not.toContain('base64');
     expect(summary?.branding?.icon).toMatchObject({ length: png.length });
     await writeFile(image, 'original replaced');
-    const projectPath = join(root, 'project.tlstudio');
+    const projectPath = join(root, 'project.torchproj');
     d.save.mockResolvedValueOnce(projectPath);
     expect((await s.request({ action: 'save' })).ok).toBe(true);
     const savedFile = await readFile(projectPath);
@@ -256,7 +256,7 @@ describe('Studio durable branding', () => {
         code: 'INVALID',
       });
     }
-    const bad = join(root, 'project.tlstudio');
+    const bad = join(root, 'project.torchproj');
     await writeFile(
       bad,
       Buffer.from(

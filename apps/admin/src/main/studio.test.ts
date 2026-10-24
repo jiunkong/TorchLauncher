@@ -83,7 +83,7 @@ function config() {
 describe('Studio project and trusted disk selections', () => {
   it('round trips the validated TorchLauncher Studio file, dirty state and reselects source after open', async () => {
     const root = await temp();
-    const path = join(root, 'project.tlstudio');
+    const path = join(root, 'project.torchproj');
     const { s, d } = await projectService();
     const project = { ...parseProject(s.snapshot().project), name: 'Persisted server' };
     expect(await s.request({ action: 'update', project })).toMatchObject({
@@ -105,7 +105,7 @@ describe('Studio project and trusted disk selections', () => {
     d.open.mockResolvedValueOnce([path]);
     expect(await s.request({ action: 'open' })).toEqual({ ok: false, code: 'UNSAVED' });
     expect(s.snapshot().project).toEqual(project);
-    expect((await readdir(root)).sort()).toEqual(['project.tlstudio']);
+    expect((await readdir(root)).sort()).toEqual(['project.torchproj']);
   });
   it('keeps prior state after malformed open and canceled save, rejects forged renderer paths', async () => {
     const { s, d } = await projectService();
@@ -122,7 +122,7 @@ describe('Studio project and trusted disk selections', () => {
       }),
     ).toEqual({ ok: false, code: 'INVALID' });
     const root = await temp();
-    const path = join(root, 'bad.tlstudio');
+    const path = join(root, 'bad.torchproj');
     await writeFile(path, '{bad');
     d.open.mockResolvedValueOnce([path]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
@@ -148,7 +148,7 @@ describe('Studio project and trusted disk selections', () => {
     const pending = s.request({ action: 'save' });
     expect(await s.request({ action: 'source' })).toEqual({ ok: false, code: 'BUSY' });
     await s.request({ action: 'cancel' });
-    finish(join(root, 'must-not-exist.tlstudio'));
+    finish(join(root, 'must-not-exist.torchproj'));
     expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
     expect(await readdir(root)).toEqual([]);
     expect(s.snapshot().dirty).toBe(true);
@@ -214,7 +214,7 @@ describe('Studio project and trusted disk selections', () => {
     expect(await readFile(join(root, 'staged'), 'utf8')).toBe('real payload');
     const checkerDialogs = dialogs();
     const checker = new StudioService(checkerDialogs, () => memorySource(bytes));
-    const projectPath = join(root, 'project.tlstudio');
+    const projectPath = join(root, 'project.torchproj');
     const built = parseProject(s.snapshot().project);
     built.sourceUrl = 'https://example.org/pack';
     project.sourceUrl = built.sourceUrl;
@@ -289,7 +289,7 @@ describe('Studio project and trusted disk selections', () => {
       throw new Error('private remote URL credentials');
     });
     const p = { ...newProject(), sourceUrl: 'https://example.org/pack' };
-    const path = join(root, 'project.tlstudio');
+    const path = join(root, 'project.torchproj');
     await writeFile(path, encodeProjectFile(p, {}));
     d.open.mockResolvedValueOnce([path]);
     await s.request({ action: 'open', discard: true });

@@ -9,7 +9,7 @@ import type { StudioProject } from '../shared/studio.js';
 import { type BrandingSnapshots, type ImageDecoder, validateImage } from './branding.js';
 import { parseProject, StudioFailure } from './project.js';
 
-/** The TorchLauncher Studio file (`.tlstudio`) container, format 1. See docs/studio-project-format.md. */
+/** The TorchLauncher Studio file (`.torchproj`) container, format 1. See docs/studio-project-format.md. */
 export const PROJECT_FILE_MAGIC = Buffer.from([0x89, 0x54, 0x4c, 0x53, 0x0d, 0x0a, 0x1a, 0x0a]);
 export const PROJECT_FILE_FORMAT = 1;
 export const PROJECT_FILE_LIMIT = 32 * 1024 ** 2;

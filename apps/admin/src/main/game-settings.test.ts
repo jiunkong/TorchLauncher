@@ -314,7 +314,7 @@ async function harness() {
   const reopenWithFiles = async (files: { path: string; policy: 'always' | 'initial-only' }[]) => {
     const project = parseProject(s.snapshot().project);
     project.files = files;
-    const path = join(root, 'legacy.tlstudio');
+    const path = join(root, 'legacy.torchproj');
     await writeFile(path, encodeProjectFile(project, {}));
     d.open.mockResolvedValueOnce([path]);
     await s.request({ action: 'open', discard: true });
@@ -581,7 +581,7 @@ describe('service: game settings preset', () => {
       ok: false,
       code: 'INVALID',
     });
-    const saved = join(h.root, 'p.tlstudio');
+    const saved = join(h.root, 'p.torchproj');
     h.d.save.mockResolvedValueOnce(saved);
     await h.s.request({ action: 'save' });
     const before = h.s.snapshot().project;
@@ -887,7 +887,7 @@ describe('service: mod configs and shaders', () => {
     const g = h.s.snapshot().project?.gameSettings;
     expect(g?.shader?.pack).toEqual({ policy: 'required', value: 'BSL.zip' });
     expect(g?.configFiles?.[0]?.items.find((i) => i.key === 'fog')?.policy).toBe('initial');
-    const saved = join(h.root, 'p.tlstudio');
+    const saved = join(h.root, 'p.torchproj');
     h.d.save.mockResolvedValueOnce(saved);
     await h.s.request({ action: 'save' });
     const before = h.s.snapshot().project;

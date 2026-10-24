@@ -216,7 +216,7 @@ describe('signing key backup', () => {
     const pub = await a.create('srv');
     const text = await a.exportBackup('srv', PASS);
     expect(JSON.parse(text)).toMatchObject({ format: 'torchlauncher-signing-backup', version: 1 });
-    await writeFile(join(root, 'backup.tlkey'), text);
+    await writeFile(join(root, 'backup.torchkey'), text);
     expect(await b.importBackup('srv', Buffer.from(text), PASS)).toEqual({
       publicKey: pub,
       replaced: false,
@@ -363,7 +363,7 @@ describe('Studio signing integration', () => {
     const project = parseProject(ctx.s.snapshot().project);
     delete project.sequence;
     const fresh = new StudioService(dialogs(), undefined, undefined, ctx.store);
-    const path = join(ctx.root, 'p.tlstudio');
+    const path = join(ctx.root, 'p.torchproj');
     await writeFile(path, encodeProjectFile(project, {}));
     const fd = dialogs();
     const f2 = new StudioService(fd, undefined, undefined, ctx.store);
@@ -404,7 +404,7 @@ describe('Studio signing integration', () => {
   it('keeps private key material out of project, deploy output and reply state', async () => {
     const ctx = await setup();
     const { pack } = await build(ctx, 'o.torchpack');
-    const projectPath = join(ctx.root, 'project.tlstudio');
+    const projectPath = join(ctx.root, 'project.torchproj');
     ctx.d.save.mockResolvedValueOnce(projectPath);
     await ctx.s.request({ action: 'save' });
     const serverId = ctx.s.snapshot().project?.serverId as string;
@@ -435,9 +435,9 @@ describe('Studio signing integration', () => {
     const d0 = dialogs();
     const legacy = new StudioService(d0);
     d0.open.mockResolvedValueOnce([sourceDir]);
-    await writeFile(join(root, 'proj.tlstudio'), encodeProjectFile(project, {}));
+    await writeFile(join(root, 'proj.torchproj'), encodeProjectFile(project, {}));
     d0.open.mockReset();
-    d0.open.mockResolvedValueOnce([join(root, 'proj.tlstudio')]);
+    d0.open.mockResolvedValueOnce([join(root, 'proj.torchproj')]);
     await legacy.request({ action: 'open', discard: true });
     d0.open.mockResolvedValueOnce([sourceDir]);
     await legacy.request({ action: 'source' });
@@ -447,7 +447,7 @@ describe('Studio signing integration', () => {
     const oldBytes = await readFile(oldPack);
     // The project file as a pre-upgrade Studio saved it, plus the build record the current one keeps.
     await writeFile(
-      join(root, 'proj.tlstudio'),
+      join(root, 'proj.torchproj'),
       encodeProjectFile(parseProject(legacy.snapshot().project), {}),
     );
     expect(
@@ -458,7 +458,7 @@ describe('Studio signing integration', () => {
     const d = dialogs();
     let remote = oldBytes;
     const s = new StudioService(d, () => memorySource(remote), undefined, store);
-    d.open.mockResolvedValueOnce([join(root, 'proj.tlstudio')]);
+    d.open.mockResolvedValueOnce([join(root, 'proj.torchproj')]);
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(true);
     expect(s.snapshot().signing).toMatchObject({ keyExists: false, publicKey: null });
     const out = join(root, 'out.zip');
@@ -520,7 +520,7 @@ describe('Studio signing integration', () => {
     for (const b of bad) expect(await ctx.s.request(b)).toEqual({ ok: false, code: 'INVALID' });
     expect((await ctx.s.request({ action: 'keyCreate' })).ok).toBe(true);
     expect(await ctx.s.request({ action: 'keyCreate' })).toEqual({ ok: false, code: 'KEY_EXISTS' });
-    const backup = join(ctx.root, 'k.tlkey');
+    const backup = join(ctx.root, 'k.torchkey');
     ctx.d.save.mockResolvedValueOnce(backup);
     const reply = await ctx.s.request({ action: 'keyExport', passphrase: PASS });
     expect(reply.ok).toBe(true);
@@ -531,7 +531,7 @@ describe('Studio signing integration', () => {
     const store2 = new SigningKeyStore(join(ctx.root, 'm2'), fakeStorage(), FAST);
     const d2 = dialogs();
     const s2 = new StudioService(d2, undefined, undefined, store2);
-    const projectFile = join(ctx.root, 'proj.tlstudio');
+    const projectFile = join(ctx.root, 'proj.torchproj');
     await writeFile(projectFile, encodeProjectFile(project, {}));
     d2.open.mockResolvedValueOnce([projectFile]);
     await s2.request({ action: 'open', discard: true });
