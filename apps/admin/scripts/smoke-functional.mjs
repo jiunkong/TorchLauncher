@@ -326,6 +326,38 @@ try {
   await page.getByTestId('start-page').waitFor();
   // The menu bar is always there; without a project the project actions are disabled.
   await page.getByTestId('menubar').waitFor();
+  // The start screen fills the renderer directly below the in-app menu, with no exposed page strip.
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 760 });
+    const startBounds = await page.evaluate(() => {
+      const menu = document.querySelector('.menubar').getBoundingClientRect();
+      const page = document.querySelector('.page').getBoundingClientRect();
+      const hero = document.querySelector('.hero').getBoundingClientRect();
+      const inner = document.querySelector('.hero .inner').getBoundingClientRect();
+      const language = document.querySelector('.hero .lang-corner').getBoundingClientRect();
+      return {
+        menuBottom: menu.bottom,
+        pageTop: page.top,
+        heroTop: hero.top,
+        innerLeft: inner.left,
+        innerRight: inner.right,
+        languageTop: language.top,
+      };
+    });
+    assert.equal(startBounds.pageTop, startBounds.menuBottom);
+    assert.equal(startBounds.heroTop, startBounds.pageTop);
+    assert.ok(
+      startBounds.innerLeft >= 36,
+      `start content lost its left gutter: ${JSON.stringify(startBounds)}`,
+    );
+    assert.ok(
+      width - startBounds.innerRight >= 36,
+      `start content lost its right gutter: ${JSON.stringify(startBounds)}`,
+    );
+    assert.equal(startBounds.languageTop, startBounds.menuBottom + 44);
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-start-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 1100, height: 760 });
   await page.getByTestId('menu-file').click();
   for (const id of ['save', 'saveAs', 'close'])
     assert.equal(await page.getByTestId(`menu-item-${id}`).getAttribute('aria-disabled'), 'true');

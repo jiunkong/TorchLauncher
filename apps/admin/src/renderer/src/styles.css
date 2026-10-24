@@ -332,6 +332,9 @@ svg {
   flex-direction: column;
   gap: 18px;
 }
+.page:has(> .hero) {
+  padding: 0;
+}
 .page > * {
   flex: none;
 }
@@ -1306,6 +1309,7 @@ div.big .body {
   justify-content: center;
   position: relative;
   min-height: 460px;
+  padding: 28px 36px;
   background:
     radial-gradient(640px 420px at 50% 22%, rgba(255, 90, 50, 0.18), transparent 66%), var(--bg);
 }
@@ -2485,6 +2489,10 @@ button.big.dlgbtn {
   top: 16px;
   right: 20px;
   z-index: 1;
+}
+.page:has(> .hero) .lang-corner {
+  top: 44px;
+  right: 56px;
 }
 .hero {
   position: relative;
