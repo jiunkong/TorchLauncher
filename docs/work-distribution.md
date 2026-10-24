@@ -2,6 +2,19 @@
 
 ## 역할과 현재 배정
 
+2026-10-24 #0 Codex 재개: LAUNCHER-EN-01 `f995008`, MAIN-I18N-01 `0eb01fd`는 main 병합됨. 통합 검증 대기.
+TEST-LOCALE-01 #1 `launcher_test_locale`, gpt-6-luna low, agent-1 `fix/launcher-test-locale`, baseline `0eb01fd`.
+독점: launcher renderer `pages.test.ts`, `shell.test.ts`, `docs/handoffs/TEST-LOCALE-01.md`만.
+테스트 전용 저장 선호로 한국어를 명시하고 mock을 복원한다. 제품 자동 언어/설정/IPC는 변경하지 않는다.
+영어·한국어 환경에서 해당 테스트 및 Biome 후 커밋·인계. #0은 검토·병합·main 전체 검사/smoke·기록 담당.
+후속 범위 추가: `scripts/smoke.mjs`, launcher `scripts/renderer-functional-smoke.mjs`의 Electron 시작 언어만 ko로 명시.
+영어 기본 환경에서 한국어 시작 selector timeout 확인; 내부 자동/영어 전환 검증은 유지한다.
+추가 허용: 런처 확인창 synthetic handler에서 set-language를 별도 기록하고 영어 IPC 수신을 검증한다.
+완료: `4978924`/`24a1ffd`/`2c37df9` → `562764a`/`95a8639`/`5f30df3` 통합.
+main 영어 pnpm check 1470 passed/9 skipped, 타입/Biome/두 빌드 성공; 공통 두 앱·Studio/런처 기능 smoke 성공.
+작업자 종료, 병합 브랜치 정리. Windows native 신규 검증 없음. 자세한 증거는 progress 및 TEST-LOCALE-01 인계 참조.
+
+
 UI-FEEDBACK-01 검토 추가: 배경 자식 z-index가 부모 밖으로 빠져 홈 내용을 덮는 원인 재현.
 브라우저 clipboard-write는 production deny 정책에서 denied 확인. #0이 좁은 범위 추가 승인:
 launcher main/product/ipc(+test), main/index, preload, shared API 및 공통 scripts/smoke.mjs 목록 정렬.

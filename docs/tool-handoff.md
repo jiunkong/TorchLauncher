@@ -5,6 +5,41 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## Current checkpoint (2026-10-24, Codex #0 completed localization integration)
+
+This checkpoint supersedes historical pending status below. User restored #0 role and authorized
+locale-test followup and integrated verification. Keep worker models small: only one worker was used,
+TEST-LOCALE-01 gpt-6-luna low. Worker finished; no further task assigned.
+
+LAUNCHER-EN-01 (`dd5a8b1`, merged `f995008`) and MAIN-I18N-01 (`22ac93f`, merged `0eb01fd`)
+were already merged by previous #0. This #0 reviewed catalogs, native-dialog extraction,
+structured Studio results and trusted exact-field language IPC. TEST-LOCALE-01 integrated:
+`4978924` → `562764a` (explicit ko SSR storage fixtures), `24a1ffd` → `95a8639`
+(explicit Korean-start Electron smoke args), `2c37df9` → `5f30df3`
+(separate language IPC from destructive confirmation fixture, assert English IPC).
+Product automatic locale behavior stays unchanged. Read all three task handoffs.
+
+Main English-environment `pnpm check` PASSED: 1470 passed/9 skipped, all types, both builds,
+Biome no errors (43 warnings/3 infos). After that only smoke scripts changed; affected smokes rerun.
+Root Electron smoke PASSED both apps (IPC/isolation/navigation/760/1100).
+Studio functional smoke PASSED including en/ko native titles and structured operation results.
+Launcher functional smoke PASSED including English layouts/auto language switching, language IPC,
+settings persistence, avatar and logout/mod-removal/deletion confirmations.
+#0 visually checked English settings/home 760px screenshots under ignored .cache/smoke/.
+Initial smoke failures: Korean selectors under default English locale, then new set-language was
+counted by confirmation fixture. Harness corrected and final checks passed; no hidden product failure.
+Logs: /tmp/torch-i18n-integrated-check.log, /tmp/torch-i18n-integrated-smoke-final.log,
+/tmp/torch-i18n-integrated-studio-smoke.log, /tmp/torch-i18n-integrated-launcher-smoke-final2.log.
+Logs/toolchain/process state are environment-specific. No real account/server was accessed.
+Windows native dialogs/packaging are still unverified for these changes.
+
+Main product integration HEAD `5f30df3` (subsequent coordinator docs commit records completion).
+Coordinator docs committed after results; merged selected branches retired with clean worktrees.
+Agent-1/2 detached at integrated main; agent-3/4 retain historical detached heads; other branches preserved.
+No task tests/processes remain running. Node v24.21.0, corepack pnpm 10.34.7, DISPLAY=:0 verified.
+Use PATH=/tmp/main-i18n-bin:$PATH for nested pnpm scripts (default pnpm is Windows shim).
+No pending user action required. Await user's next scope; Windows native validation remains separate.
+
 ## LATEST (2026-10-23, #0): launcher L1–L3 and Studio branding functions integrated
 
 UI-FEEDBACK-01 INTEGRATED 2026-10-23 by Claude #0 (home paint fix + copyServerDataPath IPC; main check 1053 passed). Windows native check pending. Text below is historical.

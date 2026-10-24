@@ -1,11 +1,30 @@
 # TorchLauncher 개발 진행 관리
 
-최종 갱신: 2026-10-23
+최종 갱신: 2026-10-24
 
 이 파일을 작업 상태·담당·머지 현황의 기준으로 사용한다. 제품 요구사항은
 [아키텍처](architecture.md), 단계의 목적과 완료 기준은 [구현 순서](implementation-plan.md)를 따른다.
 
 ## 현재 상태와 다음 작업
+
+2026-10-24 #0 Codex 재개: LAUNCHER-EN-01 `dd5a8b1` → `f995008`, MAIN-I18N-01 `22ac93f` → `0eb01fd`는
+이전 #0 세션에서 이미 병합됨. 이번 #0은 병합 diff와 IPC 신뢰/정확 필드 검사, native dialog 추출 및 구조화 결과를 검토했다.
+런처 ko/en 전체 사전, 두 main native 문구, renderer 해석 언어 동기화 및 Studio 결과 키/값 번역을 통합했다.
+TEST-LOCALE-01 #1 gpt-6-luna low `4978924` → `562764a`: 두 SSR 테스트에 명시 한국어 저장 fixture/복원을 추가.
+작업자 영어·한국어/기본 환경 각 39개 통과. main 영어 환경 `pnpm check` 성공: **1470개 통과/9 skip**,
+전체 타입·두 앱 빌드·Biome 오류 0 (43 warnings/3 infos). 로그 `/tmp/torch-i18n-integrated-check.log`.
+main에서 공통 Electron smoke(두 앱), Studio 기능 smoke, 런처 기능 smoke 모두 성공.
+TEST-LOCALE-01 후속 `24a1ffd` → `95a8639`: 한국어 시작 smoke에 `--lang=ko` 명시.
+`2c37df9` → `5f30df3`: 확인창 fixture가 새 언어 IPC를 별도 기록하고 영어 전달을 검증한다.
+첫 smoke 실패는 영어 기본 환경의 한국어 selector timeout, 다음 런처 실패는 언어 명령을 파괴 작업으로 센 fixture였다.
+제품 오류와 구분해 수정 후 영향받은 smoke 재실행 성공; 제품/타입 변경 없는 smoke 후속이므로 전체 검사를 반복하지 않았다.
+영어 760/1100px overflow·언어 전환·로그아웃/모드 삭제 확인, Studio ko/en native 제목·구조화 결과 확인.
+영어 설정/홈 760px 캡처도 #0이 시각 확인했다. 로그 `/tmp/torch-i18n-integrated-{smoke-final,launcher-smoke-final2,studio-smoke}.log`.
+병합된 작업 브랜치는 정리하며 다른 역사적 작업 브랜치/worktree는 보존한다.
+Windows native 대화상자와 실계정/실게임은 이번 검사 대상이 아니며 새 성공 증거 없음.
+[영어 번역 인계](handoffs/LAUNCHER-EN-01.md), [main 번역 인계](handoffs/MAIN-I18N-01.md),
+[테스트 후속](handoffs/TEST-LOCALE-01.md). 아래의 이전 현재 상태 문단들은 과거 기록이다.
+
 
 UI-FEEDBACK-01 검토 추가: 배경 자식 z-index가 부모 밖으로 빠져 홈 내용을 덮는 원인 재현.
 브라우저 clipboard-write는 production deny 정책에서 denied 확인. #0이 좁은 범위 추가 승인:
