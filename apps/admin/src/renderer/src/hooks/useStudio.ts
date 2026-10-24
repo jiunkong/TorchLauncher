@@ -166,7 +166,9 @@ export function useStudio() {
     return false;
   };
   const testCommand = (request: StudioRequest) =>
-    request.action === 'testStop' || request.action === 'testLogout'
+    request.action === 'testStop' ||
+    request.action === 'testLogout' ||
+    request.action === 'testLoginCopyCode'
       ? testControl(request)
       : command(request);
   /** Answers to a window-close request; not serialized with other work and never syncs the draft. */

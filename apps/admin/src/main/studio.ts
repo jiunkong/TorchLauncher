@@ -89,6 +89,8 @@ export interface StudioDialogs {
   save(kind: 'project' | 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
   /** Shows a file in the OS file manager. Optional so tests can omit it. */
   reveal?(path: string): void;
+  /** Writes text to the system clipboard (the sandboxed renderer cannot). Optional so tests can omit it. */
+  copy?(text: string): void;
 }
 const RESCAN = new Set([
   'source',
@@ -216,7 +218,7 @@ function validSpecial(value: Record<string, unknown>): boolean {
 }
 export class StudioService {
   private state: StudioState = {
-    account: { signedIn: false, name: null, available: false, error: null },
+    account: { signedIn: false, name: null, available: false, error: null, login: null },
     testRun: emptyTestRun(),
     project: null,
     projectName: null,
@@ -295,13 +297,27 @@ export class StudioService {
     const value = input as Record<string, unknown>;
     if (typeof value.action === 'string' && value.action.startsWith('test')) {
       if (
-        !['testLogin', 'testLogout', 'testStart', 'testStop', 'testReset'].includes(value.action) ||
+        ![
+          'testLogin',
+          'testLoginCopyCode',
+          'testLogout',
+          'testStart',
+          'testStop',
+          'testReset',
+        ].includes(value.action) ||
         Object.keys(value).sort().join(',') !==
           (value.action === 'testReset' ? 'action,confirmed' : 'action') ||
         (value.action === 'testReset' && value.confirmed !== true)
       )
         return Promise.resolve({ ok: false, code: 'INVALID' });
       if (!this.tests) return Promise.resolve({ ok: false, code: 'IO' });
+      if (value.action === 'testLoginCopyCode') {
+        // Allowed while the login command itself is pending; the code never leaves main otherwise.
+        const code = this.tests.account.login?.code;
+        if (!code || !this.dialogs.copy) return Promise.resolve({ ok: false, code: 'INVALID' });
+        this.dialogs.copy(code);
+        return Promise.resolve({ ok: true, state: this.snapshot() });
+      }
       if (this.closing || this.closeAsked || this.testControl)
         return Promise.resolve({ ok: false, code: 'BUSY' });
       if (value.action === 'testStop' || value.action === 'testLogout') {

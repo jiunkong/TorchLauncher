@@ -4,11 +4,17 @@ import {
   EncryptedMicrosoftTokenStorage,
   HostAuthenticationError,
 } from '@torchlauncher/desktop-auth';
-import { app, BrowserWindow, safeStorage, shell } from 'electron';
-import { testAuthText } from '../shared/test-auth-text.js';
+import { app, safeStorage, shell } from 'electron';
 import { StudioTestRunner } from './test-run.js';
 
-export function createStudioTestRunner(parent: BrowserWindow) {
+export const loginPageUrl = 'https://www.microsoft.com/link';
+
+/**
+ * The device code is shown by the Studio window itself (an in-app modal fed by `account.login`),
+ * not by a second window. The code is only published to the runner state while the login waits and
+ * is never logged.
+ */
+export function createStudioTestRunner() {
   const userData = app.getPath('userData');
   const available = () => {
     try {
@@ -21,52 +27,27 @@ export function createStudioTestRunner(parent: BrowserWindow) {
       return false;
     }
   };
+  let runner: StudioTestRunner | null = null;
   const auth = createDesktopPublicJavaAuthenticator({
     cacheDirectory: join(userData, 'public-java'),
     workerPath: join(__dirname, 'public-java-worker.cjs'),
     safeStorage,
     async showCode(code, signal) {
       if (!/^[A-Z0-9-]{4,16}$/.test(code)) throw new HostAuthenticationError('browser_failed');
-      if (signal.aborted) return;
-      const locale = app.getLocale().startsWith('ko') ? 'ko' : 'en';
-      const text = testAuthText[locale];
-      const window = new BrowserWindow({
-        parent,
-        width: 440,
-        height: 260,
-        show: false,
-        autoHideMenuBar: true,
-        title: `${app.getName()} — ${text.title}`,
-        webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true },
-      });
-      window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-      window.webContents.on('will-navigate', (event) => event.preventDefault());
-      let intentional = false;
-      const closed = new Promise<void>((resolve, reject) => {
-        window.once('closed', () =>
-          intentional ? resolve() : reject(new HostAuthenticationError('cancelled')),
-        );
-      });
-      void closed.catch(() => {});
-      const abort = () => {
-        intentional = true;
-        if (!window.isDestroyed()) window.destroy();
-      };
-      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted || !runner) return;
+      const release = runner.publishLoginCode(code);
       try {
-        await window.loadURL(
-          `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html lang="${locale}"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${text.title}</title><style>body{font:16px system-ui;padding:24px}code{font-size:32px;letter-spacing:4px}p{line-height:1.6}</style><h2>${text.title}</h2><code>${code}</code><p>${text.instruction}<br>${text.cancel}</p></html>`)}`,
-        );
-        if (signal.aborted) return;
-        if (window.isDestroyed()) throw new HostAuthenticationError('cancelled');
-        window.show();
-        await shell.openExternal('https://www.microsoft.com/link');
-        await closed;
+        await shell.openExternal(loginPageUrl);
+        // Wait until the login finishes, is cancelled, fails or the app closes.
+        await new Promise<void>((resolve) => {
+          if (signal.aborted) resolve();
+          else signal.addEventListener('abort', () => resolve(), { once: true });
+        });
       } finally {
-        signal.removeEventListener('abort', abort);
-        abort();
+        release();
       }
     },
   });
-  return new StudioTestRunner({ userData, available, auth, launcherVersion: app.getVersion() });
+  runner = new StudioTestRunner({ userData, available, auth, launcherVersion: app.getVersion() });
+  return runner;
 }

@@ -93,7 +93,22 @@ function below(parent: string, child: string) {
   return !path || (!isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`));
 }
 export class StudioTestRunner {
-  account: StudioAccount;
+  private accountBase: StudioAccount;
+  private loginCode: string | null = null;
+  /** The account with the device code only while a login is waiting for the user. */
+  get account(): StudioAccount {
+    return { ...this.accountBase, login: this.loginCode ? { code: this.loginCode } : null };
+  }
+  set account(value: StudioAccount) {
+    this.accountBase = { ...value, login: null };
+  }
+  /** Publishes the device code to the state; the returned function clears it (idempotent). */
+  publishLoginCode(code: string): () => void {
+    this.loginCode = code;
+    return () => {
+      if (this.loginCode === code) this.loginCode = null;
+    };
+  }
   state = emptyTestRun();
   private running: RunningGame | null = null;
   clearResult() {
@@ -101,7 +116,13 @@ export class StudioTestRunner {
   }
   private secrets: string[] = [];
   constructor(private readonly host: TestRunHost) {
-    this.account = { signedIn: false, name: null, available: this.available(), error: null };
+    this.accountBase = {
+      signedIn: false,
+      name: null,
+      available: this.available(),
+      error: null,
+      login: null,
+    };
   }
   private available() {
     try {
@@ -116,6 +137,7 @@ export class StudioTestRunner {
       name: auth.profile.name,
       available: this.available(),
       error: null,
+      login: null,
     };
     this.secrets = [
       auth.accessToken,
@@ -126,7 +148,7 @@ export class StudioTestRunner {
     ].filter(Boolean);
   }
   async login(signal: AbortSignal) {
-    this.account.available = this.available();
+    this.accountBase.available = this.available();
     try {
       this.accountResult(await this.host.auth.login(signal));
       signal.throwIfAborted();
@@ -136,10 +158,14 @@ export class StudioTestRunner {
         name: null,
         available: this.available(),
         error: safeCode(error),
+        login: null,
       };
       throw error instanceof HostAuthenticationError && error.code === 'secure_storage_unavailable'
         ? new StudioFailure('ENCRYPTION_UNAVAILABLE')
         : new StudioFailure(signal.aborted ? 'CANCELLED' : 'IO');
+    } finally {
+      // The code is only valid while a login waits; whatever ended it, nothing stays published.
+      this.loginCode = null;
     }
   }
   async logout() {
@@ -147,7 +173,14 @@ export class StudioTestRunner {
     try {
       await this.host.auth.logout();
     } finally {
-      this.account = { signedIn: false, name: null, available: this.available(), error: null };
+      this.loginCode = null;
+      this.account = {
+        signedIn: false,
+        name: null,
+        available: this.available(),
+        error: null,
+        login: null,
+      };
       this.secrets = [];
     }
   }
@@ -216,6 +249,7 @@ export class StudioTestRunner {
           name: null,
           available: this.available(),
           error: safeCode(error),
+          login: null,
         };
         throw error;
       }
@@ -317,6 +351,7 @@ export class StudioTestRunner {
           name: null,
           available: this.available(),
           error: safeCode(error),
+          login: null,
         };
         throw error;
       }

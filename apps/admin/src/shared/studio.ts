@@ -260,6 +260,11 @@ export interface StudioAccount {
   name: string | null;
   available: boolean;
   error: string | null;
+  /**
+   * Set only while a Microsoft device login waits for the user: the short-lived code the user types
+   * into the Microsoft page. It is cleared whenever the login ends for any reason and is never logged.
+   */
+  login: { code: string } | null;
 }
 /** Read-only last-test preview. Counts never imply that settings have been imported. */
 export interface StudioTestExtracted extends StudioPresetPreview {
@@ -313,6 +318,8 @@ export interface StudioTestRun {
 }
 export type StudioTestCommand =
   | { action: 'testLogin' | 'testLogout' | 'testStart' | 'testStop' }
+  /** Copies the code of the pending login to the clipboard (INVALID when no login is waiting). */
+  | { action: 'testLoginCopyCode' }
   | { action: 'testReset'; confirmed: true };
 export interface StudioState {
   account: StudioAccount;

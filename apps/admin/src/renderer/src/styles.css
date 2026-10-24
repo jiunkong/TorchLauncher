@@ -2407,3 +2407,48 @@ button.big.dlgbtn {
 .test-start {
   flex: 1;
 }
+
+.code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 30px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  text-align: center;
+  padding: 16px;
+  margin: 14px 0;
+  border-radius: 10px;
+  background: var(--bg-deep);
+  border: 1px solid var(--line-2);
+  user-select: text;
+}
+.login-wait {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.spin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2.5px solid var(--line-2);
+  border-top-color: var(--red-text);
+  flex: none;
+  animation: login-spin 1s linear infinite;
+}
+@keyframes login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.login-copied {
+  min-height: 20px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ok);
+}
+.dialog-actions.between {
+  justify-content: space-between;
+}
