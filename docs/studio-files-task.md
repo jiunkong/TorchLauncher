@@ -41,17 +41,33 @@
 
 ## STUDIO-EXPORT-01 — 런처 자동 수급 (항목 3)
 
-- 새 작업자 하나, Opus medium(외부 다운로드 무결성 경계). 브랜치 `feat/studio-export-launcher-fetch`, 새 worktree. 위 작업과 병렬 가능.
-- 독점: `apps/admin/src/renderer/src/pages/ExportPage.tsx`와 catalog의 `export.*` 키, `apps/admin/src/main/filesystem.ts`(exportLauncherZip),
-  `studio.ts`의 `export` 케이스와 새 `launcher-release` 모듈(+테스트), 관련 shared 타입 최소 추가, `docs/handoffs/STUDIO-EXPORT-01.md`.
+**GPT 작업자 배정(사용자 결정 2026-10-25).** 모델은 `gpt-6.1-sol` medium 권장(외부 다운로드 무결성 경계, 정책 표 기준). 세션 이름은 `studio_export_launcher`.
+브랜치 `feat/studio-export-launcher-fetch`, 새 worktree `.agents/worktrees/studio-export-launcher`.
+**기준 커밋은 STUDIO-PROJECT-FOLDER-02 통합 뒤의 main**이다(두 작업이 `studio.ts` 등 같은 파일을 건드려 병렬 금지). #0이 통합 후 시작 기준 커밋을 알려준다.
+현재 main은 프로젝트 폴더 구조(`project.torchproj` + `files/`)와 FILES-01(모드/파일 페이지)이 반영된 상태다.
+
+시작 절차: `AGENTS.md` → `docs/progress.md`(맨 위) → 이 문서 → `docs/release-policy.md` → `docs/handoffs/STUDIO-PROJECT-FOLDER-01.md`,
+`STUDIO-FILES-01.md` 순으로 읽고, `git status`/`git worktree list` 확인 후 worktree에서 `pnpm install --frozen-lockfile`.
+`docs/progress.md`와 main은 수정·통합하지 않는다. 완료 시 `docs/handoffs/STUDIO-EXPORT-01.md`에 세션 이름, 작업 ID, 커밋, 실행한 검증과 결과, 한계를 쓴다.
+
+- 독점: `apps/admin/src/renderer/src/pages/ExportPage.tsx`와 catalog의 `export.*` 키(ko/en), `apps/admin/src/main/filesystem.ts`(exportLauncherZip),
+  `studio.ts`의 `export` 케이스(현재 `selected('binary')` 사용)와 새 `launcher-release` 모듈(+테스트), `binary` 다이얼로그 종류와 제목의 정리,
+  관련 shared 타입 최소 추가, Studio 기능 smoke 중 내보내기 부분(`apps/admin/scripts/smoke-functional.mjs`, 필요하면 `scripts/smoke.mjs`), 인계 문서.
 - 할 일:
-  - 사용자 파일 선택(`selected('binary')`, 공통 런처 카드) 제거. 내보내기는 저장 위치만 묻는다.
-  - 위 "런처 출처 규칙"(개발=로컬 빌드, 릴리스=캐시 우선·최신 아니면 다운로드)을 구현하고 두 경로를 분리 테스트한다. 릴리스 위치 설정 상수(owner/repo, 플랫폼별 자산 이름 규칙) → GitHub Releases 최신 안정 릴리스에서 대상 OS(Windows .exe / Linux .AppImage) 자산 조회·다운로드.
-    임시 파일에 받아 길이·해시(릴리스 체크섬/서명 매니페스트가 정의될 때까지는 릴리스 메타데이터의 digest)를 검증한 뒤 ZIP에 넣는다. 크기 상한, 리다이렉트 호스트 제한, 취소, 진행률, 실패 시 기존 결과 보존.
-  - 내보낼 대상 OS를 사용자가 고르게 할지(Windows+Linux 모두 한 ZIP 또는 각각)는 이 작업에서 최소안을 제안: 기본은 Windows·Linux를 각각 선택 가능하게.
-  - 오프라인/릴리스 없음/자산 없음을 구분한 오류 메시지. 네트워크 접근은 주입 가능한 경계로 두고 단위 테스트는 로컬 HTTP 서버/모의로 한다. **실제 GitHub 릴리스 성공으로 기록하지 않는다.**
-  - 기존 `exportLauncherZip`의 헤더/실행권한/크기 검증은 다운로드된 파일에도 유지한다. 서명 매니페스트 기반 검증은 RELEASE-02에서 합치므로 확장 지점을 인계에 적는다.
-- 제외: 런처 앱 자체의 자동 업데이트(RELEASE-02), CI 릴리스 워크플로, lockfile/의존성 변경(필요하면 #0 사전 조정).
+  - 사용자 파일 선택(`selected('binary')`, 내보내기 화면의 공통 런처 카드 `export.launcherFile*`) 제거. 내보내기는 저장 위치만 묻는다.
+  - 위 "런처 출처 규칙"을 구현하고 두 경로를 분리 테스트한다. 개발 빌드의 로컬 산출물 경로는 `pnpm package:launcher`가 실제로 만드는 파일
+    (Windows portable `.exe`, Linux `.AppImage`)을 확인해 한 곳에 상수화한다. 현재 이 WSL의 `apps/launcher/dist`에는 `.tar.gz`만 있으므로
+    AppImage/exe가 실제로 어떤 설정(`electron-builder.config.cjs`)에서 나오는지 확인하고, 없으면 빌드 안내 오류로 처리한다.
+  - 릴리스 경로: 설정 상수(owner/repo, 플랫폼별 자산 이름 규칙, 미설정이면 명확한 오류) → GitHub Releases 최신 안정 릴리스 조회 → 대상 OS 자산 다운로드.
+    임시 파일에 받아 길이·해시(서명 매니페스트가 정의될 때까지는 릴리스 메타데이터의 digest 또는 같이 올린 체크섬)를 검증한 뒤 캐시에 원자적으로 게시하고 ZIP에 넣는다.
+    크기 상한, HTTPS와 리다이렉트 호스트 제한, 취소, 진행률, 실패 시 기존 캐시·결과 보존. 캐시는 Studio 사용자 데이터 아래 별도 폴더.
+  - 대상 OS: Windows·Linux 각각 선택 가능(최소안). 선택 UI는 기존 내보내기 화면 스타일을 따르고 앱 내 UI만 사용한다(네이티브 확인창 금지).
+  - 오프라인/릴리스 없음/자산 없음/검증 실패를 구분한 오류와 ko/en 문구. 오프라인에서 캐시를 쓰면 그 버전을 화면에 표시한다.
+  - 네트워크 접근은 주입 가능한 경계로 두고 단위 테스트는 로컬 HTTP 서버/모의로 한다. **실제 GitHub 릴리스 성공으로 기록하지 않는다.**
+  - 기존 `exportLauncherZip`의 헤더/실행권한/크기 검증을 다운로드·캐시 파일에도 유지한다. 서명 매니페스트 기반 검증은 RELEASE-02에서 합치므로 확장 지점을 인계에 적는다.
+- 제외: 런처 앱 자체의 자동 업데이트(RELEASE-02), CI 릴리스 워크플로, packages/core, lockfile/의존성 변경(필요하면 #0 사전 조정), 프로젝트 폴더 흐름.
+- 검증(실행한 것만 보고): 관련 Vitest, `pnpm check`, `pnpm smoke`, Studio 기능 smoke, `node apps/admin/scripts/branding-smoke.mjs`(DISPLAY 필요).
+- 미결(사용자): GitHub 릴리스 `owner/repo` 값. 모르면 상수는 비워 두고 릴리스 빌드 내보내기를 오류로 막는다.
 
 ## 통합
 
