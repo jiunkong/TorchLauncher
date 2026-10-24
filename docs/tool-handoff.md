@@ -5,6 +5,21 @@ status, in Korean), `docs/work-distribution.md` (assignments, model policy, scop
 This file is a resume checkpoint, not the tracker. The next coordinator session will run on GPT/Codex; chat history and
 session IDs are not needed.
 
+## Latest UI follow-up (2026-10-24, #0)
+
+STUDIO-START-LINE-01 integrated: worker #1 gpt-6-luna medium, `b0c032d` → `bcf7e1e`.
+User reported a black line atop Studio start screen. Actual 28px dark strip was shared page padding
+outside the hero background, beneath the in-app menu. Start-only CSS moves padding into hero,
+fills background up to menu and preserves 36px gutters/language-control position.
+No native frame/main menu/IPC change. Worker types/build/functional smoke passed.
+Main Studio build and full app-local functional smoke passed with 760/1100px geometry checks,
+existing menus/project/save/settings/persistence/isolation flows. #0 reviewed before/after images.
+Logs /tmp/torch-studio-start-{build,smoke}.log; ignored screenshots .cache/smoke/studio-start-{760,1100}.png.
+CSS/smoke-only: no redundant full workspace check. Windows native result still unverified.
+Worker finished, clean worktree detached at integrated main; merged task branch retired.
+Coordinator completion docs commit follows. No task process or next task remains.
+Read docs/handoffs/STUDIO-START-LINE-01.md; localization checkpoint below remains valid historical evidence.
+
 ## Current checkpoint (2026-10-24, Codex #0 completed localization integration)
 
 This checkpoint supersedes historical pending status below. User restored #0 role and authorized

@@ -7,6 +7,17 @@
 
 ## 현재 상태와 다음 작업
 
+STUDIO-START-LINE-01 완료(2026-10-24): 시작화면 메뉴 아래 검은 띠는 `.page` 상단 28px 여백이
+hero 배경 밖에 드러난 것이 원인. #1 gpt-6-luna medium `b0c032d` → `bcf7e1e` 통합.
+시작화면만 컨테이너 여백을 hero 내부로 옮겨 배경을 메뉴 바로 아래까지 채우고, 좌우 36px 및 언어 선택 위치를 보존했다.
+메뉴/단축키/프로젝트 페이지·native frame 변경 없음. 작업자 Studio 타입·빌드·기능 smoke 성공.
+main Studio 빌드와 전체 앱 로컬 기능 smoke 성공: 760/1100px 메뉴/hero 접점·gutter·언어 위치,
+기존 저장/열기/메뉴/프로젝트 흐름·paint/layout/isolation 확인. #0이 수정 전후 캡처를 시각 검토했다.
+로그 `/tmp/torch-studio-start-{build,smoke}.log`, 캡처 `.cache/smoke/studio-start-{760,1100}.png`(ignored).
+CSS 및 smoke만 바뀌어 전체 workspace 검사는 반복하지 않음. Windows native 신규 검증은 없음.
+[인계](handoffs/STUDIO-START-LINE-01.md). 작업자 종료·병합 브랜치 정리, 추가 작업 배정 없음.
+
+
 2026-10-24 #0 Codex 재개: LAUNCHER-EN-01 `dd5a8b1` → `f995008`, MAIN-I18N-01 `22ac93f` → `0eb01fd`는
 이전 #0 세션에서 이미 병합됨. 이번 #0은 병합 diff와 IPC 신뢰/정확 필드 검사, native dialog 추출 및 구조화 결과를 검토했다.
 런처 ko/en 전체 사전, 두 main native 문구, renderer 해석 언어 동기화 및 Studio 결과 키/값 번역을 통합했다.

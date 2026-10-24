@@ -2,6 +2,15 @@
 
 ## 역할과 현재 배정
 
+2026-10-24 STUDIO-START-LINE-01: 사용자 시작페이지 상단 검은 선 보고. #1 `studio_start_line`, gpt-6-luna medium,
+agent-1 `fix/studio-start-top-line`, baseline `9b61d66`. 실제 Electron 재현/paint/layout 원인 확인 후 최소 수정.
+독점: admin renderer styles.css/App.tsx/components/MenuBar.tsx/pages/StartPage.tsx, 필요시 앱 로컬 smoke의 해당 화면 검증,
+`docs/handoffs/STUDIO-START-LINE-01.md`. native frame·메뉴/단축키 유지. main/native menu 변경 필요시 #0 범위 조정 선행.
+#0은 검토·통합·검증·진행 문서 담당. core/IPC/manifest/루트 smoke 제외, 추가 작업자 없음.
+완료: `b0c032d` → `bcf7e1e` 통합; main Studio 빌드/앱 기능 smoke 성공, 760/1100px 배경 접점·내용 여백 확인.
+작업자 종료·브랜치 정리. 자세한 원인/증거는 progress 및 해당 인계 참조.
+
+
 2026-10-24 #0 Codex 재개: LAUNCHER-EN-01 `f995008`, MAIN-I18N-01 `0eb01fd`는 main 병합됨. 통합 검증 대기.
 TEST-LOCALE-01 #1 `launcher_test_locale`, gpt-6-luna low, agent-1 `fix/launcher-test-locale`, baseline `0eb01fd`.
 독점: launcher renderer `pages.test.ts`, `shell.test.ts`, `docs/handoffs/TEST-LOCALE-01.md`만.
