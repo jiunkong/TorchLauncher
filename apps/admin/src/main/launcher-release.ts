@@ -12,8 +12,8 @@ import {
 import { StudioFailure } from './project.js';
 import { hashFile } from './scan.js';
 
-/** Fill in the official public repository before shipping Studio. No renderer-controlled URLs. */
-export const LAUNCHER_REPOSITORY = '';
+/** Official launcher releases. No renderer-controlled repository or asset URLs. */
+export const LAUNCHER_REPOSITORY = 'jiunkong/TorchLauncher';
 export const LAUNCHER_PACKAGE_DIR = '../launcher/dist';
 export const launcherAssetName = (version: string, target: LauncherTarget): string =>
   `TorchLauncher-${version}-${target === 'windows' ? 'win-x64.exe' : 'linux-x64.AppImage'}`;
