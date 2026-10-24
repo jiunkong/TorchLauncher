@@ -1,7 +1,0 @@
-[main/INFO]: Loading Minecraft 1.21.1 with Fabric Loader
-[main/ERROR]: Mod resolution failed
-[main/ERROR]: Incompatible mod set!
-[main/ERROR]: Could not find required mod: example_api
-[main/ERROR]: Mod example requires version 2 of example_api, which is missing
-[main/ERROR]: Duplicate mod example
-[main/ERROR]: Incompatible environment: server-only mod example
