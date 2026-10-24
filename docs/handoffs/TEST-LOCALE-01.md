@@ -10,5 +10,7 @@
   - Targeted Biome on the two tests: clean.
 - Follow-up: root smoke now launches both apps with `--lang=ko`; launcher functional smoke also sets `--lang=ko`. These are Korean-start smoke scenarios; existing automatic and English language-switch checks remain in place. No product code changed.
 - Follow-up validation: targeted Biome on both smoke scripts and `git diff --check` passed. The coordinator will rerun Electron smokes after this commit.
+- Integrated smoke interaction follow-up: the launcher functional smoke's synthetic product handler now records `set-language` separately from destructive commands and asserts the explicit English preference reaches IPC. Logout and mod removal continue using the existing `recordedCommands` confirmation assertions.
+- Additional validation: targeted Biome on the launcher functional smoke and `git diff --check` passed; coordinator reruns the launcher smoke.
 - Limitations: worker did not run Electron smokes or full workspace check; coordinator owns integrated validation.
-- Commits: `4978924` initial test fixture change; follow-up pending.
+- Commits: `4978924` initial test fixture change, `24a1ffd` Korean Electron arguments, third follow-up pending.
