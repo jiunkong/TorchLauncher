@@ -734,6 +734,8 @@ try {
   // File > Close project returns to the start screen (clean project: no question).
   await menuAction('file', 'close');
   await page.getByTestId('start-page').waitFor();
+  const mainState = () => page.evaluate(() => window.torchlauncher.request({ action: 'state' }));
+  assert.equal((await mainState()).state.project, null);
   await menuAction('file', 'open');
   await goto('단축키 · 옵션');
   await page.getByTestId('settings-imported').waitFor();
@@ -838,6 +840,25 @@ try {
     keys: ['getApplicationInfo', 'onCloseRequest', 'request'],
   });
   assert.deepEqual(errors, []);
+
+  // Closing a dirty project asks first; after discarding, main has no project and nothing is dirty
+  // (so closing the window afterwards does not ask).
+  await goto('서버 정보');
+  await page.getByLabel('서버 이름', { exact: true }).fill('Discard me');
+  await menuAction('file', 'close');
+  const closeDialog = page.getByTestId('unsaved-dialog');
+  await closeDialog.waitFor();
+  await closeDialog.getByRole('button', { name: '취소', exact: true }).click();
+  await closeDialog.waitFor({ state: 'detached' });
+  assert.notEqual((await mainState()).state.project, null);
+  await menuAction('file', 'close');
+  await closeDialog.getByRole('button', { name: '저장 안 함', exact: true }).click();
+  await page.getByTestId('start-page').waitFor();
+  const afterClose = (await mainState()).state;
+  assert.equal(afterClose.project, null);
+  assert.equal(afterClose.dirty, false);
+  await menuAction('file', 'open');
+  await goto('서버 정보');
 
   // Window close with unsaved changes: main asks, the app answers in its own modal.
   await goto('서버 정보');

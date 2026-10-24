@@ -7,6 +7,7 @@ import {
 } from '../../../../packages/core/src/branding/index.js';
 import type { StudioProject } from '../shared/studio.js';
 import { type BrandingSnapshots, type ImageDecoder, validateImage } from './branding.js';
+import { canonical } from './canonical.js';
 import { parseProject, StudioFailure } from './project.js';
 
 /** The TorchLauncher Studio file (`.torchproj`) container, format 1. See docs/studio-project-format.md. */
@@ -21,17 +22,6 @@ const ENTRY_HEADER = 4 + 4 + 32;
 const IMAGE_SECTION: Record<BrandingRole, string> = { icon: 'ICON', background: 'BGND' };
 const SECTION_IDS = ['META', 'ICON', 'BGND'];
 
-/** Recursively sorted keys so equal projects serialize to equal bytes. */
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([k, v]) => [k, canonical(v)]),
-    );
-  return value;
-}
 const sha = (data: Uint8Array): Buffer => createHash('sha256').update(data).digest();
 
 export function encodeProjectFile(project: StudioProject, snapshots: BrandingSnapshots): Buffer {

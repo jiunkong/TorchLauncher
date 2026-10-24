@@ -18,27 +18,8 @@ import { appReady } from './splash';
 export function App() {
   const { t, preference, setLocale, useAutomaticLocale: followSystem } = useStudioLocale();
   const rawStudio = useStudio();
-  const [projectClosed, setProjectClosed] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  /**
-   * Closing a project only hides it (there is no close command in main yet); while hidden, opening
-   * or creating a project replaces it without asking again, since the user already confirmed.
-   */
-  const studio = projectClosed
-    ? {
-        ...rawStudio,
-        draft: null,
-        run: async (action: Parameters<typeof rawStudio.run>[0], options = {}) => {
-          const isSwitch = action === 'new' || action === 'open';
-          const ok = await rawStudio.run(
-            action,
-            isSwitch ? { ...options, discard: true } : options,
-          );
-          if (ok && isSwitch) setProjectClosed(false);
-          return ok;
-        },
-      }
-    : rawStudio;
+  const studio = rawStudio;
   const insights = deriveInsights(studio.state);
   const settings = useSettingsState();
   const { info, error } = useApplicationInfo();
@@ -64,17 +45,15 @@ export function App() {
       : 'TorchLauncher Studio';
   }, [draft]);
 
-  const switchTo = async (action: 'new' | 'open') => {
-    if (await runConfirmedSwitch(rawStudio, action)) setProjectClosed(false);
-  };
+  const switchTo = (action: 'new' | 'open') => runConfirmedSwitch(rawStudio, action);
   /** Unsaved changes are confirmed in the app before a project is replaced or closed. */
   const switchProject = (action: 'new' | 'open') => {
-    if (state?.dirty && !projectClosed) setConfirm(action);
+    if (state?.dirty) setConfirm(action);
     else void switchTo(action);
   };
-  const hideProject = () => {
+  const closeProject = async (discard: boolean) => {
     setPageState('overview');
-    setProjectClosed(true);
+    await rawStudio.run('closeProject', discard ? { discard: true } : {});
   };
   const confirmSave = async () => {
     const action = confirm;
@@ -86,14 +65,14 @@ export function App() {
     }
     setConfirm(null);
     if (action === 'close') await finishClose(rawStudio);
-    else if (action === 'project') hideProject();
+    else if (action === 'project') await closeProject(false);
     else await switchTo(action);
   };
   const confirmDiscard = () => {
     const action = confirm;
     setConfirm(null);
     if (action === 'close') void finishClose(rawStudio);
-    else if (action === 'project') hideProject();
+    else if (action === 'project') void closeProject(true);
     else if (action) void switchTo(action);
   };
   const confirmCancel = () => {
@@ -107,7 +86,7 @@ export function App() {
     openProject: () => switchProject('open'),
     save: () => void studio.run('save'),
     saveAs: () => void studio.run('saveAs'),
-    closeProject: () => (state?.dirty ? setConfirm('project') : hideProject()),
+    closeProject: () => (state?.dirty ? setConfirm('project') : void closeProject(false)),
     // Main closes the window through its normal close handler, so the unsaved flow applies
     // (a renderer-side window.close() skips that handler).
     exit: () => void window.torchlauncher.request({ action: 'exit' }),
