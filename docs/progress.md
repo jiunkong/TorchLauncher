@@ -10,9 +10,11 @@
 ### Studio 실행 피드백 (2026-10-24, 사용자)
 
 모드 설정 페이지가 모드 가져오기가 아님, 파일 페이지 범위·제목·재빌드 버튼, 내보내기 공통 런처 파일 선택 제거 요청.
-[배정 문서](studio-files-task.md)를 작성했다(STUDIO-FILES-01, STUDIO-EXPORT-01). 구현 미착수, 사용자 시작 승인 대기.
+[배정 문서](studio-files-task.md)를 따르도록 STUDIO-FILES-01을 시작했다. #1 `studio_mods_files`, `gpt-6-luna` low,
+`feat/studio-mods-files` / `.agents/worktrees/studio-mods-files`, baseline `42483a6`. 한 명이 배정된 renderer/main/shared 범위를 맡고,
+#0은 문서·통합·검증을 담당한다. STUDIO-EXPORT-01은 아직 시작하지 않는다.
 사용자 결정: 개발 빌드는 로컬 런처 산출물, 릴리스는 캐시 우선 후 필요 시 최신 다운로드.
-미결: GitHub 릴리스 `owner/repo`, 모드 설정 파일 편집기를 모드 페이지 하위 섹션으로 유지하는 #0 결정의 승인.
+미결: GitHub 릴리스 `owner/repo`(EXPORT 작업 전 결정 필요). 모드 설정 파일 편집기는 작업 배정서대로 모드 페이지의 하위 섹션에 둔다.
 
 ### STUDIO-VERSION-SELECT-02 완료
 

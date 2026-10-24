@@ -24,7 +24,8 @@
 
 ## STUDIO-FILES-01 — 모드 페이지·파일 페이지 (항목 1·2)
 
-- 새 작업자 하나, 최소 Sonnet medium(명세 확정 UI+기존 pack 경로 확장). 브랜치 `feat/studio-mods-files`, 새 worktree.
+- #1 `studio_mods_files`, `gpt-6-luna` low (사용자 요청; 범위·UI 동작이 이 배정서에 확정되어 있음).
+  브랜치 `feat/studio-mods-files`, worktree `.agents/worktrees/studio-mods-files`, baseline `42483a6`.
 - 독점: `apps/admin/src/renderer/**`(**`pages/ExportPage.tsx`와 catalog의 `export.*` 키 제외**), `apps/admin/src/shared/studio.ts`의
   pack 관련 타입, `apps/admin/src/main/game-settings.ts`·`files-diff.ts`·`scan.ts`·`ipc` 중 pack 추가/정책/이동/삭제에 필요한 부분,
   관련 테스트, `scripts/` 중 Studio 기능 smoke, `docs/handoffs/STUDIO-FILES-01.md`.
