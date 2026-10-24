@@ -86,6 +86,7 @@ export function App() {
     openProject: () => switchProject('open'),
     save: () => void studio.run('save'),
     saveAs: () => void studio.run('saveAs'),
+    revealProject: () => void studio.command({ action: 'revealProject' }),
     closeProject: () => (state?.dirty ? setConfirm('project') : void closeProject(false)),
     // Main closes the window through its normal close handler, so the unsaved flow applies
     // (a renderer-side window.close() skips that handler).

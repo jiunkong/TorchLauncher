@@ -11,6 +11,7 @@ import type { Installation } from '../../../../packages/core/src/minecraft/insta
 import type { GameExit, RunningGame } from '../../../../packages/core/src/minecraft/process.js';
 import { StudioService } from './fixtures/signing.js';
 import { handleStudioRequest } from './ipc.js';
+import { PROJECT_DATA_DIR } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 import { StudioTestRunner, TEST_LOG_LIMIT, type TestRunHost } from './test-run.js';
 
@@ -28,8 +29,9 @@ const account: MinecraftAuthResult = {
 async function setup() {
   const base = await mkdtemp(join(tmpdir(), 'studio-test-run-'));
   roots.push(base);
-  const source = join(base, 'source');
-  await mkdir(source);
+  const projDir = join(base, 'proj');
+  await mkdir(projDir);
+  const source = join(projDir, PROJECT_DATA_DIR);
   const mod = join(base, 'example.jar');
   await writeFile(
     mod,
@@ -37,7 +39,6 @@ async function setup() {
       { name: 'fabric.mod.json', data: '{"id":"example","version":"1.0","environment":"client"}' },
     ]),
   );
-  await writeFile(join(source, 'options.txt'), 'version:3955\ngamma:0.5\n');
   const auth = {
     login: vi.fn<TestRunHost['auth']['login']>(async () => account),
     refresh: vi.fn<TestRunHost['auth']['refresh']>(async () => account),
@@ -88,9 +89,9 @@ async function setup() {
     copy: vi.fn<NonNullable<StudioDialogs['copy']>>(),
   };
   const service = new StudioService(dialogs, undefined, undefined, undefined, runner);
+  dialogs.open.mockResolvedValueOnce([projDir]);
   await service.request({ action: 'new' });
-  dialogs.open.mockResolvedValueOnce([source]);
-  await service.request({ action: 'source' });
+  await writeFile(join(source, 'options.txt'), 'version:3955\ngamma:0.5\n');
   dialogs.open.mockResolvedValueOnce([mod]);
   expect(await service.request({ action: 'settingsPackAdd', kind: 'mod' })).toMatchObject({
     ok: true,
@@ -125,8 +126,7 @@ async function setup() {
 }
 it('keeps completed test extraction read-only until options are explicitly imported', async () => {
   const h = await setup();
-  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.torchproj'));
-  expect(await h.service.request({ action: 'saveAs' })).toMatchObject({ ok: true });
+  expect(await h.service.request({ action: 'save' })).toMatchObject({ ok: true });
   const before = h.service.snapshot();
   expect(before.dirty).toBe(false);
   const phases: string[] = [];
@@ -210,13 +210,16 @@ it('preserves chosen settings policies when importing test-run files', async () 
   await writeFile(join(h.source, 'config/example.properties'), 'quality=high\n');
   await writeFile(join(h.source, 'config/iris.properties'), 'enableShaders=false\n');
   // Use the existing external import and command path to create a policy, then test-run extraction.
+  const projDir2 = join(h.base, 'proj2');
+  await mkdir(projDir2);
   const d = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue([h.source]),
     save: vi.fn<StudioDialogs['save']>(),
   };
   const service = new StudioService(d, undefined, undefined, undefined, h.runner);
+  d.open.mockResolvedValueOnce([projDir2]);
   await service.request({ action: 'new' });
-  await service.request({ action: 'source' });
+  d.open.mockResolvedValueOnce([h.source]);
   await service.request({ action: 'settingsImport', source: 'folder' });
   await service.request({
     action: 'settingsOptions',
@@ -407,6 +410,9 @@ it('finishes analysis after a requested normal stop and clears old results on pr
   expect(await pending).toMatchObject({ ok: true });
   expect(h.runner.state).toMatchObject({ phase: 'done', exit: { reason: 'stopped' }, error: null });
   expect(h.runner.state.report?.items).toEqual([]);
+  const newDir = join(h.base, 'new-proj');
+  await mkdir(newDir);
+  h.dialogs.open.mockResolvedValueOnce([newDir]);
   await h.service.request({ action: 'new', discard: true });
   expect(h.runner.state).toMatchObject({ phase: 'idle', report: null, serverId: null });
 });
@@ -481,6 +487,9 @@ it('returns explicit errors without a last result and after clearing/resetting t
     code: 'INVALID',
     detail: { code: 'NO_TEST_RESULT' },
   });
+  const newDir = join(h.base, 'new-proj');
+  await mkdir(newDir);
+  h.dialogs.open.mockResolvedValueOnce([newDir]);
   await h.service.request({ action: 'new', discard: true });
   expect(await h.service.request({ action: 'settingsImportOptions', source: 'test' })).toEqual({
     ok: false,
@@ -547,8 +556,7 @@ it('routes file options import through the existing picker and merge path', asyn
 });
 it('refreshes config candidates without importing, including when options.txt is invalid', async () => {
   const h = await setup();
-  h.dialogs.save.mockResolvedValueOnce(join(h.base, 'project.torchproj'));
-  await h.service.request({ action: 'saveAs' });
+  await h.service.request({ action: 'save' });
   const before = h.service.snapshot();
   await completeTest(h, 'invalid\u0000options');
   expect(h.runner.state).toMatchObject({
@@ -747,7 +755,6 @@ it('closes the project for real: UNSAVED rule, full reset, no file or instance c
   expect(state).toMatchObject({
     project: null,
     projectName: null,
-    sourceName: null,
     dirty: false,
     files: null,
     deploy: null,
@@ -768,6 +775,9 @@ it('closes the project for real: UNSAVED rule, full reset, no file or instance c
 
 it('closes a clean project without discard and refuses while busy or malformed', async () => {
   const h = await setup();
+  const newDir = join(h.base, 'new-proj');
+  await mkdir(newDir);
+  h.dialogs.open.mockResolvedValueOnce([newDir]);
   await h.service.request({ action: 'new', discard: true });
   h.dialogs.save.mockResolvedValueOnce(join(h.base, 'clean.torchproj'));
   expect((await h.service.request({ action: 'save' })).ok).toBe(true);

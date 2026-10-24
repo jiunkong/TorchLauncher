@@ -35,7 +35,7 @@ export interface FakeOptions {
   run?: Partial<StudioTestRun>;
   signedIn?: boolean;
   available?: boolean;
-  sourceName?: string | null;
+  projectName?: string | null;
   project?: StudioProject;
   preset?: StudioState['preset'];
   busy?: boolean;
@@ -53,8 +53,7 @@ export function fakeStudio(options: FakeOptions = {}) {
     },
     testRun: { ...idleRun, ...options.run },
     project: current,
-    projectName: null,
-    sourceName: options.sourceName === undefined ? 'source' : options.sourceName,
+    projectName: options.projectName === undefined ? 'project' : options.projectName,
     dirty: false,
     busy: null,
     progress: 0,

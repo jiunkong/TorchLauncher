@@ -28,7 +28,7 @@ export function PackSettingsPage({ studio, draft }: PageProps) {
         labels={labels}
         send={send}
         busy={busy}
-        sourceReady={!!state?.sourceName}
+        disabled={busy || !state?.project}
       />
     </>
   );
@@ -40,14 +40,14 @@ function PackTab({
   labels,
   send,
   busy,
-  sourceReady,
+  disabled,
 }: {
   kind: PackKind;
   packs: StudioPack[];
   labels: Labels;
   send: Send;
   busy: boolean;
-  sourceReady: boolean;
+  disabled: boolean;
 }) {
   const { t } = useStudioLocale();
   return (
@@ -57,10 +57,9 @@ function PackTab({
         sub={t('settings.packs.sub')}
         add={t('settings.packs.add')}
         busy={busy}
-        disabled={!sourceReady}
+        disabled={disabled}
         onAdd={() => send({ action: 'settingsPackAdd', kind })}
       />
-      {!sourceReady && <p className="err">{t('settings.packs.needSource')}</p>}
       {packs.length === 0 && <p className="empty-row">{t('settings.packs.empty')}</p>}
       <div className="packlist">
         {packs.map((pack, index) => (

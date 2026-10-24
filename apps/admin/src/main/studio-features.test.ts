@@ -17,6 +17,7 @@ import type { StudioFileEntry, StudioState } from '../shared/studio.js';
 import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
+import { PROJECT_DATA_DIR } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 import { writeZip } from './zip.js';
 
@@ -57,12 +58,8 @@ function memorySource(bytes: Buffer): DownloadSource {
 type Remote = Buffer | Error | null;
 async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt': 'bbbb' }) {
   const root = await temp();
-  const source = join(root, 'source');
-  await mkdir(source);
-  for (const [path, content] of Object.entries(files)) {
-    await mkdir(join(source, path, '..'), { recursive: true });
-    await writeFile(join(source, path), content);
-  }
+  const projDir = join(root, 'proj');
+  await mkdir(projDir);
   const d = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
@@ -81,9 +78,14 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
     }
     return memorySource(remote.value ?? Buffer.alloc(0));
   });
+  d.open.mockResolvedValueOnce([projDir]);
   await s.request({ action: 'new', discard: true });
-  d.open.mockResolvedValueOnce([source]);
-  await s.request({ action: 'source' });
+  const source = join(projDir, PROJECT_DATA_DIR);
+  for (const [path, content] of Object.entries(files)) {
+    await mkdir(join(source, path, '..'), { recursive: true });
+    await writeFile(join(source, path), content);
+  }
+  await s.request({ action: 'rescan' });
   const include = async (paths: string[], policy: 'always' | 'initial-only' | 'excluded') =>
     s.request({ action: 'filesPolicy', paths, policy });
   const edit = async (change: (p: ReturnType<typeof parseProject>) => void) => {
@@ -102,7 +104,7 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
   await edit((p) => {
     p.sourceUrl = 'https://example.org/pack';
   });
-  return { root, source, d, s, remote, include, edit, build };
+  return { root, projDir, source, d, s, remote, include, edit, build };
 }
 const entry = (state: StudioState, path: string): StudioFileEntry => {
   const found = state.files?.entries.find((e) => e.path === path);
@@ -194,20 +196,15 @@ describe('files diff against the last build', () => {
     expect(state.files?.entries.map((e) => e.path)).toEqual(['a.txt']);
     expect(await h.include(['link.txt'], 'always')).toEqual({ ok: false, code: 'INVALID' });
   });
-  it('keeps scanning state separate: reopening drops files and diff until a source is chosen', async () => {
+  it('keeps scanning state: reopening reloads files and diff immediately upToDate', async () => {
     const h = await harness();
     await h.include(['a.txt'], 'always');
     await h.build();
-    const projectPath = join(h.root, 'p.torchproj');
-    h.d.save.mockResolvedValueOnce(projectPath);
     await h.s.request({ action: 'save' });
-    h.d.open.mockResolvedValueOnce([projectPath]);
+    h.d.open.mockResolvedValueOnce([h.projDir]);
     await h.s.request({ action: 'open', discard: true });
-    expect(h.s.snapshot().files).toBeNull();
-    expect(h.s.snapshot().deploy).toMatchObject({ status: 'unknown', lastBuild: { fileCount: 1 } });
-    h.d.open.mockResolvedValueOnce([h.source]);
-    await h.s.request({ action: 'source' });
     expect(h.s.snapshot().deploy?.status).toBe('upToDate');
+    expect(h.s.snapshot().files?.counts.total).toBe(2);
   });
   it('marks game and branding differences as reasons and cannot be forged through update', async () => {
     const h = await harness();
@@ -478,11 +475,15 @@ describe('in-app discard confirmation', () => {
       ok: false,
       code: 'INVALID',
     });
+    const dir1 = await temp();
+    h.d.open.mockResolvedValueOnce([dir1]);
     expect((await h.s.request({ action: 'new', discard: true })).ok).toBe(true);
-    const saved = join(h.root, 'p.torchproj');
-    h.d.save.mockResolvedValueOnce(saved);
+    await h.s.request({ action: 'touch' });
+    expect(h.s.snapshot().dirty).toBe(true);
     await h.s.request({ action: 'save' });
     expect(h.s.snapshot().dirty).toBe(false);
+    const dir2 = await temp();
+    h.d.open.mockResolvedValueOnce([dir2]);
     expect((await h.s.request({ action: 'new' })).ok).toBe(true);
   });
   it('answers a close request only when main asked, and never closes on its own for dirty projects', async () => {

@@ -16,6 +16,7 @@ import { parseServerConfig } from '../../../../packages/core/src/server-config/i
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
 import { encodeProjectFile } from './project-file.js';
+import { PROJECT_DATA_DIR, PROJECT_FILE_NAME } from './project-folder.js';
 import { type SafeStorageLike, SigningKeyStore } from './signing.js';
 import { type StudioDialogs, StudioService } from './studio.js';
 
@@ -79,15 +80,15 @@ async function setup(storage = fakeStorage()) {
   const store = new SigningKeyStore(keysDir, storage, FAST);
   const d = dialogs();
   const s = new StudioService(d, undefined, undefined, store);
-  const source = join(root, 'source');
-  await mkdir(source);
-  await writeFile(join(source, 'a.txt'), 'payload');
+  const projDir = join(root, 'proj');
+  await mkdir(projDir);
+  d.open.mockResolvedValueOnce([projDir]);
   await s.request({ action: 'new', discard: true });
-  d.open.mockResolvedValueOnce([source]);
-  await s.request({ action: 'source' });
+  const source = join(projDir, PROJECT_DATA_DIR);
+  await writeFile(join(source, 'a.txt'), 'payload');
   d.open.mockResolvedValueOnce([join(source, 'a.txt')]);
   await s.request({ action: 'files' });
-  return { root, keysDir, store, d, s, source };
+  return { root, keysDir, store, d, s, source, projDir };
 }
 async function build(ctx: Awaited<ReturnType<typeof setup>>, name: string) {
   const pack = join(ctx.root, name);
@@ -369,14 +370,12 @@ describe('Studio signing integration', () => {
     const project = parseProject(ctx.s.snapshot().project);
     delete project.sequence;
     const fresh = new StudioService(dialogs(), undefined, undefined, ctx.store);
-    const path = join(ctx.root, 'p.torchproj');
+    const path = join(ctx.projDir, PROJECT_FILE_NAME);
     await writeFile(path, encodeProjectFile(project, {}));
     const fd = dialogs();
     const f2 = new StudioService(fd, undefined, undefined, ctx.store);
-    fd.open.mockResolvedValueOnce([path]);
+    fd.open.mockResolvedValueOnce([ctx.projDir]);
     await f2.request({ action: 'open', discard: true });
-    fd.open.mockResolvedValueOnce([ctx.source]);
-    await f2.request({ action: 'source' });
     const d = join(ctx.root, 'd.torchpack');
     fd.save.mockResolvedValueOnce(d);
     await f2.request({ action: 'build' });
@@ -384,10 +383,8 @@ describe('Studio signing integration', () => {
     // a project carrying a higher sequence than the key store (restored key on a new machine)
     const high = { ...project, sequence: 500 };
     await writeFile(path, encodeProjectFile(high, {}));
-    fd.open.mockResolvedValueOnce([path]);
+    fd.open.mockResolvedValueOnce([ctx.projDir]);
     await f2.request({ action: 'open', discard: true });
-    fd.open.mockResolvedValueOnce([ctx.source]);
-    await f2.request({ action: 'source' });
     const e = join(ctx.root, 'e.torchpack');
     fd.save.mockResolvedValueOnce(e);
     await f2.request({ action: 'build' });
@@ -410,17 +407,11 @@ describe('Studio signing integration', () => {
   it('keeps private key material out of project, deploy output and reply state', async () => {
     const ctx = await setup();
     const { pack } = await build(ctx, 'o.torchpack');
-    const projectPath = join(ctx.root, 'project.torchproj');
-    ctx.d.save.mockResolvedValueOnce(projectPath);
     await ctx.s.request({ action: 'save' });
+    const projectPath = join(ctx.projDir, PROJECT_FILE_NAME);
     const serverId = ctx.s.snapshot().project?.serverId as string;
     const secrets = rawSecrets(ctx.store, await ctx.store.load(serverId));
-    const files = [
-      pack,
-      projectPath,
-      ...(await walk(join(ctx.root, 'source'))),
-      ...(await walk(ctx.keysDir)),
-    ];
+    const files = [pack, projectPath, ...(await walk(ctx.source)), ...(await walk(ctx.keysDir))];
     for (const f of files) {
       const bytes = await readFile(f);
       for (const secret of secrets) expect(bytes.includes(secret), f).toBe(false);
@@ -439,12 +430,9 @@ describe('Studio signing integration', () => {
     const service = new StudioService(d, () => memorySource(remote), undefined, ctx.store);
     const project = parseProject(ctx.s.snapshot().project);
     project.sourceUrl = 'https://example.org/pack';
-    const path = join(ctx.root, 'signed.torchproj');
-    await writeFile(path, encodeProjectFile(project, {}));
-    d.open.mockResolvedValueOnce([path]);
+    await writeFile(join(ctx.projDir, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
+    d.open.mockResolvedValueOnce([ctx.projDir]);
     expect((await service.request({ action: 'open' })).ok).toBe(true);
-    d.open.mockResolvedValueOnce([ctx.source]);
-    expect((await service.request({ action: 'source' })).ok).toBe(true);
     const binary = join(ctx.root, 'Torch.exe');
     await writeFile(binary, 'MZ fixture');
     const out = join(ctx.root, 'out.zip');
@@ -494,9 +482,7 @@ describe('Studio signing integration', () => {
     const store2 = new SigningKeyStore(join(ctx.root, 'm2'), fakeStorage(), FAST);
     const d2 = dialogs();
     const s2 = new StudioService(d2, undefined, undefined, store2);
-    const projectFile = join(ctx.root, 'proj.torchproj');
-    await writeFile(projectFile, encodeProjectFile(project, {}));
-    d2.open.mockResolvedValueOnce([projectFile]);
+    d2.open.mockResolvedValueOnce([ctx.projDir]);
     await s2.request({ action: 'open', discard: true });
     d2.open.mockResolvedValueOnce([backup]);
     expect(
@@ -506,12 +492,13 @@ describe('Studio signing integration', () => {
     const ok = await s2.request({ action: 'keyImport', passphrase: PASS, replace: false });
     expect(ok.ok && ok.state.signing).toMatchObject({ keyExists: true, publicKey: pub });
     // another project cannot use this backup
-    const s3 = new StudioService(dialogs(), undefined, undefined, store2);
-    const d3 = dialogs();
-    const s4 = new StudioService(d3, undefined, undefined, store2);
-    await s3.request({ action: 'new', discard: true });
+    const d4 = dialogs();
+    const s4 = new StudioService(d4, undefined, undefined, store2);
+    const projDir4 = join(ctx.root, 'proj4');
+    await mkdir(projDir4);
+    d4.open.mockResolvedValueOnce([projDir4]);
     await s4.request({ action: 'new', discard: true });
-    d3.open.mockResolvedValueOnce([backup]);
+    d4.open.mockResolvedValueOnce([backup]);
     expect(await s4.request({ action: 'keyImport', passphrase: PASS, replace: false })).toEqual({
       ok: false,
       code: 'KEY_MISMATCH',

@@ -21,11 +21,11 @@ export function createStudioNativeDialogs(
   return {
     open: async (kind, root) => {
       const t = studioMainText(getLocale());
-      const directory = kind === 'source' || kind === 'gamefolder';
+      const directory = kind === 'project' || kind === 'projectnew' || kind === 'gamefolder';
       const result = await native.showOpenDialog(window, {
         title: {
           project: t('dialog.projectOpen'),
-          source: t('dialog.sourceOpen'),
+          projectnew: t('dialog.projectNew'),
           files: t('dialog.filesOpen'),
           binary: t('dialog.binaryOpen'),
           icon: t('dialog.iconOpen'),
@@ -39,7 +39,9 @@ export function createStudioNativeDialogs(
         }[kind],
         ...(root ? { defaultPath: root } : {}),
         properties: directory
-          ? ['openDirectory']
+          ? kind === 'projectnew'
+            ? ['openDirectory', 'createDirectory']
+            : ['openDirectory']
           : kind === 'files'
             ? ['openFile', 'multiSelections']
             : ['openFile'],
@@ -61,9 +63,7 @@ export function createStudioNativeDialogs(
                         ? [{ name: t('dialog.optionsFilter'), extensions: ['txt'] }]
                         : kind === 'mod'
                           ? [{ name: t('dialog.modFilter'), extensions: ['jar'] }]
-                          : kind === 'resourcepack' || kind === 'shaderpack'
-                            ? [{ name: t('dialog.zipFilter'), extensions: ['zip'] }]
-                            : [{ name: t('dialog.studioFileFilter'), extensions: ['torchproj'] }],
+                          : [{ name: t('dialog.zipFilter'), extensions: ['zip'] }],
             }
           : {}),
       });
@@ -73,13 +73,11 @@ export function createStudioNativeDialogs(
       const t = studioMainText(getLocale());
       const result = await native.showSaveDialog(window, {
         title: {
-          project: t('dialog.projectSave'),
           pack: t('dialog.packSave'),
           keybackup: t('dialog.keyBackupSave'),
           zip: t('dialog.zipSave'),
         }[kind],
         defaultPath: {
-          project: 'server-project.torchproj',
           pack: 'server.torchpack',
           keybackup: 'signing-key.torchkey',
           zip: 'launcher.zip',
@@ -87,14 +85,11 @@ export function createStudioNativeDialogs(
         filters: [
           {
             name: {
-              project: t('dialog.studioFileFilter'),
               pack: t('dialog.deploymentFileFilter'),
               keybackup: t('dialog.keyBackupFilter'),
               zip: t('dialog.zipFilter'),
             }[kind],
-            extensions: [
-              { project: 'torchproj', pack: 'torchpack', keybackup: 'torchkey', zip: 'zip' }[kind],
-            ],
+            extensions: [{ pack: 'torchpack', keybackup: 'torchkey', zip: 'zip' }[kind]],
           },
         ],
       });

@@ -29,6 +29,7 @@ import {
 } from './game-settings.js';
 import { parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
+import { PROJECT_DATA_DIR, PROJECT_FILE_NAME } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 
 const roots: string[] = [];
@@ -330,16 +331,14 @@ describe('policy generation', () => {
 
 async function harness() {
   const root = await temp();
-  const source = join(root, 'source');
-  await mkdir(source);
   const d = {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
   };
   const s = new StudioService(d);
+  d.open.mockResolvedValueOnce([root]);
   await s.request({ action: 'new', discard: true });
-  d.open.mockResolvedValueOnce([source]);
-  await s.request({ action: 'source' });
+  const source = join(root, PROJECT_DATA_DIR);
   const game = join(root, 'game');
   await mkdir(game);
   await writeFile(
@@ -350,12 +349,9 @@ async function harness() {
   const reopenWithFiles = async (files: { path: string; policy: 'always' | 'initial-only' }[]) => {
     const project = parseProject(s.snapshot().project);
     project.files = files;
-    const path = join(root, 'files.torchproj');
-    await writeFile(path, encodeProjectFile(project, {}));
-    d.open.mockResolvedValueOnce([path]);
+    await writeFile(join(root, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
+    d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'open', discard: true });
-    d.open.mockResolvedValueOnce([source]);
-    await s.request({ action: 'source' });
   };
   const importFolder = async () => {
     d.open.mockResolvedValueOnce([game]);
@@ -602,7 +598,7 @@ describe('service: game settings preset', () => {
       code: 'CANCELLED',
     });
     expect(h.s.snapshot().project?.gameSettings).toBeUndefined();
-    expect(h.s.snapshot().dirty).toBe(true);
+    expect(h.s.snapshot().dirty).toBe(false);
   });
   it('cannot be changed through update and survives save and reopen with lastBuild', async () => {
     const h = await harness();
@@ -923,16 +919,15 @@ describe('service: mod configs and shaders', () => {
     const g = h.s.snapshot().project?.gameSettings;
     expect(g?.shader?.pack).toEqual({ policy: 'required', value: 'BSL.zip' });
     expect(g?.configFiles?.[0]?.items.find((i) => i.key === 'fog')?.policy).toBe('initial');
-    const saved = join(h.root, 'p.torchproj');
-    h.d.save.mockResolvedValueOnce(saved);
     await h.s.request({ action: 'save' });
     const before = h.s.snapshot().project;
-    h.d.open.mockResolvedValueOnce([saved]);
+    h.d.open.mockResolvedValueOnce([h.root]);
     await h.s.request({ action: 'open', discard: true });
     expect(h.s.snapshot().project).toEqual(before);
+    const saved = join(h.root, PROJECT_FILE_NAME);
     const old = structuredClone(
       decodeProjectFile(await readFile(saved), () => ({ width: 1, height: 1 })).project,
-    ) as Record<string, any>;
+    ) as unknown as { gameSettings: Record<string, unknown> };
     delete old.gameSettings.configFiles;
     delete old.gameSettings.shader;
     expect(() => parseProject(old)).not.toThrow();

@@ -77,7 +77,9 @@ const launcher = join(root, 'TorchLauncher-test.AppImage');
 await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
   mode: 0o755,
 });
-const project = join(root, 'server-project.torchproj');
+const project = join(root, 'server-project');
+await mkdir(project);
+const projectFile = join(project, 'project.torchproj');
 const pack = join(root, 'server.torchpack');
 const exported = join(root, 'export', 'launcher.zip');
 await mkdir(join(root, 'export'));
@@ -107,9 +109,9 @@ try {
         Object.defineProperty(safeStorage, name, { value, configurable: true, writable: true });
       // Native file pickers stay native in the app; here they answer with fixture paths.
       const answers = {
-        '프로젝트 열기': [paths.project],
-        '배포 소스 폴더': [paths.source],
-        '소스 폴더 안의 파일 선택': [paths.file, paths.options],
+        '프로젝트 폴더 열기': [paths.project],
+        '새 프로젝트 폴더 선택': [paths.project],
+        '추가할 파일 선택': [paths.file, paths.options],
         '게임을 한 번 실행한 폴더 선택': [paths.game],
         'options.txt 선택': [join(paths.game, 'options.txt')],
         '리소스팩(.zip) 선택': [join(paths.packs, 'server-pack.zip')],
@@ -137,11 +139,9 @@ try {
         return {
           canceled: false,
           filePath:
-            options.title === '프로젝트 저장' || options.title === 'Save project'
-              ? paths.project
-              : options.title === '런처 내보내기 ZIP 저장' || options.title === 'Save launcher ZIP'
-                ? paths.exported
-                : paths.pack,
+            options.title === '런처 내보내기 ZIP 저장' || options.title === 'Save launcher ZIP'
+              ? paths.exported
+              : paths.pack,
         };
       };
       // Studio must never show a native message box; count any attempt.
@@ -361,7 +361,7 @@ try {
   }
   await page.setViewportSize({ width: 1100, height: 760 });
   await page.getByTestId('menu-file').click();
-  for (const id of ['save', 'saveAs', 'close'])
+  for (const id of ['save', 'saveAs', 'revealProject', 'close'])
     assert.equal(await page.getByTestId(`menu-item-${id}`).getAttribute('aria-disabled'), 'true');
   assert.equal(await page.getByTestId('menu-item-new').getAttribute('aria-disabled'), null);
   await page.screenshot({ path: join(cwd, '.cache/smoke/studio-menu-start.png') });
@@ -474,21 +474,17 @@ try {
   await page.getByLabel('Server name', { exact: true }).focus();
   await page.keyboard.press('Control+s');
   await page.getByText(/프로젝트를 저장했습니다\.|Project saved\./).waitFor();
-  assert.equal(
-    (await app.evaluate(() => globalThis.__studioSmokeSaveTitles ?? [])).at(-1),
-    'Save project',
-  );
   await page.getByTestId('menu-view').click();
   await page.getByTestId('menu-item-lang-ko').click();
   await nav('개요').waitFor();
-  assert.equal(readStudioFile(await readFile(project)).name, 'Functional Studio smoke');
+  assert.equal(readStudioFile(await readFile(projectFile)).name, 'Functional Studio smoke');
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke 2');
   await menuAction('file', 'open');
   await dialog.waitFor();
   await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
   await page.getByTestId('save-state').filter({ hasText: '저장됨' }).waitFor();
-  assert.equal(readStudioFile(await readFile(project)).name, 'Functional Studio smoke 2');
+  assert.equal(readStudioFile(await readFile(projectFile)).name, 'Functional Studio smoke 2');
   await goto('서버 정보');
   assert.equal(
     await page.getByLabel('서버 이름', { exact: true }).inputValue(),
@@ -502,7 +498,7 @@ try {
   await page.locator('.nameform').getByRole('button', { name: '적용', exact: true }).click();
   await page.getByTestId('brand-preview').getByText('Branded Name').first().waitFor();
   assert.equal(
-    readStudioFile(await readFile(project)).branding?.appName,
+    readStudioFile(await readFile(projectFile)).branding?.appName,
     undefined,
     'branding name is unsaved until the project is saved',
   );
@@ -529,17 +525,11 @@ try {
     'discarding reopens the saved project',
   );
 
-  // Files: source folder, add files, real sizes, bulk policy, rescan.
+  // Files: project folder, add files, real sizes, bulk policy, rescan.
   await goto('파일');
-  await app.evaluate(() => {
-    globalThis.__studioSmokeCancelNext = true;
-  });
-  await page.getByRole('button', { name: '폴더 변경', exact: true }).click();
-  await page.getByText('작업을 취소했습니다.', { exact: true }).waitFor();
-  assert.equal(await page.getByTestId('source-name').textContent(), '선택되지 않음');
-  await page.getByRole('button', { name: '폴더 변경', exact: true }).click();
-  await page.getByTestId('source-name').filter({ hasText: 'source' }).waitFor();
-  await page.getByRole('button', { name: '파일 추가', exact: true }).click();
+  await page.getByTestId('source-name').filter({ hasText: 'server-project' }).waitFor();
+  await page.getByTestId('project-reveal').click();
+  await page.getByRole('button', { name: '파일 추가(프로젝트에 복사)', exact: true }).click();
   const customRow = page.getByRole('row').filter({ hasText: 'custom.data' });
   await customRow.waitFor();
   assert.match(await customRow.textContent(), /19 B/);
@@ -555,7 +545,7 @@ try {
   await page.getByLabel('custom.data 선택').check();
   await page.getByTestId('files-bulk').getByRole('button', { name: '항상 적용' }).click();
   await page.locator('tr:not(.off)').filter({ hasText: 'custom.data' }).waitFor();
-  await writeFile(join(source, 'extra.txt'), 'added later');
+  await writeFile(join(project, 'files', 'extra.txt'), 'added later');
   await page.getByTestId('files-rescan').click();
   await page.getByRole('row').filter({ hasText: 'extra.txt' }).waitFor();
   await page.getByLabel('extra.txt 선택').check();
@@ -780,7 +770,7 @@ try {
 
   // A later file change blocks the export again with its reason.
   await goto('파일');
-  await writeFile(join(source, 'custom.data'), 'UI payload changed after the build');
+  await writeFile(join(project, 'files', 'custom.data'), 'UI payload changed after the build');
   await page.getByTestId('files-rescan').click();
   await page
     .getByRole('row')
@@ -800,7 +790,7 @@ try {
   // Persistence: save, reopen the saved project.
   await menuAction('file', 'save');
   await page.getByText(/프로젝트를 저장했습니다\.|Project saved\./).waitFor();
-  const saved = readStudioFile(await readFile(project));
+  const saved = readStudioFile(await readFile(projectFile));
   assert.equal(saved.version, 1);
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
   assert.equal(saved.gameSettings.mods[0].name, 'example-mod.jar');
@@ -949,7 +939,7 @@ try {
   await closing.waitFor();
   await closing.getByRole('button', { name: '저장', exact: true }).click();
   await page.waitForEvent('close', { timeout: 15000 }); // save, then closeConfirm
-  assert.equal(readStudioFile(await readFile(project)).name, 'Closing edit');
+  assert.equal(readStudioFile(await readFile(projectFile)).name, 'Closing edit');
   assert.equal(
     await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0).catch(() => 0),
     0,

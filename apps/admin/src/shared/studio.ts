@@ -323,7 +323,6 @@ export interface StudioState {
   testRun: StudioTestRun;
   project: StudioProject | null;
   projectName: string | null;
-  sourceName: string | null;
   dirty: boolean;
   busy: 'saving' | 'opening' | 'choosing' | 'building' | 'checking' | 'exporting' | null;
   progress: number;
@@ -362,7 +361,6 @@ export type StudioCommand =
         | 'touch'
         | 'save'
         | 'saveAs'
-        | 'source'
         | 'files'
         | 'build'
         | 'check'
@@ -392,6 +390,8 @@ export type StudioWorkCommand =
         | 'revealPack'
         /** Show the last exported ZIP in the OS file manager. */
         | 'revealExport'
+        /** Show the project folder in the OS file manager. */
+        | 'revealProject'
         /** Answer to a close request: discard unsaved changes and close the window. Only valid after `onCloseRequest` fired. */
         | 'closeConfirm'
         /** Answer to a close request: keep the window open. */
@@ -475,7 +475,9 @@ export type StudioError =
   /** Export refused: read `state.export.checks`. */
   | 'BLOCKED'
   /** A chosen file or pack is larger than the limit. */
-  | 'TOO_LARGE';
+  | 'TOO_LARGE'
+  /** A directory chosen for a new or copied project is not empty. */
+  | 'FOLDER_NOT_EMPTY';
 export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
 export type StudioReply =
   | { ok: true; state: StudioState; loaderVersions?: string[] }
