@@ -17,12 +17,20 @@ export function App() {
   const insights = deriveInsights(studio.state);
   const settings = useSettingsState();
   const { info, error } = useApplicationInfo();
-  const [page, setPage] = useState<PageId>('overview');
+  const [page, setPageState] = useState<PageId>('overview');
   const [splashDone, setSplashDone] = useState(false);
   const [confirm, setConfirm] = useState<'new' | 'open' | 'close' | null>(null);
   useEffect(() => onCloseRequest(() => setConfirm('close')), []);
   const finishSplash = useCallback(() => setSplashDone(true), []);
-  const { draft, state, busy, message } = studio;
+  const { draft, state, busy, message, clearMessage } = studio;
+  /** A command's message belongs to the page it ran on; it is dropped when navigating away. */
+  const setPage = useCallback(
+    (next: PageId) => {
+      clearMessage();
+      setPageState(next);
+    },
+    [clearMessage],
+  );
 
   // The OS window frame is native; its title carries the project name.
   useEffect(() => {

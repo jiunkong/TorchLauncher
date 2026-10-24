@@ -7,6 +7,7 @@ import type {
   StudioState,
 } from '../../../shared/studio.js';
 import { useStudioLocale } from '../i18n';
+import { detailMessageKey } from './errors';
 
 export type StudioAction = Exclude<StudioCommand['action'], 'update' | 'touch' | 'state'>;
 
@@ -74,7 +75,11 @@ export function useStudio() {
       .catch(() => setMessage(t('error.IO')));
   };
   /** Sends the pending draft to the main process first, then the command; keeps one at a time. */
-  const execute = async (request: StudioRequest, syncDraft: boolean): Promise<boolean> => {
+  const execute = async (
+    request: StudioRequest,
+    syncDraft: boolean,
+    quiet = false,
+  ): Promise<boolean> => {
     if (actionLock.current) return false;
     actionLock.current = true;
     setPending(true);
@@ -102,11 +107,9 @@ export function useStudio() {
       } else {
         code = reply.code;
         detailCode = reply.detail?.code ?? null;
-        setMessage(
-          detailCode === 'NO_TEST_RESULT' || detailCode === 'TEST_OPTIONS_MISSING'
-            ? t(`settings.import.error.${detailCode}`)
-            : errorMessage(reply.code),
-        );
+        const detailKey = detailMessageKey(detailCode);
+        // Background reads (quiet) report through `lastRun` only; no banner for the user.
+        if (!quiet) setMessage(detailKey ? t(detailKey) : errorMessage(reply.code));
       }
     } catch {
       code = 'IO';
@@ -144,7 +147,8 @@ export function useStudio() {
     return execute({ action }, true);
   };
   /** Every other command (branding, files, settings, export, ...) goes through the same serialized path. */
-  const command = (request: StudioRequest) => execute(request, true);
+  const command = (request: StudioRequest, options: { quiet?: boolean } = {}) =>
+    execute(request, true, options.quiet === true);
   /** Stop/logout must reach the main process while a long test start/login is still pending. */
   const testControl = async (request: StudioRequest) => {
     try {
@@ -184,6 +188,7 @@ export function useStudio() {
     command,
     testCommand,
     answerClose,
+    clearMessage: () => setMessage(''),
     message,
     lastRun,
     loaded: state !== null,

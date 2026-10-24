@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { managedBy } from './filePaths';
+import { managedBy, managedPage } from './filePaths';
 
 describe('managedBy', () => {
   it('routes options.txt and pack folders to game settings', () => {
@@ -12,5 +12,15 @@ describe('managedBy', () => {
     expect(managedBy('mods/options.txt')).toBeNull();
     expect(managedBy('config/lithium.properties')).toBeNull();
     expect(managedBy('resourcepacks')).toBeNull();
+  });
+});
+
+describe('managedPage', () => {
+  it('links each managed file to the page that owns it', () => {
+    expect(managedPage('resourcepacks/a.zip')).toBe('packs');
+    expect(managedPage('shaderpacks/a.zip')).toBe('shaders');
+    expect(managedPage('config/sodium.properties')).toBe('mods');
+    expect(managedPage('options.txt')).toBe('playerSettings');
+    expect(managedPage('torchlauncher/settings-policy.json')).toBe('playerSettings');
   });
 });

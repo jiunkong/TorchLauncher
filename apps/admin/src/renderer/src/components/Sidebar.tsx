@@ -9,11 +9,14 @@ import { validateServer } from '../pages/validation';
 import {
   BrandIcon,
   FolderIcon,
-  GamepadIcon,
+  KeyboardIcon,
+  LayersIcon,
   OverviewIcon,
   PackageIcon,
   PlayIcon,
   ServerIcon,
+  SlidersIcon,
+  SunIcon,
   UploadIcon,
 } from './Icons';
 
@@ -21,12 +24,12 @@ const icons: Record<PageId, ReactNode> = {
   overview: <OverviewIcon />,
   server: <ServerIcon />,
   brand: <BrandIcon />,
-  mods: <GamepadIcon />,
-  packs: <PackageIcon />,
-  shaders: <BrandIcon />,
+  mods: <SlidersIcon />,
+  packs: <LayersIcon />,
+  shaders: <SunIcon />,
   files: <FolderIcon />,
   test: <PlayIcon />,
-  playerSettings: <GamepadIcon />,
+  playerSettings: <KeyboardIcon />,
   deploy: <UploadIcon />,
   export: <PackageIcon />,
 };
