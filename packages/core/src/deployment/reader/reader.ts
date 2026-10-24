@@ -672,7 +672,7 @@ class DeploymentReaderImpl implements BrandingDeploymentReader {
     options: { signal?: AbortSignal } = {},
   ): Promise<StagedBrandingAsset> {
     if (!BRANDING_ROLES.includes(role)) fail('branding-not-found');
-    const asset = this.index.branding?.[role];
+    const asset = this.index.branding[role];
     if (!asset) fail('branding-not-found');
     const result = await this.stageEntry(
       asset,
