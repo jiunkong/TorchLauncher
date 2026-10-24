@@ -2,12 +2,12 @@
 
 ## 역할과 현재 배정
 
-2026-10-24 STUDIO-FILES-01 시작: 사용자 지시로 배정서의 모드·기타 파일 페이지 작업만 착수한다.
+2026-10-24 STUDIO-FILES-01 완료: 사용자 지시로 배정서의 모드·기타 파일 페이지 작업을 진행했다.
 #1 `studio_mods_files`, `gpt-6-luna` low, `feat/studio-mods-files`, `.agents/worktrees/studio-mods-files`,
-initial baseline `42483a6`, docs fast-forward `570b0c4`. 독점 범위와 완료 조건은 [studio-files-task.md](studio-files-task.md). 개발 빌드 모드도 따르는 가운데
-기존 모드 설정 편집기를 모드 페이지 두 번째 섹션으로 유지한다. #0만 tracker·통합·통합 검증을 맡는다.
-STUDIO-EXPORT-01은 병렬로 시작하지 않는다. GitHub owner/repo 결정이 필요하고 사용자 지시가 아직 없다.
-추가 범위: `.jar` picker filter/title locale을 위해 Studio main `native-dialogs.ts`·`i18n.ts`·`native-dialogs.test.ts` 포함(`#0`, kickoff scope update).
+initial baseline `42483a6`, docs sync `570b0c4`. 구현 `95a2c09`와 fixture 후속 `ec9a66b`를 #0이 `a00ba7c`/`ff22526`으로 통합했다.
+독점 범위와 완료 조건은 [studio-files-task.md](studio-files-task.md). 기존 모드 설정 편집기는 Mods 페이지 두 번째 섹션에 유지했다.
+`native-dialogs.ts`·`i18n.ts`·`native-dialogs.test.ts`의 `.jar` filter/title scope도 추가했다. main `pnpm check` 1486 passed/9 skipped,
+Studio 기능 smoke, 작업자 집중 테스트·typecheck/build 성공. Windows native picker·실제 게임 미검증. STUDIO-EXPORT-01은 시작하지 않았다.
 
 2026-10-24 STUDIO-VERSION-SELECT-02 사용자 후속 결정: 최소 Minecraft 드롭다운 버전을 1.14로 상향.
 #1 `studio_version_select_low`, `gpt-6-luna` low, 기존 `.agents/worktrees/studio-version-select`와

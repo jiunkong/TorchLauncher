@@ -9,12 +9,15 @@
 
 ### Studio 실행 피드백 (2026-10-24, 사용자)
 
-모드 설정 페이지가 모드 가져오기가 아님, 파일 페이지 범위·제목·재빌드 버튼, 내보내기 공통 런처 파일 선택 제거 요청.
-[배정 문서](studio-files-task.md)를 따르도록 STUDIO-FILES-01을 시작했다. #1 `studio_mods_files`, `gpt-6-luna` low,
-`feat/studio-mods-files` / `.agents/worktrees/studio-mods-files`, code baseline `570b0c4` (task checkout `42483a6`에서 docs commit fast-forward 후 수정 시작).
-한 명이 배정된 renderer/main/shared 범위를 맡고,
-#0은 문서·통합·검증을 담당한다. STUDIO-EXPORT-01은 아직 시작하지 않는다.
-`.jar` native picker filter/title locale에 필요한 Studio `main/native-dialogs.ts`·`i18n.ts`·`native-dialogs.test.ts`를 배타 범위에 추가했다.
+모드 관리 UI·기타 파일 페이지 개선을 요청해 [배정 문서](studio-files-task.md) 기준 STUDIO-FILES-01을 완료했다.
+작업자 `studio_mods_files` (`gpt-6-luna` low)의 `95a2c09`와 테스트 후속 `ec9a66b`를 main에 통합했다
+(`a00ba7c`, `ff22526`). Mods 페이지는 `.jar`를 가져와 크기/정책을 관리하고, 기존 설정 파일 편집기를 두 번째 섹션으로 둔다.
+Files 페이지는 기타 파일로 설명을 고치고 관리 경로 링크를 제공하며 재빌드 버튼을 제거했다. native `.jar` filter 및 ko/en도 추가했다.
+main `pnpm check` 통과: **1486 passed / 9 skipped**, 4 workspace typechecks와 양 앱 빌드 성공; Biome 오류 0, 42 warnings/2 infos.
+main Studio 기능 smoke 통과(모드 가져오기·정책·관리 링크, persistence/layout/isolation; 760/1100px no-overflow).
+작업자 추가 검증: 집중 Vitest 5 files/62 tests, Studio typecheck/build, scoped Biome 통과(기존 fixture `noExplicitAny` 경고 1개).
+Windows native picker와 실제 Minecraft 설치는 미검증. STUDIO-EXPORT-01은 시작하지 않았으며 GitHub `owner/repo` 결정이 필요하다.
+세부는 [STUDIO-FILES-01 인계](handoffs/STUDIO-FILES-01.md).
 사용자 결정: 개발 빌드는 로컬 런처 산출물, 릴리스는 캐시 우선 후 필요 시 최신 다운로드.
 미결: GitHub 릴리스 `owner/repo`(EXPORT 작업 전 결정 필요). 모드 설정 파일 편집기는 작업 배정서대로 모드 페이지의 하위 섹션에 둔다.
 
