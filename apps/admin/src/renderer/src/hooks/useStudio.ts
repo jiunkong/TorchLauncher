@@ -145,6 +145,26 @@ export function useStudio() {
   };
   /** Every other command (branding, files, settings, export, ...) goes through the same serialized path. */
   const command = (request: StudioRequest) => execute(request, true);
+  /** Stop/logout must reach the main process while a long test start/login is still pending. */
+  const testControl = async (request: StudioRequest) => {
+    try {
+      const reply = await window.torchlauncher.request(request);
+      if (reply.ok) {
+        setState(reply.state);
+        setDraft(reply.state.project);
+        setMessage(reply.state.result ?? '');
+        return true;
+      }
+      setMessage(errorMessage(reply.code));
+    } catch {
+      setMessage(t('error.IO'));
+    }
+    return false;
+  };
+  const testCommand = (request: StudioRequest) =>
+    request.action === 'testStop' || request.action === 'testLogout'
+      ? testControl(request)
+      : command(request);
   /** Answers to a window-close request; not serialized with other work and never syncs the draft. */
   const answerClose = async (action: 'closeConfirm' | 'closeCancel') => {
     try {
@@ -162,6 +182,7 @@ export function useStudio() {
     edit,
     run,
     command,
+    testCommand,
     answerClose,
     message,
     lastRun,

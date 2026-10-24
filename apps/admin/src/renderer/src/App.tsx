@@ -94,7 +94,7 @@ export function App() {
                       {studio.showByteProgress &&
                         ` · ${t('shell.processed', { kib: Math.round((state?.progress ?? 0) / 1024).toLocaleString() })}`}
                     </span>
-                    {studio.canCancel && (
+                    {studio.canCancel && state?.testRun.phase !== 'running' && (
                       <button
                         type="button"
                         className="btn sm"
