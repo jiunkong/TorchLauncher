@@ -1,7 +1,7 @@
 import { createTranslator } from '@torchlauncher/core/i18n';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProductState } from '../../shared/product';
 import { DeleteDialog } from './components/DeleteDialog';
 import { RecoveryDialog } from './components/RecoveryDialog';
@@ -18,6 +18,25 @@ import { arrangePacks, canMove, movePack, packIds } from './pages/packs';
 import { SettingsPage } from './pages/Settings';
 
 const t = createTranslator(launcherTranslations, 'ko');
+const localePreferenceKey = 'torchlauncher.launcher.locale-preference';
+const storageValues = new Map<string, string>();
+const storageMock = {
+  getItem: (key: string) => storageValues.get(key) ?? null,
+  setItem: (key: string, value: string) => storageValues.set(key, value),
+  removeItem: (key: string) => storageValues.delete(key),
+};
+let previousStorage: Storage | undefined;
+beforeEach(() => {
+  previousStorage = globalThis.localStorage;
+  storageValues.clear();
+  storageMock.setItem(localePreferenceKey, JSON.stringify({ mode: 'explicit', locale: 'ko' }));
+  vi.stubGlobal('localStorage', storageMock);
+});
+afterEach(() => {
+  if (previousStorage === undefined) vi.unstubAllGlobals();
+  else vi.stubGlobal('localStorage', previousStorage);
+  storageValues.clear();
+});
 const render = (element: ReactElement) =>
   renderToStaticMarkup(createElement(LauncherLocaleProvider, null, element));
 const noop = async () => true;

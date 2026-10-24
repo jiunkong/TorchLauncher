@@ -1,12 +1,32 @@
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Menu, type MenuProps } from './components/Menu';
 import { SplashView } from './components/Splash';
 import { StopDialog } from './components/StopDialog';
 import { productState } from './fixtures';
 import { LauncherLocaleProvider } from './i18n';
 import { Home, type HomeProps } from './pages/Home';
+
+const localePreferenceKey = 'torchlauncher.launcher.locale-preference';
+const storageValues = new Map<string, string>();
+const storageMock = {
+  getItem: (key: string) => storageValues.get(key) ?? null,
+  setItem: (key: string, value: string) => storageValues.set(key, value),
+  removeItem: (key: string) => storageValues.delete(key),
+};
+let previousStorage: Storage | undefined;
+beforeEach(() => {
+  previousStorage = globalThis.localStorage;
+  storageValues.clear();
+  storageMock.setItem(localePreferenceKey, JSON.stringify({ mode: 'explicit', locale: 'ko' }));
+  vi.stubGlobal('localStorage', storageMock);
+});
+afterEach(() => {
+  if (previousStorage === undefined) vi.unstubAllGlobals();
+  else vi.stubGlobal('localStorage', previousStorage);
+  storageValues.clear();
+});
 
 const render = (element: ReactElement) =>
   renderToStaticMarkup(createElement(LauncherLocaleProvider, null, element));
