@@ -2,6 +2,13 @@
 
 ## 역할과 현재 배정
 
+2026-10-24 STUDIO-VERSION-SELECT-02 사용자 후속 결정: 최소 Minecraft 드롭다운 버전을 1.14로 상향.
+#1 `studio_version_select_low`, `gpt-6-luna` low, 기존 `.agents/worktrees/studio-version-select`와
+`feat/studio-version-select`를 이어서 사용하며 `7536aee` 기준. 독점 범위는 고정 버전 카탈로그·테스트와
+`docs/handoffs/STUDIO-VERSION-SELECT-01.md`; #0은 진행 문서와 통합을 맡는다. Fabric stable 필터는 이 후속에서
+변경하지 않는다. 현재 공식 Meta API는 해당 MC 버전에 호환되는 loader 전체를 제공하지만, 코드는 `stable:true`만
+남기므로 최신 안정판 하나만 표시한다. 사용자에게 설명하고 전체 호환 버전 노출 여부를 별도로 확인한다.
+
 2026-10-24 STUDIO-VERSION-SELECT-01: Studio 서버 설정의 게임/로더 버전 드롭다운.
 #1 `studio_version_select`, `gpt-6-luna` low, `.agents/worktrees/studio-version-select`,
 `feat/studio-version-select`, baseline `0a966ac`. 모델은 고정 메타데이터 목록과 온라인 로더 카탈로그의 범위가
@@ -11,6 +18,9 @@
 안정 Minecraft 릴리스는 공식 manifest에서 1.7.10 이상을 1회 가져와 저장하고 런타임 Minecraft 목록 요청은 하지 않는다.
 선택한 게임/로더 조합에 맞는 Fabric/NeoForge 버전은 공식 온라인 메타데이터에서 가져온다.
 선택 변경 때 호환되지 않는 로더 버전을 유지하지 않는다. 드롭다운 제공 범위와 실제 설치 검증 범위를 혼동하지 않는다.
+- 완료: catalog/i18n/test `85a4564` → main `fa5daf3`; 오래된 테스트 수정 `edc5a66` → main `d114116`.
+  통합 Vitest 4 files/10 tests, diff check 통과. 작업자 Studio typecheck/build 및 집중 Biome 통과.
+  전 버전 호환 설치는 검증하지 않았다. 전체 Fabric compatible 목록 노출 여부는 별도 사용자 결정 대기.
 - 완료: `7536aee` → main `02918a0`. 관련 Vitest 4 files/12 tests, Studio typecheck/build/기능 smoke 통과;
   작업자 Biome 오류0(기존 CSS warning31). 전체 `pnpm check`와 새 버전 조합 실설치는 미실행. [인계](handoffs/STUDIO-VERSION-SELECT-01.md).
 

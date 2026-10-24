@@ -7,6 +7,18 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-VERSION-SELECT-02 완료
+
+사용자 결정으로 최소 게임 버전을 1.14로 조정했다: `85a4564` → main `fa5daf3`.
+Mojang 고정 목록은 26.3부터 1.14까지 48개 안정판이며, 영·한 도움말과 유효성 메시지가 함께 갱신됐다.
+통합 중 발견한 1.7.10 기반 NeoForge 테스트 fixture를 1.14/unsupported 경계로 수정한 `edc5a66`도 main `d114116`으로 통합했다.
+main 검증: 관련 Vitest 4 files/10 tests 통과, `git diff --check` 통과. 후속 작업자 Studio typecheck/build 통과.
+전체 `pnpm check`, 추가 버전 조합 실설치는 미실행. [인계](handoffs/STUDIO-VERSION-SELECT-01.md).
+
+Fabric 목록의 이유: 코드가 Fabric Meta 응답에서 `stable:true`만 남겨 최신 추천 항목 하나만 표시한다.
+공식 Meta API는 게임별 전체 compatible loader 목록을 제공한다. `stable:true`가 아닌 숫자 버전도 API에 있으므로
+이들이 선택 목록에 필요하면 별도 정책 변경이 필요하다. 전체 호환 버전 노출 여부는 사용자 결정 대기.
+
 ### STUDIO-VERSION-SELECT-01 완료
 
 작업자 `studio_version_select_low`의 `7536aee`를 main `02918a0`으로 통합했다. Studio는 2026-10-24 기준
