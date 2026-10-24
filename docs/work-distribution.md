@@ -2,6 +2,9 @@
 
 ## 역할과 현재 배정
 
+2026-10-24 STUDIO-FILES-01/STUDIO-EXPORT-01: 사용자 Studio 실행 피드백(모드 페이지 오해, 파일 페이지 범위·재빌드 버튼, 내보내기 런처 선택).
+상세 배정은 [studio-files-task.md](studio-files-task.md). 작업자 두 명(Sonnet medium / Opus medium), 독점 범위 분리, 시작은 사용자 승인 대기.
+
 2026-10-24 STUDIO-VERSION-SELECT-02 사용자 후속 결정: 최소 Minecraft 드롭다운 버전을 1.14로 상향.
 #1 `studio_version_select_low`, `gpt-6-luna` low, 기존 `.agents/worktrees/studio-version-select`와
 `feat/studio-version-select`를 이어서 사용하며 `7536aee` 기준. 독점 범위는 고정 버전 카탈로그·테스트와
