@@ -168,8 +168,8 @@ it.skipIf(!liveUrl || !manifestPath)(
         expect(range.status).toBe(206);
         const file = v2.index.files.find(
           (entry) =>
-            range.start >= 64 + v2.header.indexLength + entry.offset &&
-            range.end < 64 + v2.header.indexLength + entry.offset + entry.storedLength,
+            range.start >= 128 + v2.header.indexLength + entry.offset &&
+            range.end < 128 + v2.header.indexLength + entry.offset + entry.storedLength,
         );
         expect(expectedPaths).toContain(file?.path);
         if (file) fetchedPaths.add(file.path);

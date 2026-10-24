@@ -17,7 +17,6 @@ export type LockEvidence =
   | 'child-unrecorded'
   | 'host-different'
   | 'host-unknown'
-  | 'owner-v1'
   | 'owner-missing'
   | 'owner-invalid'
   | 'lock-unsafe'
@@ -84,8 +83,6 @@ export async function assessLockOwner(
     case 'invalid':
       // An unreadable/non-regular owner entry is not safe to move aside.
       return uncertain(['owner-invalid'], undefined, read.text !== '');
-    case 'v1':
-      return uncertain(['owner-v1'], read.owner.purpose);
   }
   const owner = read.owner;
   let ownSelf = false;
@@ -154,7 +151,7 @@ export async function snapshotServerLock(root: string, probe: ProcessProbe): Pro
   const ownerText =
     read.state === 'no-owner'
       ? null
-      : read.state === 'v1' || read.state === 'v2' || (read.state === 'invalid' && read.text)
+      : read.state === 'v2' || (read.state === 'invalid' && read.text)
         ? read.text
         : undefined;
   let assessment = await assessLockOwner(read, probe);

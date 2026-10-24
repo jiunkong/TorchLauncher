@@ -26,12 +26,6 @@ export type LockPurpose = 'install' | 'game' | 'maintenance';
 export type LockChild =
   | { state: 'starting' }
   | { state: 'running'; pid: number; start: string | null };
-export interface LockOwnerV1 {
-  version: 1;
-  id: string;
-  pid: number;
-  purpose: LockPurpose;
-}
 export interface LockOwnerV2 {
   version: 2;
   id: string;
@@ -58,7 +52,6 @@ export type LockOwnerRead =
   | { state: 'unsafe' }
   | { state: 'no-owner' }
   | { state: 'invalid'; text: string }
-  | { state: 'v1'; text: string; owner: LockOwnerV1 }
   | { state: 'v2'; text: string; owner: LockOwnerV2 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -95,15 +88,6 @@ export function parseLockOwner(text: string): LockOwnerRead {
   } catch {
     return { state: 'invalid', text };
   }
-  if (
-    exactKeys(value, ['version', 'id', 'pid', 'purpose']) &&
-    value.version === 1 &&
-    typeof value.id === 'string' &&
-    UUID.test(value.id) &&
-    isValidPid(value.pid) &&
-    isPurpose(value.purpose)
-  )
-    return { state: 'v1', text, owner: value as unknown as LockOwnerV1 };
   if (
     exactKeys(value, ['version', 'id', 'pid', 'purpose', 'start', 'host', 'child']) &&
     value.version === 2 &&

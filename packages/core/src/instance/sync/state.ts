@@ -93,6 +93,8 @@ export function validatePathSet(
         formatVersion: DEPLOYMENT_FORMAT_VERSION,
         serverId,
         deploymentId: serverId,
+        sequence: 1,
+        branding: {},
         game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '1' } },
         files: files.map((file) => ({
           path: file.path,
@@ -109,7 +111,7 @@ export function validatePathSet(
         formatVersion: DEPLOYMENT_FORMAT_VERSION,
         flags: 0,
         indexLength: 1,
-        totalLength: 65,
+        totalLength: 129,
         indexSha256: '0'.repeat(64),
       },
       { expectedServerId: serverId },

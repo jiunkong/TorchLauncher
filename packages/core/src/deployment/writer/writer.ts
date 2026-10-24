@@ -9,17 +9,14 @@ import {
   BRANDING_LIMITS,
   BRANDING_ROLES,
   type BrandingRole,
-  DEPLOYMENT_BRANDING_FORMAT_VERSION,
   DEPLOYMENT_FORMAT_VERSION,
   DEPLOYMENT_HEADER_LENGTH,
   DEPLOYMENT_LIMITS,
   DEPLOYMENT_MAGIC,
   DEPLOYMENT_SIGNATURE_LENGTH,
-  DEPLOYMENT_SIGNED_FORMAT_VERSION,
   type DeploymentBranding,
   type DeploymentBrandingAsset,
   type DeploymentFile,
-  type DeploymentFormatVersion,
   type DeploymentHeader,
   type DeploymentIndex,
   deploymentIndexStart,
@@ -182,17 +179,13 @@ function encodeIndex(index: DeploymentIndex): Buffer {
   return Buffer.concat(chunks);
 }
 
-function makeHeader(
-  indexBytes: Buffer,
-  payloadLength: number,
-  formatVersion: DeploymentFormatVersion = DEPLOYMENT_FORMAT_VERSION,
-): DeploymentHeader {
+function makeHeader(indexBytes: Buffer, payloadLength: number): DeploymentHeader {
   return validateDeploymentHeader({
     magic: DEPLOYMENT_MAGIC,
-    formatVersion,
+    formatVersion: DEPLOYMENT_FORMAT_VERSION,
     flags: 0,
     indexLength: indexBytes.byteLength,
-    totalLength: deploymentIndexStart(formatVersion.minor) + indexBytes.byteLength + payloadLength,
+    totalLength: deploymentIndexStart() + indexBytes.byteLength + payloadLength,
     indexSha256: createHash('sha256').update(indexBytes).digest('hex'),
   });
 }
@@ -291,15 +284,10 @@ interface BrandingSnapshot {
 }
 
 function snapshotBranding(options: WriteDeploymentOptions): {
-  branding?: DeploymentBranding;
+  branding: DeploymentBranding;
   snapshots: Partial<Record<BrandingRole, BrandingSnapshot>>;
   length: number;
 } {
-  // v1.2 inherits the v1.1 branding rules, so a signed deployment always carries `branding`
-  // ({} meaning "retain every role").
-  if (options.branding === undefined && options.sign === undefined) {
-    return { snapshots: {}, length: 0 };
-  }
   const input = options.branding === undefined ? {} : options.branding;
   if (
     !input ||
@@ -362,21 +350,15 @@ export async function writeDeployment(
     fail('invalid-input');
   // Snapshot caller-owned metadata before awaiting filesystem operations.
   const brandingSnapshot = snapshotBranding(options);
-  const signing = options.sign !== undefined || options.sequence !== undefined;
   if (
-    signing &&
-    (typeof options.sign !== 'function' ||
-      typeof options.sequence !== 'number' ||
-      !Number.isSafeInteger(options.sequence) ||
-      options.sequence < 1)
+    typeof options.sign !== 'function' ||
+    typeof options.sequence !== 'number' ||
+    !Number.isSafeInteger(options.sequence) ||
+    options.sequence < 1
   )
     fail('invalid-input');
   const sign = options.sign;
-  const formatVersion: DeploymentFormatVersion = signing
-    ? DEPLOYMENT_SIGNED_FORMAT_VERSION
-    : brandingSnapshot.branding
-      ? DEPLOYMENT_BRANDING_FORMAT_VERSION
-      : DEPLOYMENT_FORMAT_VERSION;
+  const formatVersion = DEPLOYMENT_FORMAT_VERSION;
   const inputs = options.files.map((entry) => ({ ...entry }));
   const placeholders = inputs.map((input): DeploymentFile => {
     if (
@@ -399,12 +381,12 @@ export async function writeDeployment(
     formatVersion,
     serverId: options.serverId,
     deploymentId: options.deploymentId,
-    ...(signing ? { sequence: options.sequence as number } : {}),
+    sequence: options.sequence,
     game: structuredClone(options.game),
     files: placeholders,
-    ...(brandingSnapshot.branding ? { branding: brandingSnapshot.branding } : {}),
+    branding: brandingSnapshot.branding,
   };
-  const initialHeader = makeHeader(Buffer.from('{}'), brandingSnapshot.length, formatVersion);
+  const initialHeader = makeHeader(Buffer.from('{}'), brandingSnapshot.length);
   validateDeploymentIndex(initialIndex, initialHeader, { expectedServerId: initialIndex.serverId });
   encodeIndex(initialIndex);
 
@@ -460,49 +442,44 @@ export async function writeDeployment(
         icon?: DeploymentBrandingAsset | null;
         background?: DeploymentBrandingAsset | null;
       } = {};
-      if (brandingSnapshot.branding) {
-        for (const role of BRANDING_ROLES) {
-          if (!Object.hasOwn(brandingSnapshot.branding, role)) continue;
-          const snapshot = brandingSnapshot.snapshots[role];
-          if (!snapshot) {
-            branding[role] = null;
-            continue;
-          }
-          branding[role] = { ...snapshot.asset, offset: payloadLength };
-          options.signal?.throwIfAborted();
-          if (
-            payloadLength +
-              snapshot.bytes.byteLength +
-              DEPLOYMENT_HEADER_LENGTH +
-              DEPLOYMENT_SIGNATURE_LENGTH >
-            DEPLOYMENT_LIMITS.containerLength
-          )
-            fail('limit-exceeded');
-          await writeAll(payload, snapshot.bytes);
-          payloadLength += snapshot.bytes.byteLength;
+      for (const role of BRANDING_ROLES) {
+        if (!Object.hasOwn(brandingSnapshot.branding, role)) continue;
+        const snapshot = brandingSnapshot.snapshots[role];
+        if (!snapshot) {
+          branding[role] = null;
+          continue;
         }
+        branding[role] = { ...snapshot.asset, offset: payloadLength };
+        options.signal?.throwIfAborted();
+        if (
+          payloadLength +
+            snapshot.bytes.byteLength +
+            DEPLOYMENT_HEADER_LENGTH +
+            DEPLOYMENT_SIGNATURE_LENGTH >
+          DEPLOYMENT_LIMITS.containerLength
+        )
+          fail('limit-exceeded');
+        await writeAll(payload, snapshot.bytes);
+        payloadLength += snapshot.bytes.byteLength;
       }
       const index: DeploymentIndex = {
         ...initialIndex,
         files: entries,
-        ...(brandingSnapshot.branding ? { branding } : {}),
+        branding,
       };
       const indexBytes = encodeIndex(index);
-      const header = makeHeader(indexBytes, payloadLength, formatVersion);
+      const header = makeHeader(indexBytes, payloadLength);
       validateDeploymentIndex(index, header, { expectedServerId: index.serverId });
-      let signature: Buffer | undefined;
-      if (sign) {
-        const result: unknown = await sign(deploymentSignatureMessage(encodeHeader(header)));
-        if (!(result instanceof Uint8Array) || result.byteLength !== DEPLOYMENT_SIGNATURE_LENGTH)
-          fail('invalid-signature');
-        signature = Buffer.from(result);
-        options.signal?.throwIfAborted();
-      }
+      const result: unknown = await sign(deploymentSignatureMessage(encodeHeader(header)));
+      if (!(result instanceof Uint8Array) || result.byteLength !== DEPLOYMENT_SIGNATURE_LENGTH)
+        fail('invalid-signature');
+      const signature = Buffer.from(result);
+      options.signal?.throwIfAborted();
       const candidatePath = join(staging, 'container');
       const candidate = await open(candidatePath, 'wx', 0o600);
       try {
         await writeAll(candidate, encodeHeader(header));
-        if (signature) await writeAll(candidate, signature);
+        await writeAll(candidate, signature);
         await writeAll(candidate, indexBytes);
         let copied = 0;
         await progress(options, { phase: 'assembling', processedBytes: 0 });

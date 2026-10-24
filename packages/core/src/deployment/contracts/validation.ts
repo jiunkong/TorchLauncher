@@ -68,7 +68,7 @@ function integer(value: unknown, maximum: number, field: string, minimum = 0): n
 
 function version(value: unknown, field: string): void {
   const entry = object(value, ['major', 'minor'], field);
-  if (entry.major !== 1 || (entry.minor !== 0 && entry.minor !== 1 && entry.minor !== 2)) {
+  if (entry.major !== 1 || entry.minor !== 2) {
     fail('unsupported-version', field);
   }
 }
@@ -174,7 +174,7 @@ function brandingAsset(value: unknown, role: BrandingRole, field: string): Deplo
     })
   )
     fail('invalid-value', field);
-  // Encoded PNG/JPEG payloads are already compressed; v1.1 uses only raw encoded bytes.
+  // Encoded PNG/JPEG payloads are already compressed; the format uses only raw encoded bytes.
   if (entry.compression !== 'none') fail('invalid-value', `${field}.compression`);
   return value as DeploymentBrandingAsset;
 }
@@ -213,8 +213,7 @@ export function validateDeploymentHeader(value: unknown): DeploymentHeader {
     DEPLOYMENT_LIMITS.containerLength,
     'header.totalLength',
   );
-  const minor = (entry.formatVersion as { minor: number }).minor;
-  if (totalLength < deploymentIndexStart(minor) + indexLength) {
+  if (totalLength < deploymentIndexStart() + indexLength) {
     fail('invalid-layout', 'header.totalLength');
   }
   hash(entry.indexSha256, 'header.indexSha256');
@@ -230,26 +229,13 @@ export function validateDeploymentIndex(
   id(context.expectedServerId, 'context.expectedServerId');
   const entry = object(
     value,
-    [
-      'formatVersion',
-      'serverId',
-      'deploymentId',
-      'game',
-      'files',
-      ...(header.formatVersion.minor >= 1 ? ['branding'] : []),
-      ...(header.formatVersion.minor === 2 ? ['sequence'] : []),
-    ],
+    ['formatVersion', 'serverId', 'deploymentId', 'game', 'files', 'branding', 'sequence'],
     'index',
   );
   version(entry.formatVersion, 'index.formatVersion');
-  if ((entry.formatVersion as { minor: number }).minor !== header.formatVersion.minor) {
-    fail('unsupported-version', 'index.formatVersion');
-  }
   id(entry.serverId, 'index.serverId');
   id(entry.deploymentId, 'index.deploymentId');
-  if (header.formatVersion.minor === 2) {
-    integer(entry.sequence, Number.MAX_SAFE_INTEGER, 'index.sequence', 1);
-  }
+  integer(entry.sequence, Number.MAX_SAFE_INTEGER, 'index.sequence', 1);
   if (entry.serverId !== context.expectedServerId) fail('server-mismatch', 'index.serverId');
   const game = object(entry.game, ['minecraftVersion', 'loader'], 'index.game');
   versionToken(game.minecraftVersion, 'index.game.minecraftVersion');
@@ -287,7 +273,7 @@ export function validateDeploymentIndex(
       fail('limit-exceeded', 'index.files.originalLength');
     }
   }
-  if (header.formatVersion.minor >= 1) {
+  {
     const branding = entry.branding;
     if (branding === null || typeof branding !== 'object' || Array.isArray(branding))
       fail('invalid-shape', 'index.branding');
@@ -332,7 +318,6 @@ export function getDeploymentBrandingRange(
   entry: DeploymentBrandingAsset,
 ): DeploymentByteRange {
   validateDeploymentHeader(header);
-  if (header.formatVersion.minor < 1) fail('unsupported-version', 'header.formatVersion');
   if (!BRANDING_ROLES.includes(role)) fail('invalid-value', 'role');
   brandingAsset(entry, role, 'branding');
   return getPayloadRange(header, entry);

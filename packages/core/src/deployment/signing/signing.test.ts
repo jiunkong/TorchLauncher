@@ -77,7 +77,7 @@ interface Built {
 }
 
 async function build(
-  options: { signer?: KeyObject | null; sequence?: number; branding?: boolean } = {},
+  options: { signer?: KeyObject; sequence?: number; branding?: boolean } = {},
 ): Promise<Built> {
   const root = await temp();
   await writeFile(join(root, 'plain.dat'), Buffer.from('plain payload'));
@@ -96,7 +96,8 @@ async function build(
     ...(options.branding
       ? { branding: { icon: { bytes: tinyPng(), mediaType: 'image/png' as const } } }
       : {}),
-    ...(signer ? { sign: createEd25519Signer(signer), sequence: options.sequence ?? 7 } : {}),
+    sign: createEd25519Signer(signer),
+    sequence: options.sequence ?? 7,
   });
   const bytes = await readFile(result.outputPath);
   return { bytes, indexLength: result.header.indexLength, result };
@@ -209,33 +210,19 @@ describe('verification states and key requirements', () => {
     expect((await open(bytes).reader).verification).toBe('unverified');
   });
 
-  it('reports unsigned 1.0/1.1 as unsigned when no key is configured', async () => {
-    const v10 = await build({ signer: null });
-    const v11 = await build({ signer: null, branding: true });
-    expect(v10.result.header.formatVersion.minor).toBe(0);
-    expect(v11.result.header.formatVersion.minor).toBe(1);
-    expect((await open(v10.bytes).reader).verification).toBe('unsigned');
-    expect((await open(v11.bytes).reader).verification).toBe('unsigned');
-  });
-
-  it.each([false, true])(
-    'rejects unsigned containers when a key is required before reading the index (branding=%s)',
-    async (branding) => {
-      const { bytes } = await build({ signer: null, branding });
-      const { source, reader } = open(bytes, key.publicKey);
-      await expectReaderError(reader, 'signature-required');
-      expect(source.ranges).toEqual([{ start: 0, end: 63 }]);
+  it.each([0, 1])(
+    'rejects obsolete minor %i before signature, index or payload requests',
+    async (minor) => {
+      const { bytes } = await build();
+      for (const trusted of [undefined, key.publicKey]) {
+        const obsolete = Buffer.from(bytes);
+        obsolete.writeUInt16LE(minor, 10);
+        const { source, reader } = open(obsolete, trusted);
+        await expectReaderError(reader, 'invalid-header');
+        expect(source.ranges).toEqual([{ start: 0, end: 63 }]);
+      }
     },
   );
-
-  it('rejects a downgrade of a signed container to 1.0/1.1 when a key is required', async () => {
-    const { bytes } = await build();
-    for (const minor of [0, 1]) {
-      const forged = Buffer.from(bytes);
-      forged.writeUInt16LE(minor, 10);
-      await expectReaderError(open(forged, key.publicKey).reader, 'signature-required');
-    }
-  });
 
   it('rejects a signature from another key and never stages', async () => {
     const forged = await build({ signer: otherKey.privateKey });
@@ -401,6 +388,7 @@ describe('writer signing inputs', () => {
   };
 
   it.each([
+    ['missing both sequence and sign', {}],
     ['sequence without sign', { sequence: 1 }],
     ['sign without sequence', { sign: () => Buffer.alloc(64) }],
     ['sequence 0', { sequence: 0, sign: () => Buffer.alloc(64) }],
@@ -410,7 +398,9 @@ describe('writer signing inputs', () => {
     ['NaN', { sequence: Number.NaN, sign: () => Buffer.alloc(64) }],
   ])('rejects %s', async (_name, extra) => {
     const options = { ...(await base()), ...extra };
-    await expect(writeDeployment(options)).rejects.toMatchObject({ code: 'invalid-input' });
+    await expect(
+      writeDeployment(options as Parameters<typeof writeDeployment>[0]),
+    ).rejects.toMatchObject({ code: 'invalid-input' });
   });
 
   it.each([0, 63, 65, 128])('rejects a %i-byte signature and leaves no output', async (length) => {
@@ -455,7 +445,7 @@ describe('contract rules for sequence and version 1.2', () => {
     const signedHeader: DeploymentHeader = {
       ...header,
       formatVersion: { major: 1, minor: 2 },
-      totalLength: header.totalLength + 64,
+      totalLength: header.totalLength,
     };
     const body: Record<string, unknown> = {
       ...index,
@@ -463,7 +453,7 @@ describe('contract rules for sequence and version 1.2', () => {
       branding: {},
       ...extra,
     };
-    if (sequence !== undefined) body.sequence = sequence;
+    body.sequence = sequence;
     return { signedHeader, body };
   }
 
@@ -481,19 +471,15 @@ describe('contract rules for sequence and version 1.2', () => {
     },
   );
 
-  it('rejects sequence in 1.0 and 1.1', () => {
+  it.each([0, 1])('rejects obsolete minor %i even with valid current fields', (minor) => {
     const { index, header } = createValidDeployment();
-    expect(() => validateDeploymentIndex({ ...index, sequence: 1 }, header, context)).toThrow();
-    const v11Header = { ...header, formatVersion: { major: 1, minor: 1 } as const };
     expect(() =>
-      validateDeploymentIndex(
-        { ...index, formatVersion: { major: 1, minor: 1 }, branding: {}, sequence: 1 },
-        v11Header,
-        context,
-      ),
+      validateDeploymentHeader({ ...header, formatVersion: { major: 1, minor } }),
+    ).toThrow();
+    expect(() =>
+      validateDeploymentIndex({ ...index, formatVersion: { major: 1, minor } }, header, context),
     ).toThrow();
   });
-
   it('requires index minor to match header minor and rejects minor 3', () => {
     const { signedHeader, body } = v12(1);
     expect(() =>

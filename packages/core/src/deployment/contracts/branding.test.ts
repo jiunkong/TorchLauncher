@@ -7,8 +7,8 @@ import {
 } from './index.js';
 
 function fixture() {
-  const { header: legacyHeader, index: legacyIndex } = createValidDeployment();
-  const offset = legacyHeader.totalLength - 64 - legacyHeader.indexLength;
+  const { header: baseHeader, index: baseIndex } = createValidDeployment();
+  const offset = baseHeader.totalLength - 128 - baseHeader.indexLength;
   const icon: DeploymentBrandingAsset = {
     offset,
     sha256: 'a'.repeat(64),
@@ -24,17 +24,17 @@ function fixture() {
     originalLength: 200,
     mediaType: 'image/jpeg',
   };
-  const formatVersion = { major: 1, minor: 1 } as const;
+  const formatVersion = { major: 1, minor: 2 } as const;
   return {
-    header: { ...legacyHeader, formatVersion, totalLength: legacyHeader.totalLength + 300 },
-    index: { ...legacyIndex, formatVersion, branding: { icon, background } },
-    legacyHeader,
-    legacyIndex,
+    header: { ...baseHeader, formatVersion, totalLength: baseHeader.totalLength + 300 },
+    index: { ...baseIndex, formatVersion, branding: { icon, background } },
+    baseHeader,
+    baseIndex,
   };
 }
 const context = { expectedServerId: SERVER_ID };
 
-describe('v1.1 isolated branding payload contracts', () => {
+describe('current isolated branding payload contracts', () => {
   it('covers game entries then icon/background with one continuous payload cursor', () => {
     const { header, index } = fixture();
     expect(validateDeploymentIndex(index, header, context)).toBe(index);
@@ -44,27 +44,23 @@ describe('v1.1 isolated branding payload contracts', () => {
     });
     expect(index.files.every((file) => !file.path.startsWith('branding/'))).toBe(true);
   });
-  it('distinguishes legacy, omitted roles and explicit removal without payload', () => {
-    const { legacyHeader, legacyIndex, header, index } = fixture();
-    expect(validateDeploymentIndex(legacyIndex, legacyHeader, context).branding).toBeUndefined();
+  it('requires branding and distinguishes omitted roles from explicit removal', () => {
+    const { baseHeader, baseIndex, header, index } = fixture();
+    expect(validateDeploymentIndex(baseIndex, baseHeader, context).branding).toEqual({});
     for (const branding of [{}, { icon: null }, { icon: null, background: null }]) {
       const value = { ...index, branding };
       expect(
-        validateDeploymentIndex(
-          value,
-          { ...header, totalLength: legacyHeader.totalLength },
-          context,
-        ),
+        validateDeploymentIndex(value, { ...header, totalLength: baseHeader.totalLength }, context),
       ).toBe(value);
     }
     expect(() =>
-      validateDeploymentIndex({ ...legacyIndex, branding: {} }, legacyHeader, context),
+      validateDeploymentIndex({ ...baseIndex, branding: undefined }, baseHeader, context),
     ).toThrow();
-    expect(() => validateDeploymentIndex(index, legacyHeader, context)).toThrow();
+    expect(() => validateDeploymentIndex(index, baseHeader, context)).toThrow();
     expect(() =>
       validateDeploymentIndex({ ...index, formatVersion: { major: 1, minor: 0 } }, header, context),
     ).toThrow();
-    expect(() => validateDeploymentIndex(legacyIndex, header, context)).toThrow();
+    expect(() => validateDeploymentIndex(baseIndex, header, context)).toThrow();
   });
   it.each([
     { offset: 0 },

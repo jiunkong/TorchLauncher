@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, type TestContext } from 'vitest';
 import type { DeploymentFilePolicy } from '../../deployment/contracts/index.js';
+import { testSigning } from '../../deployment/fixtures/signing.js';
 import { openDeploymentReader } from '../../deployment/reader/index.js';
 import { writeDeployment } from '../../deployment/writer/index.js';
 import { createDownloadSource } from '../../download/source/index.js';
@@ -62,6 +63,7 @@ async function bundle(files: Input[], id = '22222222-2222-4222-8222-222222222222
     await writeFile(join(sourceRoot, file.path), file.data);
   }
   const result = await writeDeployment({
+    ...testSigning,
     sourceRoot,
     outputPath: join(sourceRoot, 'output.torchpack'),
     serverId,
@@ -74,7 +76,7 @@ async function bundle(files: Input[], id = '22222222-2222-4222-8222-222222222222
     })),
   });
   const bytes = await readFile(result.outputPath);
-  return { bytes, index: result.index, payloadStart: 64 + result.header.indexLength };
+  return { bytes, index: result.index, payloadStart: 128 + result.header.indexLength };
 }
 
 async function readerFor(artifact: Awaited<ReturnType<typeof bundle>>) {

@@ -185,10 +185,10 @@ describe('lock classification', () => {
     evidence: string[];
   }[] = [
     {
-      name: 'v1 owner is uncertain',
+      name: 'obsolete owner is invalid and remains protected',
       owner: { version: 1, id: v2().id, pid: 4242, purpose: 'install' },
       state: 'uncertain',
-      evidence: ['owner-v1'],
+      evidence: ['owner-invalid'],
     },
     {
       name: 'live owner',

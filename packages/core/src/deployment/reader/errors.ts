@@ -2,7 +2,6 @@ export class DeploymentReaderError extends Error {
   constructor(
     public readonly code:
       | 'invalid-header'
-      | 'signature-required'
       | 'signature-invalid'
       | 'signature-malformed'
       | 'invalid-signing-key'

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { ByteRange, ResourceSnapshot } from '../../download/http/index.js';
 import type { DownloadSource, SourceRangeResponse } from '../../download/source/index.js';
 import { DEPLOYMENT_LIMITS } from '../contracts/index.js';
+import { testSigning } from '../fixtures/signing.js';
 import { writeDeployment } from '../writer/index.js';
 import { openDeploymentReader } from './index.js';
 
@@ -75,6 +76,7 @@ async function buildDeployment(): Promise<{
   await writeFile(join(root, 'compressed.bin'), Buffer.from('compressed payload '.repeat(70)));
   await writeFile(join(root, 'empty.bin'), new Uint8Array());
   const result = await writeDeployment({
+    ...testSigning,
     sourceRoot: root,
     outputPath: join(root, 'bundle.torchpack'),
     serverId,
@@ -119,21 +121,21 @@ function rebuildContainerWithIndexBytes(
 ): Uint8Array {
   const header = Buffer.from(bytes.subarray(0, 64));
   header.writeBigUInt64LE(BigInt(indexBytes.byteLength), 16);
-  header.writeBigUInt64LE(BigInt(64 + indexBytes.byteLength + payload.byteLength), 24);
+  header.writeBigUInt64LE(BigInt(128 + indexBytes.byteLength + payload.byteLength), 24);
   Buffer.from(sha256(indexBytes), 'hex').copy(header, 32);
-  return Buffer.concat([header, indexBytes, payload]);
+  return Buffer.concat([header, Buffer.from(bytes.subarray(64, 128)), indexBytes, payload]);
 }
 
 function decodeIndexText(bytes: Uint8Array): string {
   const indexLength = Number(Buffer.from(bytes).readBigUInt64LE(16));
   return Buffer.from(bytes)
-    .subarray(64, 64 + indexLength)
+    .subarray(128, 128 + indexLength)
     .toString('utf8');
 }
 
 function getPayload(bytes: Uint8Array): Uint8Array {
   const indexLength = Number(Buffer.from(bytes).readBigUInt64LE(16));
-  return bytes.slice(64 + indexLength);
+  return bytes.slice(128 + indexLength);
 }
 
 describe('deployment reader', () => {
@@ -155,7 +157,7 @@ describe('deployment reader', () => {
     const plainRequests = source.ranges.slice(beforePlainRanges);
     const firstFile = reader.index.files[0];
     if (!firstFile) throw new Error('Missing plain fixture');
-    const plainStart = 64 + reader.header.indexLength + firstFile.offset;
+    const plainStart = 128 + reader.header.indexLength + firstFile.offset;
     expect(plainRequests.length).toBeGreaterThan(0);
     expect(
       plainRequests.every(
@@ -171,7 +173,7 @@ describe('deployment reader', () => {
     expect(source.ranges.some((range) => range.end - range.start + 1 > 13)).toBe(true); // header is one exact 64-byte request.
     expect(
       source.ranges
-        .filter((range) => range.start >= 64 + reader.header.indexLength)
+        .filter((range) => range.start >= 128 + reader.header.indexLength)
         .every((range) => range.end - range.start + 1 <= 13),
     ).toBe(true);
     reader.assertCurrent();
@@ -212,8 +214,8 @@ describe('deployment reader', () => {
 
     const digestMismatch = bytes.slice();
     const headerIndexLength = Number(Buffer.from(bytes).readBigUInt64LE(16));
-    digestMismatch[64 + headerIndexLength - 1] =
-      (digestMismatch[64 + headerIndexLength - 1] ?? 0) ^ 1;
+    digestMismatch[128 + headerIndexLength - 1] =
+      (digestMismatch[128 + headerIndexLength - 1] ?? 0) ^ 1;
     await expect(
       openDeploymentReader(new MemorySource(digestMismatch), { expectedServerId: serverId }),
     ).rejects.toMatchObject({ code: 'index-hash-mismatch' });
@@ -273,7 +275,7 @@ describe('deployment reader', () => {
     if (!file) throw new Error('Missing plain fixture');
     const corrupted = bytes.slice();
     const indexLength = Number(Buffer.from(bytes).readBigUInt64LE(16));
-    const payloadPosition = 64 + indexLength + file.offset;
+    const payloadPosition = 128 + indexLength + file.offset;
     corrupted[payloadPosition] = (corrupted[payloadPosition] ?? 0) ^ 1;
     const reader = await openDeploymentReader(new MemorySource(corrupted), {
       expectedServerId: serverId,
@@ -422,6 +424,7 @@ describe('deployment reader', () => {
     const data = randomBytes(512 * 1024);
     await writeFile(join(root, 'large.bin'), data);
     const result = await writeDeployment({
+      ...testSigning,
       sourceRoot: root,
       outputPath: join(root, 'large.torchpack'),
       serverId,
@@ -436,7 +439,7 @@ describe('deployment reader', () => {
     });
     const file = reader.index.files[0];
     if (!file) throw new Error('Missing large gzip fixture');
-    const payloadStart = 64 + reader.header.indexLength;
+    const payloadStart = 128 + reader.header.indexLength;
     const payloadEnd = payloadStart + file.storedLength - 1;
     const controller = new AbortController();
     source.beforeResponse = (range) => {
@@ -500,6 +503,7 @@ async function buildBrandedDeployment() {
   const background = tinyPng();
   await writeFile(join(root, 'game.dat'), 'game payload is independent');
   const result = await writeDeployment({
+    ...testSigning,
     sourceRoot: root,
     outputPath: join(root, 'branded.torchpack'),
     serverId,
@@ -537,9 +541,9 @@ describe('isolated branding reader', () => {
     expect(await readFile(output)).toEqual(pack.background);
     const asset = reader.index.branding?.background;
     if (!asset) throw new Error('Missing background');
-    expect(source.ranges[0]?.start).toBe(64 + reader.header.indexLength + asset.offset);
+    expect(source.ranges[0]?.start).toBe(128 + reader.header.indexLength + asset.offset);
     expect(
-      source.ranges.every((range) => range.start >= 64 + reader.header.indexLength + asset.offset),
+      source.ranges.every((range) => range.start >= 128 + reader.header.indexLength + asset.offset),
     ).toBe(true);
     await expect(
       reader.stageFile('background', join(pack.root, 'not-a-game-file')),
@@ -554,10 +558,10 @@ describe('isolated branding reader', () => {
     await reader.stageFile('game.dat', game);
     expect(await readFile(game, 'utf8')).toBe('game payload is independent');
   });
-  it('does not fetch or stage absent/removed roles in v1.0/v1.1', async () => {
+  it('does not fetch or stage absent or removed roles', async () => {
     const { bytes } = await buildDeployment();
-    const legacySource = new MemorySource(bytes);
-    const legacy = await openDeploymentReader(legacySource, { expectedServerId: serverId });
+    const emptySource = new MemorySource(bytes);
+    const empty = await openDeploymentReader(emptySource, { expectedServerId: serverId });
     const pack = await buildBrandedDeployment();
     const index = { ...pack.index, branding: { icon: null } };
     const raw = rebuildContainer(
@@ -569,7 +573,7 @@ describe('isolated branding reader', () => {
     const cleared = await openDeploymentReader(source, { expectedServerId: serverId });
     expect(cleared.index.branding).toEqual({ icon: null });
     for (const [reader, memory] of [
-      [legacy, legacySource],
+      [empty, emptySource],
       [cleared, source],
     ] as const) {
       const count = memory.ranges.length;
@@ -585,7 +589,7 @@ describe('isolated branding reader', () => {
     const corrupted = Buffer.from(pack.bytes);
     const asset = pack.index.branding?.icon;
     if (!asset) throw new Error('Missing icon');
-    const corruptedPosition = 64 + pack.header.indexLength + asset.offset;
+    const corruptedPosition = 128 + pack.header.indexLength + asset.offset;
     corrupted[corruptedPosition] = (corrupted[corruptedPosition] ?? 0) ^ 1;
     const reader = await openDeploymentReader(new MemorySource(corrupted), {
       expectedServerId: serverId,
@@ -612,7 +616,7 @@ describe('isolated branding reader', () => {
     const source = new MemorySource(malformed);
     await expect(openDeploymentReader(source, { expectedServerId: serverId })).rejects.toThrow();
     // Opening requests metadata only; unreferenced image bytes cannot become an optional warning.
-    const metadataEnd = 64 + Number(Buffer.from(malformed).readBigUInt64LE(16));
+    const metadataEnd = 128 + Number(Buffer.from(malformed).readBigUInt64LE(16));
     expect(source.ranges.every((range) => range.end < metadataEnd)).toBe(true);
     for (const budget of [{ maxFileBytes: 32 }, { maxStoredFileBytes: 32 }]) {
       const limitedSource = new MemorySource(pack.bytes);

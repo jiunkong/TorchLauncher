@@ -20,8 +20,8 @@ export interface ServerConfig {
   /** Optional hint so the launcher can show the game version before the deployment index is read. */
   readonly game?: ServerConfigGame;
   readonly branding?: ServerConfigBranding;
-  /** Trusted publisher key. When present the launcher rejects unsigned or badly signed deployments. */
-  readonly signing?: ServerConfigSigning;
+  /** Trusted publisher key used to verify every deployment. */
+  readonly signing: ServerConfigSigning;
 }
 
 export interface ServerConfigSigning {
@@ -149,13 +149,11 @@ export function parseServerConfig(input: unknown): ServerConfig {
   };
   if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
   const value = input as Record<string, unknown>;
-  const fields = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl'];
+  const fields = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl', 'signing'];
   const hasGame = Object.hasOwn(value, 'game');
   const hasBranding = Object.hasOwn(value, 'branding');
-  const hasSigning = Object.hasOwn(value, 'signing');
   if (
-    Object.keys(value).length !==
-      fields.length + (hasGame ? 1 : 0) + (hasBranding ? 1 : 0) + (hasSigning ? 1 : 0) ||
+    Object.keys(value).length !== fields.length + (hasGame ? 1 : 0) + (hasBranding ? 1 : 0) ||
     fields.some((key) => !Object.hasOwn(value, key))
   ) {
     return fail();
@@ -213,6 +211,6 @@ export function parseServerConfig(input: unknown): ServerConfig {
     sourceUrl: value.sourceUrl as string,
     ...(game ? { game } : {}),
     ...(hasBranding ? { branding: parseBranding(value.branding) } : {}),
-    ...(hasSigning ? { signing: parseSigning(value.signing) } : {}),
+    signing: parseSigning(value.signing),
   };
 }
