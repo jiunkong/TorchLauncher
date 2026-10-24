@@ -216,7 +216,9 @@ try {
         await app.evaluate(({ dialog }, target) => {
           dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
         }, projectPath);
-        await page.getByRole('button', { name: '저장', exact: true }).click();
+        // Saving lives in the top menu bar (File > Save).
+        await page.getByTestId('menu-file').click();
+        await page.getByTestId('menu-item-save').click();
         await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
         const savedProject = JSON.parse(await readFile(projectPath, 'utf8'));
         assert.equal(savedProject.format, 'torchlauncher-project');

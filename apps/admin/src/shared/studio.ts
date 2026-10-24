@@ -375,7 +375,9 @@ export type StudioWorkCommand =
         /** Answer to a close request: discard unsaved changes and close the window. Only valid after `onCloseRequest` fired. */
         | 'closeConfirm'
         /** Answer to a close request: keep the window open. */
-        | 'closeCancel';
+        | 'closeCancel'
+        /** File > Exit: asks main to close the window, so the normal close and unsaved flow applies. */
+        | 'exit';
     }
   | {
       action: 'filesPolicy';

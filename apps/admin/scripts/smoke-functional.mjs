@@ -192,6 +192,10 @@ try {
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20000 });
   await page.getByTestId('application-info').filter({ hasText: process.platform }).waitFor();
   const nav = (label) => page.locator('nav.menu .mi').filter({ hasText: label });
+  const menuAction = async (menu, item) => {
+    await page.getByTestId(`menu-${menu}`).click();
+    await page.getByTestId(`menu-item-${item}`).click();
+  };
   const goto = async (label) => {
     await nav(label).click();
     await page.getByRole('heading', { level: 1 }).first().waitFor();
@@ -277,6 +281,15 @@ try {
 
   // Start screen -> new project.
   await page.getByTestId('start-page').waitFor();
+  // The menu bar is always there; without a project the project actions are disabled.
+  await page.getByTestId('menubar').waitFor();
+  await page.getByTestId('menu-file').click();
+  for (const id of ['save', 'saveAs', 'close'])
+    assert.equal(await page.getByTestId(`menu-item-${id}`).getAttribute('aria-disabled'), 'true');
+  assert.equal(await page.getByTestId('menu-item-new').getAttribute('aria-disabled'), null);
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-menu-start.png') });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByTestId('menu-file').getAttribute('aria-expanded'), 'false');
   // Language setting on the start screen: explicit choices switch text now, automatic follows --lang.
   const language = (name) => page.locator(`[data-testid="start-page"] [data-choice="${name}"]`);
   assert.equal(await language('auto').getAttribute('aria-checked'), 'true');
@@ -292,8 +305,49 @@ try {
   await page.getByTestId('start-new').click();
   await page.getByTestId('project-card').waitFor();
   assert.equal(await nav('개요').getAttribute('aria-current'), 'page');
-  // The language control is also in the sidebar footer while a project is open.
-  await page.locator('.side [data-testid="language-control"] [aria-checked="true"]').waitFor();
+  // The sidebar footer only shows the save state; the version lives in the About dialog.
+  assert.equal(await page.locator('.sidefoot button').count(), 0);
+  assert.equal(await page.locator('.side [data-testid="language-control"]').count(), 0);
+  const noExtraWindow = () =>
+    app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+  // Menus: keyboard navigation, outside click, View > language, Help > About.
+  await page.getByTestId('menu-file').focus();
+  await page.keyboard.press('ArrowDown');
+  await page.getByTestId('menu-item-new').waitFor();
+  assert.equal(await page.getByTestId('menu-file').getAttribute('aria-expanded'), 'true');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.getAttribute('data-testid')),
+    'menu-item-open',
+  );
+  await page.keyboard.press('ArrowRight');
+  await page.getByTestId('menu-item-lang-ko').waitFor();
+  assert.equal(await page.getByTestId('menu-view').getAttribute('aria-expanded'), 'true');
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-menu-view.png') });
+  await page.keyboard.press('Escape');
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.getAttribute('data-testid')),
+    'menu-view',
+  );
+  await page.getByTestId('menu-file').click();
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-menu-file.png') });
+  await page.locator('.page').click({ position: { x: 5, y: 5 } });
+  assert.equal(await page.getByTestId('menu-file').getAttribute('aria-expanded'), 'false');
+  await page.getByTestId('menu-view').click();
+  await page.getByTestId('menu-item-lang-en').click();
+  await nav('Overview').waitFor();
+  await page.getByTestId('menu-view').click();
+  assert.equal(await page.getByTestId('menu-item-lang-en').getAttribute('aria-checked'), 'true');
+  await page.getByTestId('menu-item-lang-ko').click();
+  await nav('개요').waitFor();
+  await page.getByTestId('menu-help').click();
+  await page.getByTestId('menu-item-about').click();
+  await page.getByTestId('about-dialog').waitFor();
+  assert.match(await page.getByTestId('about-version').textContent(), /^v\d/);
+  assert.equal(await noExtraWindow(), 1);
+  await page.screenshot({ path: join(cwd, '.cache/smoke/studio-about.png') });
+  await page.getByRole('button', { name: '닫기' }).click();
+  await page.getByTestId('about-dialog').waitFor({ state: 'detached' });
   assert.match(await page.title(), /TorchLauncher Studio/);
 
   // Server info: validation.
@@ -312,7 +366,7 @@ try {
   assert.equal(await page.getByTestId('save-state').getAttribute('data-dirty'), 'true');
 
   // Unsaved-changes confirmation is an in-app dialog.
-  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await menuAction('file', 'open');
   const dialog = page.getByTestId('unsaved-dialog');
   await dialog.waitFor();
   assert.equal(await dialog.getAttribute('role'), 'dialog');
@@ -322,17 +376,27 @@ try {
     await page.getByLabel('서버 이름', { exact: true }).inputValue(),
     'Functional Studio smoke',
   );
-  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await menuAction('file', 'open');
   await dialog.getByRole('button', { name: '취소', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
   assert.equal(await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0), 0);
 
-  // Save, then reopen: the dialog's save path saves and proceeds without losing the project.
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  // New project from the menu with a dirty project asks first (in-app), cancel keeps the edit.
+  await menuAction('file', 'new');
+  await dialog.waitFor();
+  await dialog.getByRole('button', { name: '취소', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  assert.equal(
+    await page.getByLabel('서버 이름', { exact: true }).inputValue(),
+    'Functional Studio smoke',
+  );
+  // Ctrl+S saves even while a text input has focus.
+  await page.getByLabel('서버 이름', { exact: true }).focus();
+  await page.keyboard.press('Control+s');
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
   assert.equal(JSON.parse(await readFile(project, 'utf8')).name, 'Functional Studio smoke');
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke 2');
-  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await menuAction('file', 'open');
   await dialog.waitFor();
   await dialog.getByRole('button', { name: '저장', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
@@ -367,7 +431,7 @@ try {
     ok: false,
     code: 'UNSAVED',
   });
-  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await menuAction('file', 'open');
   await page.getByTestId('unsaved-dialog').getByRole('button', { name: '저장 안 함' }).click();
   await page.getByTestId('unsaved-dialog').waitFor({ state: 'detached' });
   await goto('서버 정보');
@@ -488,7 +552,7 @@ try {
   assert.deepEqual(bar, { oneRow: true, plain: true });
   await page.screenshot({ path: join(cwd, '.cache/smoke/studio-polish-player-settings.png') });
   // A command message belongs to its page: it is gone after navigating away.
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await menuAction('file', 'save');
   await page.getByTestId('studio-message').waitFor();
   await goto('개요');
   assert.equal(await page.getByTestId('studio-message').count(), 0);
@@ -624,13 +688,16 @@ try {
   assert.equal(await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0), 0);
 
   // Persistence: save, reopen the saved project.
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await menuAction('file', 'save');
   await page.getByText('프로젝트를 저장했습니다.', { exact: true }).waitFor();
   const saved = JSON.parse(await readFile(project, 'utf8'));
   assert.equal(saved.version, 1);
   assert.ok(saved.lastBuild && saved.gameSettings.resourcePacks.length === 1);
   assert.equal(saved.gameSettings.shader.pack.value, 'Test.zip');
-  await page.getByRole('button', { name: '열기', exact: true }).click();
+  // File > Close project returns to the start screen (clean project: no question).
+  await menuAction('file', 'close');
+  await page.getByTestId('start-page').waitFor();
+  await menuAction('file', 'open');
   await goto('단축키 · 옵션');
   await page.getByTestId('settings-imported').waitFor();
 
@@ -685,9 +752,7 @@ try {
     await page.setViewportSize({ width, height });
     const small = await page.evaluate(() => {
       const side = document.querySelector('.side');
-      const labels = [
-        ...side.querySelectorAll('.sidefoot button, .sidefoot .savest-text, .sidefoot .appinfo'),
-      ];
+      const labels = [...side.querySelectorAll('.sidefoot .savest-text')];
       return {
         horizontal: side.scrollWidth > side.clientWidth,
         clipped: labels
@@ -740,7 +805,8 @@ try {
   // Window close with unsaved changes: main asks, the app answers in its own modal.
   await goto('서버 정보');
   await page.getByLabel('서버 이름', { exact: true }).fill('Closing edit');
-  await closeWindow();
+  // File > Exit uses the window close path: the unsaved flow applies.
+  await menuAction('file', 'exit');
   const closing = page.getByTestId('unsaved-dialog');
   await closing.waitFor();
   await closing.getByRole('button', { name: '취소', exact: true }).click();

@@ -55,12 +55,12 @@ describe('language control', () => {
   });
 });
 
-it('is wired to the store from the start screen and the sidebar', async () => {
+it('is wired to the store from the start screen and the View menu', async () => {
   const start = (await import('../pages/StartPage.tsx?raw')).default as string;
-  const side = (await import('./Sidebar.tsx?raw')).default as string;
-  for (const source of [start, side]) {
-    expect(source).toContain('<LanguageControl');
-    expect(source).toContain('followSystem()');
-    expect(source).toContain('setLocale(choice)');
-  }
+  const app = (await import('../App.tsx?raw')).default as string;
+  expect(start).toContain('<LanguageControl');
+  expect(start).toContain('followSystem()');
+  expect(start).toContain('setLocale(choice)');
+  expect(app).toContain('followSystem()');
+  expect(app).toContain('setLocale(choice)');
 });

@@ -275,6 +275,11 @@ export class StudioService {
   private closeAsked = false;
   private closeHandlers: { confirm(): void; cancel(): void } | null = null;
   /** The window shell registers what happens on the renderer's answer to a close request. */
+  private exitHandler: (() => void) | null = null;
+  /** The window's close path; `exit` goes through the normal close request and unsaved flow. */
+  onExit(handler: () => void): void {
+    this.exitHandler = handler;
+  }
   onCloseAnswer(handlers: { confirm(): void; cancel(): void }): void {
     this.closeHandlers = handlers;
   }
@@ -364,6 +369,7 @@ export class StudioService {
       'revealExport',
       'closeConfirm',
       'closeCancel',
+      'exit',
     ];
     const extra =
       value.action === 'testReset'
@@ -407,6 +413,10 @@ export class StudioService {
     )
       return Promise.resolve({ ok: false, code: 'INVALID' });
     if (value.action === 'state') return Promise.resolve({ ok: true, state: this.snapshot() });
+    if (value.action === 'exit') {
+      this.exitHandler?.();
+      return Promise.resolve({ ok: true, state: this.snapshot() });
+    }
     if (value.action === 'closeConfirm' || value.action === 'closeCancel') {
       // Valid only as the answer to a close request main itself sent to the trusted renderer.
       if (!this.closeAsked) return Promise.resolve({ ok: false, code: 'INVALID' });

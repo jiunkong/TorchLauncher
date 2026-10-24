@@ -19,7 +19,6 @@ import {
   SunIcon,
   UploadIcon,
 } from './Icons';
-import { LanguageControl } from './LanguageControl';
 
 const icons: Record<PageId, ReactNode> = {
   overview: <OverviewIcon />,
@@ -51,18 +50,14 @@ export function Sidebar({
   insights,
   page,
   onNavigate,
-  onProject,
-  info,
 }: {
   studio: StudioController;
   insights: Insights;
   page: PageId;
   onNavigate(page: PageId): void;
-  onProject(action: 'new' | 'open'): void;
-  info: string;
 }) {
-  const { t, preference, setLocale, useAutomaticLocale: followSystem } = useStudioLocale();
-  const { draft, state, busy, run } = studio;
+  const { t } = useStudioLocale();
+  const { draft, state } = studio;
   if (!draft) return null;
   const tags: Partial<Record<PageId, { text: string; tone: 'w' | 'k' }>> = {};
   if (Object.keys(validateServer(draft)).length > 0)
@@ -109,50 +104,9 @@ export function Sidebar({
         })}
       </nav>
       <div className="sidefoot">
-        <div className="foot-save">
-          <div className="savest" data-testid="save-state" data-dirty={dirty}>
-            <span className={`dot ${dirty ? 'warn' : 'ok'}`} />
-            <span className="savest-text">{dirty ? t('save.unsaved') : t('save.saved')}</span>
-          </div>
-          <button type="button" className="btn sm" disabled={busy} onClick={() => void run('save')}>
-            {t('save.save')}
-          </button>
-        </div>
-        <div className="foot-row">
-          <button
-            type="button"
-            className="btn ghost sm"
-            disabled={busy}
-            onClick={() => onProject('new')}
-          >
-            {t('project.new')}
-          </button>
-          <button
-            type="button"
-            className="btn ghost sm"
-            disabled={busy}
-            onClick={() => onProject('open')}
-          >
-            {t('project.open')}
-          </button>
-          <button
-            type="button"
-            className="btn ghost sm saveas"
-            disabled={busy}
-            aria-label={t('save.saveAs')}
-            title={t('save.saveAs')}
-            onClick={() => void run('saveAs')}
-          >
-            {t('save.saveAsShort')}
-          </button>
-        </div>
-        <LanguageControl
-          compact
-          preference={preference}
-          onSelect={(choice) => (choice === 'auto' ? followSystem() : setLocale(choice))}
-        />
-        <div className="appinfo" data-testid="application-info">
-          {info}
+        <div className="savest" data-testid="save-state" data-dirty={dirty}>
+          <span className={`dot ${dirty ? 'warn' : 'ok'}`} />
+          <span className="savest-text">{dirty ? t('save.unsaved') : t('save.saved')}</span>
         </div>
       </div>
     </aside>
