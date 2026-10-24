@@ -35,6 +35,7 @@ export function createStudioNativeDialogs(
           gamefolder: t('dialog.gameFolderOpen'),
           resourcepack: t('dialog.resourcePackOpen'),
           shaderpack: t('dialog.shaderPackOpen'),
+          mod: t('dialog.modOpen'),
         }[kind],
         ...(root ? { defaultPath: root } : {}),
         properties: directory
@@ -58,9 +59,11 @@ export function createStudioNativeDialogs(
                       ? [{ name: t('dialog.keyBackupFilter'), extensions: ['torchkey'] }]
                       : kind === 'optionsfile'
                         ? [{ name: t('dialog.optionsFilter'), extensions: ['txt'] }]
-                        : kind === 'resourcepack' || kind === 'shaderpack'
-                          ? [{ name: t('dialog.zipFilter'), extensions: ['zip'] }]
-                          : [{ name: t('dialog.studioFileFilter'), extensions: ['torchproj'] }],
+                        : kind === 'mod'
+                          ? [{ name: t('dialog.modFilter'), extensions: ['jar'] }]
+                          : kind === 'resourcepack' || kind === 'shaderpack'
+                            ? [{ name: t('dialog.zipFilter'), extensions: ['zip'] }]
+                            : [{ name: t('dialog.studioFileFilter'), extensions: ['torchproj'] }],
             }
           : {}),
       });

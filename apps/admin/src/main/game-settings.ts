@@ -48,6 +48,7 @@ export const PACK_LIMIT = 256 * 1024 ** 2;
 export const PACK_DIRECTORY: Record<PackKind, string> = {
   resourcepack: 'resourcepacks',
   shaderpack: 'shaderpacks',
+  mod: 'mods',
 };
 export const MAX_OPTIONS = 2000;
 export const MAX_PACKS = SETTINGS_LIMITS.packsPerList;
@@ -55,25 +56,39 @@ export const MAX_PACKS = SETTINGS_LIMITS.packsPerList;
 const GAME_OWNED = new Set(['version', 'resourcePacks', 'incompatibleResourcePacks']);
 const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 
+export function isModPath(path: string): boolean {
+  return /^mods\/[^/]+\.jar$/i.test(path.replaceAll('\\', '/'));
+}
 export function isReservedPath(path: string): boolean {
+  const normalized = path.replaceAll('\\', '/').toLowerCase();
   return (
-    path === 'options.txt' ||
-    path === SETTINGS_POLICY_PATH ||
-    path.startsWith('resourcepacks/') ||
-    path.startsWith('shaderpacks/')
+    normalized === 'options.txt' ||
+    normalized === SETTINGS_POLICY_PATH ||
+    normalized.startsWith('resourcepacks/') ||
+    normalized.startsWith('shaderpacks/') ||
+    isModPath(normalized)
   );
 }
 /** Paths the build plan takes from game settings instead of the file list. */
 export function isPlanReserved(path: string): boolean {
-  return path === 'options.txt' || path === SETTINGS_POLICY_PATH;
+  const normalized = path.replaceAll('\\', '/').toLowerCase();
+  return (
+    normalized === 'options.txt' || normalized === SETTINGS_POLICY_PATH || isModPath(normalized)
+  );
 }
-export function validatePackName(name: unknown): asserts name is string {
+export function validatePackName(
+  name: unknown,
+  kind: PackKind = 'resourcepack',
+): asserts name is string {
+  const extension = kind === 'mod' ? 'jar' : 'zip';
+  const extensionPattern = kind === 'mod' ? /\.jar$/i : /\.zip$/i;
   if (
     typeof name !== 'string' ||
-    !/^[\p{L}\p{N}][\p{L}\p{N} _.()+\-[\]]{0,98}\.zip$/u.test(name) ||
+    !/^[\p{L}\p{N}][\p{L}\p{N} _.()+\-[\]]{0,98}\.[a-z]{3}$/iu.test(name) ||
+    !extensionPattern.test(name) ||
     name.normalize('NFC') !== name ||
     name.includes('..') ||
-    / \.zip$/i.test(name) ||
+    new RegExp(` \\.${extension}$`, 'i').test(name) ||
     WINDOWS_RESERVED.test(name) ||
     Buffer.byteLength(name) > 120
   )
@@ -135,7 +150,7 @@ export function mergeOptions<T extends { key: string; policy: SettingPolicyChoic
   return merged.slice(0, MAX_OPTIONS);
 }
 export function emptySettings(): StudioGameSettings {
-  return { options: [], resourcePacks: [], shaderPacks: [] };
+  return { options: [], resourcePacks: [], shaderPacks: [], mods: [] };
 }
 export function defaultShader(): StudioShaderSettings {
   return {
@@ -200,7 +215,7 @@ export function parseGameSettings(input: unknown): StudioGameSettings {
   const g = input as Record<string, unknown>;
   const required = ['options', 'resourcePacks', 'shaderPacks'];
   if (
-    Object.keys(g).some((k) => ![...required, 'configFiles', 'shader'].includes(k)) ||
+    Object.keys(g).some((k) => ![...required, 'mods', 'configFiles', 'shader'].includes(k)) ||
     required.some((k) => !Object.hasOwn(g, k)) ||
     !Array.isArray(g.resourcePacks) ||
     !Array.isArray(g.shaderPacks) ||
@@ -209,7 +224,12 @@ export function parseGameSettings(input: unknown): StudioGameSettings {
   )
     return fail();
   parseItems(g.options, 'option');
-  for (const list of [g.resourcePacks, g.shaderPacks] as unknown[][]) {
+  for (const [kind, list] of [
+    ['resourcepack', g.resourcePacks],
+    ['shaderpack', g.shaderPacks],
+    ['mod', g.mods ?? []],
+  ] as const) {
+    if (!Array.isArray(list) || list.length > MAX_PACKS) return fail();
     const names = new Set<string>();
     for (const p of list) {
       const e = p as Record<string, unknown>;
@@ -225,7 +245,7 @@ export function parseGameSettings(input: unknown): StudioGameSettings {
         (e.length as number) > PACK_LIMIT
       )
         return fail();
-      validatePackName(e.name);
+      validatePackName(e.name, kind);
       if (names.has((e.name as string).toLowerCase())) return fail();
       names.add((e.name as string).toLowerCase());
     }
@@ -598,7 +618,7 @@ export async function addPack(
   signal: AbortSignal,
 ): Promise<StudioPack> {
   const name = basename(picked);
-  validatePackName(name);
+  validatePackName(name, kind);
   await noLinks(picked);
   const directory = join(sourceRoot, PACK_DIRECTORY[kind]);
   await noLinks(sourceRoot);

@@ -50,6 +50,7 @@ export function buildPlan(project: StudioProject): BuildPlan {
     for (const [kind, list] of [
       ['resourcepack', settings.resourcePacks],
       ['shaderpack', settings.shaderPacks],
+      ['mod', settings.mods ?? []],
     ] as const)
       for (const pack of list) {
         if (pack.policy === 'none') continue;
@@ -79,8 +80,8 @@ export function buildPlan(project: StudioProject): BuildPlan {
     }
   }
   const taken = new Set(managed.map((i) => i.path));
-  // Game settings own options.txt, the generated policy and their packs; plain entries for the
-  // same paths are not built twice. Other plain files under resourcepacks/ keep working as before.
+  // Game settings own options.txt, the generated policy, packs and imported mods; plain entries
+  // for the same paths are not built twice. Other plain files under resourcepacks/ keep working.
   const plain: PlanItem[] = project.files
     .filter((f) => !taken.has(f.path) && !(settings && isPlanReserved(f.path)))
     .map((f) => ({

@@ -5,17 +5,10 @@ import type {
   StudioGameSettings,
 } from '../../../../shared/studio.js';
 import { FolderIcon } from '../../components/Icons';
-import { Chip, Note, PageHeader, PolicyControl } from '../../components/ui';
+import { Chip, Note, PolicyControl } from '../../components/ui';
 import { useStudioLocale } from '../../i18n';
 import type { PageProps } from '../types';
-import {
-  type Labels,
-  PolicyUsage,
-  PresetDialog,
-  packColor,
-  type Send,
-  usePolicyLabels,
-} from './shared';
+import { type Labels, PresetDialog, packColor, type Send, usePolicyLabels } from './shared';
 
 /** Config files the project manages plus the candidates the last test run found. */
 export function mergeConfigFiles(
@@ -30,7 +23,7 @@ export function mergeConfigFiles(
 
 const fileName = (path: string) => path.split('/').pop() ?? path;
 
-export function ModSettingsPage({ studio, draft }: PageProps) {
+export function ModConfigSection({ studio, draft }: PageProps) {
   const { t } = useStudioLocale();
   const { state, busy } = studio;
   const [dialog, setDialog] = useState(false);
@@ -45,27 +38,29 @@ export function ModSettingsPage({ studio, draft }: PageProps) {
   const unsupported = state?.testRun.configPreview?.skippedConfigs ?? [];
   return (
     <>
-      <PageHeader
-        eyebrow={t('settings.config.eyebrow')}
-        title={t('settings.config.title')}
-        lead={t('settings.config.lead')}
-      />
-      <PolicyUsage policy={draft.gameSettings ? (state?.policy ?? null) : null} />
-      <ConfigPanes
-        files={files}
-        managed={new Set((draft.gameSettings?.configFiles ?? []).map((file) => file.path))}
-        unsupported={unsupported.map((file) => file.path)}
-        labels={labels}
-        send={send}
-        busy={busy}
-      />
-      <div>
-        <button className="btn sm" type="button" disabled={busy} onClick={() => setDialog(true)}>
-          <FolderIcon />
-          {t('settings.dialog.folderAction')}
-        </button>
-      </div>
-      <Note>{t('settings.config.note')}</Note>
+      <section className="card" data-testid="settings-config-section">
+        <div className="sechead">
+          <div>
+            <h2>{t('settings.config.title')}</h2>
+            <p className="sub tight">{t('settings.config.lead')}</p>
+          </div>
+        </div>
+        <ConfigPanes
+          files={files}
+          managed={new Set((draft.gameSettings?.configFiles ?? []).map((file) => file.path))}
+          unsupported={unsupported.map((file) => file.path)}
+          labels={labels}
+          send={send}
+          busy={busy}
+        />
+        <div>
+          <button className="btn sm" type="button" disabled={busy} onClick={() => setDialog(true)}>
+            <FolderIcon />
+            {t('settings.dialog.folderAction')}
+          </button>
+        </div>
+        <Note>{t('settings.config.note')}</Note>
+      </section>
       {dialog && (
         <PresetDialog
           busy={busy}

@@ -30,5 +30,10 @@ describe('Studio native dialogs', () => {
       title: 'Choose signing key backup file',
       filters: [{ name: 'Signing key backup', extensions: ['torchkey'] }],
     });
+    await dialogs.open('mod');
+    expect(showOpenDialog.mock.calls[1]?.[1]).toMatchObject({
+      title: 'Choose a mod (.jar)',
+      filters: [{ name: 'Java archive', extensions: ['jar'] }],
+    });
   });
 });
