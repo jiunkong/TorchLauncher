@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { StudioExportCheck } from '../../../shared/studio.js';
+import type { LauncherTarget, StudioExportCheck } from '../../../shared/studio.js';
 import { CheckIcon, DownloadIcon, FileIcon, FolderIcon } from '../components/Icons';
 import { CheckRow, Note, PageHeader } from '../components/ui';
 import { formatBytes, loaderLabel } from '../format';
@@ -12,7 +12,10 @@ let dismissedDone: string | null = null;
 
 export function ExportPage({ studio, draft, insights, go }: PageProps) {
   const { t } = useStudioLocale();
-  const { busy, command, run } = studio;
+  const { busy, command } = studio;
+  const [target, setTarget] = useState<LauncherTarget>('windows');
+  const [allowCached, setAllowCached] = useState(false);
+  const release = studio.state?.launcherRelease;
   const { deploy } = insights;
   const status = insights.export;
   const [dismissed, setDismissedState] = useState<string | null>(dismissedDone);
@@ -82,6 +85,9 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
             </span>
           </div>
         </section>
+        {release && (
+          <Note>{t(`export.source.${release.source}`, { version: release.version })}</Note>
+        )}
         <Note>{t('export.done.note')}</Note>
         <div className="row-actions start">
           <button type="button" className="btn" onClick={() => setDismissed(doneKey)}>
@@ -100,14 +106,40 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
           <h2>{t('export.card.launcher')}</h2>
           <div className="card-body">
             <div className="fld">
-              <span className="lbl">{t('export.launcherFile')}</span>
-              <div className="pick">
-                <span className="g">
-                  <span>{t('export.launcherFileValue')}</span>
-                  <small>{t('export.launcherFileHelp')}</small>
-                </span>
-              </div>
+              <label className="lbl" htmlFor="export-target">
+                {t('export.target')}
+              </label>
+              <select
+                id="export-target"
+                className="inp"
+                value={target}
+                disabled={busy}
+                onChange={(event) => {
+                  setTarget(event.target.value as LauncherTarget);
+                  setAllowCached(false);
+                }}
+              >
+                <option value="windows">Windows x64</option>
+                <option value="linux">Linux x64</option>
+              </select>
+              <small>{t('export.automatic')}</small>
             </div>
+            {release && release.target === target && (
+              <Note tone={release.source === 'offline-cache' ? 'warn' : undefined}>
+                {t(`export.source.${release.source}`, { version: release.version })}
+                {release.source === 'offline-cache' && (
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={allowCached}
+                      disabled={busy}
+                      onChange={(event) => setAllowCached(event.target.checked)}
+                    />
+                    {t('export.allowCached', { version: release.version })}
+                  </label>
+                )}
+              </Note>
+            )}
             <div className="fld">
               <span className="lbl">{t('export.destination')}</span>
               <div className="pick">
@@ -124,8 +156,15 @@ export function ExportPage({ studio, draft, insights, go }: PageProps) {
                 disabled={busy || blocked || !serverReady}
                 data-testid="export-button"
                 onClick={() => {
-                  setDismissed(null);
-                  void run('export');
+                  void command({
+                    action: 'export',
+                    target,
+                    allowCached,
+                    ...(allowCached && release ? { cachedVersion: release.version } : {}),
+                  }).then((ok) => {
+                    if (ok) setDismissed(null);
+                  });
+                  setAllowCached(false);
                 }}
               >
                 <DownloadIcon />

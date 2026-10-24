@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach } from 'vitest';
+import { StudioFailure } from '../project.js';
 import { SigningKeyStore } from '../signing.js';
 import { StudioService as Service } from '../studio.js';
 
@@ -22,9 +23,21 @@ export function testSigningKeys(): SigningKeyStore {
 }
 export class StudioService extends Service {
   readonly testKeys: SigningKeyStore;
+  testLauncherPath: string | null = null;
   constructor(...args: Partial<ConstructorParameters<typeof Service>>) {
     const keys = args[3] ?? testSigningKeys();
-    super(args[0] as ConstructorParameters<typeof Service>[0], args[1], args[2], keys, args[4]);
+    super(
+      args[0] as ConstructorParameters<typeof Service>[0],
+      args[1],
+      args[2],
+      keys,
+      args[4],
+      args[5] ??
+        (async () => {
+          if (!this.testLauncherPath) throw new StudioFailure('LAUNCHER_UNCONFIGURED');
+          return this.testLauncherPath;
+        }),
+    );
     this.testKeys = keys;
   }
 }

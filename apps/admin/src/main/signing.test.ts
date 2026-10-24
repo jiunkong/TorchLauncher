@@ -427,7 +427,14 @@ describe('Studio signing integration', () => {
     const bytes = await readFile(pack);
     const d = dialogs();
     let remote = bytes;
-    const service = new StudioService(d, () => memorySource(remote), undefined, ctx.store);
+    const service = new StudioService(
+      d,
+      () => memorySource(remote),
+      undefined,
+      ctx.store,
+      null,
+      async () => join(ctx.root, 'Torch.exe'),
+    );
     const project = parseProject(ctx.s.snapshot().project);
     project.sourceUrl = 'https://example.org/pack';
     await writeFile(join(ctx.projDir, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
@@ -436,7 +443,6 @@ describe('Studio signing integration', () => {
     const binary = join(ctx.root, 'Torch.exe');
     await writeFile(binary, 'MZ fixture');
     const out = join(ctx.root, 'out.zip');
-    d.open.mockResolvedValueOnce([binary]);
     d.save.mockResolvedValueOnce(out);
     expect((await service.request({ action: 'export' })).ok).toBe(true);
     const cfg = parseServerConfig(

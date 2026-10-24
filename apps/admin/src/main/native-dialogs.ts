@@ -27,7 +27,6 @@ export function createStudioNativeDialogs(
           project: t('dialog.projectOpen'),
           projectparent: t('dialog.projectParent'),
           files: t('dialog.filesOpen'),
-          binary: t('dialog.binaryOpen'),
           icon: t('dialog.iconOpen'),
           background: t('dialog.backgroundOpen'),
           keybackup: t('dialog.keyBackupOpen'),
@@ -55,15 +54,13 @@ export function createStudioNativeDialogs(
                         extensions: kind === 'icon' ? ['png'] : ['png', 'jpg', 'jpeg'],
                       },
                     ]
-                  : kind === 'binary'
-                    ? [{ name: t('dialog.binaryFilter'), extensions: ['exe', 'AppImage'] }]
-                    : kind === 'keybackup'
-                      ? [{ name: t('dialog.keyBackupFilter'), extensions: ['torchkey'] }]
-                      : kind === 'optionsfile'
-                        ? [{ name: t('dialog.optionsFilter'), extensions: ['txt'] }]
-                        : kind === 'mod'
-                          ? [{ name: t('dialog.modFilter'), extensions: ['jar'] }]
-                          : [{ name: t('dialog.zipFilter'), extensions: ['zip'] }],
+                  : kind === 'keybackup'
+                    ? [{ name: t('dialog.keyBackupFilter'), extensions: ['torchkey'] }]
+                    : kind === 'optionsfile'
+                      ? [{ name: t('dialog.optionsFilter'), extensions: ['txt'] }]
+                      : kind === 'mod'
+                        ? [{ name: t('dialog.modFilter'), extensions: ['jar'] }]
+                        : [{ name: t('dialog.zipFilter'), extensions: ['zip'] }],
             }
           : {}),
       });

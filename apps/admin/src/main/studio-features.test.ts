@@ -225,6 +225,15 @@ describe('files diff against the last build', () => {
 });
 
 describe('url check and export', () => {
+  it.each([
+    { action: 'export', target: 'darwin' },
+    { action: 'export', allowCached: 'yes' },
+    { action: 'export', cachedVersion: 12 },
+    { action: 'export', binary: '/untrusted/path.exe' },
+  ])('rejects invalid export arguments: %j', async (command) => {
+    const h = await harness();
+    expect(await h.s.request(command)).toEqual({ ok: false, code: 'INVALID' });
+  });
   it('records a structured result per item', async () => {
     const h = await harness();
     await h.include(['a.txt'], 'always');
@@ -291,9 +300,11 @@ describe('url check and export', () => {
     Object.fromEntries((s.snapshot().export?.checks ?? []).map((c) => [c.id, c.reasons]));
   it('exports exactly one ZIP with the launcher and server config', async () => {
     const h = await exportReady();
-    h.d.open.mockResolvedValueOnce([h.binary]);
+    h.s.testLauncherPath = h.binary;
     h.d.save.mockResolvedValueOnce(h.zip);
-    expect((await h.s.request({ action: 'export' })).ok).toBe(true);
+    const openCalls = h.d.open.mock.calls.length;
+    expect((await h.s.request({ action: 'export', target: 'windows' })).ok).toBe(true);
+    expect(h.d.open).toHaveBeenCalledTimes(openCalls);
     expect((await readdir(h.root)).filter((n) => n.endsWith('.zip'))).toEqual(['out.zip']);
     expect((await readdir(h.root)).some((n) => n.startsWith('.torchstudio-'))).toBe(false);
     const zip = readZip(await readFile(h.zip));
@@ -372,7 +383,7 @@ describe('url check and export', () => {
   it('leaves nothing behind when export is interrupted or the launcher is invalid', async () => {
     const h = await exportReady();
     await writeFile(h.zip, 'previous export');
-    h.d.open.mockResolvedValueOnce([h.binary]);
+    h.s.testLauncherPath = h.binary;
     h.d.save.mockResolvedValueOnce(h.zip);
     await truncate(h.binary, 0);
     await writeFile(h.binary, 'not a launcher');

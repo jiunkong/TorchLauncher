@@ -18,6 +18,7 @@ import {
 import { studioChannel, studioCloseChannel } from '../shared/studio.js';
 import { resolveMainLocale } from './i18n.js';
 import { handleStudioRequest } from './ipc.js';
+import { createLauncherResolver } from './launcher-release.js';
 import { decodeNativeImage } from './native-branding.js';
 import { createStudioNativeDialogs } from './native-dialogs.js';
 import { SigningKeyStore } from './signing.js';
@@ -65,6 +66,12 @@ function createWindow(): void {
     decodeNativeImage,
     new SigningKeyStore(join(app.getPath('userData'), 'signing-keys'), safeStorage),
     createStudioTestRunner(),
+    createLauncherResolver({
+      packaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      appVersion: app.getVersion(),
+      cacheDir: join(app.getPath('userData'), 'launcher-cache'),
+    }),
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>

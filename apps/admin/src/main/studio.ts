@@ -67,6 +67,7 @@ import {
   validPackOptionsName,
   writeGeneratedPolicy,
 } from './game-settings.js';
+import type { LauncherResolver } from './launcher-release.js';
 import { getLoaderVersions } from './loader-versions.js';
 import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './project.js';
 import { encodeProjectFile } from './project-file.js';
@@ -88,7 +89,6 @@ export interface StudioDialogs {
       | 'project'
       | 'projectparent'
       | 'files'
-      | 'binary'
       | 'icon'
       | 'background'
       | 'keybackup'
@@ -267,6 +267,9 @@ export class StudioService {
     },
     private readonly keys: SigningKeyStore,
     private readonly tests: StudioTestRunner | null = null,
+    private readonly launcherResolver: LauncherResolver = async () => {
+      throw new StudioFailure('LAUNCHER_UNCONFIGURED');
+    },
   ) {}
   snapshot(): StudioState {
     return structuredClone({
@@ -417,7 +420,18 @@ export class StudioService {
       keyImport: ['passphrase', 'replace'],
     };
     const keyFields = typeof value.action === 'string' ? keyActions[value.action] : undefined;
-    if (typeof value.action === 'string' && SPECIAL_FIELDS[value.action]) {
+    if (value.action === 'export') {
+      if (
+        Object.keys(value).some(
+          (key) => !['action', 'target', 'allowCached', 'cachedVersion'].includes(key),
+        ) ||
+        (value.target !== undefined && value.target !== 'windows' && value.target !== 'linux') ||
+        (value.allowCached !== undefined && typeof value.allowCached !== 'boolean') ||
+        (value.cachedVersion !== undefined &&
+          (typeof value.cachedVersion !== 'string' || value.cachedVersion.length > 100))
+      )
+        return Promise.resolve({ ok: false, code: 'INVALID' });
+    } else if (typeof value.action === 'string' && SPECIAL_FIELDS[value.action]) {
       if (!validSpecial(value)) return Promise.resolve({ ok: false, code: 'INVALID' });
     } else if (keyFields) {
       if (
@@ -1220,15 +1234,28 @@ export class StudioService {
       }
       case 'export': {
         const project = this.project();
-        this.exportDone = null;
+        this.state.launcherRelease = null;
         // Local state first: the source folder may have changed since the last listing.
         await this.runUrlCheck(signal);
         await this.derive(signal, true);
         const state = this.state.export;
         if (!state || state.blocked) throw new StudioFailure('BLOCKED');
-        const binary = (await this.selected('binary'))[0];
         const destination = await this.dialogs.save('zip');
-        if (!binary || !destination) throw new StudioFailure('CANCELLED');
+        signal.throwIfAborted();
+        if (!destination) throw new StudioFailure('CANCELLED');
+        const binary = await this.launcherResolver({
+          target: command.target ?? 'windows',
+          allowCached: command.allowCached === true,
+          ...(command.cachedVersion ? { cachedVersion: command.cachedVersion } : {}),
+          signal,
+          progress: (bytes) => {
+            this.state.progress = bytes;
+          },
+          status: (info) => {
+            this.state.launcherRelease = info;
+          },
+        });
+        signal.throwIfAborted();
         const keyCreated = await this.ensureKey(this.keys, project.serverId);
         const publicKey = (await this.keys.status(project.serverId)).publicKey;
         const config = parseServerConfig({
