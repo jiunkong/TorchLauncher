@@ -127,6 +127,25 @@ try {
     .waitFor({ state: 'detached' });
   await assert.rejects(readFile(unregistered), { code: 'ENOENT' });
 
+  // Microsoft login code: no dialog and no extra window normally; the dialog follows state only.
+  assert.equal(await page.getByTestId('login-dialog').count(), 0);
+  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
+  assert.equal(
+    (await page.evaluate(() => window.torchlauncher.command({ type: 'copy-login-code' }))).ok,
+    false,
+  );
+  const loginState = await page.evaluate(() => window.torchlauncher.getState());
+  const sendState = (state) =>
+    app.evaluate(({ BrowserWindow }, next) => {
+      BrowserWindow.getAllWindows()[0].webContents.send('torchlauncher:product-state', next);
+    }, state);
+  await sendState({ ...loginState, loginCode: 'ABCD-1234' });
+  await page.getByTestId('login-dialog').waitFor();
+  assert.equal(await page.getByTestId('login-code').textContent(), 'ABCD-1234');
+  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
+  await sendState({ ...loginState });
+  await page.getByTestId('login-dialog').waitFor({ state: 'detached' });
+
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('heading', { level: 2, name: '활성 리소스팩 순서' }).waitFor();
   await page.getByTestId('usage').filter({ hasText: '파일' }).waitFor();

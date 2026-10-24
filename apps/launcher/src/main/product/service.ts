@@ -61,6 +61,12 @@ export interface ProductHost {
   skins?: { get(profileId: string, signal?: AbortSignal): Promise<string | null>; clear(): void };
   observeDeployment?(reader: DeploymentReader): void;
   openLogs?(path: string): Promise<string>;
+  /** The pending Microsoft device code (see `DeviceCodePresenter`); mirrored into `state.loginCode`. */
+  deviceCode?: {
+    readonly code: string | null;
+    subscribe(listener: () => void): () => void;
+    copy(): boolean;
+  };
   chooseMod(): Promise<string | null>;
   publish(state: ProductState): void;
   quit?(): void;
@@ -186,6 +192,12 @@ export class ProductService {
       recovery: null,
       logs: [],
     };
+    host.deviceCode?.subscribe(() => {
+      const code = host.deviceCode?.code;
+      if (code) this.state.loginCode = code;
+      else delete this.state.loginCode;
+      this.publish();
+    });
   }
   private clearSkin() {
     this.skinGeneration++;
@@ -366,6 +378,10 @@ export class ProductService {
       return { ok: false, error: 'invalid-request', state: this.snapshot() };
     }
     if (command.type === 'open-logs') return this.openLogs();
+    if (command.type === 'copy-login-code')
+      return this.host.deviceCode?.copy()
+        ? { ok: true, state: this.snapshot() }
+        : { ok: false, error: 'invalid-request', state: this.snapshot() };
     if (command.type === 'set-game-memory') return this.saveGameMemory(command);
     if (command.type === 'cancel' || command.type === 'stop') {
       this.operations.cancel();

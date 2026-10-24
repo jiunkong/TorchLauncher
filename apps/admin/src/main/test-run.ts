@@ -102,6 +102,10 @@ export class StudioTestRunner {
   set account(value: StudioAccount) {
     this.accountBase = { ...value, login: null };
   }
+  /** Mirrors the host's pending device code into the state (null when none waits). */
+  setLoginCode(code: string | null) {
+    this.loginCode = code;
+  }
   /** Publishes the device code to the state; the returned function clears it (idempotent). */
   publishLoginCode(code: string): () => void {
     this.loginCode = code;

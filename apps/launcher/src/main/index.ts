@@ -17,7 +17,7 @@ import {
 } from 'electron';
 import { brandingChangedChannel } from '../shared/branding';
 import { productStateChannel } from '../shared/product';
-import { createPublicJavaAuthenticator } from './auth/public-java-electron';
+import { createPublicJavaAuthenticator, loginDeviceCode } from './auth/public-java-electron';
 import { type BrandingService, createBrandingService } from './branding';
 import { bindBrandingIpc } from './branding/ipc';
 import { readServerConfig, serverConfigPath } from './product/bootstrap';
@@ -190,6 +190,7 @@ if (primaryInstance)
       version: app.getVersion(),
       config,
       auth,
+      deviceCode: loginDeviceCode,
       skins: createPlayerSkinService(),
       observeDeployment: (reader) => branding?.observe(reader),
       quit: () => app.quit(),
