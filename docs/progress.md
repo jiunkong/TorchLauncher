@@ -7,6 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-POLISH-02 통합 (2026-10-25)
+
+Sonnet 작업자 `66f2af2` → main `536fe70`. 개요의 "소스 폴더" 문구와 카탈로그의 다른 소스 폴더 표현 정리, 게임 환경 도움말 정리
+(Minecraft 버전 도움말 삭제, 로더 버전 드롭다운의 형식 오류 문구 삭제, 잘못된 MC 버전은 목록 선택 안내), 파일 추가 버튼 라벨 `파일 추가`.
+모드/리소스팩/셰이더 추가는 다중 선택을 지원하고 **유효한 파일만 추가, 잘못된 파일은 건너뛰며** 추가/건너뜀 수와 이름·사유(최대 5개)를 보고한다.
+전부 잘못이면 아무것도 추가하지 않고 오류. 건너뜀 사유: invalid/too-large/duplicate/limit/failed.
+main 검증: `pnpm check` 117 files/**1557 passed**(9 skip), 공통 smoke, Studio 기능 smoke, branding smoke 성공.
+한계: 다중 선택은 단위 테스트로만 검증(기능 smoke의 모의 다이얼로그는 단일 파일), 선택창 제목은 단수 그대로, 정책 확인 실패 시 복사된 파일이 `files/`에 남을 수 있음(기존 단일 추가와 동일).
+
 ### 작업 문서 로컬 전용 전환 (2026-10-25, 사용자 결정)
 
 `chore/ignore-agent-docs` `cdab0fc`를 main에 병합했다. 인계(`docs/handoffs/`), 배정(`*-task.md`, `*-prompts.md`, `work-distribution.md`, `tool-handoff.md` 등)은
