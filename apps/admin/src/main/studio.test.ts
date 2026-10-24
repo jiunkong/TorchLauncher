@@ -271,7 +271,7 @@ describe('Studio project and trusted disk selections', () => {
     const zipPath = join(root, 'export.zip');
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, 'MZ portable launcher fixture');
-    checkerDialogs.open.mockResolvedValueOnce([binary]);
+    checker.testLauncherPath = binary;
     checkerDialogs.save.mockResolvedValueOnce(zipPath);
     expect((await checker.request({ action: 'export' })).ok).toBe(true);
     const zip = readZip(await readFile(zipPath));
@@ -376,7 +376,7 @@ describe('Studio project and trusted disk selections', () => {
   });
 });
 
-describe('operator-selected launcher ZIP export', () => {
+describe('validated launcher ZIP export', () => {
   it('stores actual bytes and strict config with execute bits, replaces only a regular file', async () => {
     const root = await temp();
     const binaryName = process.platform === 'win32' ? 'Torch.exe' : 'Torch.AppImage';

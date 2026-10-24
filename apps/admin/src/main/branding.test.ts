@@ -118,7 +118,7 @@ describe('Studio durable branding', () => {
     const binary = join(root, 'Torch.exe');
     await writeFile(binary, 'MZ unchanged binary');
     const zipPath = join(root, 'output.zip');
-    d.open.mockResolvedValueOnce([binary]);
+    s.testLauncherPath = binary;
     d.save.mockResolvedValueOnce(zipPath);
     expect((await s.request({ action: 'export' })).ok).toBe(true);
     const zip = readZip(await readFile(zipPath));

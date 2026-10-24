@@ -318,7 +318,14 @@ export type StudioTestCommand =
   /** Copies the code of the pending login to the clipboard (INVALID when no login is waiting). */
   | { action: 'testLoginCopyCode' }
   | { action: 'testReset'; confirmed: true };
+export type LauncherTarget = 'windows' | 'linux';
+export interface LauncherReleaseInfo {
+  target: LauncherTarget;
+  version: string;
+  source: 'local' | 'release' | 'cache' | 'offline-cache';
+}
 export interface StudioState {
+  launcherRelease?: LauncherReleaseInfo | null;
   account: StudioAccount;
   testRun: StudioTestRun;
   project: StudioProject | null;
@@ -349,6 +356,7 @@ export type StudioResult =
   | { key: 'packCreated'; sequence: number; signed: true; keyCreated: boolean }
   | { key: 'launcherZipCreated'; keyCreated: boolean };
 export type StudioCommand =
+  | { action: 'export'; target?: LauncherTarget; allowCached?: boolean; cachedVersion?: string }
   | {
       /** Fetch compatible stable loader versions for a catalog game release. */
       action: 'loaderVersions';
@@ -356,16 +364,7 @@ export type StudioCommand =
       kind: 'fabric' | 'neoforge';
     }
   | {
-      action:
-        | 'state'
-        | 'touch'
-        | 'save'
-        | 'saveAs'
-        | 'files'
-        | 'build'
-        | 'check'
-        | 'export'
-        | 'cancel';
+      action: 'state' | 'touch' | 'save' | 'saveAs' | 'files' | 'build' | 'check' | 'cancel';
     }
   | { action: 'setLanguage'; language: 'ko' | 'en' }
   | {
@@ -477,7 +476,15 @@ export type StudioError =
   /** A chosen file or pack is larger than the limit. */
   | 'TOO_LARGE'
   /** A directory chosen for a new or copied project is not empty. */
-  | 'FOLDER_NOT_EMPTY';
+  | 'FOLDER_NOT_EMPTY'
+  | 'LAUNCHER_LOCAL_MISSING'
+  | 'LAUNCHER_UNCONFIGURED'
+  | 'LAUNCHER_OFFLINE'
+  | 'LAUNCHER_CACHE_CONFIRM'
+  | 'LAUNCHER_NO_RELEASE'
+  | 'LAUNCHER_RELEASE_FAILED'
+  | 'LAUNCHER_NO_ASSET'
+  | 'LAUNCHER_VERIFY';
 export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
 export type StudioReply =
   | { ok: true; state: StudioState; loaderVersions?: string[] }

@@ -73,10 +73,23 @@ await mkdir(packs);
 await writeFile(join(packs, 'server-pack.zip'), zipBytes);
 await writeFile(join(packs, 'Test.zip'), zipBytes);
 await writeFile(join(packs, 'example-mod.jar'), zipBytes);
-const launcher = join(root, 'TorchLauncher-test.AppImage');
-await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
-  mode: 0o755,
-});
+// Provide the dev resolver's expected package artifact; never overwrite an existing build.
+const launcherVersion = JSON.parse(
+  await readFile(join(cwd, 'apps/admin/package.json'), 'utf8'),
+).version;
+const launcherName = `TorchLauncher-${launcherVersion}-linux-x64.AppImage`;
+const launcher = join(cwd, 'apps/launcher/dist', launcherName);
+await mkdir(join(cwd, 'apps/launcher/dist'), { recursive: true });
+let createdLauncherFixture = false;
+try {
+  await writeFile(launcher, Buffer.concat([Buffer.from('\x7fELF'), Buffer.alloc(2048, 1)]), {
+    mode: 0o755,
+    flag: 'wx',
+  });
+  createdLauncherFixture = true;
+} catch (error) {
+  if (error.code !== 'EEXIST') throw error;
+}
 const project = join(root, 'server-project');
 await mkdir(project);
 const projectFile = join(project, 'project.torchproj');
@@ -117,7 +130,6 @@ try {
         '리소스팩(.zip) 선택': [join(paths.packs, 'server-pack.zip')],
         '셰이더팩(.zip) 선택': [join(paths.packs, 'Test.zip')],
         '모드(.jar) 선택': [join(paths.packs, 'example-mod.jar')],
-        '기존 공통 런처 선택': [paths.launcher],
       };
       function join(...parts) {
         return parts.join('/');
@@ -758,12 +770,29 @@ try {
   assert.equal(await page.getByTestId('address-checks').locator('.ck.ok').count(), 5);
   await goto('내보내기');
   await page.locator('[data-testid="export-checks"][data-blocked="false"]').waitFor();
+  await page.locator('#export-target').selectOption('linux');
+  const pickerCountBeforeExport = await app.evaluate(
+    () => (globalThis.__studioSmokeOpenTitles ?? []).length,
+  );
   await page.getByTestId('export-button').click();
   await page.getByTestId('export-done').waitFor();
   const zip = await readFile(exported);
   assert.equal(zip.subarray(0, 2).toString(), 'PK');
   assert.ok(zip.includes(Buffer.from('torchlauncher-server.json')), 'zip lists the server config');
-  assert.ok(zip.includes(Buffer.from('TorchLauncher-test.AppImage')), 'zip lists the launcher');
+  assert.ok(
+    zip.includes(Buffer.from(launcherName)),
+    'zip lists the automatically resolved launcher',
+  );
+  assert.equal(
+    await app.evaluate(() => (globalThis.__studioSmokeOpenTitles ?? []).length),
+    pickerCountBeforeExport,
+    'export must not open a launcher picker',
+  );
+  assert.equal(
+    (await page.evaluate(() => window.torchlauncher.request({ action: 'state' }))).state
+      .launcherRelease.source,
+    'local',
+  );
   await page.getByRole('button', { name: '폴더 열기' }).click();
   await expectRevealed(exported);
   await page.getByRole('button', { name: '다시 내보내기' }).click();
@@ -960,5 +989,6 @@ try {
     }
     await Promise.race([exited, new Promise((done) => setTimeout(done, 5000))]);
   }
+  if (createdLauncherFixture) await rm(launcher, { force: true });
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

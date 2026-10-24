@@ -147,6 +147,38 @@ const table = {
     'The pre-export checks did not pass.',
     '내보내기 전 확인을 통과하지 못했습니다.',
   ],
+  'error.LAUNCHER_LOCAL_MISSING': [
+    'Build the local launcher first: pnpm package:launcher (Windows portable .exe). For Linux AppImage, run pnpm --filter @torchlauncher/launcher exec electron-builder --config electron-builder.config.cjs --linux AppImage --x64 after building. The default Linux package is tar.gz.',
+    '로컬 런처를 먼저 빌드하세요: pnpm package:launcher (Windows portable .exe). Linux AppImage는 빌드 후 pnpm --filter @torchlauncher/launcher exec electron-builder --config electron-builder.config.cjs --linux AppImage --x64 로 만드세요. Linux 기본 패키지는 tar.gz입니다.',
+  ],
+  'error.LAUNCHER_UNCONFIGURED': [
+    'The official launcher release repository is not configured in Studio.',
+    'Studio에 공식 런처 릴리스 저장소가 설정되지 않았습니다.',
+  ],
+  'error.LAUNCHER_OFFLINE': [
+    'Cannot connect to the launcher release service. No verified cached launcher is available.',
+    '런처 릴리스 서비스에 연결할 수 없고 검증된 캐시도 없습니다.',
+  ],
+  'error.LAUNCHER_CACHE_CONFIRM': [
+    'Check the cached version on the export page, then choose whether to use it and export again.',
+    '내보내기 페이지에서 캐시 버전을 확인하고 사용 여부를 선택한 뒤 다시 내보내세요.',
+  ],
+  'error.LAUNCHER_NO_RELEASE': [
+    'No stable launcher release is available.',
+    '안정 런처 릴리스가 없습니다.',
+  ],
+  'error.LAUNCHER_RELEASE_FAILED': [
+    'The release service returned an error. Try again later.',
+    '릴리스 서비스가 오류를 반환했습니다. 나중에 다시 시도하세요.',
+  ],
+  'error.LAUNCHER_NO_ASSET': [
+    'The release has no launcher for the selected platform.',
+    '선택한 운영체제의 런처 파일이 릴리스에 없습니다.',
+  ],
+  'error.LAUNCHER_VERIFY': [
+    'Launcher integrity verification failed. The previous cache and ZIP were preserved.',
+    '런처 무결성 검증에 실패했습니다. 기존 캐시와 ZIP은 보존했습니다.',
+  ],
   'error.TOO_LARGE': [
     'The selected file exceeds the allowed size.',
     '선택한 파일이 허용 크기를 넘습니다.',
@@ -935,11 +967,21 @@ const table = {
   'export.card.launcher': ['Launcher to export', '내보낼 런처'],
   'export.card.checks': ['Checks before export', '내보내기 전 확인'],
   'export.checksSub': ['All must pass before you can export.', '모두 통과해야 내보낼 수 있습니다.'],
-  'export.launcherFile': ['Common launcher file', '공통 런처 파일'],
-  'export.launcherFileValue': ['You choose it when exporting', '내보낼 때 파일을 선택합니다'],
-  'export.launcherFileHelp': [
-    'The common Windows portable .exe or Linux .AppImage. Linux AppImage needs the execute permission.',
-    '공통 Windows portable .exe 또는 Linux .AppImage입니다. Linux AppImage는 실행 권한이 있어야 합니다.',
+  'export.target': ['Target platform', '대상 운영체제'],
+  'export.automatic': [
+    'Studio supplies the launcher automatically. Choose only where to save the ZIP.',
+    'Studio가 런처를 자동으로 준비합니다. ZIP 저장 위치만 선택하세요.',
+  ],
+  'export.source.local': ['Local launcher {version}', '로컬 런처 {version}'],
+  'export.source.release': ['Downloaded launcher {version}', '내려받은 런처 {version}'],
+  'export.source.cache': ['Verified cached launcher {version}', '검증된 캐시 런처 {version}'],
+  'export.source.offline-cache': [
+    'Offline: the latest release could not be checked. Cached version: {version}.',
+    '오프라인으로 최신 릴리스를 확인하지 못했습니다. 캐시 버전: {version}.',
+  ],
+  'export.allowCached': [
+    'Use cached version {version} if still offline',
+    '계속 오프라인이면 캐시 버전 {version} 사용',
   ],
   'export.destination': ['Save location', '저장 위치'],
   'export.destinationValue': ['You choose it when exporting', '내보낼 때 저장 위치를 선택합니다'],

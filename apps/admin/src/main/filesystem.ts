@@ -135,25 +135,7 @@ export async function exportLauncherZip(
 ): Promise<number> {
   signal.throwIfAborted();
   const assets = verifiedBrandingAssets(config, snapshots);
-  await noLinks(binary);
-  if (!/\.(?:exe|AppImage)$/i.test(binary)) throw new StudioFailure('INVALID');
-  const appImage = /\.AppImage$/i.test(binary);
-  const handle = await open(binary, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try {
-    const stat = await handle.stat();
-    if (!stat.isFile() || stat.nlink !== 1 || stat.size < 4) throw new StudioFailure('INVALID');
-    if (stat.size > LAUNCHER_LIMIT) throw new StudioFailure('TOO_LARGE');
-    const header = Buffer.alloc(4);
-    await handle.read(header, 0, 4, 0);
-    if (
-      appImage
-        ? header.toString('hex') !== '7f454c46' || (stat.mode & 0o111) === 0
-        : header.subarray(0, 2).toString() !== 'MZ'
-    )
-      throw new StudioFailure('INVALID');
-  } finally {
-    await handle.close();
-  }
+  await validateLauncherBinary(binary);
   const entries: ZipEntry[] = [
     { name: basename(binary), mode: 0o755, path: binary, maxSize: LAUNCHER_LIMIT },
     {
@@ -168,4 +150,29 @@ export async function exportLauncherZip(
     if (asset && bytes) entries.push({ name: asset.path, mode: 0o644, data: bytes });
   }
   return writeZip(destination, entries, signal, progress);
+}
+
+/** Shared validation for local, downloaded and cached launcher artifacts. */
+export async function validateLauncherBinary(binary: string): Promise<void> {
+  await noLinks(binary);
+  if (!/\.(?:exe|AppImage)$/i.test(binary)) throw new StudioFailure('INVALID');
+  const appImage = /\.AppImage$/i.test(binary);
+  // Windows cannot represent Unix execute bits; the ZIP entry always carries mode 0755.
+  const handle = await open(binary, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.nlink !== 1 || stat.size < 4) throw new StudioFailure('INVALID');
+    if (stat.size > LAUNCHER_LIMIT) throw new StudioFailure('TOO_LARGE');
+    const header = Buffer.alloc(4);
+    await handle.read(header, 0, 4, 0);
+    if (
+      appImage
+        ? header.toString('hex') !== '7f454c46' ||
+          (process.platform !== 'win32' && (stat.mode & 0o111) === 0)
+        : header.subarray(0, 2).toString() !== 'MZ'
+    )
+      throw new StudioFailure('INVALID');
+  } finally {
+    await handle.close();
+  }
 }
