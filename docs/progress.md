@@ -7,6 +7,14 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-TEST-RESULT-01 작업 브랜치 완료 (2026-10-25)
+
+사용자 요청으로 테스트 결과 화면에는 문제·경고 건수, 다시 실행, 종료 코드, 최근 로그, 인스턴스 초기화만 남기고 로그 폴더 열기를 추가했다. 상세 진단·모드 목록·설정 추출 안내를 제거했으며 분석·설정 추출 동작은 유지한다. 로그 폴더는 main에서 현재 완료된 인스턴스로 결정하고 추가 경로 인자·다른 서버 ID·심볼릭 링크를 거부한다. 폴더 열기 실패는 IO로 반환한다.
+- 작업자 `studio_test_result`, 브랜치 `feat/studio-test-result`, 구현 커밋 `b9e2901`, 기준 `f7948f6`.
+- 집중 Vitest 3 files/39 passed, Studio typecheck/build, 변경 파일 Biome 오류 0(기존 warning 1), Studio 전체 기능 smoke 성공. 합성 완료 상태에서 표시 항목·버튼 명령을 검증하고 760/1100px 캡처를 확인했다.
+- Windows 탐색기 실제 열기와 실게임은 미검증. 인계: 로컬 `docs/handoffs/STUDIO-TEST-RESULT-01.md`.
+- 사용자 지시로 **작업 브랜치에 커밋만 보관, main 미통합**. 기존 체크아웃의 별도 브랜딩 변경은 포함하지 않았다.
+
 ### GitHub Actions JavaScript 런타임 Node 24 (2026-10-25)
 
 사용자 요청으로 CI/릴리스 workflow에서 Node 20을 선언하던 JavaScript 액션을 Node 24 런타임 액션으로 갱신했다.
