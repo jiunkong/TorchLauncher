@@ -1,11 +1,20 @@
 # TorchLauncher 개발 진행 관리
 
-최종 갱신: 2026-10-24
+최종 갱신: 2026-10-25
 
 이 파일을 작업 상태·담당·머지 현황의 기준으로 사용한다. 제품 요구사항은
 [아키텍처](architecture.md), 단계의 목적과 완료 기준은 [구현 순서](implementation-plan.md)를 따른다.
 
 ## 현재 상태와 다음 작업
+
+### GitHub Actions JavaScript 런타임 Node 24 (2026-10-25)
+
+사용자 요청으로 CI/릴리스 workflow에서 Node 20을 선언하던 JavaScript 액션을 Node 24 런타임 액션으로 갱신했다.
+제품 명령의 Node는 이미 `setup-node`에서 24였다. CI는 checkout v7.0.1, pnpm/action-setup v6.1.0,
+setup-node v7.1.0, upload-artifact v7.0.2를 사용한다. 릴리스 workflow도 같은 버전으로 올리고 전체 SHA로 고정했으며,
+아티팩트 다운로드는 download-artifact v7.0.0으로 갱신했다. 각 SHA의 `action.yml`에서 `runs.using: node24`를 확인했다.
+통합: 작업자 `actions_node24` `21eae60` → main `fd0d440`; `git diff --check` 성공.
+actionlint는 환경에 없어 실행하지 않았고 실제 GitHub Actions 재실행은 미실행이다. 인계: 로컬 전용 `docs/handoffs/ACTIONS-NODE24-01.md`.
 
 ### GitHub 푸시와 첫 CI (2026-10-25)
 
