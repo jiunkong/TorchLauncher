@@ -7,6 +7,21 @@
 
 ## 현재 상태와 다음 작업
 
+### RELEASE-MENUBAR-01 · 사용자 정정에 따른 상단 메뉴 수정·검토 완료 (2026-10-26, 기능 브랜치)
+
+사용자는 도움말 페이지를 원한 것이 아니라 Studio처럼 상단 메뉴를 원했다고 정정했다. 아래 RELEASE-UI-01의 도움말 페이지 설계는 취소한다.
+`feat/launcher-release-download`(baseline `95b6eb2`)에서 작업자 `launcher_menubar`(gpt-6-luna medium)의 `20e085c`를 #0이 검토했다. main 병합/push 없음.
+- 별도 도움말 페이지/사이드바 항목을 삭제하고 36px 제목 표시줄 아래에 Studio 패턴의 32px 앱 내 상단 메뉴를 추가했다.
+  **보기 → 언어**(시스템 기본값·한국어·English), **도움말 → 현재 버전·최신 버전 확인·업데이트**를 제공한다.
+  언어 설정은 Settings 카드에서 이동하고 기존 locale 저장/자동 선택·main 언어 동기화, 업데이트 IPC/backend를 재사용했다.
+- 메뉴 열림은 네트워크를 요청하지 않는다. 명시적인 확인/다운로드 결과는 메뉴 상태와 기존 toast로 표시하며 빠른 결과의 React batching도 요청 flag로 처리한다.
+  중복 작업/미지원 기기/초기 상태를 비활성화하고 기존 오류 구분을 공통 formatter로 유지했다. 실제 교체 기능은 추가하지 않았다.
+- 제목 표시줄 드래그·native overlay 유지, 메뉴 높이를 반영한 본문 flex 레이아웃, splash/모달 inert(로그아웃 포함), 키보드·바깥 클릭 동작을 구현했다.
+  smoke 선택자를 상단 메뉴로 바꾸고 제품 설명을 갱신했다.
+- 작업자 검증: 집중 Vitest 4 files/**7 passed**, 런처 main/renderer 타입·build, 관련 smoke 3개 `node --check`, scoped Biome 오류0(기존 CSS 경고8), diff check 성공.
+  #0은 코드/선택자/문서/인계를 검토했다. GUI 권한을 재요청하지 않아 Electron smoke·화면 캡처·760/1100 실제 배치·native·실제 GitHub는 계속 미검증이다.
+  로컬 인계 `docs/handoffs/RELEASE-MENUBAR-01.md`. 아래 별도 도움말 페이지 기록은 취소된 과거 설계다.
+
 ### RELEASE-UI-01 · 런처 도움말의 업데이트 버튼 구현·검토 완료 (2026-10-25, 기능 브랜치)
 
 사용자 요청으로 `feat/launcher-release-download`에서 작업자 `release_download`의 `5796376`을 #0이 검토했다(baseline `9b22dd6`). main 병합/push 없음.
