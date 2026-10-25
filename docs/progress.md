@@ -7,6 +7,23 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-BRANDING-IMAGE-01 통합 (2026-10-25)
+
+사용자 보고: 브랜딩 이미지 불러오기가 일반 문구("입력값이나 선택한 경로를 확인하세요")만 내고 실패, PNG만 선택되는 듯함. 원인(코드 조사): 아이콘 PNG ≤512px/1 MiB,
+배경 PNG·JPEG ≤3840×2160/8 MiB 한도를 넘으면 사유 없이 `INVALID`, 선택창 필터가 아이콘 `png`뿐. 사용자 결정: **자동 변환 + 정확한 오류**.
+Sonnet `c216288` → main `0ffc568`(작업자 기준 `5a249af` = 병합 당시 main, 충돌 없음, 병합 결과는 작업자가 검증한 트리와 동일).
+- 한도 안의 PNG/JPEG는 원본 바이트 그대로(해시 불변). 한도를 넘으면 `nativeImage`로 비율 유지 축소·재인코딩(아이콘은 항상 PNG, 배경은 JPEG 원본이면 JPEG·그 외 PNG 우선 후 JPEG 대체,
+  용량 초과 시 최대 10회 시도), 최종 관문은 변경 없는 `validateImage`. 변환된 바이트가 프로젝트 스냅샷·`branding/` 사본·서버 구성·torchpack에 저장된다. core 한도·런처 계약 불변.
+- 이 환경(Electron 44.9.1, Linux)에서 `nativeImage`가 읽은 형식은 PNG·JPEG뿐이다(BMP/GIF/WebP/ICO는 작은 손제작 버퍼로만 시험, 빈 이미지). 선택창은 PNG·JPEG만 허용하며 아이콘 선택창에도 JPEG가 추가됐다.
+  원본 읽기 32 MiB 상한, PNG/JPEG는 디코딩 전 헤더로 64메가픽셀 초과 거부.
+- 실패는 `IMAGE_FAILED` + 타입이 정해진 `image` 페이로드(reason: unsupported/corrupt/fileTooLarge/tooManyPixels/cannotFit/unreadable/storeFailed, 원인·값·파일 이름만; 절대 경로·원시 오류 없음)로
+  한국어/영어 구체 문구를 브랜딩 페이지의 지속 배너에 보여 준다. 브랜딩 흐름에서 일반 `INVALID` 문구로 떨어지지 않음을 테스트와 기능 smoke가 확인.
+- `brandingRemove`가 `branding/<role>` 사본을 지우도록 수정(이전 한계 해소). 문서: `studio-project-format.md`, `studio-ui.md`.
+- 작업자 검증: 루트 `pnpm check` 123 files/**1649 passed**(9 skip), Studio branding smoke(실제 Electron 변환/오류), Studio 기능 smoke 성공. 공통 `pnpm smoke`는 IPC 목록·preload 불변이라 미실행.
+  #0은 새 검증 기준(깨끗한 병합은 재실행 안 함)에 따라 main 재검증을 생략했다. 푸시 후 CI가 넓은 검증을 맡는다.
+- 한계: Windows/Windows Electron 디코더 미검증, 아이콘 1 MiB 한도 분기는 가짜 처리기 단위 테스트로만 확인, 자동 저장 실패 시 구조화된 원인 대신 기존 `autosaveFailed`, EXIF 방향 미처리, 미리보기는 기본 아트워크 그대로.
+- 후속(착수 안 함): 실패 원인 표시를 Studio 전체로 확장하는 [STUDIO-ERROR-REASONS-01](studio-error-reasons-task.md)(로컬 문서). 런처 포함 여부는 사용자 결정 대기.
+
 ### STUDIO-BRANDING-AUTOSAVE · SERVER-MEMORY-01 통합 (2026-10-25)
 
 - 브랜딩 이미지 저장 `606a4df` → main `3c3c8ff`: 이미지 선택 시 검증된 원본을 `<프로젝트>/branding/`에 원자적으로 복사하고 프로젝트를 자동 저장한다(`project.torchproj`의 내장 스냅샷은 유지).
