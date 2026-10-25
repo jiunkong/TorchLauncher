@@ -81,6 +81,8 @@ const ko = {
     '운영자가 options.txt 전체를 관리하고 있습니다. 운영자에게 설정 정책 구성을 요청하세요.',
   'failure.preferences-failed':
     '런처 설정을 읽거나 저장하지 못했습니다. 설정 파일과 접근 권한을 확인하세요.',
+  'failure.memory-limit-server':
+    '서버의 기본 게임 메모리가 이 컴퓨터의 RAM보다 큽니다. 설정에서 게임 메모리를 낮춘 뒤 다시 실행하세요.',
   'failure.memory-limit': '현재 컴퓨터의 RAM에 맞게 게임 메모리를 낮춘 뒤 다시 실행하세요.',
   'failure.sync-not-initialized': '게임 동기화가 완료된 뒤 설정을 변경하세요.',
   'failure.configuration-unavailable':
@@ -184,6 +186,13 @@ const ko = {
     '저장된 런처 설정을 읽지 못해 자동 종료를 껐습니다. 스위치를 다시 설정하세요.',
   'settings.gameMemory': '게임 메모리',
   'settings.memoryInitialHint': '초기 메모리는 비워 두면 Java 기본값을 사용합니다.',
+  'settings.memoryServerDefault': '서버 기본값: 최대 {max} GB',
+  'settings.memoryServerDefaultInitial': '서버 기본값: 최대 {max} GB, 초기 {initial} GB',
+  'settings.memoryBuiltInDefault': '서버 기본값 없음. 런처 기본값: 최대 {max} GB',
+  'settings.memoryEffective': '현재 적용 값: 최대 {max} GB',
+  'settings.memoryEffectiveInitial': '현재 적용 값: 최대 {max} GB, 초기 {initial} GB',
+  'settings.memoryUseServerDefault': '서버 기본값 사용',
+  'settings.memoryUseDefault': '기본값 사용',
   'settings.maxMemory': '최대 메모리 (Xmx)',
   'settings.initialMemory': '초기 메모리 (Xms, 선택)',
   'settings.memoryNextLaunch': '저장한 값은 다음 실행부터 적용됩니다.',
@@ -348,6 +357,8 @@ export const launcherTranslations = defineTranslations(
       'The operator manages the entire options.txt file. Ask them to configure a settings policy.',
     'failure.preferences-failed':
       'Could not read or save launcher settings. Check the settings file and your access permissions.',
+    'failure.memory-limit-server':
+      "The server's default game memory is more than this computer's RAM allows. Lower the game memory in Settings, then try again.",
     'failure.memory-limit': 'Lower the game memory limit to fit your computer, then try again.',
     'failure.sync-not-initialized': 'Wait for game sync to finish before changing settings.',
     'failure.configuration-unavailable':
@@ -451,6 +462,13 @@ export const launcherTranslations = defineTranslations(
       'Could not read saved launcher settings, so auto-close is off. Set the switch again.',
     'settings.gameMemory': 'Game memory',
     'settings.memoryInitialHint': 'Leave initial memory blank to use the Java default.',
+    'settings.memoryServerDefault': 'Server default: maximum {max} GB',
+    'settings.memoryServerDefaultInitial': 'Server default: maximum {max} GB, initial {initial} GB',
+    'settings.memoryBuiltInDefault': 'No server default. Launcher default: maximum {max} GB',
+    'settings.memoryEffective': 'Currently applied: maximum {max} GB',
+    'settings.memoryEffectiveInitial': 'Currently applied: maximum {max} GB, initial {initial} GB',
+    'settings.memoryUseServerDefault': 'Use server default',
+    'settings.memoryUseDefault': 'Use default',
     'settings.maxMemory': 'Maximum memory (Xmx)',
     'settings.initialMemory': 'Initial memory (Xms, optional)',
     'settings.memoryNextLaunch': 'Saved values take effect the next time you launch the game.',

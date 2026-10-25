@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateServer, validHttps } from './validation';
+import { parseMemoryGiBText, validateServer, validHttps } from './validation';
 
 function project() {
   return {
@@ -60,5 +60,45 @@ describe('Studio field validation', () => {
         game: { ...value.game, minecraftVersion: '1.21.1/evil' },
       }),
     ).toHaveProperty('minecraftVersion', 'validation.gameVersion');
+  });
+});
+
+describe('Studio default memory validation', () => {
+  it('accepts an absent or valid memory block and blank Xms', () => {
+    const value = project();
+    expect(validateServer(value)).toEqual({});
+    expect(validateServer({ ...value, memory: { maxMiB: 2048 } })).toEqual({});
+    expect(validateServer({ ...value, memory: { maxMiB: 2048, initialMiB: 256 } })).toEqual({});
+    expect(validateServer({ ...value, memory: { maxMiB: 2048, initialMiB: 2048 } })).toEqual({});
+  });
+  it('rejects out-of-range, fractional, Xms above Xmx and Xms without Xmx', () => {
+    const value = project();
+    expect(validateServer({ ...value, memory: { maxMiB: 511 } })).toHaveProperty(
+      'memoryMax',
+      'validation.memoryMax',
+    );
+    expect(validateServer({ ...value, memory: { maxMiB: 65537 } })).toHaveProperty('memoryMax');
+    expect(validateServer({ ...value, memory: { maxMiB: 307.2 } })).toHaveProperty('memoryMax');
+    expect(validateServer({ ...value, memory: { maxMiB: Number.NaN } })).toHaveProperty(
+      'memoryMax',
+    );
+    expect(validateServer({ ...value, memory: { maxMiB: 2048, initialMiB: 255 } })).toHaveProperty(
+      'memoryInitial',
+      'validation.memoryInitial',
+    );
+    expect(validateServer({ ...value, memory: { maxMiB: 2048, initialMiB: 4096 } })).toHaveProperty(
+      'memoryInitial',
+      'validation.memoryInitialAboveMax',
+    );
+    expect(
+      validateServer({ ...value, memory: { maxMiB: Number.NaN, initialMiB: 1024 } }),
+    ).toHaveProperty('memoryInitial', 'validation.memoryInitialNeedsMax');
+  });
+  it('parses GB text boxes into MiB', () => {
+    expect(parseMemoryGiBText('')).toBeUndefined();
+    expect(parseMemoryGiBText('0.25')).toBe(256);
+    expect(parseMemoryGiBText('1.5')).toBe(1536);
+    expect(parseMemoryGiBText('0.3')).toBe(307.2);
+    expect(parseMemoryGiBText('abc')).toBeNaN();
   });
 });

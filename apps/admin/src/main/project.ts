@@ -3,7 +3,10 @@ import {
   EMPTY_FILE_SHA256,
   validateDeploymentIndex,
 } from '../../../../packages/core/src/deployment/contracts/index.js';
-import { parseServerIdentity } from '../../../../packages/core/src/server-config/index.js';
+import {
+  parseServerIdentity,
+  parseServerMemory,
+} from '../../../../packages/core/src/server-config/index.js';
 import type { StudioLastBuild, StudioProject } from '../shared/studio.js';
 import { parseBranding } from './branding.js';
 import { isReservedPath, parseGameSettings } from './game-settings.js';
@@ -41,7 +44,7 @@ export function parseProject(input: unknown): StudioProject {
   const keys = ['format', 'version', 'serverId', 'name', 'address', 'sourceUrl', 'game', 'files'];
   if (
     Object.keys(p).some(
-      (k) => ![...keys, 'branding', 'sequence', 'lastBuild', 'gameSettings'].includes(k),
+      (k) => ![...keys, 'branding', 'memory', 'sequence', 'lastBuild', 'gameSettings'].includes(k),
     ) ||
     keys.some((k) => !Object.hasOwn(p, k)) ||
     p.format !== 'torchlauncher-project' ||
@@ -53,6 +56,7 @@ export function parseProject(input: unknown): StudioProject {
     throw new StudioFailure('INVALID');
   try {
     if (Object.hasOwn(p, 'branding')) parseBranding(p.branding);
+    if (Object.hasOwn(p, 'memory')) parseServerMemory(p.memory);
     if (
       Object.hasOwn(p, 'sequence') &&
       (!Number.isSafeInteger(p.sequence) ||
@@ -192,5 +196,6 @@ export function newProject(name = 'New server'): StudioProject {
     sourceUrl: '',
     game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } },
     files: [],
+    memory: { maxMiB: 2048 },
   };
 }

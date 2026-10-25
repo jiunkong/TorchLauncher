@@ -4,6 +4,7 @@ import {
   parseServerBranding,
   parseServerConfig,
   parseServerIdentity,
+  resolveGameMemory,
   SERVER_CONFIG_FILENAME,
 } from './index.js';
 
@@ -171,5 +172,66 @@ describe('server metadata validation without publisher trust', () => {
   it('rejects extra metadata fields and invalid branding', () => {
     expect(() => parseServerIdentity({ ...identity, extra: true })).toThrow();
     expect(() => parseServerBranding({ appName: '' })).toThrow();
+  });
+});
+
+describe('default game memory', () => {
+  it('accepts an optional memory block with optional initial memory', () => {
+    expect(parseServerConfig(config).memory).toBeUndefined();
+    expect(parseServerConfig({ ...config, memory: { maxMiB: 4096 } }).memory).toEqual({
+      maxMiB: 4096,
+    });
+    expect(
+      parseServerConfig({ ...config, memory: { maxMiB: 4096, initialMiB: 4096 } }).memory,
+    ).toEqual({ maxMiB: 4096, initialMiB: 4096 });
+    expect(
+      parseServerConfig({ ...config, memory: { initialMiB: 256, maxMiB: 512 } }).memory,
+    ).toEqual({ maxMiB: 512, initialMiB: 256 });
+    expect(parseServerConfig({ ...config, memory: { maxMiB: 65536 } }).memory?.maxMiB).toBe(65536);
+  });
+  it.each([
+    null,
+    [],
+    'x',
+    {},
+    { initialMiB: 1024 },
+    { maxMiB: 511 },
+    { maxMiB: 65537 },
+    { maxMiB: 2048.5 },
+    { maxMiB: '2048' },
+    { maxMiB: null },
+    { maxMiB: 2048, extra: 1 },
+    { maxMiB: 2048, initialMiB: 255 },
+    { maxMiB: 2048, initialMiB: 2049 },
+    { maxMiB: 2048, initialMiB: 1024.5 },
+    { maxMiB: 2048, initialMiB: '1024' },
+    { maxMiB: 2048, initialMiB: null },
+    { maxMiB: 2048, initialMiB: undefined },
+  ])('rejects invalid memory %j', (memory) => {
+    expect(() => parseServerConfig({ ...config, memory })).toThrow('Invalid server configuration');
+  });
+  it('resolves player value, then server default, then built-in default', () => {
+    const server = { maxMiB: 4096, initialMiB: 1024 };
+    expect(resolveGameMemory({})).toEqual({ maxMemoryMiB: 2048 });
+    expect(resolveGameMemory({}, { maxMiB: 3072 })).toEqual({ maxMemoryMiB: 3072 });
+    expect(resolveGameMemory({}, server)).toEqual({ maxMemoryMiB: 4096, initialMemoryMiB: 1024 });
+    expect(resolveGameMemory({ maxMemoryMiB: 8192 }, server)).toEqual({
+      maxMemoryMiB: 8192,
+      initialMemoryMiB: 1024,
+    });
+    expect(resolveGameMemory({ maxMemoryMiB: 8192, initialMemoryMiB: 2048 }, server)).toEqual({
+      maxMemoryMiB: 8192,
+      initialMemoryMiB: 2048,
+    });
+    // A player Xmx below the server Xms default drops the Xms instead of exceeding Xmx.
+    expect(resolveGameMemory({ maxMemoryMiB: 512 }, server)).toEqual({ maxMemoryMiB: 512 });
+    expect(resolveGameMemory({ maxMemoryMiB: 1024 }, server)).toEqual({
+      maxMemoryMiB: 1024,
+      initialMemoryMiB: 1024,
+    });
+    expect(resolveGameMemory({ initialMemoryMiB: 512 }, { maxMiB: 4096 })).toEqual({
+      maxMemoryMiB: 4096,
+      initialMemoryMiB: 512,
+    });
   });
 });

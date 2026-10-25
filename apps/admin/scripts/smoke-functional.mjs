@@ -492,6 +492,40 @@ try {
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke');
   assert.equal(await page.getByTestId('save-state').getAttribute('data-dirty'), 'true');
 
+  // Server info: default game memory (Xmx default 2 GB, Xms blank; Xms requires Xmx and fits it).
+  const memoryMax = page.getByTestId('memory-max');
+  const memoryInitial = page.getByTestId('memory-initial');
+  assert.equal(await memoryMax.inputValue(), '2');
+  assert.equal(await memoryInitial.inputValue(), '');
+  assert.equal(await memoryMax.getAttribute('aria-invalid'), 'false');
+  await memoryInitial.fill('3');
+  assert.equal(await memoryInitial.getAttribute('aria-invalid'), 'true');
+  await memoryInitial.fill('');
+  assert.equal(await memoryInitial.getAttribute('aria-invalid'), 'false');
+  await memoryMax.fill('0.25');
+  assert.equal(await memoryMax.getAttribute('aria-invalid'), 'true');
+  await memoryMax.fill('');
+  await memoryInitial.fill('1');
+  assert.equal(await memoryInitial.getAttribute('aria-invalid'), 'true');
+  await memoryMax.fill('4');
+  assert.equal(await memoryMax.getAttribute('aria-invalid'), 'false');
+  assert.equal(await memoryInitial.getAttribute('aria-invalid'), 'false');
+  await memoryInitial.fill('1.5');
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 900 });
+    const layout = await page.evaluate(() => {
+      const pageElement = document.querySelector('[data-testid="page"]');
+      return {
+        documentOverflow: document.documentElement.scrollWidth > innerWidth,
+        pageOverflow: pageElement ? pageElement.scrollWidth > pageElement.clientWidth : false,
+      };
+    });
+    assert.deepEqual(layout, { documentOverflow: false, pageOverflow: false });
+    await memoryMax.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-server-memory-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 1100, height: 760 });
+
   // Unsaved-changes confirmation is an in-app dialog.
   await menuAction('file', 'open');
   const dialog = page.getByTestId('unsaved-dialog');
@@ -539,6 +573,10 @@ try {
   await page.getByTestId('menu-item-lang-ko').click();
   await nav('개요').waitFor();
   assert.equal(readStudioFile(await readFile(projectFile)).name, 'Functional Studio smoke');
+  assert.deepEqual(readStudioFile(await readFile(projectFile)).memory, {
+    maxMiB: 4096,
+    initialMiB: 1536,
+  });
   await page.getByLabel('서버 이름', { exact: true }).fill('Functional Studio smoke 2');
   await menuAction('file', 'open');
   await dialog.waitFor();

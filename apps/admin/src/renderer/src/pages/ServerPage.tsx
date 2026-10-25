@@ -3,7 +3,7 @@ import { minecraftVersions } from '../../../shared/minecraft-versions.js';
 import { Note, PageHeader } from '../components/ui';
 import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
-import { type ServerField, validateServer } from './validation';
+import { parseMemoryGiBText, type ServerField, validateServer } from './validation';
 
 const loaderCache = new Map<string, string[]>();
 
@@ -71,6 +71,69 @@ export function ServerPage({ studio, draft }: PageProps) {
     };
   }, [minecraftVersion, loaderKind, retryVersionLookup, selectionKey]);
 
+  const gibText = (mib: number | undefined) =>
+    mib === undefined || Number.isNaN(mib) ? '' : String(mib / 1024);
+  const [maxText, setMaxText] = useState(gibText(draft.memory?.maxMiB));
+  const [initialText, setInitialText] = useState(gibText(draft.memory?.initialMiB));
+  const memoryOwner = useRef(draft.serverId);
+  if (memoryOwner.current !== draft.serverId) {
+    memoryOwner.current = draft.serverId;
+    setMaxText(gibText(draft.memory?.maxMiB));
+    setInitialText(gibText(draft.memory?.initialMiB));
+  }
+  const editMemory = (nextMax: string, nextInitial: string) => {
+    setMaxText(nextMax);
+    setInitialText(nextInitial);
+    const maxMiB = parseMemoryGiBText(nextMax);
+    const initialMiB = parseMemoryGiBText(nextInitial);
+    const { memory: _previous, ...rest } = draft;
+    edit(
+      maxMiB === undefined && initialMiB === undefined
+        ? rest
+        : {
+            ...rest,
+            memory: {
+              maxMiB: maxMiB ?? Number.NaN,
+              ...(initialMiB === undefined ? {} : { initialMiB }),
+            },
+          },
+    );
+  };
+  const memoryField = (
+    key: 'memoryMax' | 'memoryInitial',
+    label: string,
+    text: string,
+    change: (value: string) => void,
+    options: { min: number; help: string; testId: string },
+  ) => {
+    const error = errors[key];
+    return (
+      <div className="fld">
+        <label htmlFor={`${id}-${key}`}>{label}</label>
+        <span className="inp-unit">
+          <input
+            id={`${id}-${key}`}
+            className={`inp narrow mono${error ? ' bad' : ''}`}
+            type="number"
+            min={options.min}
+            max={64}
+            step={options.min}
+            inputMode="decimal"
+            value={text}
+            data-testid={options.testId}
+            disabled={busy}
+            aria-invalid={!!error}
+            aria-describedby={`${id}-${key}-d`}
+            onChange={(event) => change(event.target.value)}
+          />
+          <span>{t('server.memory.unit')}</span>
+        </span>
+        <span id={`${id}-${key}-d`} className={error ? 'err' : 'help'}>
+          {error ? t(error) : options.help}
+        </span>
+      </div>
+    );
+  };
   const patch = (values: Partial<typeof draft>) => edit({ ...draft, ...values });
   const field = (
     key: ServerField,
@@ -256,6 +319,24 @@ export function ServerPage({ studio, draft }: PageProps) {
                   ) : null}
                 </span>
               </div>
+              <div className="fld memory-group">
+                <span className="lbl">{t('server.memory.title')}</span>
+                <span className="help">{t('server.memory.help')}</span>
+              </div>
+              {memoryField(
+                'memoryMax',
+                t('server.memory.max'),
+                maxText,
+                (value) => editMemory(value, initialText),
+                { min: 0.5, help: t('server.memory.maxHelp'), testId: 'memory-max' },
+              )}
+              {memoryField(
+                'memoryInitial',
+                t('server.memory.initial'),
+                initialText,
+                (value) => editMemory(maxText, value),
+                { min: 0.25, help: t('server.memory.initialHelp'), testId: 'memory-initial' },
+              )}
             </div>
           </section>
         </div>

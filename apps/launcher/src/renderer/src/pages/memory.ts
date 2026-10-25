@@ -37,3 +37,24 @@ export function validGameMemory(
 export function exceedsRecommendedPhysicalMemory(maxMemoryMiB: number, physicalMemoryMiB: number) {
   return maxMemoryMiB > physicalMemoryMiB * 0.75;
 }
+
+export interface EffectiveMemory {
+  maxMemoryMiB: number;
+  initialMemoryMiB?: number;
+}
+
+/** Mirrors the launch-time rule: player value, else server default, else built-in; no Xms above Xmx. */
+export function effectiveGameMemory(
+  player: { maxMemoryMiB?: number; initialMemoryMiB?: number },
+  server?: { maxMiB: number; initialMiB?: number },
+): EffectiveMemory {
+  const maxMemoryMiB = player.maxMemoryMiB ?? server?.maxMiB ?? defaultMaxMemoryMiB;
+  const initial = player.initialMemoryMiB ?? server?.initialMiB;
+  return initial !== undefined && initial >= minimumInitialMemoryMiB && initial <= maxMemoryMiB
+    ? { maxMemoryMiB, initialMemoryMiB: initial }
+    : { maxMemoryMiB };
+}
+
+export function formatGiB(mib: number): string {
+  return String(Number((mib / 1024).toFixed(2)));
+}

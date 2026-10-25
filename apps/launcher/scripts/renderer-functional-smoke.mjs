@@ -300,6 +300,26 @@ try {
     return preferences.maxMemoryMiB === 512 && preferences.initialMemoryMiB === 256;
   });
   assert.equal(await page.getByTestId('max-memory').inputValue(), '0.5');
+  // Server default hint, effective value and returning to the default by clearing the override.
+  assert.match(await page.getByTestId('memory-server-default').innerText(), /2 GB/);
+  assert.match(await page.getByTestId('memory-effective').innerText(), /0\.5 GB/);
+  await page.getByTestId('clear-memory').click();
+  await page.waitForFunction(async () => {
+    const preferences = (await window.torchlauncher.getState()).preferences;
+    return preferences.maxMemoryMiB === undefined && preferences.initialMemoryMiB === undefined;
+  });
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="clear-memory"]')?.disabled === true,
+  );
+  assert.equal(await page.getByTestId('max-memory').inputValue(), '2');
+  assert.match(await page.getByTestId('memory-effective').innerText(), /2 GB/);
+  await page.getByTestId('max-memory').fill('0.5');
+  await page.getByTestId('initial-memory').fill('0.25');
+  await page.getByTestId('save-memory').click();
+  await page.waitForFunction(async () => {
+    const preferences = (await window.torchlauncher.getState()).preferences;
+    return preferences.maxMemoryMiB === 512 && preferences.initialMemoryMiB === 256;
+  });
   assert.deepEqual(
     await page.evaluate(async () => {
       const preferences = (await window.torchlauncher.getState()).preferences;

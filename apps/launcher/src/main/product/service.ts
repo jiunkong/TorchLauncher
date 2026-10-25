@@ -36,7 +36,10 @@ import {
   inspectServerEnvironment,
   recoverServerEnvironment,
 } from '../../../../../packages/core/src/minecraft/recovery/index';
-import type { ServerConfig } from '../../../../../packages/core/src/server-config/index';
+import {
+  resolveGameMemory,
+  type ServerConfig,
+} from '../../../../../packages/core/src/server-config/index';
 import { pingServer } from '../../../../../packages/core/src/server-status/index';
 import {
   type ProductLogEntry,
@@ -75,6 +78,7 @@ const safeCodes = new Set([
   'busy',
   'preferences-failed',
   'memory-limit',
+  'memory-limit-server',
   'invalid-request',
   'unsupported-platform',
   'unsupported-game',
@@ -157,6 +161,7 @@ export class ProductService {
       physicalMemoryMiB: Number.isSafeInteger(reportedMemoryMiB)
         ? Math.max(0, reportedMemoryMiB)
         : 0,
+      ...(config?.memory ? { serverMemory: { ...config.memory } } : {}),
       server: config
         ? { serverId: config.serverId, name: config.name, address: config.address }
         : null,
@@ -369,6 +374,24 @@ export class ProductService {
       return { ok: false as const, error: safeProductError(error), state: this.snapshot() };
     }
   }
+  /** Drops the personal memory override; the server default (or built-in default) applies again. */
+  private async clearGameMemory(): Promise<ProductResult> {
+    try {
+      if (this.closing || this.relinquished) throw new Error('busy');
+      await this.withPreferences(async () => {
+        if (this.closing || this.relinquished) throw new Error('busy');
+        await this.loadPreferences();
+        if (this.state.preferences.error) throw new Error('preferences-failed');
+        const persisted = { closeOnLaunch: this.state.preferences.closeOnLaunch };
+        await writePreferences(this.host.base, persisted);
+        this.state.preferences = persisted;
+      });
+      this.publish();
+      return { ok: true as const, state: this.snapshot() };
+    } catch (error) {
+      return { ok: false as const, error: safeProductError(error), state: this.snapshot() };
+    }
+  }
   private async execute(raw: unknown, restoring = false): Promise<ProductResult> {
     let command: ReturnType<typeof parseProductCommand>;
     try {
@@ -383,6 +406,7 @@ export class ProductService {
         ? { ok: true, state: this.snapshot() }
         : { ok: false, error: 'invalid-request', state: this.snapshot() };
     if (command.type === 'set-game-memory') return this.saveGameMemory(command);
+    if (command.type === 'clear-game-memory') return this.clearGameMemory();
     if (command.type === 'cancel' || command.type === 'stop') {
       this.operations.cancel();
       if (this.game && !this.game.detached) await this.game.stop();
@@ -696,15 +720,16 @@ export class ProductService {
   }
   private async launch(signal: AbortSignal, preferences: ProductState['preferences']) {
     if (!this.state.supported) throw new Error('unsupported-platform');
-    const maximum = preferences.maxMemoryMiB ?? 2048;
-    const memoryLimit = Math.min(65536, this.state.physicalMemoryMiB);
-    if (
-      memoryLimit < 512 ||
-      maximum > memoryLimit ||
-      (preferences.initialMemoryMiB !== undefined && preferences.initialMemoryMiB > maximum)
-    )
-      throw new Error('memory-limit');
     const config = this.config();
+    // Player value, else the server default, else the built-in default; Xms never exceeds Xmx.
+    const memory = resolveGameMemory(preferences, config.memory);
+    const memoryLimit = Math.min(65536, this.state.physicalMemoryMiB);
+    if (memoryLimit < 512 || memory.maxMemoryMiB > memoryLimit)
+      throw new Error(
+        preferences.maxMemoryMiB === undefined && config.memory
+          ? 'memory-limit-server'
+          : 'memory-limit',
+      );
     this.log('launch: started');
     // Per-attempt check: verified-stale state is recovered silently; held-live falls through to
     // ensure() ('locked'); uncertain or invalid state blocks until the user confirms.
@@ -728,10 +753,10 @@ export class ProductService {
       server: config.address,
       launcherVersion: this.host.version,
       signal,
-      ...(preferences.maxMemoryMiB === undefined ? {} : { maxMemoryMiB: preferences.maxMemoryMiB }),
-      ...(preferences.initialMemoryMiB === undefined
+      maxMemoryMiB: memory.maxMemoryMiB,
+      ...(memory.initialMemoryMiB === undefined
         ? {}
-        : { initialMemoryMiB: preferences.initialMemoryMiB }),
+        : { initialMemoryMiB: memory.initialMemoryMiB }),
       process: preferences.closeOnLaunch ? { detachable: true } : {},
       current,
       onPhase: (phase) => {

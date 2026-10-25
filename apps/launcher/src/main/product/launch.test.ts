@@ -256,3 +256,150 @@ it('preserves stored preferences when the current machine has less RAM than the 
     initialMemoryMiB: 1024,
   });
 });
+
+const serverConfig = (memory?: { maxMiB: number; initialMiB?: number }) => ({
+  format: 'torchlauncher-server' as const,
+  signing: {
+    algorithm: 'ed25519' as const,
+    publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+  },
+  version: 1 as const,
+  serverId,
+  name: 'Fixture',
+  address: 'localhost:25565',
+  sourceUrl: 'https://example.org/fixture',
+  ...(memory ? { memory } : {}),
+});
+const fakeGame = () =>
+  ({
+    pid: 1,
+    finished: Promise.resolve({ reason: 'exited', code: 0, signal: null, logs: { entries: [] } }),
+    stop: vi.fn(),
+    getLogs: () => ({ entries: [], bytes: 0, droppedEntries: 0, discardedLines: 0 }),
+  }) as never;
+
+const memoryTable: {
+  name: string;
+  player: { closeOnLaunch: boolean; maxMemoryMiB?: number; initialMemoryMiB?: number };
+  server?: { maxMiB: number; initialMiB?: number };
+  expected: { max: number; initial?: number };
+}[] = [
+  { name: 'nothing set', player: { closeOnLaunch: false }, expected: { max: 2048 } },
+  {
+    name: 'server default only',
+    player: { closeOnLaunch: false },
+    server: { maxMiB: 4096, initialMiB: 1024 },
+    expected: { max: 4096, initial: 1024 },
+  },
+  {
+    name: 'server Xmx without Xms',
+    player: { closeOnLaunch: false },
+    server: { maxMiB: 3072 },
+    expected: { max: 3072 },
+  },
+  {
+    name: 'player only',
+    player: { closeOnLaunch: false, maxMemoryMiB: 1024, initialMemoryMiB: 512 },
+    expected: { max: 1024, initial: 512 },
+  },
+  {
+    name: 'player Xmx wins, server Xms still fits',
+    player: { closeOnLaunch: false, maxMemoryMiB: 2048 },
+    server: { maxMiB: 4096, initialMiB: 1024 },
+    expected: { max: 2048, initial: 1024 },
+  },
+  {
+    name: 'player Xmx below server Xms drops Xms',
+    player: { closeOnLaunch: false, maxMemoryMiB: 512 },
+    server: { maxMiB: 4096, initialMiB: 1024 },
+    expected: { max: 512 },
+  },
+  {
+    name: 'player overrides both',
+    player: { closeOnLaunch: false, maxMemoryMiB: 2048, initialMemoryMiB: 2048 },
+    server: { maxMiB: 4096, initialMiB: 1024 },
+    expected: { max: 2048, initial: 2048 },
+  },
+];
+it.each(memoryTable)('resolves launch memory: $name', async (row) => {
+  base = await realpath(await mkdtemp(join(tmpdir(), 'launcher-effective-memory-')));
+  await writeFile(join(base, 'launcher-preferences.json'), JSON.stringify(row.player));
+  const product = new ProductService({
+    base,
+    version: 'product-test',
+    config: serverConfig(row.server),
+    auth: { login: vi.fn(), logout: vi.fn(), refresh: vi.fn() },
+    chooseMod: vi.fn(),
+    publish: vi.fn(),
+  });
+  vi.mocked(launchDeployment).mockImplementation(async (options) => {
+    expect(options.maxMemoryMiB).toBe(row.expected.max);
+    expect(options.initialMemoryMiB).toBe(row.expected.initial);
+    return fakeGame();
+  });
+  expect((await product.command({ type: 'launch' })).ok).toBe(true);
+  expect(launchDeployment).toHaveBeenCalledTimes(1);
+  expect(product.snapshot().serverMemory).toEqual(row.server);
+});
+
+it('reports an actionable memory-limit when the server default exceeds physical RAM', async () => {
+  base = await realpath(await mkdtemp(join(tmpdir(), 'launcher-server-memory-limit-')));
+  const make = () =>
+    new ProductService({
+      base,
+      version: 'product-test',
+      config: serverConfig({ maxMiB: 8192 }),
+      auth: { login: vi.fn(), logout: vi.fn(), refresh: vi.fn() },
+      chooseMod: vi.fn(),
+      publish: vi.fn(),
+    });
+  const service = make();
+  (service as unknown as { state: { physicalMemoryMiB: number } }).state.physicalMemoryMiB = 4096;
+  expect(await service.command({ type: 'launch' })).toMatchObject({
+    ok: false,
+    error: 'memory-limit-server',
+  });
+  expect(launchDeployment).not.toHaveBeenCalled();
+  // A personal override that fits lets the launch proceed without clearing anything else.
+  expect((await service.command({ type: 'set-game-memory', maxMemoryMiB: 2048 })).ok).toBe(true);
+  vi.mocked(launchDeployment).mockResolvedValue(fakeGame());
+  expect((await service.command({ type: 'launch' })).ok).toBe(true);
+  // A too-large personal value keeps the generic message.
+  await writeFile(
+    join(base, 'launcher-preferences.json'),
+    JSON.stringify({ closeOnLaunch: false, maxMemoryMiB: 8192 }),
+  );
+  const personal = make();
+  (personal as unknown as { state: { physicalMemoryMiB: number } }).state.physicalMemoryMiB = 4096;
+  expect(await personal.command({ type: 'launch' })).toMatchObject({
+    ok: false,
+    error: 'memory-limit',
+  });
+});
+
+it('clears the personal override so the server default applies again', async () => {
+  base = await realpath(await mkdtemp(join(tmpdir(), 'launcher-clear-memory-')));
+  await writeFile(
+    join(base, 'launcher-preferences.json'),
+    JSON.stringify({ closeOnLaunch: false, maxMemoryMiB: 1024, initialMemoryMiB: 512 }),
+  );
+  const product = new ProductService({
+    base,
+    version: 'product-test',
+    config: serverConfig({ maxMiB: 4096 }),
+    auth: { login: vi.fn(), logout: vi.fn(), refresh: vi.fn() },
+    chooseMod: vi.fn(),
+    publish: vi.fn(),
+  });
+  expect((await product.command({ type: 'clear-game-memory' })).ok).toBe(true);
+  expect(product.snapshot().preferences).toEqual({ closeOnLaunch: false });
+  expect(JSON.parse(await readFile(join(base, 'launcher-preferences.json'), 'utf8'))).toEqual({
+    closeOnLaunch: false,
+  });
+  vi.mocked(launchDeployment).mockImplementation(async (options) => {
+    expect(options.maxMemoryMiB).toBe(4096);
+    expect(options.initialMemoryMiB).toBeUndefined();
+    return fakeGame();
+  });
+  expect((await product.command({ type: 'launch' })).ok).toBe(true);
+});

@@ -23,8 +23,71 @@ export interface ServerConfig extends ServerIdentity {
   /** Optional hint so the launcher can show the game version before the deployment index is read. */
   readonly game?: ServerConfigGame;
   readonly branding?: ServerConfigBranding;
+  /** Operator-chosen default game memory; the player's own launcher settings take precedence. */
+  readonly memory?: ServerConfigMemory;
   /** Trusted publisher key used to verify every deployment. */
   readonly signing: ServerConfigSigning;
+}
+
+export interface ServerConfigMemory {
+  /** Default -Xmx in MiB (512..65536). */
+  readonly maxMiB: number;
+  /** Optional default -Xms in MiB (>= 256 and <= maxMiB); absent means the Java default. */
+  readonly initialMiB?: number;
+}
+
+export const SERVER_MEMORY_MAX_MIN_MIB = 512;
+export const SERVER_MEMORY_MAX_MAX_MIB = 65536;
+export const SERVER_MEMORY_INITIAL_MIN_MIB = 256;
+export const DEFAULT_GAME_MAX_MEMORY_MIB = 2048;
+
+export function parseServerMemory(input: unknown): ServerConfigMemory {
+  const fail = (): never => {
+    throw new Error('Invalid server configuration');
+  };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return fail();
+  const value = input as Record<string, unknown>;
+  if (Object.keys(value).some((key) => key !== 'maxMiB' && key !== 'initialMiB')) return fail();
+  const max = value.maxMiB;
+  if (
+    typeof max !== 'number' ||
+    !Number.isSafeInteger(max) ||
+    max < SERVER_MEMORY_MAX_MIN_MIB ||
+    max > SERVER_MEMORY_MAX_MAX_MIB
+  )
+    return fail();
+  if (!Object.hasOwn(value, 'initialMiB')) return { maxMiB: max };
+  const initial = value.initialMiB;
+  if (
+    typeof initial !== 'number' ||
+    !Number.isSafeInteger(initial) ||
+    initial < SERVER_MEMORY_INITIAL_MIN_MIB ||
+    initial > max
+  )
+    return fail();
+  return { maxMiB: max, initialMiB: initial };
+}
+
+export interface EffectiveGameMemory {
+  readonly maxMemoryMiB: number;
+  readonly initialMemoryMiB?: number;
+}
+
+/**
+ * Per launch: player's saved value, else the server default, else the built-in default
+ * (Xmx 2048 MiB, no Xms). An Xms that would exceed the effective Xmx is dropped, never applied.
+ */
+export function resolveGameMemory(
+  player: { readonly maxMemoryMiB?: number; readonly initialMemoryMiB?: number },
+  server?: ServerConfigMemory,
+): EffectiveGameMemory {
+  const maxMemoryMiB = player.maxMemoryMiB ?? server?.maxMiB ?? DEFAULT_GAME_MAX_MEMORY_MIB;
+  const initial = player.initialMemoryMiB ?? server?.initialMiB;
+  return initial !== undefined &&
+    initial >= SERVER_MEMORY_INITIAL_MIN_MIB &&
+    initial <= maxMemoryMiB
+    ? { maxMemoryMiB, initialMemoryMiB: initial }
+    : { maxMemoryMiB };
 }
 
 export interface ServerConfigSigning {
@@ -217,9 +280,10 @@ export function parseServerConfig(input: unknown): ServerConfig {
     throw new Error('Invalid server configuration');
   const value = input as Record<string, unknown>;
   if (!Object.hasOwn(value, 'signing')) throw new Error('Invalid server configuration');
-  const { game, branding, signing, ...identityInput } = value;
+  const { game, branding, memory, signing, ...identityInput } = value;
   const hasGame = Object.hasOwn(value, 'game');
   const hasBranding = Object.hasOwn(value, 'branding');
+  const hasMemory = Object.hasOwn(value, 'memory');
   const identity = parseServerIdentity(identityInput);
   const parsedGame = hasGame ? parseGame(game) : undefined;
   if (parsedGame === null) throw new Error('Invalid server configuration');
@@ -227,6 +291,7 @@ export function parseServerConfig(input: unknown): ServerConfig {
     ...identity,
     ...(parsedGame ? { game: parsedGame } : {}),
     ...(hasBranding ? { branding: parseServerBranding(branding) } : {}),
+    ...(hasMemory ? { memory: parseServerMemory(memory) } : {}),
     signing: parseSigning(signing),
   };
 }

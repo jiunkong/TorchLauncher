@@ -9,7 +9,9 @@ import { useLauncherLocale } from '../i18n';
 import type { LoadState } from './Mods';
 import {
   defaultMaxMemoryMiB,
+  effectiveGameMemory,
   exceedsRecommendedPhysicalMemory,
+  formatGiB,
   memoryLimitMiB,
   parseMemoryGiB,
   validGameMemory,
@@ -56,7 +58,12 @@ export function SettingsPage({
       t(copied ? 'settings.pathCopied' : 'settings.pathCopyFailed'),
     );
   };
-  const maxMemoryMiB = state.preferences.maxMemoryMiB ?? defaultMaxMemoryMiB;
+  const serverMemory = state.serverMemory;
+  const effectiveMemory = effectiveGameMemory(state.preferences, serverMemory);
+  const hasMemoryOverride =
+    state.preferences.maxMemoryMiB !== undefined ||
+    state.preferences.initialMemoryMiB !== undefined;
+  const maxMemoryMiB = effectiveMemory.maxMemoryMiB;
   const initialMemoryMiB = state.preferences.initialMemoryMiB;
   const [maxMemoryDraft, setMaxMemoryDraft] = useState(String(maxMemoryMiB / 1024));
   const [initialMemoryDraft, setInitialMemoryDraft] = useState(
@@ -146,6 +153,24 @@ export function SettingsPage({
         <section className="card" aria-labelledby="settings-memory">
           <h2 id="settings-memory">{t('settings.gameMemory')}</h2>
           <p className="hint">{t('settings.memoryInitialHint')}</p>
+          <p className="hint" data-testid="memory-server-default">
+            {serverMemory
+              ? serverMemory.initialMiB === undefined
+                ? t('settings.memoryServerDefault', { max: formatGiB(serverMemory.maxMiB) })
+                : t('settings.memoryServerDefaultInitial', {
+                    max: formatGiB(serverMemory.maxMiB),
+                    initial: formatGiB(serverMemory.initialMiB),
+                  })
+              : t('settings.memoryBuiltInDefault', { max: formatGiB(defaultMaxMemoryMiB) })}
+          </p>
+          <p className="hint" data-testid="memory-effective">
+            {effectiveMemory.initialMemoryMiB === undefined
+              ? t('settings.memoryEffective', { max: formatGiB(effectiveMemory.maxMemoryMiB) })
+              : t('settings.memoryEffectiveInitial', {
+                  max: formatGiB(effectiveMemory.maxMemoryMiB),
+                  initial: formatGiB(effectiveMemory.initialMemoryMiB),
+                })}
+          </p>
           <div className="field">
             <span>{t('settings.maxMemory')}</span>
             <span className="input-unit memory-input">
@@ -156,6 +181,7 @@ export function SettingsPage({
                 step={0.25}
                 inputMode="decimal"
                 value={maxMemoryDraft}
+                placeholder={formatGiB(serverMemory?.maxMiB ?? defaultMaxMemoryMiB)}
                 aria-label={t('settings.maxMemory')}
                 data-testid="max-memory"
                 disabled={memorySaving}
@@ -174,6 +200,9 @@ export function SettingsPage({
                 step={0.25}
                 inputMode="decimal"
                 value={initialMemoryDraft}
+                placeholder={
+                  serverMemory?.initialMiB === undefined ? '' : formatGiB(serverMemory.initialMiB)
+                }
                 aria-label={t('settings.initialMemory')}
                 data-testid="initial-memory"
                 disabled={memorySaving}
@@ -198,6 +227,18 @@ export function SettingsPage({
             )}
           <div className="row">
             <small className="grow">{t('settings.memoryNextLaunch')}</small>
+            <button
+              className="btn sm"
+              type="button"
+              data-testid="clear-memory"
+              disabled={!hasMemoryOverride || memorySaving}
+              onClick={() => {
+                setMemorySaving(true);
+                void command({ type: 'clear-game-memory' }).then(() => setMemorySaving(false));
+              }}
+            >
+              {serverMemory ? t('settings.memoryUseServerDefault') : t('settings.memoryUseDefault')}
+            </button>
             <button
               className="btn sm primary"
               type="button"

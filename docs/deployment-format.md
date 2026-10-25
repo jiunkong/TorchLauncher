@@ -254,7 +254,21 @@ portable 경로 규칙을 적용한 NFC 상대 경로이며 **실제 프로파�
 표시에만 쓰며 `app.setName`, appId, userData, 인증 캐시, 홈 서버 이름, 시작 TorchLauncher 로고와
 EXE 아이콘은 변경하지 않는다. 생략하면 기존 제목/메뉴 표시를 유지한다.
 
-현재 프로파일은 `signing`이 필수이며, `branding`은 선택 기능이다.
+## 프로파일 선택 `memory` (서버 기본 게임 메모리)
+
+`torchlauncher-server.json`의 선택 `memory`는 `{maxMiB, initialMiB?}`다. `maxMiB`는 512–65536 정수(MiB)이며
+필수다. `initialMiB`는 선택이며 있으면 256 이상 `maxMiB` 이하 정수다. 이 객체의 다른 키, 정수 아님,
+범위 밖 값, `maxMiB` 없는 `initialMiB`(Xms 기본값은 같은 블록의 명시적 Xmx 기본값이 필요)는 프로파일 오류다.
+`memory`가 없으면 런처 내장 기본값(Xmx 2048 MiB, Xms 없음)을 쓴다. `initialMiB`를 생략하면 Xms 기본값이 없다.
+`memory`는 `.torchpack` 배포가 아니라 내보낸 런처 ZIP의 서버 구성에만 들어가므로 바꿔도 torchpack을
+다시 만들 필요는 없지만, 런처 ZIP은 다시 내보내 전달해야 한다.
+
+실행 시 유효 메모리는 필드별로 **플레이어 개인 설정(설정 화면에서 저장한 값) → 서버 기본값 → 내장 기본값** 순이다.
+Xms는 유효 Xmx 이상이면 적용하지 않고 버린다(플레이어가 Xmx를 서버 Xms 기본값보다 낮게 정하면 Xms 없이 실행한다).
+물리 RAM 한도를 넘으면 기존 `memory-limit` 보호가 실행을 막고, 원인이 서버 기본값이면 설정에서 메모리를 낮추라고 안내한다.
+서버 구성이 바뀌어도 플레이어 개인 설정 파일은 지우지 않는다.
+
+현재 프로파일은 `signing`이 필수이며, `branding`·`memory`는 선택 기능이다.
 JSON 구조·필드·unsafe 경로 등 계약 오류는 프로파일 오류다. 구조상 올바른 참조의 파일 누락·hash 불일치·
 실제 decode 실패는 런타임 자산 실패이며 기본/이전 표시를 유지해야 한다. 런타임은 symlink/hardlink와
 실제 root 이탈을 거부하고 게임 데이터 밖 캐시를 서버 ID·프로파일 기준으로 분리한다. 원격 전체 인덱스가

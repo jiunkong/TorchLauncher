@@ -22,6 +22,8 @@ export type ProductCommand =
         | 'usage'
         | 'preview-delete'
         | 'open-logs'
+        /** Removes the personal memory override so the server default applies again. */
+        | 'clear-game-memory'
         /** Copies the pending Microsoft login code through main (the renderer cannot use the clipboard). */
         | 'copy-login-code';
     }
@@ -72,6 +74,8 @@ export interface ProductState {
     error?: 'preferences-failed';
   };
   physicalMemoryMiB: number;
+  /** Operator default from the server configuration; absent when the server sets none. */
+  serverMemory?: { maxMiB: number; initialMiB?: number };
   server: { serverId: string; name: string; address: string } | null;
   configuration: 'ready' | 'unavailable';
   supported: boolean;
@@ -155,6 +159,7 @@ export function parseProductCommand(input: unknown): ProductCommand {
     'usage',
     'preview-delete',
     'open-logs',
+    'clear-game-memory',
     'copy-login-code',
   ];
   if (typeof value.type !== 'string') return fail();
