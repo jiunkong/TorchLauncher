@@ -3,7 +3,7 @@ import {
   type BrandingAssetMetadata,
   type BrandingRole,
 } from '../../../../packages/core/src/branding/index.js';
-import type { StudioImageIoCause } from '../shared/studio.js';
+import { BRANDING_PREVIEW_LIMITS, type StudioImageIoCause } from '../shared/studio.js';
 import { type ImageDecoder, validateImage } from './branding.js';
 import { ImageFailure, StudioFailure } from './project.js';
 
@@ -228,4 +228,37 @@ export function prepareBrandingImage(
     else factor *= format === 'jpeg' ? 0.85 : 0.75;
   }
   return fail({ reason: 'cannotFit', attempts, ...last, limit });
+}
+
+export interface BrandingPreviewImage {
+  readonly bytes: Buffer;
+  readonly mediaType: 'image/png' | 'image/jpeg';
+  readonly width: number;
+  readonly height: number;
+}
+/**
+ * The bounded preview of a stored (already validated) branding image: the original bytes when they
+ * already fit BRANDING_PREVIEW_LIMITS, otherwise a downscaled copy (icons PNG, backgrounds JPEG).
+ * Throws when the image cannot be decoded.
+ */
+export function previewBrandingImage(
+  role: BrandingRole,
+  bytes: Buffer,
+  raster: RasterDecoder,
+): BrandingPreviewImage {
+  const limit = BRANDING_PREVIEW_LIMITS[role];
+  const header = readImageHeader(bytes);
+  if (!header || header.kind === 'broken') throw new Error('INVALID');
+  const mediaType = header.kind === 'png' ? 'image/png' : 'image/jpeg';
+  if (Math.max(header.width, header.height) <= limit.maxEdge && bytes.length <= limit.maxBytes)
+    return { bytes, mediaType, width: header.width, height: header.height };
+  const image = raster(bytes);
+  if (!image) throw new Error('INVALID');
+  const scale = Math.min(1, limit.maxEdge / Math.max(image.width, image.height));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const resized = scale === 1 ? image : image.resize(width, height);
+  return role === 'icon'
+    ? { bytes: resized.toPNG(), mediaType: 'image/png', width, height }
+    : { bytes: resized.toJPEG(82), mediaType: 'image/jpeg', width, height };
 }

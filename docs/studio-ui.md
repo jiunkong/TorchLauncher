@@ -37,3 +37,10 @@
 - 모든 사용자 문구는 기존 Studio i18n 사전을 거친다. 신규 IPC는 좁고 검증된 인터페이스로 만들고 `smoke` 격리 목록을 갱신한다.
 - 파일 경로 검증과 해시 검증, 소유권 규칙은 AGENTS.md를 따른다. 설정 파일 읽기는 크기 제한을 두고 임의 경로 쓰기를 만들지 않는다.
 - 완료 보고: 브랜치, 커밋, 실행한 검증 명령과 결과(통과/실패/미실행), 한계를 `docs/handoffs/<ID>.md`에 쓴다. `docs/progress.md`와 main은 건드리지 않는다.
+
+## 브랜딩 미리보기 (STUDIO-BRANDING-PREVIEW-01)
+
+- 선택한 아이콘/배경은 브랜딩 페이지의 행 썸네일과 큰 미리보기(제목줄 아이콘, 홈 배경)에 표시한다. 역할이 비어 있거나 로딩/실패 중이면 기본 이미지를 쓰고, 새 이미지가 도착하기 전까지 이전 이미지를 유지한다.
+- 이미지 바이트는 main의 `snapshots`에만 있다. 렌더러는 상태에 이미지가 없으므로 자산 `sha256`이 바뀔 때만 읽기 전용 명령 `{ action: 'brandingImage', role, sha256 }`을 호출하고 sha로 캐시한다. 응답은 `{ ok: true, state, image: { dataUrl, width, height, sha256 } }`이며 경로를 포함하지 않는다. sha가 현재 자산과 다르거나 이미지가 없으면 `MISMATCH`, 프로젝트가 없으면 `NO_PROJECT`, 변환 실패는 `INVALID`, 한도 초과는 `TOO_LARGE`다. 작업 중(busy)에도 응답한다.
+- main은 주입 가능한 `ImageThumbnailer`(Electron `nativeImage`)로 축소본을 만든다: 아이콘은 긴 변 128 px 이하 PNG(최대 256 KiB), 배경은 긴 변 960 px 이하 JPEG(최대 768 KiB). 확대하지 않으며 이미 한도 이하이면 원본을 그대로 쓴다. 원본 전체(최대 8 MiB)는 전송하지 않는다.
+- 미리보기는 실제 런처의 렌더링과 완전히 같지 않을 수 있다(배경 자르기 등). `brand.limits` 안내문이 이를 알린다.

@@ -98,6 +98,47 @@ await writeFile(join(game, 'config/iris.properties'), 'enableShaders=true\nshade
 await writeFile(join(game, 'shaderpacks/Test.zip.txt'), 'SHADOW_RES=2048\n');
 // Minimal zip-looking packs (the main process checks name, size and the zip signature).
 const zipBytes = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64, 7)]);
+// Distinct coloured branding images so the preview is obviously not the default artwork.
+function colourPng(width, height, pixel) {
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const [r, g, b] = pixel(x, y);
+      raw.set([r, g, b], y * (width * 3 + 1) + 1 + x * 3);
+    }
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const out = Buffer.alloc(body.length + 8);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(crc32(body), body.length + 4);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+const iconPng = join(source, 'icon-magenta.png');
+const backgroundPng = join(source, 'background-green.png');
+await writeFile(
+  iconPng,
+  colourPng(256, 256, (x, y) => (Math.abs(x - y) < 24 ? [0, 255, 255] : [255, 0, 255])),
+);
+await writeFile(
+  backgroundPng,
+  colourPng(1920, 1080, (x, y) => [
+    0,
+    140 + Math.round((y / 1080) * 80),
+    40 + Math.round((x / 1920) * 160),
+  ]),
+);
 const packs = join(root, 'packs');
 await mkdir(packs);
 await writeFile(join(packs, 'server-pack.zip'), zipBytes);
@@ -163,6 +204,7 @@ try {
         '셰이더팩(.zip) 선택': [join(paths.packs, 'Test.zip')],
         '모드(.jar) 선택': [join(paths.packs, 'example-mod.jar')],
         '앱 아이콘 선택 (PNG 또는 JPEG, 자동으로 크기 조정)': [paths.bigIcon],
+        '홈 배경 선택 (PNG 또는 JPEG, 자동으로 크기 조정)': [paths.backgroundPng],
       };
       function join(...parts) {
         return parts.join('/');
@@ -250,6 +292,8 @@ try {
       bigIcon,
       badIcon,
       options: join(source, 'options.txt'),
+      iconPng,
+      backgroundPng,
       project,
       projectParent,
       pack,
@@ -1325,6 +1369,141 @@ try {
     'auto',
   );
   await page.setViewportSize({ width: 1100, height: 800 });
+
+  // Branding images: rows and preview show the chosen images (never the default art), also after
+  // a save and reopen (read back from the project file), and return to default when removed.
+  await goto('브랜딩');
+  // Earlier steps may have left an icon; start from the default art.
+  for (const label of ['앱 아이콘 제거', '홈 배경 제거']) {
+    const button = page.getByRole('button', { name: label, exact: true });
+    if (await button.count()) await button.click();
+  }
+  await page.locator('[data-testid="brand-preview-icon"][data-custom="false"]').waitFor();
+  const brandState = async () =>
+    page.evaluate(() => {
+      const bg = document.querySelector('[data-testid="brand-preview-bg"]');
+      const icon = document.querySelector('[data-testid="brand-preview-icon"]');
+      const rowIcon = document.querySelector('[data-testid="brand-icon-thumb"] img');
+      const rowBg = document.querySelector('[data-testid="brand-background-thumb"]');
+      const rowBgImg = rowBg?.querySelector('img');
+      return {
+        previewIcon: icon?.getAttribute('src') ?? '',
+        previewIconCustom: icon?.getAttribute('data-custom'),
+        rowIcon: rowIcon?.getAttribute('src') ?? '',
+        rowBgSrc: rowBgImg?.getAttribute('src') ?? '',
+        rowBgCustom: rowBg?.getAttribute('data-custom'),
+        previewBgCustom: bg?.getAttribute('data-custom'),
+        previewBgImage: bg ? getComputedStyle(bg).backgroundImage : '',
+        defaultArt: !!bg?.querySelector('.sun'),
+      };
+    });
+  const defaults = await brandState();
+  assert.equal(defaults.previewIconCustom, 'false');
+  assert.ok(!defaults.previewIcon.startsWith('data:'));
+  assert.equal(defaults.defaultArt, true);
+  const expectChosen = async (label) => {
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="brand-preview-icon"]')
+          ?.getAttribute('data-custom') === 'true' &&
+        document.querySelector('[data-testid="brand-preview-bg"]')?.getAttribute('data-custom') ===
+          'true' &&
+        document.querySelector('[data-testid="brand-icon-thumb"]')?.getAttribute('data-custom') ===
+          'true' &&
+        document
+          .querySelector('[data-testid="brand-background-thumb"]')
+          ?.getAttribute('data-custom') === 'true',
+    );
+    const now = await brandState();
+    assert.ok(now.previewIcon.startsWith('data:image/png;base64,'), `${label} preview icon`);
+    assert.ok(now.rowIcon.startsWith('data:image/png;base64,'), `${label} row icon`);
+    assert.ok(now.rowBgSrc.startsWith('data:image/jpeg;base64,'), `${label} row background`);
+    assert.ok(
+      now.previewBgImage.includes('data:image/jpeg;base64,'),
+      `${label} preview background`,
+    );
+    assert.equal(now.defaultArt, false);
+    assert.notEqual(now.previewIcon, defaults.previewIcon);
+    const sizes = await page.evaluate(
+      async (urls) =>
+        Promise.all(
+          urls.map(
+            (url) =>
+              new Promise((resolve) => {
+                const image = new Image();
+                image.onload = () => resolve([image.naturalWidth, image.naturalHeight]);
+                image.src = url;
+              }),
+          ),
+        ),
+      [now.previewIcon, now.rowBgSrc],
+    );
+    assert.deepEqual(sizes, [
+      [128, 128],
+      [960, 540],
+    ]);
+  };
+  await page.getByRole('button', { name: '앱 아이콘 변경', exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="brand-preview-icon"]')?.getAttribute('data-custom') ===
+      'true',
+  );
+  await page.getByRole('button', { name: '홈 배경 변경', exact: true }).click();
+  await expectChosen('selected');
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.getByTestId('brand-preview').waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+      0,
+      `branding page overflows at ${width}`,
+    );
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-branding-images-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await menuAction('file', 'save');
+  await page.getByTestId('save-state').filter({ hasText: '저장됨' }).waitFor();
+  await menuAction('file', 'open');
+  await page.getByTestId('brand-preview').waitFor();
+  const reopened = await page.evaluate(async () => {
+    const { project } = (await window.torchlauncher.request({ action: 'state' })).state;
+    const out = {};
+    for (const role of ['icon', 'background']) {
+      const reply = await window.torchlauncher.request({
+        action: 'brandingImage',
+        role,
+        sha256: project.branding[role].sha256,
+      });
+      out[role] = reply.ok ? reply.image.dataUrl.split(',')[0] : reply.code;
+    }
+    return out;
+  });
+  assert.deepEqual(reopened, {
+    icon: 'data:image/png;base64',
+    background: 'data:image/jpeg;base64',
+  });
+  await page.reload();
+  await goto('브랜딩');
+  await expectChosen('reloaded from the project file');
+  await page.getByRole('button', { name: '앱 아이콘 제거', exact: true }).click();
+  await page.getByRole('button', { name: '홈 배경 제거', exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="brand-preview-icon"]')?.getAttribute('data-custom') ===
+        'false' &&
+      document.querySelector('[data-testid="brand-preview-bg"]')?.getAttribute('data-custom') ===
+        'false',
+  );
+  const removed = await brandState();
+  assert.equal(removed.rowBgCustom, 'false');
+  assert.ok(!removed.previewIcon.startsWith('data:'));
+  assert.ok(!removed.rowIcon.startsWith('data:'));
+  assert.equal(removed.defaultArt, true);
+  assert.equal(removed.previewIcon, defaults.previewIcon);
 
   const isolation = await page.evaluate(() => ({
     require: 'require' in window,

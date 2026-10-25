@@ -212,6 +212,110 @@ describe('Studio durable branding', () => {
     await s.request({ action: 'brandingName', appName: null });
     expect(s.snapshot().project?.branding?.appName).toBeUndefined();
   });
+  it('serves bounded read-only previews keyed by sha256 and drops them on remove', async () => {
+    const root = await temp();
+    const path = join(root, 'image.png');
+    await writeFile(path, png);
+    const { s, d, projDir } = await service();
+    const sha = createHash('sha256').update(png).digest('hex');
+    expect(await s.request({ action: 'brandingImage', role: 'icon', sha256: sha })).toEqual({
+      ok: false,
+      code: 'MISMATCH',
+    });
+    for (const input of [
+      { action: 'brandingImage', role: 'other', sha256: sha },
+      { action: 'brandingImage', role: 'icon', sha256: 'abc' },
+      { action: 'brandingImage', role: 'icon' },
+      { action: 'brandingImage', role: 'icon', sha256: sha, path },
+    ])
+      expect(await s.request(input)).toEqual({ ok: false, code: 'INVALID' });
+    d.open.mockResolvedValueOnce([path]);
+    await s.request({ action: 'brandingSelect', role: 'icon' });
+    const reply = await s.request({ action: 'brandingImage', role: 'icon', sha256: sha });
+    expect(reply.ok && reply.image).toEqual({
+      dataUrl: `data:image/png;base64,${png.toString('base64')}`,
+      width: 1,
+      height: 1,
+      sha256: sha,
+    });
+    expect(JSON.stringify(reply)).not.toContain(root);
+    expect(
+      await s.request({ action: 'brandingImage', role: 'icon', sha256: '0'.repeat(64) }),
+    ).toEqual({ ok: false, code: 'MISMATCH' });
+    expect(await s.request({ action: 'brandingImage', role: 'background', sha256: sha })).toEqual({
+      ok: false,
+      code: 'MISMATCH',
+    });
+    expect((await s.request({ action: 'save' })).ok).toBe(true);
+    // Reopening loads the snapshot from the project file.
+    const other = new StudioService(d, undefined, decode);
+    d.open.mockResolvedValueOnce([projDir]);
+    expect((await other.request({ action: 'open' })).ok).toBe(true);
+    expect((await other.request({ action: 'brandingImage', role: 'icon', sha256: sha })).ok).toBe(
+      true,
+    );
+    await s.request({ action: 'brandingRemove', role: 'icon' });
+    expect(await s.request({ action: 'brandingImage', role: 'icon', sha256: sha })).toEqual({
+      ok: false,
+      code: 'MISMATCH',
+    });
+  });
+  it('downscales large stored images for the preview and reports failures', async () => {
+    const root = await temp();
+    const path = join(root, 'image.png');
+    const header = Buffer.alloc(33);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(header);
+    header.writeUInt32BE(13, 8);
+    header.write('IHDR', 12, 'latin1');
+    header.writeUInt32BE(300, 16);
+    header.writeUInt32BE(300, 20);
+    header.set([8, 6, 0, 0, 0], 24);
+    await writeFile(path, header);
+    const d = dialogs();
+    const small = { width: 128, height: 128 };
+    let encoded = Buffer.alloc(1000, 7);
+    const resize = vi.fn(() => ({
+      ...small,
+      resize,
+      toPNG: () => encoded,
+      toJPEG: () => encoded,
+    }));
+    const raster = vi.fn(() => ({
+      width: 300,
+      height: 300,
+      resize,
+      toPNG: () => encoded,
+      toJPEG: () => encoded,
+    }));
+    const s = new StudioService(
+      d,
+      undefined,
+      () => ({ width: 300, height: 300 }),
+      undefined,
+      undefined,
+      undefined,
+      raster,
+    );
+    await createProjectAt(s, d, await temp());
+    d.open.mockResolvedValueOnce([path]);
+    expect((await s.request({ action: 'brandingSelect', role: 'icon' })).ok).toBe(true);
+    const sha = createHash('sha256').update(header).digest('hex');
+    const reply = await s.request({ action: 'brandingImage', role: 'icon', sha256: sha });
+    expect(reply.ok && reply.image).toMatchObject({ width: 128, height: 128, sha256: sha });
+    expect(resize).toHaveBeenCalledWith(128, 128);
+    encoded = Buffer.alloc(300 * 1024);
+    expect(await s.request({ action: 'brandingImage', role: 'icon', sha256: sha })).toEqual({
+      ok: false,
+      code: 'TOO_LARGE',
+    });
+    raster.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    expect(await s.request({ action: 'brandingImage', role: 'icon', sha256: sha })).toEqual({
+      ok: false,
+      code: 'INVALID',
+    });
+  });
   it('rejects malformed/corrupt snapshots, metadata, bounds and actual decoder disagreement', () => {
     const metadata = validateImage('icon', png, decode);
     const project = { ...newProject(), branding: { icon: metadata } };

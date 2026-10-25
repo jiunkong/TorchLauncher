@@ -484,8 +484,22 @@ export type StudioSettingsCommand =
   | { action: 'settingsPackPolicy'; kind: PackKind; name: string; policy: SettingPolicyChoice }
   | { action: 'settingsPackMove'; kind: PackKind; name: string; index: number }
   | { action: 'settingsPackRemove'; kind: PackKind; name: string };
+/** Bounds of the preview image main returns for `brandingImage` (never the original file). */
+export const BRANDING_PREVIEW_LIMITS = {
+  icon: { maxEdge: 128, maxBytes: 256 * 1024 },
+  background: { maxEdge: 960, maxBytes: 768 * 1024 },
+} as const;
+/** A downscaled preview of the chosen image; `sha256` is that of the original asset in the project. */
+export interface StudioBrandingImage {
+  dataUrl: string;
+  width: number;
+  height: number;
+  sha256: string;
+}
 export type StudioBrandingCommand =
   | { action: 'brandingSelect' | 'brandingRemove'; role: 'icon' | 'background' }
+  /** Read-only: the preview of the role's current image, only while its sha256 still matches. */
+  | { action: 'brandingImage'; role: 'icon' | 'background'; sha256: string }
   | { action: 'brandingName'; appName: string | null };
 export type StudioSigningCommand =
   | { action: 'keyStatus' | 'keyCreate' }
@@ -586,7 +600,13 @@ export type StudioImageFailure =
   | { reason: 'storeFailed'; role: 'icon' | 'background'; cause: StudioImageIoCause };
 export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
 export type StudioReply =
-  | { ok: true; state: StudioState; loaderVersions?: string[] }
+  | {
+      ok: true;
+      state: StudioState;
+      loaderVersions?: string[];
+      /** Only for `brandingImage`. */
+      image?: StudioBrandingImage;
+    }
   | {
       ok: false;
       code: StudioError;
