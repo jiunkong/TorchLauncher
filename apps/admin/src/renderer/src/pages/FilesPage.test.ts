@@ -38,7 +38,7 @@ describe('file target dialog', () => {
     expect(html).toContain('런처 폴더 편집');
     expect(html).toContain('custom.data');
     expect(html).toContain('value="data"');
-    expect(html).toContain('게임 폴더 기준 상대 경로');
+    expect(html).toContain('게임 폴더 기준 상대 폴더');
     expect(html).toContain('원본 파일명은 유지됩니다.');
     expect(html).toContain('data-autofocus');
     expect(html).toContain('type="submit"');
@@ -71,7 +71,11 @@ describe('launcher folder path helpers', () => {
     expect(fileDirectory('custom.data')).toBe('');
     expect(fileDirectory('source/nested/custom.data')).toBe('source/nested');
     expect(normalizeFileDirectory(' data/ ')).toBe('data');
+    expect(normalizeFileDirectory('./')).toBe('');
+    expect(normalizeFileDirectory('/')).toBe('');
     expect(targetPathForDirectory('custom.data', 'data/')).toBe('data/custom.data');
     expect(targetPathForDirectory('source/custom.data', '')).toBe('custom.data');
+    expect(targetPathForDirectory('custom.data', './')).toBe('custom.data');
+    expect(targetPathForDirectory('custom.data', '/')).toBe('custom.data');
   });
 });

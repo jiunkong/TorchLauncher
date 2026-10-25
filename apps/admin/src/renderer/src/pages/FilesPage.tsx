@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { FilePolicyChoice, StudioFileEntry } from '../../../shared/studio.js';
 import { FolderIcon, PencilIcon, PlusIcon, RefreshIcon } from '../components/Icons';
 import { Modal } from '../components/Modal';
-import { Checkbox, Chip, Note, PageHeader } from '../components/ui';
+import { Checkbox, Chip, PageHeader } from '../components/ui';
 import { formatBytes } from '../format';
 import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
@@ -13,7 +13,8 @@ export function fileDirectory(filePath: string) {
 }
 
 export function normalizeFileDirectory(directory: string) {
-  return directory.trim().replace(/\/+$/, '');
+  const normalized = directory.trim().replace(/\/+$/, '');
+  return normalized === '.' ? '' : normalized;
 }
 
 export function targetPathForDirectory(sourcePath: string, directory: string) {
@@ -283,7 +284,6 @@ export function FilesPage({ studio, insights }: PageProps) {
           <p className="fine pad">{t('files.skipped', { count: files?.skipped ?? 0 })}</p>
         )}
       </section>
-      <Note>{t('files.removeHint')}</Note>
       {targetEntry && (
         <FileTargetDialog
           path={targetEntry.path}

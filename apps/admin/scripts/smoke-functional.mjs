@@ -648,6 +648,35 @@ try {
         .targetPath === 'data/custom.data',
   );
   await targetDialog.waitFor({ state: 'detached' });
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('/');
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(
+    async () =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === 'custom.data',
+  );
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('./');
+  assert.equal(await targetDialog.getByTestId('files-target-save').isDisabled(), true);
+  await targetInput.press('Escape');
+  await targetDialog.waitFor({ state: 'detached' });
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('data');
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(
+    async () =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === 'data/custom.data',
+  );
   for (const bad of ['../escape', 'resourcepacks', 'shaderpacks/subdir']) {
     if (!(await targetDialog.isVisible())) {
       await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();

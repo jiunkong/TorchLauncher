@@ -427,12 +427,8 @@ const table = {
   'files.target.title': ['Edit launcher folder', '런처 폴더 편집'],
   'files.target.reset': ['Use source path', '원래대로'],
   'files.targetHint': [
-    'Choose a folder relative to the game folder. The source filename is kept.',
-    '게임 폴더 기준 상대 경로를 입력하세요. 원본 파일명은 유지됩니다.',
-  ],
-  'files.removeHint': [
-    'Removing a file also deletes it from the project folder.',
-    '파일을 삭제하면 프로젝트 폴더에서도 제거됩니다.',
+    'Choose a folder relative to the game folder. Leave blank, or enter ./ or / alone for the game folder. The source filename is kept.',
+    '게임 폴더 기준 상대 폴더를 입력하세요. 빈칸, ./ 또는 단독 /는 게임 폴더를 뜻합니다. 원본 파일명은 유지됩니다.',
   ],
   'files.remove': ['Delete {path} from the project', '프로젝트에서 {path} 삭제'],
   'files.removeButton': ['Delete', '삭제'],
