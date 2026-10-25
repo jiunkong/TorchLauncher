@@ -24,8 +24,8 @@ export function FilesPage({ studio, insights }: PageProps) {
   const chosen = [...selected].filter((path) => live.has(path));
   const selectable = entries;
   const hasBuild = insights.deploy.lastBuild !== null;
-  const [targetDrafts, setTargetDrafts] = useState<Record<string, string>>({});
   const [removePath, setRemovePath] = useState<string | null>(null);
+  const [targetPath, setTargetPath] = useState<string | null>(null);
 
   const apply = async (paths: string[], policy: FilePolicyChoice) => {
     if (paths.length === 0) return;
@@ -48,6 +48,7 @@ export function FilesPage({ studio, insights }: PageProps) {
     }[entry.change];
     return <span className={`chg ${entry.change === 'added' ? 'add' : 'mod'}`}>{label}</span>;
   };
+  const targetEntry = entries.find((entry) => entry.path === targetPath) ?? null;
 
   return (
     <>
@@ -177,49 +178,35 @@ export function FilesPage({ studio, insights }: PageProps) {
                       onChange={(on) => toggle(entry.path, on)}
                     />
                   </td>
-                  <td className="mono path">
+                  <td className="mono path" data-label={t('files.col.path')}>
                     {entry.path}
                     {entry.missing && <small className="err block">{t('files.missingRow')}</small>}
                   </td>
-                  <td>
-                    <input
-                      type="text"
-                      className="input file-target"
-                      value={targetDrafts[entry.path] ?? entry.targetPath ?? entry.path}
-                      aria-label={t('files.targetPath', { path: entry.path })}
+                  <td className="target-cell" data-label={t('files.col.target')}>
+                    <span
+                      className={`target-value${(entry.targetPath ?? entry.path) !== entry.path ? ' changed' : ''}`}
+                      title={entry.targetPath ?? entry.path}
+                    >
+                      {entry.targetPath ?? entry.path}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn sm ghost target-edit"
                       disabled={busy || entry.missing}
-                      onChange={(event) =>
-                        setTargetDrafts((drafts) => ({
-                          ...drafts,
-                          [entry.path]: event.target.value,
-                        }))
-                      }
-                      onBlur={(event) => {
-                        const targetPath = event.currentTarget.value.trim();
-                        const current = entry.targetPath ?? entry.path;
-                        if (targetPath !== current) {
-                          void command({
-                            action: 'filesTarget',
-                            path: entry.path,
-                            targetPath,
-                          }).then((saved) => {
-                            if (saved) {
-                              setTargetDrafts((drafts) => {
-                                const next = { ...drafts };
-                                delete next[entry.path];
-                                return next;
-                              });
-                            }
-                          });
-                        }
-                      }}
-                    />
+                      aria-label={t('files.targetEdit', { path: entry.path })}
+                      data-testid="files-target-edit"
+                      onClick={() => setTargetPath(entry.path)}
+                    >
+                      {t('files.edit')}
+                    </button>
                   </td>
-                  <td className="c-size dim">
+                  <td className="c-size dim" data-label={t('files.col.size')}>
                     {entry.size === null ? '—' : formatBytes(entry.size)}
                   </td>
-                  <td className="c-chg">{changeChip(entry)}</td>
-                  <td className="c-pol">
+                  <td className="c-chg" data-label={t('files.col.change')}>
+                    {changeChip(entry)}
+                  </td>
+                  <td className="c-pol" data-label={t('files.col.policy')}>
                     <span
                       className="pol"
                       role="radiogroup"
@@ -245,7 +232,7 @@ export function FilesPage({ studio, insights }: PageProps) {
                       ))}
                     </span>
                   </td>
-                  <td>
+                  <td className="file-actions" data-label={t('files.col.actions')}>
                     <button
                       type="button"
                       className="btn sm ghost"
@@ -268,7 +255,28 @@ export function FilesPage({ studio, insights }: PageProps) {
           <p className="fine pad">{t('files.skipped', { count: files?.skipped ?? 0 })}</p>
         )}
       </section>
-      <Note>{t('files.targetHint')}</Note>
+      <Note>{t('files.removeHint')}</Note>
+      {targetEntry && (
+        <FileTargetDialog
+          path={targetEntry.path}
+          currentTarget={targetEntry.targetPath ?? targetEntry.path}
+          busy={busy}
+          failure={studio.message}
+          onCancel={() => setTargetPath(null)}
+          onSubmit={async (nextTarget) => {
+            if (nextTarget.trim() === (targetEntry.targetPath ?? targetEntry.path)) {
+              setTargetPath(null);
+              return;
+            }
+            const saved = await command({
+              action: 'filesTarget',
+              path: targetEntry.path,
+              targetPath: nextTarget.trim(),
+            });
+            if (saved) setTargetPath(null);
+          }}
+        />
+      )}
       {removePath && (
         <Modal
           titleId="files-remove-title"
@@ -303,5 +311,82 @@ export function FilesPage({ studio, insights }: PageProps) {
         </Modal>
       )}
     </>
+  );
+}
+
+export function FileTargetDialog({
+  path,
+  currentTarget,
+  busy,
+  failure,
+  onCancel,
+  onSubmit,
+}: {
+  path: string;
+  currentTarget: string;
+  busy: boolean;
+  failure: string;
+  onCancel(): void;
+  onSubmit(targetPath: string): Promise<void>;
+}) {
+  const { t } = useStudioLocale();
+  const [value, setValue] = useState(currentTarget);
+  const unchanged = value.trim() === currentTarget;
+  return (
+    <Modal titleId="files-target-title" testId="files-target-dialog" onCancel={onCancel}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!busy && !unchanged) void onSubmit(value);
+        }}
+      >
+        <h2 id="files-target-title">{t('files.target.title')}</h2>
+        <p className="lead mono target-source" title={path}>
+          {path}
+        </p>
+        <div className="fld">
+          <label htmlFor="files-target-input">{t('files.col.target')}</label>
+          <input
+            id="files-target-input"
+            className="inp"
+            type="text"
+            data-autofocus
+            data-testid="files-target-input"
+            aria-label={t('files.targetPath', { path })}
+            value={value}
+            aria-describedby="files-target-hint files-target-error"
+            onChange={(event) => setValue(event.target.value)}
+          />
+          <span id="files-target-hint" className="fine">
+            {t('files.targetHint')}
+          </span>
+          <span id="files-target-error" className="err" role={failure ? 'alert' : undefined}>
+            {failure}
+          </span>
+        </div>
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onCancel}>
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy || value === path}
+            data-testid="files-target-reset"
+            onClick={() => setValue(path)}
+          >
+            {t('files.target.reset')}
+          </button>
+          <button
+            type="submit"
+            className="btn primary"
+            data-testid="files-target-save"
+            disabled={busy || unchanged}
+          >
+            {t('files.target.save')}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

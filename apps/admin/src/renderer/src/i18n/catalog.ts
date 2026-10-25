@@ -3,6 +3,7 @@ import { defineTranslations } from '@torchlauncher/core/i18n';
 /** Each key holds [English, Korean]; Korean is the reference text of the approved mockups. */
 const table = {
   'common.cancel': ['Cancel', '취소'],
+  'files.target.save': ['Save', '저장'],
   'common.close': ['Close', '닫기'],
   'common.apply': ['Apply', '적용'],
   'common.retry': ['Try again', '다시 시도'],
@@ -421,9 +422,17 @@ const table = {
   'files.col.target': ['Launcher path', '런처 경로'],
   'files.col.actions': ['Actions', '작업'],
   'files.targetPath': ['Launcher path for {path}', '{path}의 런처 경로'],
+  'files.targetEdit': ['Edit launcher path for {path}', '{path}의 런처 경로 편집'],
+  'files.edit': ['Edit', '편집'],
+  'files.target.title': ['Edit launcher path', '런처 경로 편집'],
+  'files.target.reset': ['Use source path', '원래대로'],
   'files.targetHint': [
-    'Launcher paths are relative to the game folder. Removing a file deletes it from the project folder.',
-    '런처 경로는 게임 폴더 기준 상대 경로입니다. 파일을 삭제하면 프로젝트 폴더에서도 제거됩니다.',
+    'Launcher paths are relative to the game folder.',
+    '런처 경로는 게임 폴더 기준 상대 경로입니다.',
+  ],
+  'files.removeHint': [
+    'Removing a file also deletes it from the project folder.',
+    '파일을 삭제하면 프로젝트 폴더에서도 제거됩니다.',
   ],
   'files.remove': ['Delete {path} from the project', '프로젝트에서 {path} 삭제'],
   'files.removeButton': ['Delete', '삭제'],

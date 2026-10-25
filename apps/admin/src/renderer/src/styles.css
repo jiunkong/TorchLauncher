@@ -904,12 +904,36 @@ button.chip.link:hover {
   padding: 8px 8px 8px;
 }
 .scroll {
-  overflow-x: auto;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 .tbl {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
+}
+.tbl th:nth-child(1),
+.tbl td:nth-child(1) {
+  width: 38px;
+}
+.tbl th:nth-child(2) {
+  width: 21%;
+}
+.tbl th:nth-child(3) {
+  width: 26%;
+}
+.tbl th:nth-child(4) {
+  width: 9%;
+}
+.tbl th:nth-child(5) {
+  width: 9%;
+}
+.tbl th:nth-child(6) {
+  width: 21%;
+}
+.tbl th:nth-child(7) {
+  width: 78px;
 }
 .tbl th {
   text-align: left;
@@ -927,11 +951,22 @@ button.chip.link:hover {
 }
 .tbl .path {
   overflow-wrap: anywhere;
-  min-width: 160px;
+  min-width: 0;
 }
-.file-target {
-  width: 100%;
-  min-width: 160px;
+.target-cell {
+  min-width: 0;
+}
+.target-value {
+  display: block;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.target-value.changed {
+  color: var(--red-text);
+  font-weight: 600;
+}
+.target-edit {
+  margin-top: 5px;
 }
 .c-box {
   width: 36px;
@@ -944,7 +979,13 @@ button.chip.link:hover {
   width: 80px;
 }
 .c-pol {
-  width: 190px;
+  width: 21%;
+}
+.tbl .pol {
+  max-width: 100%;
+}
+.file-actions .btn {
+  padding-inline: 8px;
 }
 .empty-row {
   padding: 18px 10px;
@@ -2212,6 +2253,87 @@ button.chip.pick {
   }
   .big .cp b {
     font-size: 26px;
+  }
+  .tablecard {
+    min-width: 0;
+  }
+  .scroll {
+    overflow: visible;
+  }
+  .tbl,
+  .tbl tbody {
+    display: block;
+    width: 100%;
+  }
+  .tbl thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+  .tbl tbody tr {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "box path path"
+      "target target target"
+      "size change actions"
+      "policy policy policy";
+    gap: 0 8px;
+    padding: 8px;
+    margin: 8px 0;
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    background: var(--panel-2);
+  }
+  .tbl tbody td {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 7px 4px;
+    border-bottom: 0;
+  }
+  .tbl tbody td:not(.c-box)::before {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-3);
+    font-size: 11px;
+    font-weight: 500;
+    content: attr(data-label);
+  }
+  .tbl tbody .c-box {
+    grid-area: box;
+    align-self: start;
+  }
+  .tbl tbody .path {
+    grid-area: path;
+    overflow-wrap: anywhere;
+  }
+  .tbl tbody .target-cell {
+    grid-area: target;
+  }
+  .tbl tbody .c-size {
+    grid-area: size;
+    white-space: normal;
+  }
+  .tbl tbody .c-chg {
+    grid-area: change;
+  }
+  .tbl tbody .c-pol {
+    grid-area: policy;
+    width: auto;
+  }
+  .tbl tbody .file-actions {
+    grid-area: actions;
+  }
+  .tbl tbody .file-actions .btn {
+    max-width: 100%;
+  }
+  .tbl tbody .target-edit {
+    margin-top: 8px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
