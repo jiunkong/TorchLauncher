@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { FilePolicyChoice, StudioFileEntry } from '../../../shared/studio.js';
-import { FolderIcon, PlusIcon, RefreshIcon } from '../components/Icons';
+import { FolderIcon, PencilIcon, PlusIcon, RefreshIcon } from '../components/Icons';
 import { Modal } from '../components/Modal';
 import { Checkbox, Chip, Note, PageHeader } from '../components/ui';
 import { formatBytes } from '../format';
@@ -194,10 +194,11 @@ export function FilesPage({ studio, insights }: PageProps) {
                       className="btn sm ghost target-edit"
                       disabled={busy || entry.missing}
                       aria-label={t('files.targetEdit', { path: entry.path })}
+                      title={t('files.targetEdit', { path: entry.path })}
                       data-testid="files-target-edit"
                       onClick={() => setTargetPath(entry.path)}
                     >
-                      {t('files.edit')}
+                      <PencilIcon />
                     </button>
                   </td>
                   <td className="c-size dim" data-label={t('files.col.size')}>
