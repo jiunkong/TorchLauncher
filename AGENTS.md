@@ -57,26 +57,27 @@ session IDs, model names, and tool-specific messaging are not required to resume
 
 Use these module boundaries; applications must not import each other:
 
-- `apps/admin/`: server configuration, branding assets, deployment generation, and portable launcher export.
-- `apps/launcher/`: authentication, synchronization, server status, game launch, and user mod management.
-- `packages/core/`: shared installation, deployment format, download, and integrity logic.
+- `apps/admin/`: server configuration, branding assets, deployment generation, and portable launcher export (`@torchlauncher/studio`).
+- `apps/launcher/`: authentication, synchronization, server status, game launch, and user mod management (`@torchlauncher/launcher`).
+- `packages/core/`: shared installation, deployment format, download, and integrity logic (`@torchlauncher/core`). The default entrypoint has no Electron dependency; desktop contracts live in `@torchlauncher/core/desktop`. Core is bundled into each app so distributed builds do not require workspace sources or pnpm.
 - `mods/`: contains only a notice that the Fabric and NeoForge companion mod plan was withdrawn (2026-10-21); no Java build exists or is scheduled.
+- `scripts/`: Electron smoke verification and release automation scripts.
 - `docs/`: architecture and deployment specifications.
 
 Keep tests beside their modules as `*.test.ts`; place reusable fixtures in dedicated `fixtures/` directories. Store bundled images with their owning application.
 
 ## Build, Test, and Development Commands
 
-Use Node.js 24 and pnpm 10.34.7 with the committed lockfile.
+Use Node.js 24 and pnpm 10.34.7 with the committed lockfile. Linux requires Electron system libraries and a display (or WSLg / Xvfb) to open windows. In WSL, ensure the Linux Node.js and pnpm binaries are used rather than Windows shims on `PATH`.
 
 - `pnpm install --frozen-lockfile`: install workspace dependencies.
-- `pnpm dev:launcher` / `pnpm dev:studio`: run either application. Renderer dev ports default to 5173/5174; override with `TORCH_LAUNCHER_DEV_PORT` / `TORCH_STUDIO_DEV_PORT` (integer 1024-65535 and not a Chromium-blocked port such as 6000 or 6665-6669; invalid values fail fast; e.g. 6100/6101 if 5173/5174 are in a Windows excluded range).
+- `pnpm dev:launcher` / `pnpm dev:studio`: run either application. Renderer dev ports default to 5173/5174; override with `TORCH_LAUNCHER_DEV_PORT` / `TORCH_STUDIO_DEV_PORT` (integer 1024-65535 and not a Chromium-blocked port such as 6000 or 6665-6669; invalid values fail fast; e.g. 6100/6101 if 5173/5174 are in a Windows excluded range — check with `netsh interface ipv4 show excludedportrange protocol=tcp` if `listen EACCES 127.0.0.1:5173/5174` occurs).
 - `pnpm check`: Biome, TypeScript, Vitest, then both app builds.
 - `pnpm format`: apply lint fixes and formatting.
-- `pnpm smoke`: build and launch both apps to check IPC and isolation; requires a display or Xvfb.
-- `pnpm package:launcher` / `pnpm package:studio`: package for the host OS.
+- `pnpm smoke`: build and launch both apps to check IPC and isolation; requires a display or `xvfb-run --auto-servernum pnpm smoke`. Playwright launches the installed Electron binary (no separate Playwright browser download is required) and writes git-ignored screenshots to `.cache/smoke/`.
+- `pnpm package:launcher` / `pnpm package:studio`: package for the host OS (`electron-builder` outputs Windows portable EXE and Linux `tar.gz` under `apps/<app>/dist/`; compiled sources are emitted to `out/`).
 
-Individual `build`, `typecheck`, `lint`, and `test` scripts are also available. Verify portable packages on each target OS; CI configuration alone is not evidence of successful execution.
+Individual `build`, `typecheck`, `lint`, `test`, and `test:watch` scripts are also available. Verify portable packages on each target OS; CI configuration alone is not evidence of successful execution. Automated `release` branch publishing builds Windows x64 portable EXE and Linux x64 AppImage artifacts per `docs/github-releases.md`; code signing credentials and auto-update are not configured yet.
 
 ## Coding Style & Naming Conventions
 
