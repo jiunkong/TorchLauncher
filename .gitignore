@@ -27,3 +27,6 @@ coverage/
 /docs/ui-handoff.md
 /docs/launcher-parallel-followups.md
 /docs/ui-production.md
+
+# Standalone TorchLauncher website repository.
+/torchlauncher-web/
