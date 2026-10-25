@@ -1106,9 +1106,18 @@ const table = {
   'result.packsAdded': ['Added {count}.', '{count}개를 추가했습니다.'],
   'result.packsSkipped': ['Skipped {count}:', '{count}개는 건너뛰었습니다:'],
   'result.packsMore': ['and {count} more', '외 {count}개'],
-  'result.packSkip.invalid': [
-    'not a valid file or name, or a different file with that name exists',
-    '올바르지 않은 파일·이름이거나 같은 이름의 다른 파일이 있음',
+  'result.packSkip.bad-name': [
+    'unusable file name (no < > : " \\ / | ? * %, control characters, a leading or trailing space or dot, or reserved names like CON)',
+    '이름에 쓸 수 없는 문자 또는 형식 (< > : " \\ / | ? * %, 제어 문자, 앞뒤 공백·점, CON 같은 예약어)',
+  ],
+  'result.packSkip.name-too-long': ['file name too long', '파일 이름이 너무 김'],
+  'result.packSkip.bad-type': [
+    'not a valid file of this type (wrong extension, not a ZIP, or a link)',
+    '이 종류의 올바른 파일이 아님 (확장자 오류, ZIP이 아님, 또는 링크)',
+  ],
+  'result.packSkip.conflict': [
+    'a different file with the same name already exists',
+    '같은 이름의 다른 파일이 이미 있음',
   ],
   'result.packSkip.too-large': ['too large', '크기 초과'],
   'result.packSkip.duplicate': ['selected twice', '중복 선택'],

@@ -365,7 +365,15 @@ export type StudioResult =
       /** The automatic project save after the add failed; the change is kept and unsaved. */
       saveFailed?: true;
     };
-export type PackSkipReason = 'invalid' | 'too-large' | 'duplicate' | 'limit' | 'failed';
+export type PackSkipReason =
+  | 'bad-name'
+  | 'name-too-long'
+  | 'bad-type'
+  | 'too-large'
+  | 'duplicate'
+  | 'conflict'
+  | 'limit'
+  | 'failed';
 export type StudioCommand =
   | { action: 'export'; target?: LauncherTarget; allowCached?: boolean; cachedVersion?: string }
   | {

@@ -61,6 +61,7 @@ import {
   mergeOptions,
   PACK_DIRECTORY,
   PACK_LIMIT,
+  PackFailure,
   PolicyFailure,
   parseGameSettings,
   policyConfigPaths,
@@ -1014,10 +1015,10 @@ export class StudioService {
               skipped.push({
                 name,
                 reason:
-                  error instanceof StudioFailure && error.code === 'TOO_LARGE'
-                    ? 'too-large'
-                    : error instanceof StudioFailure && error.code === 'INVALID'
-                      ? 'invalid'
+                  error instanceof PackFailure
+                    ? error.reason
+                    : error instanceof StudioFailure && error.code === 'TOO_LARGE'
+                      ? 'too-large'
                       : 'failed',
               });
             }
