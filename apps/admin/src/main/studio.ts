@@ -52,12 +52,14 @@ import {
   addPack,
   applyConfigChanges,
   defaultShader,
+  discoverPacks,
   emptySettings,
   generatePolicy,
   isReservedPath,
   MAX_CONFIG_FILES,
   MAX_PACKS,
   mergeOptions,
+  PACK_DIRECTORY,
   PACK_LIMIT,
   PolicyFailure,
   parseGameSettings,
@@ -708,6 +710,79 @@ export class StudioService {
     }, true);
     this.state.preset = preview;
   }
+  /**
+   * Writes the current project exactly like the `save` command (same atomic path, no dialog).
+   * Shared by `save` and the automatic save after file adds.
+   */
+  private async writeProject(project: StudioProject): Promise<void> {
+    if (!this.projectDir) throw new StudioFailure('NO_PROJECT');
+    await saveProject(
+      join(this.projectDir, PROJECT_FILE_NAME),
+      encodeProjectFile(project, this.snapshots),
+    );
+    this.state.dirty = false;
+  }
+  /**
+   * Automatic save after a command copied or listed files in the project folder, so the list
+   * cannot be lost while the files stay. It saves the whole project, including other pending
+   * edits. A failed save is not an error of the command: the in-memory change stays, `dirty`
+   * stays true and the command's result is flagged so the UI reports the failure beside the
+   * success. Returns whether the project is now saved. The write is atomic and is never started
+   * once the command was aborted, so a cancel cannot leave a half-saved state.
+   */
+  private async autoSave(signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) return false;
+    try {
+      await this.writeProject(this.project());
+      return true;
+    } catch {
+      this.state.dirty = true;
+      return false;
+    }
+  }
+  /**
+   * Adds valid files found in files/mods, files/resourcepacks and files/shaderpacks that the
+   * lists do not mention yet. Mods are always applied; other packs start as first-install. Never
+   * removes entries and never marks the project dirty by itself (the result is deterministic).
+   */
+  private async reconcilePacks(signal: AbortSignal): Promise<void> {
+    const root = this.sourceRoot;
+    if (!root || !this.state.project) return;
+    const wasDirty = this.state.dirty;
+    for (const kind of ['mod', 'resourcepack', 'shaderpack'] as const) {
+      const settings = this.state.project.gameSettings;
+      const current =
+        (kind === 'resourcepack'
+          ? settings?.resourcePacks
+          : kind === 'shaderpack'
+            ? settings?.shaderPacks
+            : settings?.mods) ?? [];
+      const found = await discoverPacks(
+        root,
+        kind,
+        new Set(current.map((p) => p.name.toLowerCase())),
+        MAX_PACKS - current.length,
+        signal,
+      );
+      if (found.length === 0) continue;
+      try {
+        this.updatePack(
+          kind,
+          (list) => {
+            for (const pack of found)
+              list.push({ ...pack, policy: kind === 'mod' ? 'required' : 'initial' });
+          },
+          true,
+        );
+      } catch (error) {
+        // A list the policy cannot express is left as it was; opening must not fail for it.
+        signal.throwIfAborted();
+        this.policyRejected = null;
+        if (!(error instanceof StudioFailure || error instanceof PolicyFailure)) throw error;
+      }
+    }
+    this.state.dirty = wasDirty;
+  }
   /** Everything derived from the current project; shared by new, open and closeProject. */
   private resetProjectState(): void {
     this.state.signing = null;
@@ -746,6 +821,10 @@ export class StudioService {
         return;
 
       case 'rescan':
+        this.project();
+        // A file dropped into files/mods (or a pack folder) while Studio runs joins the lists.
+        await this.reconcilePacks(signal);
+        return;
       case 'exportCheck':
         this.project();
         return;
@@ -974,11 +1053,13 @@ export class StudioService {
           },
           true,
         );
+        const saved = await this.autoSave(signal);
         this.state.result = {
           key: 'packsAdded',
           added: added.length,
           skippedCount: skipped.length,
           skipped: skipped.slice(0, 5),
+          ...(saved ? {} : { saveFailed: true as const }),
         };
         return;
       }
@@ -1003,6 +1084,22 @@ export class StudioService {
             }
           }
         });
+        if (command.action === 'settingsPackRemove') {
+          // The file must go too: files in the project folder are always read back (reconcile
+          // on open/rescan), so a removed entry whose file stayed would reappear.
+          const root = this.sourceRoot;
+          if (root) {
+            try {
+              const target = join(root, PACK_DIRECTORY[command.kind], command.name);
+              await noLinks(dirname(target));
+              const info = await lstat(target);
+              if (info.isFile()) await rm(target, { force: true });
+            } catch {
+              // Already gone or not removable: the list entry is removed either way.
+            }
+          }
+          if (!(await this.autoSave(signal))) this.state.result = { key: 'autosaveFailed' };
+        }
         return;
       }
 
@@ -1046,6 +1143,7 @@ export class StudioService {
         this.state.projectName = basename(dir);
         this.state.dirty = false;
         this.resetProjectState();
+        await this.reconcilePacks(signal);
         await this.refreshSigning();
         return;
       }
@@ -1122,11 +1220,7 @@ export class StudioService {
         const project = this.project();
         if (!this.projectDir) throw new StudioFailure('NO_PROJECT');
         signal.throwIfAborted();
-        await saveProject(
-          join(this.projectDir, PROJECT_FILE_NAME),
-          encodeProjectFile(project, this.snapshots),
-        );
-        this.state.dirty = false;
+        await this.writeProject(project);
         this.state.result = { key: 'projectSaved' };
         return;
       }
@@ -1178,6 +1272,7 @@ export class StudioService {
         signal.throwIfAborted();
         this.state.project = parseProject({ ...project, files: [...files.values()] });
         this.state.dirty = true;
+        if (!(await this.autoSave(signal))) this.state.result = { key: 'autosaveFailed' };
         return;
       }
       case 'keyStatus':

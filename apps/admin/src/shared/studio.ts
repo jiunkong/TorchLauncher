@@ -348,6 +348,7 @@ export type StudioResult =
   | {
       key:
         | 'projectSaved'
+        | 'autosaveFailed'
         | 'signingKeyCreated'
         | 'signingKeyBackupSaved'
         | 'signingKeyRestored'
@@ -361,6 +362,8 @@ export type StudioResult =
       added: number;
       skippedCount: number;
       skipped: { name: string; reason: PackSkipReason }[];
+      /** The automatic project save after the add failed; the change is kept and unsaved. */
+      saveFailed?: true;
     };
 export type PackSkipReason = 'invalid' | 'too-large' | 'duplicate' | 'limit' | 'failed';
 export type StudioCommand =

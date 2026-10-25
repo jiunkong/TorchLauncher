@@ -519,7 +519,7 @@ describe('service: game settings preset', () => {
       'torchlauncher/settings-policy.json|always',
     ]);
   });
-  it('replaces a same-named pack keeping policy and position, and removes without deleting the file', async () => {
+  it('replaces a same-named pack keeping policy and position, and removes the list entry and its file', async () => {
     const h = await harness();
     await h.addPackFile('resourcepack', 'a.zip', '1');
     await h.addPackFile('resourcepack', 'b.zip', '2');
@@ -542,7 +542,8 @@ describe('service: game settings preset', () => {
     expect(h.s.snapshot().project?.gameSettings?.resourcePacks.map((p) => p.name)).toEqual([
       'b.zip',
     ]);
-    expect(await readdir(join(h.source, 'resourcepacks'))).toContain('a.zip');
+    // The file goes too: files in the project folder are read back on open, so it would reappear.
+    expect(await readdir(join(h.source, 'resourcepacks'))).not.toContain('a.zip');
   });
   describe('multi-file add', () => {
     const pick = async (h: Awaited<ReturnType<typeof harness>>, files: [string, string][]) => {

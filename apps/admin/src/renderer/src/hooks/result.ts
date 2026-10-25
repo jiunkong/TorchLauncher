@@ -9,6 +9,8 @@ export function studioResultMessage(result: StudioResult | null, t: Translate): 
   switch (result.key) {
     case 'projectSaved':
       return t('result.projectSaved');
+    case 'autosaveFailed':
+      return t('result.autosaveFailed');
     case 'signingKeyCreated':
       return t('result.signingKeyCreated');
     case 'signingKeyBackupSaved':
@@ -36,6 +38,7 @@ export function studioResultMessage(result: StudioResult | null, t: Translate): 
           more > 0 ? `${listed} ${t('result.packsMore', { count: more })}` : listed,
         );
       }
+      if (result.saveFailed) parts.push(t('result.autosaveFailed'));
       return parts.join(' ');
     }
     case 'launcherZipCreated':

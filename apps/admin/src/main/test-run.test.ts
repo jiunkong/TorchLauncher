@@ -733,6 +733,8 @@ it('closes the project for real: UNSAVED rule, full reset, no file or instance c
   await h.service.request({ action: 'testStop' });
   await pending;
   expect(h.runner.state.phase).toBe('done');
+  // Adding the mod saved the project; an unsaved edit makes the close ask first.
+  await h.service.request({ action: 'touch' });
   expect(await h.service.request({ action: 'closeProject' })).toEqual({
     ok: false,
     code: 'UNSAVED',
