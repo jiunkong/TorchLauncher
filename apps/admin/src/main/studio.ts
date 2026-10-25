@@ -80,9 +80,9 @@ import {
   copyProjectFolderInto,
   createProjectFolder,
   PROJECT_DATA_DIR,
-  removeStaleProjectBrandingAsset,
   PROJECT_FILE_NAME,
   readProjectFolder,
+  removeStaleProjectBrandingAsset,
   saveProjectBrandingAsset,
 } from './project-folder.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
