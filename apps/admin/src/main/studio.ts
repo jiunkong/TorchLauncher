@@ -80,8 +80,10 @@ import {
   copyProjectFolderInto,
   createProjectFolder,
   PROJECT_DATA_DIR,
+  removeStaleProjectBrandingAsset,
   PROJECT_FILE_NAME,
   readProjectFolder,
+  saveProjectBrandingAsset,
 } from './project-folder.js';
 import { hashFile, type ScanResult, scanSource } from './scan.js';
 import type { SigningKeyStore } from './signing.js';
@@ -1239,17 +1241,28 @@ export class StudioService {
       }
       case 'brandingSelect': {
         const project = this.project();
+        const projectDir = this.projectDir;
+        if (!projectDir) throw new StudioFailure('NO_PROJECT');
         const path = (await this.selected(command.role))[0];
         if (!path) throw new StudioFailure('CANCELLED');
         const bytes = await safeRead(path, BRANDING_LIMITS[command.role].length);
         const metadata = validateImage(command.role, bytes, this.decode);
         signal.throwIfAborted();
+        await saveProjectBrandingAsset(projectDir, command.role, metadata.mediaType, bytes);
         this.snapshots[command.role] = bytes;
         this.state.project = {
           ...project,
           branding: { ...project.branding, [command.role]: metadata },
         };
         this.state.dirty = true;
+        if (await this.autoSave(signal)) {
+          await removeStaleProjectBrandingAsset(projectDir, command.role, metadata.mediaType).catch(
+            () => undefined,
+          );
+          this.state.result = { key: 'projectSaved' };
+        } else {
+          this.state.result = { key: 'autosaveFailed' };
+        }
         return;
       }
       case 'brandingRemove': {
