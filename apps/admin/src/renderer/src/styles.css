@@ -956,8 +956,16 @@ button.chip.link:hover {
 .target-cell {
   min-width: 0;
 }
+.target-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
 .target-value {
-  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -967,14 +975,26 @@ button.chip.link:hover {
   color: var(--red-text);
   font-weight: 600;
 }
-.btn.sm.target-edit {
-  display: inline-flex;
+.target-edit {
+  display: inline-grid;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  min-width: 32px;
-  padding: 0;
-  margin-top: 5px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+}
+.target-edit:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--red-text);
+}
+.target-edit svg {
+  width: 18px;
+  height: 18px;
 }
 .c-box {
   width: 36px;
@@ -2340,8 +2360,8 @@ button.chip.pick {
   .tbl tbody .file-actions .btn {
     max-width: 100%;
   }
-  .tbl tbody .target-edit {
-    margin-top: 8px;
+  .tbl tbody .target-display {
+    width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

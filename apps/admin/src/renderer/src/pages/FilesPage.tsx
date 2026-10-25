@@ -7,6 +7,21 @@ import { formatBytes } from '../format';
 import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
 
+export function fileDirectory(filePath: string) {
+  const separator = filePath.lastIndexOf('/');
+  return separator < 0 ? '' : filePath.slice(0, separator);
+}
+
+export function normalizeFileDirectory(directory: string) {
+  return directory.trim().replace(/\/+$/, '');
+}
+
+export function targetPathForDirectory(sourcePath: string, directory: string) {
+  const fileName = sourcePath.slice(sourcePath.lastIndexOf('/') + 1);
+  const normalizedDirectory = normalizeFileDirectory(directory);
+  return normalizedDirectory ? `${normalizedDirectory}/${fileName}` : fileName;
+}
+
 export function FilesPage({ studio, insights }: PageProps) {
   const { t } = useStudioLocale();
   const { busy, state, run, command } = studio;
@@ -168,85 +183,97 @@ export function FilesPage({ studio, insights }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.path}>
-                  <td className="c-box">
-                    <Checkbox
-                      checked={selected.has(entry.path)}
-                      disabled={entry.missing}
-                      label={t('files.selectFile', { path: entry.path })}
-                      onChange={(on) => toggle(entry.path, on)}
-                    />
-                  </td>
-                  <td className="mono path" data-label={t('files.col.path')}>
-                    {entry.path}
-                    {entry.missing && <small className="err block">{t('files.missingRow')}</small>}
-                  </td>
-                  <td className="target-cell" data-label={t('files.col.target')}>
-                    <span
-                      className={`target-value${(entry.targetPath ?? entry.path) !== entry.path ? ' changed' : ''}`}
-                      title={entry.targetPath ?? entry.path}
-                    >
-                      {entry.targetPath ?? entry.path}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn sm ghost target-edit"
-                      disabled={busy || entry.missing}
-                      aria-label={t('files.targetEdit', { path: entry.path })}
-                      title={t('files.targetEdit', { path: entry.path })}
-                      data-testid="files-target-edit"
-                      onClick={() => setTargetPath(entry.path)}
-                    >
-                      <PencilIcon />
-                    </button>
-                  </td>
-                  <td className="c-size dim" data-label={t('files.col.size')}>
-                    {entry.size === null ? '—' : formatBytes(entry.size)}
-                  </td>
-                  <td className="c-chg" data-label={t('files.col.change')}>
-                    {changeChip(entry)}
-                  </td>
-                  <td className="c-pol" data-label={t('files.col.policy')}>
-                    <span
-                      className="pol"
-                      role="radiogroup"
-                      aria-label={t('files.policyOf', { path: entry.path })}
-                    >
-                      {(['always', 'initial-only'] as const).map((policy) => (
-                        // biome-ignore lint/a11y/useSemanticElements: segmented control of toggle buttons
-                        <button
-                          key={policy}
-                          type="button"
-                          role="radio"
-                          aria-checked={entry.policy === policy}
-                          className={
-                            entry.policy === policy ? (policy === 'always' ? 'a' : 'i') : undefined
-                          }
-                          disabled={busy || entry.missing}
-                          onClick={() => void apply([entry.path], policy)}
+              {entries.map((entry) => {
+                const targetDirectory = fileDirectory(entry.targetPath ?? entry.path);
+                const sourceDirectory = fileDirectory(entry.path);
+                return (
+                  <tr key={entry.path}>
+                    <td className="c-box">
+                      <Checkbox
+                        checked={selected.has(entry.path)}
+                        disabled={entry.missing}
+                        label={t('files.selectFile', { path: entry.path })}
+                        onChange={(on) => toggle(entry.path, on)}
+                      />
+                    </td>
+                    <td className="mono path" data-label={t('files.col.path')}>
+                      {entry.path}
+                      {entry.missing && (
+                        <small className="err block">{t('files.missingRow')}</small>
+                      )}
+                    </td>
+                    <td className="target-cell" data-label={t('files.col.target')}>
+                      <div className="target-display">
+                        <span
+                          className={`target-value${targetDirectory !== sourceDirectory ? ' changed' : ''}`}
+                          title={targetDirectory || t('files.targetRoot')}
                         >
-                          {policy === 'always'
-                            ? t('files.policy.alwaysShort')
-                            : t('files.policy.initialShort')}
+                          {targetDirectory || t('files.targetRoot')}
+                        </span>
+                        <button
+                          type="button"
+                          className="target-edit"
+                          disabled={busy || entry.missing}
+                          aria-label={t('files.targetEdit', { path: entry.path })}
+                          title={t('files.targetEdit', { path: entry.path })}
+                          data-testid="files-target-edit"
+                          onClick={() => setTargetPath(entry.path)}
+                        >
+                          <PencilIcon />
                         </button>
-                      ))}
-                    </span>
-                  </td>
-                  <td className="file-actions" data-label={t('files.col.actions')}>
-                    <button
-                      type="button"
-                      className="btn sm ghost"
-                      disabled={busy}
-                      aria-label={t('files.remove', { path: entry.path })}
-                      data-testid="files-remove"
-                      onClick={() => setRemovePath(entry.path)}
-                    >
-                      {t('files.removeButton')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      </div>
+                    </td>
+                    <td className="c-size dim" data-label={t('files.col.size')}>
+                      {entry.size === null ? '—' : formatBytes(entry.size)}
+                    </td>
+                    <td className="c-chg" data-label={t('files.col.change')}>
+                      {changeChip(entry)}
+                    </td>
+                    <td className="c-pol" data-label={t('files.col.policy')}>
+                      <span
+                        className="pol"
+                        role="radiogroup"
+                        aria-label={t('files.policyOf', { path: entry.path })}
+                      >
+                        {(['always', 'initial-only'] as const).map((policy) => (
+                          // biome-ignore lint/a11y/useSemanticElements: segmented control of toggle buttons
+                          <button
+                            key={policy}
+                            type="button"
+                            role="radio"
+                            aria-checked={entry.policy === policy}
+                            className={
+                              entry.policy === policy
+                                ? policy === 'always'
+                                  ? 'a'
+                                  : 'i'
+                                : undefined
+                            }
+                            disabled={busy || entry.missing}
+                            onClick={() => void apply([entry.path], policy)}
+                          >
+                            {policy === 'always'
+                              ? t('files.policy.alwaysShort')
+                              : t('files.policy.initialShort')}
+                          </button>
+                        ))}
+                      </span>
+                    </td>
+                    <td className="file-actions" data-label={t('files.col.actions')}>
+                      <button
+                        type="button"
+                        className="btn sm ghost"
+                        disabled={busy}
+                        aria-label={t('files.remove', { path: entry.path })}
+                        data-testid="files-remove"
+                        onClick={() => setRemovePath(entry.path)}
+                      >
+                        {t('files.removeButton')}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -260,19 +287,23 @@ export function FilesPage({ studio, insights }: PageProps) {
       {targetEntry && (
         <FileTargetDialog
           path={targetEntry.path}
-          currentTarget={targetEntry.targetPath ?? targetEntry.path}
+          sourceDirectory={fileDirectory(targetEntry.path)}
+          currentDirectory={fileDirectory(targetEntry.targetPath ?? targetEntry.path)}
           busy={busy}
           failure={studio.message}
           onCancel={() => setTargetPath(null)}
-          onSubmit={async (nextTarget) => {
-            if (nextTarget.trim() === (targetEntry.targetPath ?? targetEntry.path)) {
+          onSubmit={async (nextDirectory) => {
+            if (
+              normalizeFileDirectory(nextDirectory) ===
+              fileDirectory(targetEntry.targetPath ?? targetEntry.path)
+            ) {
               setTargetPath(null);
               return;
             }
             const saved = await command({
               action: 'filesTarget',
               path: targetEntry.path,
-              targetPath: nextTarget.trim(),
+              targetPath: targetPathForDirectory(targetEntry.path, nextDirectory),
             });
             if (saved) setTargetPath(null);
           }}
@@ -317,22 +348,24 @@ export function FilesPage({ studio, insights }: PageProps) {
 
 export function FileTargetDialog({
   path,
-  currentTarget,
+  sourceDirectory,
+  currentDirectory,
   busy,
   failure,
   onCancel,
   onSubmit,
 }: {
   path: string;
-  currentTarget: string;
+  sourceDirectory: string;
+  currentDirectory: string;
   busy: boolean;
   failure: string;
   onCancel(): void;
   onSubmit(targetPath: string): Promise<void>;
 }) {
   const { t } = useStudioLocale();
-  const [value, setValue] = useState(currentTarget);
-  const unchanged = value.trim() === currentTarget;
+  const [value, setValue] = useState(currentDirectory);
+  const unchanged = normalizeFileDirectory(value) === currentDirectory;
   return (
     <Modal titleId="files-target-title" testId="files-target-dialog" onCancel={onCancel}>
       <form
@@ -354,6 +387,7 @@ export function FileTargetDialog({
             data-autofocus
             data-testid="files-target-input"
             aria-label={t('files.targetPath', { path })}
+            placeholder={t('files.targetRoot')}
             value={value}
             aria-describedby="files-target-hint files-target-error"
             onChange={(event) => setValue(event.target.value)}
@@ -372,9 +406,9 @@ export function FileTargetDialog({
           <button
             type="button"
             className="btn ghost"
-            disabled={busy || value === path}
+            disabled={busy || normalizeFileDirectory(value) === sourceDirectory}
             data-testid="files-target-reset"
-            onClick={() => setValue(path)}
+            onClick={() => setValue(sourceDirectory)}
           >
             {t('files.target.reset')}
           </button>
