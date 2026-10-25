@@ -11,6 +11,11 @@ import { systemProcessProbe } from '../../../../../packages/core/src/minecraft/i
 import type { RunningGame } from '../../../../../packages/core/src/minecraft/process';
 import { type ProductHost, ProductService } from './service';
 
+// vi.waitFor defaults to a 1 s budget; Windows runners (process probes, file locking) need more.
+// Polling stops as soon as the condition holds, so the larger bound costs nothing when it passes.
+const waitFor = (callback: () => unknown) =>
+  vi.waitFor(callback, { timeout: 20_000, interval: 25 });
+
 vi.mock('../../../../../packages/core/src/loaders/launch-gate', () => ({
   launchDeployment: vi.fn(),
 }));
@@ -164,7 +169,7 @@ it('cancels cleanly during a play attempt without launching', async () => {
     return fakeGame();
   });
   const launch = service.command({ type: 'launch' });
-  await vi.waitFor(() => expect(launchDeployment).toHaveBeenCalled());
+  await waitFor(() => expect(launchDeployment).toHaveBeenCalled());
   await service.command({ type: 'cancel' });
   expect(await launch).toMatchObject({ ok: false, error: 'cancelled' });
   expect(service.snapshot().operation).toBeNull();

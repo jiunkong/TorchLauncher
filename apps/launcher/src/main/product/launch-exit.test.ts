@@ -7,6 +7,11 @@ import type { RunningGame } from '../../../../../packages/core/src/minecraft/pro
 import * as preferences from './preferences';
 import { type ProductHost, ProductService } from './service';
 
+// vi.waitFor defaults to a 1 s budget; Windows runners (process probes, file locking) need more.
+// Polling stops as soon as the condition holds, so the larger bound costs nothing when it passes.
+const waitFor = (callback: () => unknown) =>
+  vi.waitFor(callback, { timeout: 20_000, interval: 25 });
+
 vi.mock('../../../../../packages/core/src/loaders/launch-gate', () => ({
   launchDeployment: vi.fn(),
 }));
@@ -168,7 +173,7 @@ it('saves memory during a live game, drains an active save on close, and uses it
   });
   vi.mocked(launchDeployment).mockResolvedValue(game);
   const firstLaunch = service.command({ type: 'launch' });
-  await vi.waitFor(() => expect(service.snapshot().running).toBe(true));
+  await waitFor(() => expect(service.snapshot().running).toBe(true));
 
   let saveEntered: () => void = () => {};
   const saving = new Promise<void>((resolve) => {

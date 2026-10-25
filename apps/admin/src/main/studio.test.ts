@@ -548,7 +548,7 @@ describe('validated launcher ZIP export', () => {
     await expect(
       exportLauncherZip(binary, zipPath, config(), controller.signal, () => controller.abort()),
     ).rejects.toThrow();
-    expect(await readdir(root)).toEqual(['Torch.exe', 'out.zip']);
+    expect((await readdir(root)).sort()).toEqual(['Torch.exe', 'out.zip']);
     expect(await readFile(zipPath, 'utf8')).toBe('previous');
   });
   it('rejects mislabeled binaries, absent executable permission, links and oversized reads', async () => {

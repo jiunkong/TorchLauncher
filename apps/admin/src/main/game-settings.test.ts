@@ -335,9 +335,9 @@ describe('pack names and files', () => {
     ).rejects.toMatchObject({
       code: 'TOO_LARGE',
     });
-    await writeFile(join(other, 'bad name?.zip'), zipBytes());
+    await writeFile(join(other, 'bad%name.zip'), zipBytes());
     await expect(
-      addPack(source, 'shaderpack', join(other, 'bad name?.zip'), signal),
+      addPack(source, 'shaderpack', join(other, 'bad%name.zip'), signal),
     ).rejects.toMatchObject({
       code: 'INVALID',
     });
@@ -694,7 +694,7 @@ describe('service: game settings preset', () => {
         await pick(h, [
           ['good.zip', '1'],
           ['bad.zip', 'plain'],
-          ['bad name?.zip', '3'],
+          ['bad%name.zip', '3'],
         ]),
       );
       const reply = await h.s.request({ action: 'settingsPackAdd', kind: 'resourcepack' });
@@ -707,7 +707,7 @@ describe('service: game settings preset', () => {
             skippedCount: 2,
             skipped: [
               { name: 'bad.zip', reason: 'bad-type' },
-              { name: 'bad name?.zip', reason: 'bad-name' },
+              { name: 'bad%name.zip', reason: 'bad-name' },
             ],
           },
         },
