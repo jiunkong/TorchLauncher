@@ -467,7 +467,7 @@ async function harness() {
   /** Reopens a current project with an explicit file list. */
   const reopenWithFiles = async (files: { path: string; policy: 'always' | 'initial-only' }[]) => {
     const project = parseProject(s.snapshot().project);
-    project.files = files;
+    project.files = files.map((file) => ({ ...file, targetPath: file.path }));
     await writeFile(join(root, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
     d.open.mockResolvedValueOnce([root]);
     await s.request({ action: 'open', discard: true });
@@ -844,7 +844,7 @@ describe('project schema', () => {
           address: 'localhost:25565',
           sourceUrl: '',
           game: { minecraftVersion: '1.21.1', loader: { kind: 'fabric', version: '0.19.5' } },
-          files: [{ path: 'a.txt', policy: 'always' }],
+          files: [{ path: 'a.txt', targetPath: 'a.txt', policy: 'always' }],
         }),
         {},
       ),

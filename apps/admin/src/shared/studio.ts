@@ -7,7 +7,10 @@ export const studioChannel = 'studio:request';
 /** Main -> renderer event: the window is closing with unsaved changes; the renderer must answer with `closeConfirm` or `closeCancel`. */
 export const studioCloseChannel = 'studio:close-request';
 export interface ProjectFile {
+  /** Path inside the Studio project source folder. */
   path: string;
+  /** Game-folder-relative path written into the deployment for the launcher to install. */
+  targetPath: string;
   policy: DeploymentFilePolicy;
 }
 export interface StudioBranding {
@@ -45,7 +48,14 @@ export interface StudioLastBuild {
   game: DeploymentGame;
   /** sha256 of "<icon sha>|<background sha>|<appName>" at build time. */
   brandingKey: string;
-  files: { path: string; sha256: string; length: number; policy: DeploymentFilePolicy }[];
+  files: {
+    /** Studio source path; used to compare changes even when the deployment target changes. */
+    sourcePath: string;
+    path: string;
+    sha256: string;
+    length: number;
+    policy: DeploymentFilePolicy;
+  }[];
 }
 export type SettingPolicyChoice = 'none' | 'initial' | 'required';
 export type PackKind = 'resourcepack' | 'shaderpack' | 'mod';
@@ -112,14 +122,17 @@ export interface StudioSigning {
   /** Set by the last build or export: what happened to the key and the sequence. */
   lastOperation: { keyCreated: boolean; sequence: number | null } | null;
 }
-export type FilePolicyChoice = 'always' | 'initial-only' | 'excluded';
+export type FilePolicyChoice = 'always' | 'initial-only';
 export type FileChange = 'added' | 'modified' | 'removed' | 'unchanged';
 export interface StudioFileEntry {
+  /** Path inside the Studio project source folder. */
   path: string;
+  /** Game-folder-relative path written into the deployment. */
+  targetPath: string | null;
   /** Bytes in the source folder; null when the file is not (or no longer) there. */
   size: number | null;
   /** `managed` = options.txt, mods/*.jar, resourcepacks/, shaderpacks/ and generated policy. */
-  policy: FilePolicyChoice | 'managed';
+  policy: FilePolicyChoice | 'excluded' | 'managed';
   /** Change versus the last build; null when the project has no last build. */
   change: FileChange | null;
   /** The project includes the file but the source folder no longer has it (a build would fail). */
@@ -429,7 +442,9 @@ export type StudioWorkCommand =
       /** Source-relative, slash-separated paths (max 1000); each must exist in the source folder. */
       paths: string[];
       policy: FilePolicyChoice;
-    };
+    }
+  | { action: 'filesTarget'; path: string; targetPath: string }
+  | { action: 'filesRemove'; path: string };
 export type StudioSettingsCommand =
   | { action: 'settingsImport'; source: 'folder' | 'file' }
   | { action: 'settingsImportOptions'; source: 'test' | 'file' }

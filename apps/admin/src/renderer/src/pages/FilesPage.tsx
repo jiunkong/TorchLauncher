@@ -1,23 +1,31 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FilePolicyChoice, StudioFileEntry } from '../../../shared/studio.js';
 import { FolderIcon, PlusIcon, RefreshIcon } from '../components/Icons';
+import { Modal } from '../components/Modal';
 import { Checkbox, Chip, Note, PageHeader } from '../components/ui';
 import { formatBytes } from '../format';
 import { useStudioLocale } from '../i18n';
-import { managedPage } from './filePaths';
 import type { PageProps } from './types';
 
-export function FilesPage({ studio, insights, go }: PageProps) {
+export function FilesPage({ studio, insights }: PageProps) {
   const { t } = useStudioLocale();
   const { busy, state, run, command } = studio;
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const hasProject = !!state?.project;
   const files = insights.files;
-  const entries = files?.entries ?? [];
+  const entries = useMemo(
+    () =>
+      (files?.entries ?? []).filter(
+        (entry) => entry.policy !== 'managed' && entry.policy !== 'excluded',
+      ),
+    [files?.entries],
+  );
   const live = new Set(entries.map((entry) => entry.path));
   const chosen = [...selected].filter((path) => live.has(path));
-  const selectable = entries.filter((entry) => entry.policy !== 'managed');
+  const selectable = entries;
   const hasBuild = insights.deploy.lastBuild !== null;
+  const [targetDrafts, setTargetDrafts] = useState<Record<string, string>>({});
+  const [removePath, setRemovePath] = useState<string | null>(null);
 
   const apply = async (paths: string[], policy: FilePolicyChoice) => {
     if (paths.length === 0) return;
@@ -97,8 +105,10 @@ export function FilesPage({ studio, insights, go }: PageProps) {
         <div className="chips">
           <Chip>
             {t('files.totalSize', {
-              count: files?.counts.total ?? 0,
-              size: formatBytes(files?.counts.totalBytes ?? 0),
+              count: entries.filter((entry) => !entry.missing).length,
+              size: formatBytes(
+                entries.reduce((sum, entry) => sum + (entry.missing ? 0 : (entry.size ?? 0)), 0),
+              ),
             })}
           </Chip>
           {hasBuild && (
@@ -106,11 +116,10 @@ export function FilesPage({ studio, insights, go }: PageProps) {
               {t('files.changed', { count: insights.changed })}
             </Chip>
           )}
-          {(files?.counts.excluded ?? 0) > 0 && (
-            <Chip>{t('files.excluded', { count: files?.counts.excluded ?? 0 })}</Chip>
-          )}
-          {(files?.counts.missing ?? 0) > 0 && (
-            <Chip tone="warn">{t('files.missing', { count: files?.counts.missing ?? 0 })}</Chip>
+          {entries.filter((entry) => entry.missing).length > 0 && (
+            <Chip tone="warn">
+              {t('files.missing', { count: entries.filter((entry) => entry.missing).length })}
+            </Chip>
           )}
         </div>
         {chosen.length > 0 && (
@@ -128,9 +137,6 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                 onClick={() => void apply(chosen, 'initial-only')}
               >
                 {t('files.policy.initial')}
-              </button>
-              <button type="button" disabled={busy} onClick={() => void apply(chosen, 'excluded')}>
-                {t('files.policy.exclude')}
               </button>
             </span>
             <button type="button" className="btn sm ghost" onClick={() => setSelected(new Set())}>
@@ -153,18 +159,20 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                   />
                 </th>
                 <th>{t('files.col.path')}</th>
+                <th>{t('files.col.target')}</th>
                 <th className="c-size">{t('files.col.size')}</th>
                 <th className="c-chg">{t('files.col.change')}</th>
                 <th className="c-pol">{t('files.col.policy')}</th>
+                <th>{t('files.col.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
-                <tr key={entry.path} className={entry.policy === 'excluded' ? 'off' : undefined}>
+                <tr key={entry.path}>
                   <td className="c-box">
                     <Checkbox
                       checked={selected.has(entry.path)}
-                      disabled={entry.policy === 'managed'}
+                      disabled={entry.missing}
                       label={t('files.selectFile', { path: entry.path })}
                       onChange={(on) => toggle(entry.path, on)}
                     />
@@ -173,49 +181,81 @@ export function FilesPage({ studio, insights, go }: PageProps) {
                     {entry.path}
                     {entry.missing && <small className="err block">{t('files.missingRow')}</small>}
                   </td>
+                  <td>
+                    <input
+                      type="text"
+                      className="input file-target"
+                      value={targetDrafts[entry.path] ?? entry.targetPath ?? entry.path}
+                      aria-label={t('files.targetPath', { path: entry.path })}
+                      disabled={busy || entry.missing}
+                      onChange={(event) =>
+                        setTargetDrafts((drafts) => ({
+                          ...drafts,
+                          [entry.path]: event.target.value,
+                        }))
+                      }
+                      onBlur={(event) => {
+                        const targetPath = event.currentTarget.value.trim();
+                        const current = entry.targetPath ?? entry.path;
+                        if (targetPath !== current) {
+                          void command({
+                            action: 'filesTarget',
+                            path: entry.path,
+                            targetPath,
+                          }).then((saved) => {
+                            if (saved) {
+                              setTargetDrafts((drafts) => {
+                                const next = { ...drafts };
+                                delete next[entry.path];
+                                return next;
+                              });
+                            }
+                          });
+                        }
+                      }}
+                    />
+                  </td>
                   <td className="c-size dim">
                     {entry.size === null ? '—' : formatBytes(entry.size)}
                   </td>
                   <td className="c-chg">{changeChip(entry)}</td>
                   <td className="c-pol">
-                    {entry.policy === 'managed' ? (
-                      <button
-                        type="button"
-                        className="chip link"
-                        onClick={() => go(managedPage(entry.path))}
-                      >
-                        {t('files.managed')}
-                      </button>
-                    ) : (
-                      <span
-                        className="pol"
-                        role="radiogroup"
-                        aria-label={t('files.policyOf', { path: entry.path })}
-                      >
-                        {(['always', 'initial-only'] as const).map((policy) => (
-                          // biome-ignore lint/a11y/useSemanticElements: segmented control of toggle buttons
-                          <button
-                            key={policy}
-                            type="button"
-                            role="radio"
-                            aria-checked={entry.policy === policy}
-                            className={
-                              entry.policy === policy
-                                ? policy === 'always'
-                                  ? 'a'
-                                  : 'i'
-                                : undefined
-                            }
-                            disabled={busy}
-                            onClick={() => void apply([entry.path], policy)}
-                          >
-                            {policy === 'always'
-                              ? t('files.policy.alwaysShort')
-                              : t('files.policy.initialShort')}
-                          </button>
-                        ))}
-                      </span>
-                    )}
+                    <span
+                      className="pol"
+                      role="radiogroup"
+                      aria-label={t('files.policyOf', { path: entry.path })}
+                    >
+                      {(['always', 'initial-only'] as const).map((policy) => (
+                        // biome-ignore lint/a11y/useSemanticElements: segmented control of toggle buttons
+                        <button
+                          key={policy}
+                          type="button"
+                          role="radio"
+                          aria-checked={entry.policy === policy}
+                          className={
+                            entry.policy === policy ? (policy === 'always' ? 'a' : 'i') : undefined
+                          }
+                          disabled={busy || entry.missing}
+                          onClick={() => void apply([entry.path], policy)}
+                        >
+                          {policy === 'always'
+                            ? t('files.policy.alwaysShort')
+                            : t('files.policy.initialShort')}
+                        </button>
+                      ))}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn sm ghost"
+                      disabled={busy}
+                      aria-label={t('files.remove', { path: entry.path })}
+                      data-testid="files-remove"
+                      onClick={() => setRemovePath(entry.path)}
+                    >
+                      {t('files.removeButton')}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -228,24 +268,40 @@ export function FilesPage({ studio, insights, go }: PageProps) {
           <p className="fine pad">{t('files.skipped', { count: files?.skipped ?? 0 })}</p>
         )}
       </section>
-      <Note>
-        <b>{t('files.managedNote.title')}</b> {t('files.managedNote.body')}{' '}
-        <button type="button" className="textlink" onClick={() => go('mods')}>
-          {t('nav.mods')}
-        </button>
-        {' · '}
-        <button type="button" className="textlink" onClick={() => go('playerSettings')}>
-          {t('nav.playerSettings')}
-        </button>
-        {' · '}
-        <button type="button" className="textlink" onClick={() => go('packs')}>
-          {t('nav.packs')}
-        </button>
-        {' · '}
-        <button type="button" className="textlink" onClick={() => go('shaders')}>
-          {t('nav.shaders')}
-        </button>
-      </Note>
+      <Note>{t('files.targetHint')}</Note>
+      {removePath && (
+        <Modal
+          titleId="files-remove-title"
+          testId="files-remove-dialog"
+          onCancel={() => setRemovePath(null)}
+        >
+          <h2 id="files-remove-title">{t('files.remove.title')}</h2>
+          <p className="lead">{t('files.remove.body', { path: removePath })}</p>
+          <div className="dialog-actions">
+            <button
+              type="button"
+              className="btn ghost"
+              data-autofocus
+              onClick={() => setRemovePath(null)}
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              className="btn danger"
+              data-testid="files-remove-confirm"
+              disabled={busy}
+              onClick={() => {
+                const path = removePath;
+                setRemovePath(null);
+                void command({ action: 'filesRemove', path });
+              }}
+            >
+              {t('files.remove.confirm')}
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

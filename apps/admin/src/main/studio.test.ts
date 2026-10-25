@@ -279,7 +279,10 @@ describe('Studio project and trusted disk selections', () => {
     expect(
       await s.request({
         action: 'update',
-        project: { ...before, files: [{ path: 'secret.txt', policy: 'always' }] },
+        project: {
+          ...before,
+          files: [{ path: 'secret.txt', targetPath: 'secret.txt', policy: 'always' }],
+        },
       }),
     ).toEqual({ ok: false, code: 'INVALID' });
     const root = await temp();
@@ -289,10 +292,22 @@ describe('Studio project and trusted disk selections', () => {
     expect((await s.request({ action: 'open', discard: true })).ok).toBe(false);
     expect(s.snapshot().project).toEqual(before);
     expect(() =>
-      parseProject({ ...before, files: [{ path: '../escape', policy: 'always' }] }),
+      parseProject({
+        ...before,
+        files: [{ path: '../escape', targetPath: '../escape', policy: 'always' }],
+      }),
     ).toThrow();
     expect(() =>
-      parseProject({ ...before, files: [{ path: '.torchlauncher/state', policy: 'always' }] }),
+      parseProject({
+        ...before,
+        files: [
+          {
+            path: '.torchlauncher/state',
+            targetPath: '.torchlauncher/state',
+            policy: 'always',
+          },
+        ],
+      }),
     ).toThrow();
     expect(() => parseProject({ ...before, command: 'run' })).toThrow();
   });
@@ -463,7 +478,9 @@ describe('Studio project and trusted disk selections', () => {
     expect(await readFile(join(projDir, PROJECT_DATA_DIR, 'external.txt'), 'utf8')).toBe(
       'copied content',
     );
-    expect(s.snapshot().project?.files).toEqual([{ path: 'external.txt', policy: 'always' }]);
+    expect(s.snapshot().project?.files).toEqual([
+      { path: 'external.txt', targetPath: 'external.txt', policy: 'always' },
+    ]);
 
     // Same name existing in destination: refused with INVALID
     const external2 = join(outside, 'external.txt');
