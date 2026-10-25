@@ -17,6 +17,7 @@ try {
     timeout: 30_000,
   });
   const page = await app.firstWindow();
+  await page.waitForLoadState('load');
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   // Replace only the update IPC boundary in this disposable host. Never use real release HTTP.

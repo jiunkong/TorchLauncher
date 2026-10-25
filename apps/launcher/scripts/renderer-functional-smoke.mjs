@@ -307,6 +307,9 @@ try {
   await page.waitForFunction(
     () => document.querySelector('[data-testid="clear-memory"]')?.disabled === true,
   );
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="max-memory"]')?.value === '2',
+  );
   assert.equal(await page.getByTestId('max-memory').inputValue(), '2');
   assert.match(await page.getByTestId('memory-effective').innerText(), /2 GB/);
   await page.getByTestId('max-memory').fill('0.5');
@@ -411,7 +414,7 @@ try {
   };
   await openMenu();
   await page.getByRole('button', { name: '설정', exact: true }).click();
-  await choose('en').click();
+  await selectLanguage('en');
   assert.equal(await pathTitle(), 'Copy path');
   assert.ok((await languages()).includes('en'));
   // Logout: cancel button, Escape, then confirm; no command until confirmed.
