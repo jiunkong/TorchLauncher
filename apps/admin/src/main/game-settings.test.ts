@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { validateDeploymentPath } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseSettingsPolicy } from '../../../../packages/core/src/instance/settings/index.js';
@@ -167,6 +168,77 @@ describe('pack names and files', () => {
     for (const good of ['fabric-api.jar', '모드 1.2.jar'])
       expect(() => validatePackName(good, 'mod'), good).not.toThrow();
   });
+  it('accepts real-world pack names and every accepted name is a valid deployment path', () => {
+    const good = [
+      "Icon Xaero's 1.22.zip",
+      'NewGlowingOres-§6[Border]§r.zip',
+      'a,b.zip',
+      'Tom & Jerry.zip',
+      'pack #1.zip',
+      'Wow!.zip',
+      'me@home.zip',
+      'a=b~c;d.zip',
+      '‘Smart’ quotes.zip',
+      'Pack_v1.20.4-final(2).zip',
+      'Ünï Çödé.zip',
+    ];
+    for (const name of good) {
+      expect(() => validatePackName(name), name).not.toThrow();
+      expect(() => validateDeploymentPath(`resourcepacks/${name}`), name).not.toThrow();
+    }
+    expect(() => validatePackName("Xaero's Map [1.21].jar", 'mod')).not.toThrow();
+    for (const bad of [
+      'a%b.zip',
+      'a"b.zip',
+      'a<b>.zip',
+      'a|b.zip',
+      'a?b.zip',
+      'a*b.zip',
+      'tab\there.zip',
+      'a\u007f.zip',
+      'a/b.zip',
+      'a\\b.zip',
+      'x.zip.zip ',
+      'trailing .zip',
+      'Com1.zip',
+      'LPT9.zip',
+      `${'é'.repeat(61)}.zip`,
+      'e\u0301.zip',
+    ])
+      expect(() => validatePackName(bad), bad).toThrow();
+  });
+  it('reports a precise reason for each refusal', () => {
+    const reason = (name: string, kind: 'resourcepack' | 'mod' = 'resourcepack') => {
+      try {
+        validatePackName(name, kind);
+      } catch (error) {
+        return (error as { reason?: string }).reason;
+      }
+      return undefined;
+    };
+    expect(reason('a?.zip')).toBe('bad-name');
+    expect(reason('a.txt')).toBe('bad-type');
+    expect(reason('a.zip', 'mod')).toBe('bad-type');
+    expect(reason(`${'x'.repeat(130)}.zip`)).toBe('name-too-long');
+    expect(reason("it's.zip")).toBeUndefined();
+  });
+  it('builds the settings policy and shader selection with special pack names', () => {
+    const names = ["Icon Xaero's 1.22.zip", 'NewGlowingOres-§6[Border]§r.zip', 'a,b&c#d.zip'];
+    const text =
+      generatePolicy({
+        options: [],
+        resourcePacks: names.map((name) => ({
+          name,
+          sha256: 'a'.repeat(64),
+          length: 1,
+          policy: 'required' as const,
+        })),
+        shaderPacks: [],
+      })?.text ?? '';
+    expect(parseSettingsPolicy(Buffer.from(text)).resourcePacks.required).toEqual(
+      names.map((name) => `file/${name}`),
+    );
+  });
   it('copies a pack into the source folder, verifies the hash, and never overwrites a different file', async () => {
     const source = await temp();
     const other = await temp();
@@ -283,6 +355,36 @@ describe('pack names and files', () => {
     await truncate(join(other, 'edge.zip'), PACK_LIMIT);
     const pack = await addPack(source, 'resourcepack', join(other, 'edge.zip'), signal);
     expect(pack.length).toBe(PACK_LIMIT);
+  });
+});
+
+describe('adding packs with special names', () => {
+  it('adds the reported pack names and explains each refusal', async () => {
+    const source = await temp();
+    const other = await temp();
+    for (const name of ["Icon Xaero's 1.22.zip", 'NewGlowingOres-§6[Border]§r.zip']) {
+      await writeFile(join(other, name), zipBytes(name));
+      await expect(
+        addPack(source, 'resourcepack', join(other, name), signal),
+      ).resolves.toMatchObject({ name, policy: 'none' });
+    }
+    expect((await readdir(join(source, 'resourcepacks'))).sort()).toEqual(
+      ["Icon Xaero's 1.22.zip", 'NewGlowingOres-§6[Border]§r.zip'].sort(),
+    );
+    await writeFile(join(other, 'plain.zip'), 'plain text');
+    await expect(
+      addPack(source, 'resourcepack', join(other, 'plain.zip'), signal),
+    ).rejects.toMatchObject({ reason: 'bad-type' });
+    const changed = await temp();
+    await writeFile(join(changed, "Icon Xaero's 1.22.zip"), zipBytes('different'));
+    await expect(
+      addPack(source, 'resourcepack', join(changed, "Icon Xaero's 1.22.zip"), signal),
+    ).rejects.toMatchObject({ reason: 'conflict' });
+    await writeFile(join(other, 'real.zip'), zipBytes());
+    await symlink(join(other, 'real.zip'), join(other, 'link.zip'));
+    await expect(
+      addPack(source, 'resourcepack', join(other, 'link.zip'), signal),
+    ).rejects.toMatchObject({ reason: 'bad-type' });
   });
 });
 
@@ -593,8 +695,8 @@ describe('service: game settings preset', () => {
             added: 1,
             skippedCount: 2,
             skipped: [
-              { name: 'bad.zip', reason: 'invalid' },
-              { name: 'bad name?.zip', reason: 'invalid' },
+              { name: 'bad.zip', reason: 'bad-type' },
+              { name: 'bad name?.zip', reason: 'bad-name' },
             ],
           },
         },

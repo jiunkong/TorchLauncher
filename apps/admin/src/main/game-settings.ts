@@ -3,6 +3,10 @@ import { constants } from 'node:fs';
 import { link, lstat, mkdir, open, readdir, realpath, rename, rm } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import {
+  DEPLOYMENT_LIMITS,
+  validateDeploymentPath,
+} from '../../../../packages/core/src/deployment/contracts/index.js';
+import {
   buildSettingsPolicy,
   classifyOptionKey,
   IRIS_CONFIG_PATH,
@@ -32,7 +36,7 @@ import {
   shaderConfigPaths,
 } from '../shared/studio.js';
 import { noLinks, safeRead } from './filesystem.js';
-import { PolicyFailure, StudioFailure } from './project.js';
+import { PackFailure, PolicyFailure, StudioFailure } from './project.js';
 import { hashFile } from './scan.js';
 
 /*
@@ -42,7 +46,7 @@ import { hashFile } from './scan.js';
  * import, and policy generation through core's `buildSettingsPolicy` (options.txt items, resource
  * pack lists, mod config files and Iris/Oculus shader settings in one policy format).
  */
-export { PolicyFailure, SETTINGS_POLICY_PATH };
+export { PackFailure, PolicyFailure, SETTINGS_POLICY_PATH };
 export const OPTIONS_READ_LIMIT = SETTINGS_LIMITS.optionsBytes;
 export const PACK_LIMIT = 256 * 1024 ** 2;
 export const PACK_DIRECTORY: Record<PackKind, string> = {
@@ -54,7 +58,8 @@ export const MAX_OPTIONS = 2000;
 export const MAX_PACKS = SETTINGS_LIMITS.packsPerList;
 /** Keys that the game or the resource pack list own; they never become option items. */
 const GAME_OWNED = new Set(['version', 'resourcePacks', 'incompatibleResourcePacks']);
-const WINDOWS_RESERVED = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+/** Same UTF-8 byte cap as one deployment path component. */
+const PACK_NAME_BYTES = DEPLOYMENT_LIMITS.pathComponentLength;
 
 export function isModPath(path: string): boolean {
   return /^mods\/[^/]+\.jar$/i.test(path.replaceAll('\\', '/'));
@@ -76,23 +81,32 @@ export function isPlanReserved(path: string): boolean {
     normalized === 'options.txt' || normalized === SETTINGS_POLICY_PATH || isModPath(normalized)
   );
 }
+/**
+ * A pack file name must be one valid deployment path component (the same rule the deployment
+ * format applies, so the file can always be shipped) with the right extension, and must not start
+ * with a space or dot or have a space before the extension. Control characters, path separators
+ * and `<>:"|?*%` are refused by the shared rule.
+ */
 export function validatePackName(
   name: unknown,
   kind: PackKind = 'resourcepack',
 ): asserts name is string {
-  const extension = kind === 'mod' ? 'jar' : 'zip';
   const extensionPattern = kind === 'mod' ? /\.jar$/i : /\.zip$/i;
+  if (typeof name !== 'string' || !extensionPattern.test(name) || name.length <= 4)
+    throw new PackFailure('bad-type');
+  if (Buffer.byteLength(name) > PACK_NAME_BYTES) throw new PackFailure('name-too-long');
   if (
-    typeof name !== 'string' ||
-    !/^[\p{L}\p{N}][\p{L}\p{N} _.()+\-[\]]{0,98}\.[a-z]{3}$/iu.test(name) ||
-    !extensionPattern.test(name) ||
-    name.normalize('NFC') !== name ||
+    name.includes('/') ||
     name.includes('..') ||
-    new RegExp(` \\.${extension}$`, 'i').test(name) ||
-    WINDOWS_RESERVED.test(name) ||
-    Buffer.byteLength(name) > 120
+    /^[ .]/u.test(name) ||
+    / \.(?:jar|zip)$/i.test(name)
   )
-    throw new StudioFailure('INVALID');
+    throw new PackFailure('bad-name');
+  try {
+    validateDeploymentPath(name);
+  } catch {
+    throw new PackFailure('bad-name');
+  }
 }
 export const packId = (name: string) => `file/${name}`;
 
@@ -619,7 +633,13 @@ export async function addPack(
 ): Promise<StudioPack> {
   const name = basename(picked);
   validatePackName(name, kind);
-  await noLinks(picked);
+  try {
+    await noLinks(picked);
+  } catch (error) {
+    if (error instanceof StudioFailure && error.code === 'INVALID')
+      throw new PackFailure('bad-type');
+    throw error;
+  }
   const directory = join(sourceRoot, PACK_DIRECTORY[kind]);
   await noLinks(sourceRoot);
   const target = join(directory, name);
@@ -637,7 +657,7 @@ export async function addPack(
       const { bytesRead } = await handle.read(head, 0, 4, 0);
       const magic = head.toString('hex');
       if (bytesRead < 4 || (magic !== '504b0304' && magic !== '504b0506'))
-        throw new StudioFailure('INVALID');
+        throw new PackFailure('bad-type');
     } finally {
       await handle.close();
     }
@@ -675,12 +695,12 @@ export async function addPack(
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
         const existing = await hashFile(target, PACK_LIMIT, signal);
-        if (existing.sha256 !== pack.sha256) throw new StudioFailure('INVALID');
+        if (existing.sha256 !== pack.sha256) throw new PackFailure('conflict');
       } else {
         // File systems without hard links: fall back to a rename, still never over an existing file.
         try {
           await lstat(target);
-          throw new StudioFailure('INVALID');
+          throw new PackFailure('conflict');
         } catch (inner) {
           if ((inner as NodeJS.ErrnoException).code !== 'ENOENT') throw inner;
         }

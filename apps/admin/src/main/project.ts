@@ -13,6 +13,12 @@ export class StudioFailure extends Error {
     super(code);
   }
 }
+/** A pack file that cannot be added, with the precise reason shown to the user. */
+export class PackFailure extends StudioFailure {
+  constructor(readonly reason: import('../shared/studio.js').PackSkipReason) {
+    super('INVALID');
+  }
+}
 /** A precise settings-source failure within the existing INVALID request category. */
 export class TestSettingsFailure extends StudioFailure {
   constructor(readonly detailCode: import('../shared/studio.js').StudioTestSettingsError) {
