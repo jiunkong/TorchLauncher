@@ -7,7 +7,7 @@ import type {
   StudioState,
 } from '../../../shared/studio.js';
 import { useStudioLocale } from '../i18n';
-import { detailMessageKey } from './errors';
+import { detailMessageKey, imageFailureMessage } from './errors';
 import {
   type OperationAction,
   type OperationLabelKey,
@@ -123,7 +123,14 @@ export function useStudio() {
         detailCode = reply.detail?.code ?? null;
         const detailKey = detailMessageKey(detailCode);
         // Background reads (quiet) report through `lastRun` only; no banner for the user.
-        if (!quiet) setMessage(detailKey ? t(detailKey) : errorMessage(reply.code));
+        if (!quiet)
+          setMessage(
+            reply.image
+              ? imageFailureMessage(reply.image, t)
+              : detailKey
+                ? t(detailKey)
+                : errorMessage(reply.code),
+          );
       }
     } catch {
       code = 'IO';

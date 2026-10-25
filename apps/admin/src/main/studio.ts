@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, rm } from 'node:fs/promises';
+import { lstat, rm, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
-import { BRANDING_LIMITS, BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
+import { BRANDING_ROLES } from '../../../../packages/core/src/branding/index.js';
 import { DeploymentValidationError } from '../../../../packages/core/src/deployment/contracts/index.js';
 import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import { createEd25519Signer } from '../../../../packages/core/src/deployment/signing/index.js';
@@ -35,9 +35,15 @@ import {
   type ImageDecoder,
   parseBranding,
   profileBranding,
-  validateImage,
   writerBranding,
 } from './branding.js';
+import {
+  BRANDING_SOURCE_LIMITS,
+  displayFileName,
+  ioCause,
+  prepareBrandingImage,
+  type RasterDecoder,
+} from './branding-image.js';
 import { sameContent } from './canonical.js';
 import {
   brandingKey,
@@ -73,7 +79,13 @@ import {
 } from './game-settings.js';
 import type { LauncherResolver } from './launcher-release.js';
 import { getLoaderVersions } from './loader-versions.js';
-import { newProject, parseProject, StudioFailure, TestSettingsFailure } from './project.js';
+import {
+  ImageFailure,
+  newProject,
+  parseProject,
+  StudioFailure,
+  TestSettingsFailure,
+} from './project.js';
 import { encodeProjectFile } from './project-file.js';
 import {
   copyIntoDataDir,
@@ -291,6 +303,7 @@ export class StudioService {
     private readonly launcherResolver: LauncherResolver = async () => {
       throw new StudioFailure('LAUNCHER_UNCONFIGURED');
     },
+    private readonly raster: RasterDecoder = () => null,
   ) {}
   snapshot(): StudioState {
     return structuredClone({
@@ -536,6 +549,7 @@ export class StudioService {
           ...(!cancelled && error instanceof TestSettingsFailure
             ? { detail: { code: error.detailCode } }
             : {}),
+          ...(!cancelled && error instanceof ImageFailure ? { image: error.image } : {}),
         };
       })
       .finally(() => {
@@ -1245,10 +1259,45 @@ export class StudioService {
         if (!projectDir) throw new StudioFailure('NO_PROJECT');
         const path = (await this.selected(command.role))[0];
         if (!path) throw new StudioFailure('CANCELLED');
-        const bytes = await safeRead(path, BRANDING_LIMITS[command.role].length);
-        const metadata = validateImage(command.role, bytes, this.decode);
+        const name = displayFileName(path);
+        let source: Buffer;
+        try {
+          const info = await stat(path);
+          if (info.isFile() && info.size > BRANDING_SOURCE_LIMITS.bytes)
+            throw new ImageFailure({
+              reason: 'fileTooLarge',
+              role: command.role,
+              name,
+              bytes: info.size,
+              limit: BRANDING_SOURCE_LIMITS.bytes,
+            });
+          source = await safeRead(path, BRANDING_SOURCE_LIMITS.bytes);
+        } catch (error) {
+          if (error instanceof ImageFailure) throw error;
+          throw new ImageFailure({
+            reason: 'unreadable',
+            role: command.role,
+            name,
+            cause: ioCause(error),
+          });
+        }
+        const { bytes, metadata } = prepareBrandingImage(
+          command.role,
+          name,
+          source,
+          this.raster,
+          this.decode,
+        );
         signal.throwIfAborted();
-        await saveProjectBrandingAsset(projectDir, command.role, metadata.mediaType, bytes);
+        try {
+          await saveProjectBrandingAsset(projectDir, command.role, metadata.mediaType, bytes);
+        } catch (error) {
+          throw new ImageFailure({
+            reason: 'storeFailed',
+            role: command.role,
+            cause: ioCause(error),
+          });
+        }
         this.snapshots[command.role] = bytes;
         this.state.project = {
           ...project,
@@ -1267,12 +1316,20 @@ export class StudioService {
       }
       case 'brandingRemove': {
         const project = this.project();
+        const projectDir = this.projectDir;
         delete this.snapshots[command.role];
         this.state.project = {
           ...project,
           branding: { ...project.branding, [command.role]: null },
         };
         this.state.dirty = true;
+        if (projectDir && (await this.autoSave(signal))) {
+          // The saved project no longer references the copy; a failed cleanup only leaves a stale file.
+          await removeStaleProjectBrandingAsset(projectDir, command.role, null).catch(
+            () => undefined,
+          );
+          this.state.result = { key: 'projectSaved' };
+        } else if (projectDir) this.state.result = { key: 'autosaveFailed' };
         return;
       }
       case 'brandingName': {

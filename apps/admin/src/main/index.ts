@@ -19,7 +19,7 @@ import { studioChannel, studioCloseChannel } from '../shared/studio.js';
 import { resolveMainLocale } from './i18n.js';
 import { handleStudioRequest } from './ipc.js';
 import { createLauncherResolver } from './launcher-release.js';
-import { decodeNativeImage } from './native-branding.js';
+import { decodeNativeImage, rasterNativeImage } from './native-branding.js';
 import { createStudioNativeDialogs } from './native-dialogs.js';
 import { SigningKeyStore } from './signing.js';
 import { StudioService } from './studio.js';
@@ -74,6 +74,7 @@ function createWindow(): void {
       appVersion: app.getVersion(),
       cacheDir: join(app.getPath('userData'), 'launcher-cache'),
     }),
+    rasterNativeImage,
   );
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>

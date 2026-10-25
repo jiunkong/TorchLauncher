@@ -49,10 +49,9 @@ export function createStudioNativeDialogs(
               filters:
                 kind === 'icon' || kind === 'background'
                   ? [
-                      {
-                        name: t('dialog.brandingFilter'),
-                        extensions: kind === 'icon' ? ['png'] : ['png', 'jpg', 'jpeg'],
-                      },
+                      { name: t('dialog.brandingAllFilter'), extensions: ['png', 'jpg', 'jpeg'] },
+                      { name: t('dialog.pngFilter'), extensions: ['png'] },
+                      { name: t('dialog.jpegFilter'), extensions: ['jpg', 'jpeg'] },
                     ]
                   : kind === 'keybackup'
                     ? [{ name: t('dialog.keyBackupFilter'), extensions: ['torchkey'] }]

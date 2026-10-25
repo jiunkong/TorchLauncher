@@ -26,7 +26,7 @@
 | id | 필수 | data |
 | --- | --- | --- |
 | `META` | 예 | 프로젝트 모델(현재 `StudioProject`에서 branding 이미지 바이트를 뺀 것) JSON UTF-8을 zlib(deflate) 압축 |
-| `ICON` | 아니오 | 앱 아이콘 원본 바이트(PNG 등, 기존 branding 검증 규칙) |
+| `ICON` | 아니오 | 앱 아이콘 바이트(PNG; 선택 시 필요하면 변환된 결과, 기존 branding 검증 규칙) |
 | `BGND` | 아니오 | 홈 배경 원본 바이트 |
 
 - `META` 안의 branding 메타데이터가 `ICON`/`BGND` 섹션과 일치해야 한다(역할, 길이, 해시). 이미지 섹션은 해당 메타데이터가 있을 때만 허용한다.
@@ -57,7 +57,26 @@
 └── files/               # 게임 데이터 파일 (mods/, resourcepacks/, shaderpacks/, config/ 등)
 ```
 
-브랜딩 이미지 선택 시 유효성 검사를 마친 원본을 `branding/` 아래에 원자적으로 복사하고,
+브랜딩 이미지 선택(`brandingSelect`)은 main 프로세스에서 다음 순서로 처리한다. 계약(아이콘 PNG ≤ 512×512 px·1 MiB,
+배경 PNG/JPEG ≤ 3840×2160 px·8,294,400 px·8 MiB)은 바뀌지 않았고, 그 제한에 맞추는 일을 Studio가 대신한다.
+
+1. 원본 파일은 최대 32 MiB까지 안전 읽기로 읽는다(초과하면 `fileTooLarge`). PNG/JPEG는 디코딩 **전에** 헤더에서 크기를 읽어
+   6,400만 화소를 넘으면 `tooManyPixels`로 거부한다(압축 폭탄 방지). 헤더가 깨졌으면 `corrupt`(`part: header`).
+2. 원본이 이미 규칙에 맞으면(역할에 맞는 형식, 크기·화소·바이트 제한 이내) **원본 바이트를 그대로** 저장한다(해시 불변).
+3. 아니면 `nativeImage`로 디코딩한다(실패 시 PNG/JPEG면 `corrupt`(`part: data`), 그 외 형식이면 `unsupported`). 가로·세로·화소 제한에
+   맞게 비율을 유지하며 축소(고품질)하고 PNG(아이콘은 항상 PNG; 배경은 JPEG 원본이면 JPEG, 그 외는 PNG를 먼저 시도하고 제한을
+   넘으면 JPEG)로 다시 인코딩한다. 바이트 제한을 넘으면 JPEG 품질을 낮추거나(92→80→68→56) 배율을 줄이며 최대 10번 인코딩을
+   시도하고, 그래도 안 되면 `cannotFit`(시도 횟수와 마지막 크기 포함)으로 거부한다.
+4. 변환 결과는 기존 `validateImage`(최종 검증)를 그대로 통과해야 하며, **변환된 바이트·메타데이터·해시**가 프로젝트 스냅샷,
+   `branding/` 사본, 내보낸 서버 구성과 torchpack에 저장된다.
+
+실패는 `{ok:false, code:'IMAGE_FAILED', image:{reason, role, ...}}`로 보고한다. `reason`은 `unsupported`, `corrupt`
+(`part`: `empty`/`header`/`data`, `format`, 알려진 크기), `fileTooLarge`, `tooManyPixels`, `cannotFit`, `unreadable`
+(`cause`), `storeFailed`(`cause`)이며, 값은 숫자·열거형·파일 이름뿐이고 경로와 오류 원문은 담지 않는다. 렌더러가 ko/en 카탈로그
+템플릿으로 문구를 만든다. 실패하면 프로젝트와 기존 `branding/` 사본은 바뀌지 않는다. `brandingRemove`는 프로젝트를 자동 저장한
+뒤 `branding/<role>.png|jpg` 사본도 지운다(다른 역할은 그대로).
+
+선택한 이미지를 처리한 뒤 유효성 검사를 마친 결과를 `branding/` 아래에 원자적으로 복사하고,
 프로젝트의 메타데이터와 이미지 바이트를 `project.torchproj`에 즉시 저장한다. `project.torchproj`의
 이미지 섹션은 프로젝트를 다시 열 때 쓰는 자체 포함 스냅샷이다. `branding/` 사본은 사용자가 프로젝트
 폴더에서 확인·복사할 수 있도록 보관하며, 다른 이름으로 저장할 때 함께 복사한다.

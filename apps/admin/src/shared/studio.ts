@@ -521,6 +521,8 @@ export type StudioError =
   | 'BLOCKED'
   /** A chosen file or pack is larger than the limit. */
   | 'TOO_LARGE'
+  /** A branding image could not be imported: read the reply's `image` payload for the cause. */
+  | 'IMAGE_FAILED'
   /** A directory chosen for a copied project is not empty. */
   | 'FOLDER_NOT_EMPTY'
   /** The project name cannot be used as a folder name. */
@@ -535,10 +537,62 @@ export type StudioError =
   | 'LAUNCHER_RELEASE_FAILED'
   | 'LAUNCHER_NO_ASSET'
   | 'LAUNCHER_VERIFY';
+/** OS-level cause of a failed read or write, without any path. */
+export type StudioImageIoCause =
+  | 'denied'
+  | 'notFound'
+  | 'notFile'
+  | 'changed'
+  | 'diskFull'
+  | 'other';
+/** Concrete, path-free cause of a failed branding image import (numbers are bytes or pixels). */
+export type StudioImageFailure =
+  | { reason: 'unsupported'; role: 'icon' | 'background'; name: string }
+  | {
+      reason: 'corrupt';
+      role: 'icon' | 'background';
+      name: string;
+      part: 'empty' | 'header' | 'data';
+      format: 'PNG' | 'JPEG' | null;
+      width: number | null;
+      height: number | null;
+    }
+  | {
+      reason: 'fileTooLarge';
+      role: 'icon' | 'background';
+      name: string;
+      bytes: number;
+      limit: number;
+    }
+  | {
+      reason: 'tooManyPixels';
+      role: 'icon' | 'background';
+      name: string;
+      width: number;
+      height: number;
+      limit: number;
+    }
+  | {
+      reason: 'cannotFit';
+      role: 'icon' | 'background';
+      name: string;
+      attempts: number;
+      bytes: number;
+      width: number;
+      height: number;
+      limit: number;
+    }
+  | { reason: 'unreadable'; role: 'icon' | 'background'; name: string; cause: StudioImageIoCause }
+  | { reason: 'storeFailed'; role: 'icon' | 'background'; cause: StudioImageIoCause };
 export type StudioTestSettingsError = 'NO_TEST_RESULT' | 'TEST_OPTIONS_MISSING';
 export type StudioReply =
   | { ok: true; state: StudioState; loaderVersions?: string[] }
-  | { ok: false; code: StudioError; detail?: { code: StudioTestSettingsError } };
+  | {
+      ok: false;
+      code: StudioError;
+      detail?: { code: StudioTestSettingsError };
+      image?: StudioImageFailure;
+    };
 export interface StudioApi extends DesktopApi {
   request(command: StudioRequest): Promise<StudioReply>;
   /** Subscribes to window-close requests while the project has unsaved changes. Returns an unsubscribe function. */

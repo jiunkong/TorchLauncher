@@ -37,6 +37,7 @@ export class StudioService extends Service {
           if (!this.testLauncherPath) throw new StudioFailure('LAUNCHER_UNCONFIGURED');
           return this.testLauncherPath;
         }),
+      args[6],
     );
     this.testKeys = keys;
   }

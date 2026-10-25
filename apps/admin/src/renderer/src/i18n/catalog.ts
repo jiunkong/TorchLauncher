@@ -212,6 +212,87 @@ const table = {
     'Launcher integrity verification failed. The previous cache and ZIP were preserved.',
     '런처 무결성 검증에 실패했습니다. 기존 캐시와 ZIP은 보존했습니다.',
   ],
+  'error.IMAGE_FAILED': ['The image could not be imported.', '이미지를 가져오지 못했습니다.'],
+  'brand.error.unsupported': [
+    '"{name}" is not a supported image. Only PNG and JPEG files can be read.',
+    '"{name}"은(는) 지원하는 이미지가 아닙니다. PNG 또는 JPEG 파일만 읽을 수 있습니다.',
+  ],
+  'brand.error.corrupt.empty': [
+    '"{name}" is empty (0 bytes), so there is no image to import.',
+    '"{name}" 파일이 비어 있어(0바이트) 가져올 이미지가 없습니다.',
+  ],
+  'brand.error.corrupt.header': [
+    '"{name}" is not a valid {format} image: its file header is damaged or cut off.',
+    '"{name}"은(는) 올바른 {format} 이미지가 아닙니다. 파일 머리글이 손상되었거나 잘려 있습니다.',
+  ],
+  'brand.error.corrupt.data': [
+    '"{name}" has a valid {format} header ({width}×{height} px), but its image data is incomplete or damaged and cannot be decoded.',
+    '"{name}"은(는) {format} 머리글({width}×{height} px)은 정상이지만 이미지 데이터가 불완전하거나 손상되어 읽을 수 없습니다.',
+  ],
+  'brand.error.corrupt.unknown': [
+    '"{name}" could not be decoded as an image: its data is incomplete or damaged.',
+    '"{name}"의 이미지 데이터가 불완전하거나 손상되어 읽을 수 없습니다.',
+  ],
+  'brand.error.fileTooLarge': [
+    '"{name}" is {size}, which is over the {limit} limit for source files.',
+    '"{name}" 파일은 {size}로, 원본 파일 제한 {limit}를 넘습니다.',
+  ],
+  'brand.error.tooManyPixels': [
+    '"{name}" is {width}×{height} px ({megapixels} megapixels), which is over the {limit} megapixel limit for source images.',
+    '"{name}" 이미지는 {width}×{height} px({megapixels}메가픽셀)로, 원본 이미지 제한 {limit}메가픽셀을 넘습니다.',
+  ],
+  'brand.error.cannotFit': [
+    '"{name}" is still {size} ({width}×{height} px) after {attempts} resize attempts, which is over the {limit} limit for the {role}.',
+    '"{name}" 이미지를 {attempts}번 줄였지만 {width}×{height} px, {size}까지만 줄어 {role} 제한 {limit}를 넘습니다.',
+  ],
+  'brand.error.unreadable.denied': [
+    'No permission to read "{name}".',
+    '"{name}" 파일을 읽을 권한이 없습니다.',
+  ],
+  'brand.error.unreadable.notFound': [
+    '"{name}" was not found. It may have been moved or deleted.',
+    '"{name}" 파일을 찾을 수 없습니다. 이동되었거나 삭제되었을 수 있습니다.',
+  ],
+  'brand.error.unreadable.notFile': [
+    '"{name}" is not a regular file (folders, shortcuts and linked files cannot be used).',
+    '"{name}"은(는) 일반 파일이 아닙니다. 폴더, 바로 가기, 연결된 파일은 사용할 수 없습니다.',
+  ],
+  'brand.error.unreadable.changed': [
+    '"{name}" changed while it was being read.',
+    '"{name}" 파일을 읽는 도중 내용이 바뀌었습니다.',
+  ],
+  'brand.error.unreadable.diskFull': [
+    'Not enough free disk space to read "{name}".',
+    '"{name}" 파일을 읽기 위한 디스크 공간이 부족합니다.',
+  ],
+  'brand.error.unreadable.other': [
+    '"{name}" could not be read because of an operating system error.',
+    '운영체제 오류로 "{name}" 파일을 읽지 못했습니다.',
+  ],
+  'brand.error.store.denied': [
+    'The {role} image could not be saved in the project folder: no permission to write there.',
+    '{role} 이미지를 프로젝트 폴더에 저장하지 못했습니다. 해당 폴더에 쓸 권한이 없습니다.',
+  ],
+  'brand.error.store.notFound': [
+    'The {role} image could not be saved: the project folder was not found.',
+    '{role} 이미지를 저장하지 못했습니다. 프로젝트 폴더를 찾을 수 없습니다.',
+  ],
+  'brand.error.store.notFile': [
+    'The {role} image could not be saved: the project branding folder or file is not an ordinary folder or file.',
+    '{role} 이미지를 저장하지 못했습니다. 프로젝트의 branding 폴더 또는 파일이 일반 폴더나 파일이 아닙니다.',
+  ],
+  'brand.error.store.changed': [
+    'The {role} image could not be saved: the project folder changed while saving.',
+    '{role} 이미지를 저장하지 못했습니다. 저장하는 동안 프로젝트 폴더가 바뀌었습니다.',
+  ],
+  'brand.error.store.diskFull': [
+    'The {role} image could not be saved: the disk is full.',
+    '{role} 이미지를 저장하지 못했습니다. 디스크 공간이 부족합니다.',
+  ],
+  'brand.error.store.other': [
+    'The {role} image could not be saved in the project folder because of an operating system error.',
+    '운영체제 오류로 {role} 이미지를 프로젝트 폴더에 저장하지 못했습니다.',
+  ],
   'error.TOO_LARGE': [
     'The selected file exceeds the allowed size.',
     '선택한 파일이 허용 크기를 넘습니다.',
@@ -399,8 +480,8 @@ const table = {
   'brand.changeLabel': ['Change {item}', '{item} 변경'],
   'brand.removeLabel': ['Remove {item}', '{item} 제거'],
   'brand.limits': [
-    'The preview shows the default artwork; chosen images are applied to the launcher when you export. Icon: PNG. Background: PNG or JPEG.',
-    '미리보기는 기본 이미지를 보여 줍니다. 고른 이미지는 내보낸 런처에 적용됩니다. 아이콘은 PNG, 배경은 PNG 또는 JPEG입니다.',
+    'The preview shows the default artwork; chosen images are applied to the launcher when you export. You can choose a PNG or JPEG file (up to 32 MiB and 64 megapixels). Images are resized automatically to fit: the icon to at most 512×512 px and 1 MiB (always saved as PNG), the background to at most 3840×2160 px and 8 MiB (PNG or JPEG). Images that already fit are used unchanged.',
+    '미리보기는 기본 이미지를 보여 줍니다. 고른 이미지는 내보낸 런처에 적용됩니다. PNG 또는 JPEG 파일(32 MiB, 6400만 화소 이하)을 고를 수 있으며, 크기에 맞게 자동으로 줄입니다. 아이콘은 최대 512×512 px, 1 MiB(항상 PNG), 배경은 최대 3840×2160 px, 8 MiB(PNG 또는 JPEG)입니다. 이미 제한 안에 있는 이미지는 그대로 사용합니다.',
   ],
 
   'files.eyebrow': ['Files', '파일'],

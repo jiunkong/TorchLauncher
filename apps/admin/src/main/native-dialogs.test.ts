@@ -3,6 +3,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { createStudioNativeDialogs } from './native-dialogs.js';
 
 describe('Studio native dialogs', () => {
+  it('offers PNG and JPEG for both branding roles', async () => {
+    const showOpenDialog = vi.fn().mockResolvedValue({ canceled: true, filePaths: [] });
+    const dialogs = createStudioNativeDialogs(
+      { showOpenDialog, showSaveDialog: vi.fn() },
+      {} as BrowserWindow,
+      () => 'en',
+    );
+    for (const kind of ['icon', 'background'] as const) await dialogs.open(kind);
+    for (const call of showOpenDialog.mock.calls)
+      expect(call[1].filters).toEqual([
+        { name: 'All supported images (PNG, JPEG)', extensions: ['png', 'jpg', 'jpeg'] },
+        { name: 'PNG image', extensions: ['png'] },
+        { name: 'JPEG image', extensions: ['jpg', 'jpeg'] },
+      ]);
+  });
   it('uses the active locale for injected save and open dialogs', async () => {
     const showOpenDialog = vi.fn().mockResolvedValue({ canceled: true, filePaths: [] });
     const showSaveDialog = vi.fn().mockResolvedValue({ canceled: true });
