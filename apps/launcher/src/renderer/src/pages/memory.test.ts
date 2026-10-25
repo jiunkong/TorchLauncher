@@ -1,7 +1,9 @@
 import { expect, it } from 'vitest';
 import {
   defaultMaxMemoryMiB,
+  effectiveGameMemory,
   exceedsRecommendedPhysicalMemory,
+  formatGiB,
   memoryLimitMiB,
   parseMemoryGiB,
   validGameMemory,
@@ -28,4 +30,17 @@ it('validates physical and JVM bounds, including the optional initial memory', (
 it('flags values above three quarters of physical RAM', () => {
   expect(exceedsRecommendedPhysicalMemory(6144, 8192)).toBe(false);
   expect(exceedsRecommendedPhysicalMemory(6145, 8192)).toBe(true);
+});
+
+it('resolves the effective memory like the launch gate', () => {
+  const server = { maxMiB: 4096, initialMiB: 1024 };
+  expect(effectiveGameMemory({})).toEqual({ maxMemoryMiB: 2048 });
+  expect(effectiveGameMemory({}, server)).toEqual({ maxMemoryMiB: 4096, initialMemoryMiB: 1024 });
+  expect(effectiveGameMemory({ maxMemoryMiB: 512 }, server)).toEqual({ maxMemoryMiB: 512 });
+  expect(effectiveGameMemory({ maxMemoryMiB: 8192, initialMemoryMiB: 2048 }, server)).toEqual({
+    maxMemoryMiB: 8192,
+    initialMemoryMiB: 2048,
+  });
+  expect(formatGiB(1536)).toBe('1.5');
+  expect(formatGiB(2048)).toBe('2');
 });

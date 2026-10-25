@@ -487,6 +487,25 @@ select.inp {
 .inp.narrow {
   max-width: 280px;
 }
+.inp-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3, inherit);
+}
+.inp-unit input::-webkit-inner-spin-button,
+.inp-unit input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+.inp-unit input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.inp-unit .inp {
+  flex: 0 1 140px;
+  min-width: 0;
+}
 .inp.bad {
   border-color: var(--warn);
 }

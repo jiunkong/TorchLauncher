@@ -30,6 +30,11 @@ export interface StudioProject {
   sourceUrl: string;
   game: DeploymentGame;
   files: ProjectFile[];
+  /**
+   * Operator default game memory (Xmx, optional Xms). Absent means the launcher built-in defaults.
+   * Written to `torchlauncher-server.json` only; it is not part of the torchpack.
+   */
+  memory?: import('../../../../packages/core/src/server-config/index.js').ServerConfigMemory;
   branding?: StudioBranding;
   /** Highest deployment sequence used by a build of this project (signing, torchpack 1.2). */
   sequence?: number;

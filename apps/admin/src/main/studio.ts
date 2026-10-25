@@ -1510,6 +1510,7 @@ export class StudioService {
           address: project.address,
           sourceUrl: project.sourceUrl,
           game: project.game,
+          ...(project.memory ? { memory: project.memory } : {}),
           ...(project.branding ? { branding: profileBranding(project) } : {}),
           signing: { algorithm: 'ed25519', publicKey },
         });

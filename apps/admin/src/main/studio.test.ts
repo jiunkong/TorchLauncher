@@ -593,3 +593,46 @@ it('asks main to close the window for exit and accepts no extra fields', async (
   expect(await service.request({ action: 'exit' })).toMatchObject({ ok: true });
   expect(exit).toHaveBeenCalledOnce();
 });
+
+describe('project default memory', () => {
+  it('starts new projects at Xmx 2 GB with Xms unset and round trips blank Xms', () => {
+    const fresh = newProject();
+    expect(fresh.memory).toEqual({ maxMiB: 2048 });
+    expect(parseProject(fresh).memory).toEqual({ maxMiB: 2048 });
+    const withInitial = { ...fresh, memory: { maxMiB: 4096, initialMiB: 1024 } };
+    const decoded = decodeProjectFile(encodeProjectFile(withInitial, {}), () => ({
+      width: 1,
+      height: 1,
+    })).project;
+    expect(decoded.memory).toEqual({ maxMiB: 4096, initialMiB: 1024 });
+    const { memory: _removed, ...unset } = fresh;
+    expect(parseProject(unset).memory).toBeUndefined();
+    expect(
+      decodeProjectFile(encodeProjectFile(unset, {}), () => ({ width: 1, height: 1 })).project,
+    ).not.toHaveProperty('memory');
+  });
+  it('rejects invalid memory blocks authoritatively, including on load', () => {
+    const fresh = newProject();
+    for (const memory of [
+      null,
+      [],
+      {},
+      { maxMiB: 511 },
+      { maxMiB: 65537 },
+      { maxMiB: 2048.5 },
+      { maxMiB: '2048' },
+      { initialMiB: 1024 },
+      { maxMiB: 2048, initialMiB: 255 },
+      { maxMiB: 2048, initialMiB: 4096 },
+      { maxMiB: 2048, extra: 1 },
+    ]) {
+      expect(() => parseProject({ ...fresh, memory })).toThrow();
+      expect(() =>
+        decodeProjectFile(encodeProjectFile({ ...fresh, memory } as never, {}), () => ({
+          width: 1,
+          height: 1,
+        })),
+      ).toThrow();
+    }
+  });
+});

@@ -330,6 +330,38 @@ const table = {
     'No stable version of this loader is available for the selected Minecraft release.',
     '선택한 Minecraft 버전에 사용할 수 있는 안정 로더 버전이 없습니다.',
   ],
+  'server.memory.title': ['Default game memory', '기본 게임 메모리'],
+  'server.memory.help': [
+    'Defaults for every player. Players can change them in the launcher Settings; their own values take precedence. Included in the exported launcher, not in the deployment file.',
+    '모든 플레이어에게 적용되는 기본값입니다. 플레이어가 런처 설정에서 바꿀 수 있으며, 직접 설정한 값이 우선합니다. 배포 파일이 아니라 내보낸 런처에 포함됩니다.',
+  ],
+  'server.memory.max': ['Maximum memory (Xmx)', '최대 메모리 (Xmx)'],
+  'server.memory.initial': ['Initial memory (Xms, optional)', '초기 메모리 (Xms, 선택)'],
+  'server.memory.unit': ['GB', 'GB'],
+  'server.memory.maxHelp': [
+    'Leave blank to use the launcher default (2 GB).',
+    '비워 두면 런처 기본값(2 GB)을 사용합니다.',
+  ],
+  'server.memory.initialHelp': [
+    'Leave blank to not set it (Java default).',
+    '비워 두면 지정하지 않습니다 (Java 기본값).',
+  ],
+  'validation.memoryMax': [
+    'Maximum memory must be between 0.5 GB and 64 GB, in whole MiB.',
+    '최대 메모리는 0.5 GB 이상 64 GB 이하이며 MiB 단위 정수여야 합니다.',
+  ],
+  'validation.memoryInitial': [
+    'Initial memory must be at least 0.25 GB, in whole MiB.',
+    '초기 메모리는 0.25 GB 이상이며 MiB 단위 정수여야 합니다.',
+  ],
+  'validation.memoryInitialNeedsMax': [
+    'Enter maximum memory too, or clear initial memory.',
+    '최대 메모리도 입력하거나 초기 메모리를 비우세요.',
+  ],
+  'validation.memoryInitialAboveMax': [
+    'Initial memory cannot be higher than maximum memory.',
+    '초기 메모리는 최대 메모리보다 클 수 없습니다.',
+  ],
   'server.idSub': [
     'Generated automatically and cannot be changed.',
     '자동 생성되며 바꿀 수 없습니다.',
@@ -339,8 +371,8 @@ const table = {
     '같은 서버의 모든 업데이트는 이 ID로 연결됩니다.',
   ],
   'server.reexport': [
-    'After changing server info, re-export the launcher and hand it out again.',
-    '서버 정보를 바꾸면 런처를 다시 내보내 전달해야 합니다.',
+    'After changing server info or the default memory, re-export the launcher and hand it out again.',
+    '서버 정보나 기본 메모리를 바꾸면 런처를 다시 내보내 전달해야 합니다.',
   ],
   'server.validated': [
     'Installation is validated for Minecraft 1.21.1 on Windows/Linux x64. Studio checks that the game and loader match the deployment file when you check the address.',

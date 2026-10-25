@@ -599,6 +599,53 @@ describe('url check and export', () => {
     expect(h.d.reveal).toHaveBeenCalledWith(h.zip);
     expect((await h.s.request({ action: 'revealPack' })).ok).toBe(true);
   });
+  it('writes only the present default memory fields and never needs a rebuild for them', async () => {
+    const h = await exportReady();
+    h.s.testLauncherPath = h.binary;
+    const exported = async (name: string) => {
+      const destination = join(h.root, name);
+      h.d.save.mockResolvedValueOnce(destination);
+      expect((await h.s.request({ action: 'export', target: 'windows' })).ok).toBe(true);
+      const zip = readZip(await readFile(destination));
+      return JSON.parse(zip.get('torchlauncher-server.json')?.data.toString('utf8') ?? '');
+    };
+    // New projects start with Xmx 2 GB and no Xms.
+    expect((await exported('default.zip')).memory).toEqual({ maxMiB: 2048 });
+    const packBefore = h.s.snapshot().project?.lastBuild;
+    expect(
+      (
+        await h.edit((p) => {
+          p.memory = { maxMiB: 4096, initialMiB: 1024 };
+        })
+      ).ok,
+    ).toBe(true);
+    // Memory is server-config only: deployment and export checks stay ready.
+    expect(h.s.snapshot().export?.blocked).toBe(false);
+    expect(h.s.snapshot().project?.lastBuild).toEqual(packBefore);
+    expect((await exported('both.zip')).memory).toEqual({ maxMiB: 4096, initialMiB: 1024 });
+    expect(
+      (
+        await h.edit((p) => {
+          delete p.memory;
+        })
+      ).ok,
+    ).toBe(true);
+    expect(await exported('none.zip')).not.toHaveProperty('memory');
+    for (const memory of [
+      { maxMiB: 511 },
+      { maxMiB: 2048, initialMiB: 4096 },
+      { maxMiB: 2048, initialMiB: 255 },
+      { initialMiB: 1024 },
+      { maxMiB: 2048, extra: 1 },
+    ])
+      expect(
+        (
+          await h.edit((p) => {
+            (p as { memory?: unknown }).memory = memory;
+          })
+        ).ok,
+      ).toBe(false);
+  });
   it('blocks with a structured reason before asking for any file', async () => {
     const h = await exportReady();
     const attempt = async () => {

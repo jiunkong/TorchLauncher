@@ -365,6 +365,15 @@ export class StudioTestRunner {
         {
           auth,
           launcherVersion: this.host.launcherVersion,
+          // Same memory defaults a player without personal settings gets from the exported launcher.
+          ...(project.memory
+            ? {
+                maxMemoryMiB: project.memory.maxMiB,
+                ...(project.memory.initialMiB === undefined
+                  ? {}
+                  : { initialMemoryMiB: project.memory.initialMiB }),
+              }
+            : {}),
         },
         {
           signal,

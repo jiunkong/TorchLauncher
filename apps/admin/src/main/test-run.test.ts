@@ -12,6 +12,7 @@ import type { GameExit, RunningGame } from '../../../../packages/core/src/minecr
 import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import { handleStudioRequest } from './ipc.js';
+import { parseProject } from './project.js';
 import { PROJECT_DATA_DIR } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 import { StudioTestRunner, TEST_LOG_LIMIT, type TestRunHost } from './test-run.js';
@@ -807,4 +808,41 @@ it('only accepts closeProject from the trusted main frame', async () => {
       ),
     ).toEqual({ ok: false, code: 'UNTRUSTED' });
   expect(h.service.snapshot().project).not.toBeNull();
+});
+
+it('launches the test run with the operator default memory', async () => {
+  const h = await setup();
+  const update = async (memory?: { maxMiB: number; initialMiB?: number }) => {
+    const { memory: _previous, ...rest } = parseProject(h.service.snapshot().project);
+    expect(
+      (
+        await h.service.request({
+          action: 'update',
+          project: { ...rest, ...(memory ? { memory } : {}) },
+        })
+      ).ok,
+    ).toBe(true);
+  };
+  const run = async () => {
+    h.launch.mockClear();
+    h.launch.mockImplementation(async () => ({
+      pid: 123,
+      stop: h.stop,
+      finished: Promise.resolve({ reason: 'exited', code: 0, signal: null, logs: h.logs }),
+      getLogs: () => h.logs,
+    }));
+    expect(await h.service.request({ action: 'testStart' })).toMatchObject({ ok: true });
+    expect(h.launch).toHaveBeenCalledTimes(1);
+    return h.launch.mock.calls[0]?.[1];
+  };
+  await update({ maxMiB: 4096, initialMiB: 1024 });
+  expect(await run()).toMatchObject({ maxMemoryMiB: 4096, initialMemoryMiB: 1024 });
+  await update({ maxMiB: 3072 });
+  const maxOnly = await run();
+  expect(maxOnly).toMatchObject({ maxMemoryMiB: 3072 });
+  expect(maxOnly).not.toHaveProperty('initialMemoryMiB');
+  await update();
+  const unset = await run();
+  expect(unset).not.toHaveProperty('maxMemoryMiB');
+  expect(unset).not.toHaveProperty('initialMemoryMiB');
 });
