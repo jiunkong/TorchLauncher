@@ -146,3 +146,59 @@ it('bounds a stalled metadata body by the network deadline', async () => {
     vi.useRealTimers();
   }
 });
+
+describe('release application identity', () => {
+  it.each(['windows', 'linux'] as const)(
+    'selects the exact Studio asset for %s alongside launcher assets',
+    async (target) => {
+      const h = await setup();
+      const release = metadata();
+      const launcherName = `TorchLauncher-1.10.0-${target === 'windows' ? 'win-x64.exe' : 'linux-x64.AppImage'}`;
+      const studioName = launcherName.replace('TorchLauncher-', 'TorchLauncher Studio-');
+      const fixture = release.assets[0];
+      if (!fixture) throw new Error('missing asset');
+      release.assets = [launcherName, studioName].map((name) => ({
+        ...fixture,
+        name,
+        browser_download_url: `https://github.com/jiunkong/TorchLauncher/releases/download/v1.10.0/${encodeURIComponent(name)}`,
+      }));
+      h.fetch.mockImplementation(async () => Response.json(release));
+      const studio = createLauncherReleaseClient({
+        cacheDir: h.cacheDir,
+        fetch: h.fetch,
+        application: 'studio',
+      });
+      expect((await studio.latest(target, h.signal)).name).toBe(studioName);
+      expect((await h.client.latest(target, h.signal)).name).toBe(launcherName);
+      release.assets = release.assets.filter((asset) => asset.name === launcherName);
+      h.fetch.mockImplementation(async () => Response.json(release));
+      await expect(studio.latest(target, h.signal)).rejects.toMatchObject({
+        code: 'LAUNCHER_NO_ASSET',
+      });
+    },
+  );
+  it('never reuses a different product cache and retains each verified artifact', async () => {
+    const h = await setup();
+    const studioRelease = metadata('1.10.0', 'studio');
+    h.fetch.mockImplementation(async (url) =>
+      String(url).includes('/latest') ? Response.json(studioRelease) : new Response(bytes),
+    );
+    const studio = createLauncherReleaseClient({
+      cacheDir: h.cacheDir,
+      fetch: h.fetch,
+      application: 'studio',
+    });
+    const artifact = await studio.download('windows', { signal: h.signal });
+    expect(artifact.name).toBe('TorchLauncher Studio-1.10.0-win-x64.exe');
+    expect((await studio.cached('windows', h.signal))?.path).toBe(artifact.path);
+    expect(await h.client.cached('windows', h.signal)).toBeNull();
+    h.fetch.mockImplementation(async (url) =>
+      String(url).includes('/latest') ? Response.json(metadata()) : new Response(bytes),
+    );
+    const launcher = await h.client.download('windows', { signal: h.signal });
+    expect(launcher.name).toBe('TorchLauncher-1.10.0-win-x64.exe');
+    expect(await studio.cached('windows', h.signal)).toBeNull();
+    expect(await readFile(artifact.path)).toEqual(bytes);
+    expect(await readFile(launcher.path)).toEqual(bytes);
+  });
+});

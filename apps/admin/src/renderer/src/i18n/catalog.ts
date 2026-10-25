@@ -2,6 +2,43 @@ import { defineTranslations } from '@torchlauncher/core/i18n';
 
 /** Each key holds [English, Korean]; Korean is the reference text of the approved mockups. */
 const table = {
+  'help.version': ['Current version {version}', '현재 버전 {version}'],
+  'help.versionUnknown': ['Unavailable', '확인할 수 없음'],
+  'help.check': ['Check for updates', '최신 버전 확인'],
+  'help.update': ['Update', '업데이트'],
+  'help.idle': ['Check for the latest version.', '최신 버전을 확인해 주세요.'],
+  'help.checking': ['Checking for updates…', '최신 버전을 확인하는 중…'],
+  'help.current': ['You are using the latest version.', '최신 버전을 사용하고 있습니다.'],
+  'help.available': [
+    'Version {version} is available to download.',
+    '새 버전 {version}을 다운로드할 수 있습니다.',
+  ],
+  'help.downloading': ['Downloading update… {size}', '업데이트 다운로드 중… {size}'],
+  'help.downloaded': [
+    'Version {version} downloaded and verified. Installation is not applied.',
+    '버전 {version} 다운로드 및 검증 완료. 설치는 적용되지 않았습니다.',
+  ],
+  'help.noRelease': [
+    'No Studio release has been published yet.',
+    '아직 공개된 Studio 버전이 없습니다.',
+  ],
+  'help.offline': [
+    'Could not connect to the internet. Check your connection and try again.',
+    '인터넷에 연결할 수 없습니다. 연결을 확인한 뒤 다시 시도해 주세요.',
+  ],
+  'help.verifyFailed': [
+    'Could not verify the update file. Please try again later.',
+    '업데이트 파일을 확인하지 못했습니다. 나중에 다시 시도해 주세요.',
+  ],
+  'help.unsupported': [
+    'Studio updates are not supported on this device.',
+    '이 기기에서는 Studio 업데이트를 지원하지 않습니다.',
+  ],
+  'help.failed': [
+    'Could not check for or download updates. Please try again later.',
+    '업데이트를 확인하거나 다운로드하지 못했습니다. 나중에 다시 시도해 주세요.',
+  ],
+  'help.cancelled': ['The update was cancelled.', '업데이트가 취소되었습니다.'],
   'common.cancel': ['Cancel', '취소'],
   'files.target.save': ['Save', '저장'],
   'common.close': ['Close', '닫기'],

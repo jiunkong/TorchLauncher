@@ -13,6 +13,7 @@ import {
   compareStableVersions,
   type LauncherTarget,
   parseStableVersion,
+  type ReleaseApplication,
   type ReleaseArtifact,
   ReleaseFailure,
   type ReleaseMetadata,
@@ -21,8 +22,12 @@ import {
 
 export * from './types.js';
 export const LAUNCHER_REPOSITORY = 'jiunkong/TorchLauncher';
-export const launcherAssetName = (version: string, target: LauncherTarget): string =>
-  `TorchLauncher-${version}-${target === 'windows' ? 'win-x64.exe' : 'linux-x64.AppImage'}`;
+export const launcherAssetName = (
+  version: string,
+  target: LauncherTarget,
+  application: ReleaseApplication = 'launcher',
+): string =>
+  `TorchLauncher${application === 'studio' ? ' Studio' : ''}-${version}-${target === 'windows' ? 'win-x64.exe' : 'linux-x64.AppImage'}`;
 const HOSTS = new Set([
   'api.github.com',
   'github.com',
@@ -101,6 +106,9 @@ function checkDigest(value: unknown): string {
 }
 
 export function createLauncherReleaseClient(options: ReleaseOptions) {
+  const application = options.application ?? 'launcher';
+  if (application !== 'launcher' && application !== 'studio')
+    throw new ReleaseFailure('LAUNCHER_UNCONFIGURED');
   const transport = options.fetch ?? fetch;
   const repository = options.repository ?? LAUNCHER_REPOSITORY;
   function context(target: LauncherTarget, signal: AbortSignal) {
@@ -173,7 +181,7 @@ export function createLauncherReleaseClient(options: ReleaseOptions) {
           data.repository !== repository ||
           data.target !== target ||
           !parseStableVersion(data.version) ||
-          data.name !== launcherAssetName(data.version.replace(/^v/, ''), target) ||
+          data.name !== launcherAssetName(data.version.replace(/^v/, ''), target, application) ||
           !Number.isSafeInteger(data.size) ||
           data.size < 4 ||
           data.size > LAUNCHER_LIMIT ||
@@ -220,7 +228,7 @@ export function createLauncherReleaseClient(options: ReleaseOptions) {
       )
         throw new ReleaseFailure('LAUNCHER_NO_RELEASE');
       const version = release.tag_name.replace(/^v/, '');
-      const name = launcherAssetName(version, target);
+      const name = launcherAssetName(version, target, application);
       if (!Array.isArray(release.assets)) throw new ReleaseFailure('LAUNCHER_NO_ASSET');
       const matches = release.assets.filter(
         (a) => a && typeof a === 'object' && a.name === name && a.state === 'uploaded',
@@ -238,7 +246,8 @@ export function createLauncherReleaseClient(options: ReleaseOptions) {
       const assetUrl = validUrl(asset.browser_download_url);
       if (
         assetUrl.hostname !== 'github.com' ||
-        assetUrl.pathname !== `/${repository}/releases/download/${release.tag_name}/${name}` ||
+        assetUrl.pathname !==
+          `/${repository}/releases/download/${release.tag_name}/${encodeURIComponent(name)}` ||
         assetUrl.search ||
         assetUrl.hash
       )

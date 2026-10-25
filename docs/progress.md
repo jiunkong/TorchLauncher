@@ -1,11 +1,29 @@
 # TorchLauncher 개발 진행 관리
 
-최종 갱신: 2026-10-25
+최종 갱신: 2026-10-26
 
 이 파일을 작업 상태·담당·머지 현황의 기준으로 사용한다. 제품 요구사항은
 [아키텍처](architecture.md), 단계의 목적과 완료 기준은 [구현 순서](implementation-plan.md)를 따른다.
 
 ## 현재 상태와 다음 작업
+
+### STUDIO-UPDATE-MENU-01 · Studio 도움말 업데이트 main 통합 (2026-10-26)
+
+사용자가 업데이트 대상을 **Studio 자체**로 확인했다. 작업자 `studio_update_menu`의 `f6a0ecf`를 #0이 검토했다.
+작업 브랜치 `feat/studio-update-menu`, baseline `0467a40`. 사용자가 병합 보류 지시를 철회하고 main 병합을 요청했다.
+제품 코드는 충돌 없이 합쳐졌고 진행 문서의 양쪽 기록을 보존했다. push는 하지 않는다.
+- 기존 도움말에 현재 버전·최신 버전 확인·업데이트·상태/받은 바이트를 연결하고 기존 정보를 유지한다.
+  명시적 클릭 때만 네트워크를 요청하며, 새 버전 확인 후 업데이트를 활성화한다. 중복 요청·오류·한국어/영어 결과 안내를 처리한다.
+- 기존 공통 다운로드에 Studio 파일 선택 옵션을 추가했다(기본은 launcher). Windows/Linux의 정확한 Studio 파일명과
+  공백 URL 인코딩·캐시 제품 식별을 검증한다. 앱 간 import 없이 Studio 로컬 IPC/backend/preload를 연결했다.
+- 실제 종료 시 취소·staging 정리를 기다리며, 미저장 확인 취소는 업데이트 서비스를 닫지 않는다.
+- 작업자 검증: 집중 Vitest **8 files/73 passed**, 최종 메뉴 변경 후 **8 passed**, Studio 타입·build,
+  smoke 2개 구문·diff check 성공. Scoped Biome 오류0, 기존 경고35. #0 코드/테스트/경계 검토 완료.
+- GUI·화면 캡처·native·실제 GitHub 다운로드는 미검증이다. 다운로드/검증까지이며 파일 교체·설치·재시작은 미구현이다.
+  이전 병합 보류 때 main을 복원한 기록은 과거 상태다. 사용자 지시로 전체 통합 검증은 생략하고 변경 부분만 검증한다.
+  로컬 인계 `docs/handoffs/STUDIO-UPDATE-MENU-01.md`.
+- 병합 결과의 필요한 검사만 수행: 관련 Vitest **8 files/73 passed**, Studio 타입 검사, smoke 2개 구문, diff check 성공.
+  전체 pnpm check·build·Electron smoke 재실행은 사용자 지시로 생략했다.
 
 ### 런처 릴리스 다운로드·상단 메뉴 main 통합 (2026-10-26, #0)
 

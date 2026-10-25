@@ -119,7 +119,14 @@ const appCases = [
       ['배포', '배포'],
       ['내보내기', '런처 내보내기'],
     ],
-    expectedBridge: ['request', 'onCloseRequest', 'getApplicationInfo'],
+    expectedBridge: [
+      'request',
+      'onCloseRequest',
+      'getApplicationInfo',
+      'getUpdateState',
+      'update',
+      'onUpdate',
+    ],
     env,
   },
 ];
