@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cancelClose, finishClose, onCloseRequest, runConfirmedSwitch } from './adapters/discard';
 import { deriveInsights } from './adapters/insights';
+import torchUrl from './assets/torch.png';
 import { AboutDialog } from './components/AboutDialog';
 import { LoginCodeDialog } from './components/LoginCodeDialog';
 import { MenuBar } from './components/MenuBar';
@@ -41,12 +42,12 @@ export function App() {
     [clearMessage],
   );
 
-  // The OS window frame is native; its title carries the project name.
+  const windowTitle = draft
+    ? `${draft.name || 'TorchLauncher'} · TorchLauncher Studio`
+    : 'TorchLauncher Studio';
   useEffect(() => {
-    document.title = draft
-      ? `${draft.name || 'TorchLauncher'} · TorchLauncher Studio`
-      : 'TorchLauncher Studio';
-  }, [draft]);
+    document.title = windowTitle;
+  }, [windowTitle]);
 
   const askName = (mode: 'new' | 'saveAs') => {
     clearMessage();
@@ -145,6 +146,12 @@ export function App() {
   return (
     <>
       <div className="frame" inert={!splashDone}>
+        <header className="desktop-titlebar" data-testid="desktop-titlebar">
+          <div className="desktop-titlebar-content">
+            <img src={torchUrl} alt="" width={18} height={18} draggable={false} />
+            <span title={windowTitle}>{windowTitle}</span>
+          </div>
+        </header>
         <MenuBar label={t('menu.bar')} menus={menus} />
         <div className="app-shell" data-testid="app-shell">
           {draft && (
