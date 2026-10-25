@@ -50,14 +50,22 @@
 ```
 <프로젝트 폴더>/
 ├── project.torchproj    # 위 컨테이너 v1 형식의 프로젝트 파일
+├── branding/            # 선택한 아이콘·배경 원본 사본 (있는 역할만)
+│   ├── icon.png
+│   └── background.png|jpg
 └── files/               # 게임 데이터 파일 (mods/, resourcepacks/, shaderpacks/, config/ 등)
 ```
+
+브랜딩 이미지 선택 시 유효성 검사를 마친 원본을 `branding/` 아래에 원자적으로 복사하고,
+프로젝트의 메타데이터와 이미지 바이트를 `project.torchproj`에 즉시 저장한다. `project.torchproj`의
+이미지 섹션은 프로젝트를 다시 열 때 쓰는 자체 포함 스냅샷이다. `branding/` 사본은 사용자가 프로젝트
+폴더에서 확인·복사할 수 있도록 보관하며, 다른 이름으로 저장할 때 함께 복사한다.
 
 - **새 프로젝트 (`new`)**: 앱 안 모달에서 프로젝트 이름을 입력하고 네이티브 선택창으로 상위 폴더를 고르면 Studio가 `<상위>/<이름>/`을 만들고 `project.torchproj`와 `files/`를 생성한다(저장 상태 `dirty: false`). 이름은 한 경로 단위로 검증한다(공백 제거 후 1~64자, `<>:"/\|?*`·제어 문자·끝의 `.`·Windows 예약 장치 이름 금지, 위반 시 `FOLDER_NAME_INVALID`). 같은 이름의 파일/폴더가 있으면 건드리지 않고 `FOLDER_EXISTS`로 거부하며, 이후 단계가 실패하면 만든 폴더를 제거한다.
 - **프로젝트 열기 (`open`)**: 프로젝트 폴더를 선택한다. 폴더 내에 `project.torchproj`가 없으면 `INVALID`로 거부된다 (과거 단일 파일 열기는 비지원). 열 때(그리고 `rescan` 때) `files/mods/`(.jar), `files/resourcepacks/`, `files/shaderpacks/`(.zip)에서 목록에 없는 유효한 파일(이름 규칙·크기 상한·ZIP 시그니처·심볼릭/하드 링크 거부·목록 개수 상한)을 목록 끝에 이름순으로 추가한다(모드는 `required`, 리소스/셰이더 팩은 `initial`). 잘못된 파일은 조용히 건너뛰고, 파일이 없는 기존 항목은 지우지 않으며, 이 추가만으로는 `dirty`가 되지 않는다.
 - **저장 (`save`)**: 대화상자 없이 현재 프로젝트 폴더의 `project.torchproj`에 직접 원자적으로 덮어쓴다.
-- **자동 저장**: 파일을 프로젝트 폴더에 넣는 명령(`settingsPackAdd`, `settingsPackRemove`(목록 항목과 `files/` 안의 파일을 함께 제거), Files 페이지 `files` 추가)이 성공하면 `save`와 같은 원자적 경로로 즉시 저장하고 `dirty: false`가 된다(다른 미저장 편집도 함께 저장). 자동 저장이 실패하면 변경은 메모리에 남고 `dirty`는 `true`로 유지되며 결과(`saveFailed` / `autosaveFailed`)로 알린다.
-- **다른 이름으로 저장 (`saveAs`)**: `new`와 같은 이름 입력·상위 폴더 선택으로 새 폴더를 만들고 `files/`와 `project.torchproj`를 전체 복사한 뒤 새 폴더로 전환한다. 원본과 같거나 포함 관계인 대상은 `INVALID`로 거부한다.
+- **자동 저장**: 파일을 프로젝트 폴더에 넣는 명령(`settingsPackAdd`, `settingsPackRemove`(목록 항목과 `files/` 안의 파일을 함께 제거), Files 페이지 `files` 추가, 브랜딩 이미지 선택)이 성공하면 `save`와 같은 원자적 경로로 즉시 저장하고 `dirty: false`가 된다(다른 미저장 편집도 함께 저장). 브랜딩 이미지는 별도 `branding/` 사본과 `project.torchproj` 내장 스냅샷을 함께 갱신한다. 자동 저장이 실패하면 변경은 메모리에 남고 `dirty`는 `true`로 유지되며 결과(`saveFailed` / `autosaveFailed`)로 알린다.
+- **다른 이름으로 저장 (`saveAs`)**: `new`와 같은 이름 입력·상위 폴더 선택으로 새 폴더를 만들고 `files/`, 존재하는 `branding/`, `project.torchproj`를 전체 복사한 뒤 새 폴더로 전환한다. 원본과 같거나 포함 관계인 대상은 `INVALID`로 거부한다.
 - **파일 추가**: 프로젝트 폴더 밖의 파일은 항상 `files/`로 안전하게 복사된다. 대상 경로에 이미 내용이 다른 파일이 존재할 경우 덮어쓰지 않고 `INVALID`로 거부된다.
 - **파일 항목 (`project.files`, 2026-10-25)**: 각 항목은 정확히 `path`, `targetPath`, `policy` 세 필드를 가진다.
   - `path`: `files/` 기준 원본 경로(페이로드를 읽는 곳). `targetPath`: 게임 폴더 기준 배포 경로로, 배포 인덱스의 `path`에 기록된다. 둘 다 배포 경로 규칙(코어 `validateDeploymentPath`: 상대·`/` 구분·`..`/빈 요소/제어 문자/`.torchlauncher` 금지 등)을 따르고 `targetPath`끼리는 대소문자를 무시하고 중복될 수 없다. 새로 추가한 파일은 `targetPath = path`, `policy = always`로 시작한다.
