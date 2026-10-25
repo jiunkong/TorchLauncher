@@ -9,8 +9,10 @@ import { ProjectNameDialog } from './components/ProjectNameDialog';
 import { Sidebar } from './components/Sidebar';
 import { Splash } from './components/Splash';
 import { UnsavedDialog } from './components/UnsavedDialog';
+import { updateStatus } from './components/updateStatus';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
 import { useStudio } from './hooks/useStudio';
+import { useUpdates } from './hooks/useUpdates';
 import { useStudioLocale } from './i18n';
 import { buildMenus, shortcutAction } from './menus';
 import { PageContent, type PageId } from './pages/Pages';
@@ -20,6 +22,26 @@ import { appReady } from './splash';
 export function App() {
   const { t, preference, setLocale, useAutomaticLocale: followSystem } = useStudioLocale();
   const rawStudio = useStudio();
+  const updates = useUpdates();
+  const [updateNotice, setUpdateNotice] = useState('');
+  const updateRequested = useRef(false);
+  const updateAction = (action: 'check' | 'download') => {
+    updateRequested.current = true;
+    setUpdateNotice('');
+    void updates.command({ action });
+  };
+  useEffect(() => {
+    const next = updates.state;
+    if (
+      !updateRequested.current ||
+      updates.pending ||
+      !next ||
+      ['idle', 'checking', 'downloading'].includes(next.phase)
+    )
+      return;
+    setUpdateNotice(updateStatus(t, next));
+    updateRequested.current = false;
+  }, [updates.state, updates.pending, t]);
   const [aboutOpen, setAboutOpen] = useState(false);
   const studio = rawStudio;
   const insights = deriveInsights(studio.state);
@@ -118,8 +140,18 @@ export function App() {
     language: (choice: Parameters<typeof setLocale>[0] | 'auto') =>
       choice === 'auto' ? followSystem() : setLocale(choice),
     about: () => setAboutOpen(true),
+    checkUpdates: () => updateAction('check'),
+    downloadUpdate: () => updateAction('download'),
   };
-  const menus = buildMenus({ t, hasProject, busy, preference, actions });
+  const menus = buildMenus({
+    t,
+    hasProject,
+    busy,
+    preference,
+    actions,
+    version: info?.version,
+    updates,
+  });
   // One shortcut listener: ignored while busy or a modal is open; text inputs keep working.
   const shortcutRef = useRef<(event: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (event) => {
@@ -159,6 +191,11 @@ export function App() {
           )}
           <div className="col">
             <main className="page" data-testid="page" data-page={draft ? page : 'start'}>
+              {updateNotice && (
+                <p className="note" role="status" data-testid="update-notice">
+                  {updateNotice}
+                </p>
+              )}
               {(message || busy) && (
                 <div className="notices">
                   {message && !busy && (

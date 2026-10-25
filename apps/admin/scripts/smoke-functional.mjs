@@ -1334,7 +1334,14 @@ try {
   assert.deepEqual(isolation, {
     require: false,
     process: false,
-    keys: ['getApplicationInfo', 'onCloseRequest', 'request'],
+    keys: [
+      'getApplicationInfo',
+      'getUpdateState',
+      'onCloseRequest',
+      'onUpdate',
+      'request',
+      'update',
+    ],
   });
   assert.deepEqual(errors, []);
 

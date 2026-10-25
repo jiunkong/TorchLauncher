@@ -20,6 +20,8 @@ const actions = () => ({
   exit: vi.fn(),
   language: vi.fn(),
   about: vi.fn(),
+  checkUpdates: vi.fn(),
+  downloadUpdate: vi.fn(),
 });
 const entries = (rows: ReturnType<typeof buildMenus>[number]['rows']) =>
   rows.filter((row): row is MenuEntry => 'id' in row);
@@ -119,3 +121,56 @@ describe('menu bar and about dialog markup', () => {
     expect(html).toContain('data-autofocus');
   });
 });
+
+it.each(['ko', 'en'] as const)(
+  'offers explicit Studio update actions and phase gating in %s',
+  (locale) => {
+    const translate = createTranslator(studioTranslations, locale);
+    const handlers = actions();
+    const buildHelp = (state: import('../../shared/updates').UpdateState | null, pending = false) =>
+      buildMenus({
+        t: translate,
+        hasProject: false,
+        busy: false,
+        preference: { mode: 'auto' },
+        actions: handlers,
+        version: '1.0.0',
+        updates: { state, pending },
+      })[2];
+    const get = (state: import('../../shared/updates').UpdateState | null, pending = false) =>
+      entries(buildHelp(state, pending)?.rows ?? []);
+    expect(handlers.checkUpdates).not.toHaveBeenCalled();
+    expect(buildHelp({ phase: 'idle' })?.rows[0]).toEqual({
+      caption: translate('help.version', { version: 'v1.0.0' }),
+    });
+    expect(get({ phase: 'idle' }).find((row) => row.id === 'check-updates')?.disabled).toBe(false);
+    expect(get({ phase: 'idle' }).find((row) => row.id === 'download-update')?.disabled).toBe(true);
+    const available = { phase: 'available', version: '2.0.0', size: 42 } as const;
+    const ready = get(available);
+    expect(ready.find((row) => row.id === 'download-update')?.disabled).toBe(false);
+    ready.find((row) => row.id === 'check-updates')?.onSelect();
+    ready.find((row) => row.id === 'download-update')?.onSelect();
+    expect(handlers.checkUpdates).toHaveBeenCalledOnce();
+    expect(handlers.downloadUpdate).toHaveBeenCalledOnce();
+    for (const state of [
+      null,
+      { phase: 'checking' },
+      { phase: 'downloading', received: 10 },
+    ] as const) {
+      expect(
+        get(state)
+          .filter((row) => row.id !== 'about')
+          .every((row) => row.disabled),
+      ).toBe(true);
+    }
+    expect(
+      get(available, true)
+        .filter((row) => row.id !== 'about')
+        .every((row) => row.disabled),
+    ).toBe(true);
+    expect(buildHelp({ phase: 'downloaded', version: '2.0.0', size: 42 })?.rows).toContainEqual({
+      caption: translate('help.downloaded', { version: '2.0.0' }),
+      status: true,
+    });
+  },
+);

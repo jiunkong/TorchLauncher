@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { vi } from 'vitest';
 import { launcherAssetName } from '../index.js';
 export const bytes = Buffer.from('MZ00 release fixture');
-export function metadata(version = '1.10.0') {
-  const name = launcherAssetName(version, 'windows');
+export function metadata(version = '1.10.0', application: 'launcher' | 'studio' = 'launcher') {
+  const name = launcherAssetName(version, 'windows', application);
   return {
     tag_name: `v${version}`,
     draft: false,

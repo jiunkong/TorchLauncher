@@ -10,7 +10,7 @@ export interface MenuEntry {
   radio?: boolean;
   onSelect(): void;
 }
-export type MenuRow = MenuEntry | { separator: true } | { caption: string };
+export type MenuRow = MenuEntry | { separator: true } | { caption: string; status?: boolean };
 export interface MenuDefinition {
   id: string;
   label: string;
@@ -163,7 +163,12 @@ export function MenuBar({ label, menus }: { label: string; menus: MenuDefinition
                     return <hr key={`s${menu.rows.indexOf(row)}`} className="mb-sep" />;
                   if ('caption' in row)
                     return (
-                      <div key={`c${row.caption}`} className="mb-cap" role="presentation">
+                      <div
+                        key={row.status ? 'update-status' : `c${row.caption}`}
+                        className={`mb-cap${row.status ? ' mb-status' : ''}`}
+                        role={row.status ? 'status' : 'presentation'}
+                        data-testid={row.status ? 'update-menu-status' : undefined}
+                      >
                         {row.caption}
                       </div>
                     );

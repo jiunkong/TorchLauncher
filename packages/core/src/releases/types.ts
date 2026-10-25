@@ -16,7 +16,9 @@ export class ReleaseFailure extends Error {
     super(code);
   }
 }
+export type ReleaseApplication = 'launcher' | 'studio';
 export interface ReleaseOptions {
+  application?: ReleaseApplication;
   cacheDir: string;
   repository?: string;
   fetch?: typeof fetch;

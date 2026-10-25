@@ -1,6 +1,8 @@
 import type { Locale, LocalePreference } from '@torchlauncher/core/i18n';
+import type { UpdateState } from '../../shared/updates';
 import { activeChoice, type LanguageChoice, languageChoices } from './components/LanguageControl';
 import type { MenuDefinition } from './components/MenuBar';
+import { updateStatus } from './components/updateStatus';
 import type { useStudioLocale } from './i18n';
 
 type Translator = ReturnType<typeof useStudioLocale>['t'];
@@ -15,6 +17,8 @@ export interface MenuActions {
   exit(): void;
   language(choice: LanguageChoice): void;
   about(): void;
+  checkUpdates(): void;
+  downloadUpdate(): void;
 }
 
 /** File / View / Help. Items that do not apply are disabled (aria-disabled), never hidden. */
@@ -24,9 +28,17 @@ export function buildMenus(options: {
   busy: boolean;
   preference: LocalePreference;
   actions: MenuActions;
+  version?: string | undefined;
+  updates?: { state: UpdateState | null; pending: boolean };
 }): MenuDefinition[] {
   const { t, hasProject, busy, preference, actions } = options;
   const active = activeChoice(preference);
+  const state = options.updates?.state;
+  const updating =
+    options.updates?.pending ||
+    !state ||
+    state.phase === 'checking' ||
+    state.phase === 'downloading';
   return [
     {
       id: 'file',
@@ -95,7 +107,28 @@ export function buildMenus(options: {
     {
       id: 'help',
       label: t('menu.help'),
-      rows: [{ id: 'about', label: t('menu.about'), onSelect: actions.about }],
+      rows: [
+        {
+          caption: t('help.version', {
+            version: options.version ? `v${options.version}` : t('help.versionUnknown'),
+          }),
+        },
+        {
+          id: 'check-updates',
+          label: t('help.check'),
+          disabled: !!updating || (state?.phase === 'error' && state.code === 'UNSUPPORTED_TARGET'),
+          onSelect: () => actions.checkUpdates(),
+        },
+        {
+          id: 'download-update',
+          label: t('help.update'),
+          disabled: !!updating || state?.phase !== 'available',
+          onSelect: () => actions.downloadUpdate(),
+        },
+        ...(state ? [{ caption: updateStatus(t, state), status: true }] : []),
+        { separator: true },
+        { id: 'about', label: t('menu.about'), onSelect: actions.about },
+      ],
     },
   ];
 }

@@ -54,7 +54,10 @@ GitHub Releases에 올라가며 Git 소스 커밋에는 포함되지 않는다.
 저장소 기본 `GITHUB_TOKEN`을 사용하므로 별도 PAT나 코드 서명 인증서는 요구하지 않는다.
 저장소/조직 정책에서 Actions의 해당 권한 사용을 허용해야 한다.
 
-Studio의 릴리스 다운로드는 같은 저장소의 안정 릴리스와 위 런처 이름을 사용한다.
+Studio의 런처 내보내기는 같은 저장소의 안정 릴리스와 위 런처 이름을 사용한다.
+Studio 도움말의 최신 버전 확인·업데이트는 `TorchLauncher Studio-` 이름의 현재 OS용 산출물을 사용한다.
+시작 및 메뉴 열기는 네트워크를 사용하지 않으며, 업데이트는 검증된 다운로드까지만 수행한다.
+실행 파일 교체·설치·재시작은 수행하지 않는다.
 Studio의 GitHub 계정 연동은 없으므로 배포 시 해당 저장소/릴리스가 인증 없이 접근 가능해야 한다.
 GitHub가 제공하는 asset `digest`를 무결성 검사에 사용한다.
 
@@ -73,6 +76,6 @@ GitHub가 제공하는 asset `digest`를 무결성 검사에 사용한다.
 [gh release edit](https://cli.github.com/manual/gh_release_edit),
 [GitHub asset digest](https://docs.github.com/en/rest/releases/assets).
 
-공유 다운로드 모듈과 아직 UI에 연결되지 않은 런처 업데이트 백엔드의 범위는
+공유 다운로드 모듈과 런처·Studio 도움말 업데이트의 범위는
 [런처 릴리스 다운로드](launcher-updates.md)를 참고한다. 현재 GitHub digest 검증은
 독립 게시자 서명 검증을 대신하지 않으며 실행 파일 교체·설치는 구현하지 않는다.

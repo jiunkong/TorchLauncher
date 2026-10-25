@@ -3,6 +3,7 @@ import type {
   DeploymentFilePolicy,
   DeploymentGame,
 } from '../../../../packages/core/src/deployment/contracts/index.js';
+import type { UpdateApi } from './updates';
 export const studioChannel = 'studio:request';
 /** Main -> renderer event: the window is closing with unsaved changes; the renderer must answer with `closeConfirm` or `closeCancel`. */
 export const studioCloseChannel = 'studio:close-request';
@@ -593,7 +594,7 @@ export type StudioReply =
       detail?: { code: StudioTestSettingsError };
       image?: StudioImageFailure;
     };
-export interface StudioApi extends DesktopApi {
+export interface StudioApi extends DesktopApi, UpdateApi {
   request(command: StudioRequest): Promise<StudioReply>;
   /** Subscribes to window-close requests while the project has unsaved changes. Returns an unsubscribe function. */
   onCloseRequest(listener: () => void): () => void;

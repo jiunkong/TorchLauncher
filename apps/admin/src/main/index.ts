@@ -24,6 +24,8 @@ import { createStudioNativeDialogs } from './native-dialogs.js';
 import { SigningKeyStore } from './signing.js';
 import { StudioService } from './studio.js';
 import { createStudioTestRunner } from './test-auth.js';
+import { bindUpdateIpc } from './updates/ipc';
+import { createUpdateService } from './updates/service';
 
 const applicationName = applicationNames.studio;
 let mainLocale = resolveMainLocale(app.getLocale());
@@ -76,6 +78,15 @@ function createWindow(): void {
     }),
     rasterNativeImage,
   );
+  const updates = createUpdateService({
+    cacheDir: join(app.getPath('userData'), 'studio-updates'),
+    currentVersion: app.getVersion(),
+  });
+  const unbindUpdates = bindUpdateIpc(ipcMain, window, rendererUrl, updates);
+  const destroyAfterUpdates = async () => {
+    await updates.close();
+    if (!window.isDestroyed()) window.destroy();
+  };
   ipcMain.removeHandler(studioChannel);
   ipcMain.handle(studioChannel, (event, input: unknown) =>
     handleStudioRequest(event, window.webContents, rendererUrl, service, input, (locale) => {
@@ -115,7 +126,7 @@ function createWindow(): void {
   service.onCloseAnswer({
     confirm: () => {
       settle();
-      window.destroy();
+      void destroyAfterUpdates();
     },
     cancel: () => {
       settle();
@@ -131,8 +142,7 @@ function createWindow(): void {
       .close()
       .then(() => {
         if (service.beginClose()) {
-          window.destroy();
-          return;
+          return destroyAfterUpdates();
         }
         // The renderer shows its own confirmation. No answer in time keeps the window open:
         // unsaved work is never discarded on a timeout.
@@ -146,6 +156,8 @@ function createWindow(): void {
       });
   });
   window.once('closed', () => {
+    unbindUpdates();
+    void updates.close();
     ipcMain.removeHandler(applicationInfoChannel);
     ipcMain.removeHandler(studioChannel);
   });
