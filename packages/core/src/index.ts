@@ -5,3 +5,5 @@ export type LoaderKind = (typeof supportedLoaders)[number];
 
 export * as diagnostics from './diagnostics/index.js';
 export * as testInstance from './instance/test-instance/index.js';
+
+export * as releases from './releases/index.js';

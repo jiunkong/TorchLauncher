@@ -90,6 +90,9 @@ const appCases = [
       ['로그', '로그'],
     ],
     expectedBridge: [
+      'getUpdateState',
+      'update',
+      'onUpdate',
       'getApplicationInfo',
       'getBranding',
       'onBranding',

@@ -102,3 +102,10 @@ export const CopyIcon = () => (
     <path d="M5 15V6a2 2 0 0 1 2-2h8" />
   </Svg>
 );
+
+export const HelpIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 17h.01" />
+  </Svg>
+);

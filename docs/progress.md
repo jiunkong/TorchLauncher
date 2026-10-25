@@ -7,6 +7,52 @@
 
 ## 현재 상태와 다음 작업
 
+### RELEASE-MENUBAR-01 · 사용자 정정에 따른 상단 메뉴 수정·검토 완료 (2026-10-26, 기능 브랜치)
+
+사용자는 도움말 페이지를 원한 것이 아니라 Studio처럼 상단 메뉴를 원했다고 정정했다. 아래 RELEASE-UI-01의 도움말 페이지 설계는 취소한다.
+`feat/launcher-release-download`(baseline `95b6eb2`)에서 작업자 `launcher_menubar`(gpt-6-luna medium)의 `20e085c`를 #0이 검토했다. main 병합/push 없음.
+- 별도 도움말 페이지/사이드바 항목을 삭제하고 36px 제목 표시줄 아래에 Studio 패턴의 32px 앱 내 상단 메뉴를 추가했다.
+  **보기 → 언어**(시스템 기본값·한국어·English), **도움말 → 현재 버전·최신 버전 확인·업데이트**를 제공한다.
+  언어 설정은 Settings 카드에서 이동하고 기존 locale 저장/자동 선택·main 언어 동기화, 업데이트 IPC/backend를 재사용했다.
+- 메뉴 열림은 네트워크를 요청하지 않는다. 명시적인 확인/다운로드 결과는 메뉴 상태와 기존 toast로 표시하며 빠른 결과의 React batching도 요청 flag로 처리한다.
+  중복 작업/미지원 기기/초기 상태를 비활성화하고 기존 오류 구분을 공통 formatter로 유지했다. 실제 교체 기능은 추가하지 않았다.
+- 제목 표시줄 드래그·native overlay 유지, 메뉴 높이를 반영한 본문 flex 레이아웃, splash/모달 inert(로그아웃 포함), 키보드·바깥 클릭 동작을 구현했다.
+  smoke 선택자를 상단 메뉴로 바꾸고 제품 설명을 갱신했다.
+- 작업자 검증: 집중 Vitest 4 files/**7 passed**, 런처 main/renderer 타입·build, 관련 smoke 3개 `node --check`, scoped Biome 오류0(기존 CSS 경고8), diff check 성공.
+  #0은 코드/선택자/문서/인계를 검토했다. GUI 권한을 재요청하지 않아 Electron smoke·화면 캡처·760/1100 실제 배치·native·실제 GitHub는 계속 미검증이다.
+  로컬 인계 `docs/handoffs/RELEASE-MENUBAR-01.md`. 아래 별도 도움말 페이지 기록은 취소된 과거 설계다.
+
+### RELEASE-UI-01 · 런처 도움말의 업데이트 버튼 구현·검토 완료 (2026-10-25, 기능 브랜치)
+
+사용자 요청으로 `feat/launcher-release-download`에서 작업자 `release_download`의 `5796376`을 #0이 검토했다(baseline `9b22dd6`). main 병합/push 없음.
+- 사이드 메뉴에 도움말 페이지를 추가하고 현재 버전·`최신 버전 확인`/`업데이트` 두 버튼과 ko/en 상태/받은 바이트를 표시한다.
+  시작/도움말 진입은 로컬 상태만 읽고, 클릭 때만 네트워크를 요청한다. 새 버전 확인 후에만 다운로드 버튼을 활성화한다.
+- shared 상태·preload·신뢰된 main-frame IPC를 연결했다. 정확한 check/download 명령만 받고 경로·URL·저장소·버전 입력/원본 오류를 노출하지 않는다.
+  중복 요청 차단, 이벤트 구독 정리, 미지원 기기의 안전한 상태, 종료 때 취소+staging 정리 대기를 구현했다.
+  React StrictMode의 오래된 초기 응답이 최신 이벤트를 덮지 않도록 effect 수명을 분리했다.
+- 작업자 검증: 집중 Vitest 9 files/**95 passed**(공통/기존 Studio 회귀·backend/IPC/service·Help/hook/i18n/menu), workspace 타입 전체,
+  런처 main/preload/renderer build, 변경 TS/JS 20 files Biome 오류/경고0. 기존 CSS 경고8은 유지한다. 마지막 기기 안내 문구 수정은 정적 검사만 수행했다.
+  #0은 코드·문서·검증 인계와 `git diff --check 9b22dd6..5796376`을 검토했다.
+- Electron 모의 화면 smoke는 GUI 실행 승인이 부여되지 않아 **미실행**이다. 스크립트는 작성/정적 검사됐지만 760/1100 배치·화면 캡처·실제 버튼/이벤트 동작을 검증한 증거는 없다.
+  실제 GitHub 릴리스가 없어 실제 수급도 미검증이다. 다운로드 완료만 표시하며 독립 서명 검증·실행 파일 교체·재시작은 계속 후속이다.
+  인계: 로컬 `docs/handoffs/RELEASE-UI-01.md`, 모의 화면 검사 명령 `node apps/launcher/scripts/updates-smoke.mjs`(실행 시 GUI 권한 필요).
+
+### RELEASE-DOWNLOAD-01 · 공통 런처 다운로드 구현·검토 완료 (2026-10-25, 기능 브랜치)
+
+사용자 요청으로 새 `feat/launcher-release-download` 브랜치에서 작업한다(baseline `5a249af`).
+작업자 `release_download`(gpt-6.1-sol medium) `588f887`을 #0이 검토했다. main 병합·push 없이 기능 브랜치에 남긴다.
+- 최신 안정 릴리스 조회·검증·다운로드·캐시를 Electron 없는 `core/releases`로 분리하고 Studio resolver를 adapter로 교체했다.
+  Studio의 개발 로컬 파일·검증된 온라인 캐시·정확한 버전의 오프라인 캐시 사용 동의·오류/상태 계약은 유지한다.
+- 런처에 미연결 `main/updates` backend를 추가했다. 확인은 metadata만 조회하고 다운로드 시 최신 정보를 다시 확인해 현재 버전보다 높은 안정판만 받는다.
+  진행·취소·이전 작업 무효화·경로/URL 없는 상태 snapshot을 제공하며 오프라인 캐시를 업데이트 성공으로 취급하지 않는다.
+- stream까지 적용되는 120초 deadline, 크기·SHA-256·헤더 검사, immutable generation/원자적 포인터, 취소/실패 정리,
+  symlink·hardlink·FIFO 차단을 확인했다. 숫자 버전 비교와 잘못된 stable 태그/후행 공백 거부를 테스트했다.
+- 작업자 검증: 집중 Vitest 3 files/**58 passed**(공통19/런처7/기존 Studio32), workspace 타입 전체, scoped Biome 오류/경고0, 두 앱 build 성공.
+  #0은 공통 경계·adapter·backend·제품 문서의 diff 검토와 `git diff --check`를 완료했다. 깨끗한 기능 브랜치의 테스트/빌드는 중복 실행하지 않았다.
+- 한계/후속: 현재 검증 기준은 GitHub API size/digest다. 실행 파일 교체 전 독립 게시자 서명 검증이 필요하다.
+  실제 교체·재시작, native Windows·실제 GitHub 다운로드는 미구현 또는 미검증이며 RELEASE-02 전체 완료가 아니다. IPC/도움말 UI 후속은 위 RELEASE-UI-01을 따른다.
+  성공한 캐시 generation 자동 정리는 후속이다. 제품 설명 [런처 다운로드](launcher-updates.md), 로컬 인계 `docs/handoffs/RELEASE-DOWNLOAD-01.md`.
+
 ### STUDIO-BRANDING-IMAGE-01 통합 (2026-10-25)
 
 사용자 보고: 브랜딩 이미지 불러오기가 일반 문구("입력값이나 선택한 경로를 확인하세요")만 내고 실패, PNG만 선택되는 듯함. 원인(코드 조사): 아이콘 PNG ≤512px/1 MiB,
@@ -23,7 +69,6 @@ Sonnet `c216288` → main `0ffc568`(작업자 기준 `5a249af` = 병합 당시 m
   #0은 새 검증 기준(깨끗한 병합은 재실행 안 함)에 따라 main 재검증을 생략했다. 푸시 후 CI가 넓은 검증을 맡는다.
 - 한계: Windows/Windows Electron 디코더 미검증, 아이콘 1 MiB 한도 분기는 가짜 처리기 단위 테스트로만 확인, 자동 저장 실패 시 구조화된 원인 대신 기존 `autosaveFailed`, EXIF 방향 미처리, 미리보기는 기본 아트워크 그대로.
 - 후속(착수 안 함): 실패 원인 표시를 Studio 전체로 확장하는 [STUDIO-ERROR-REASONS-01](studio-error-reasons-task.md)(로컬 문서). 런처 포함 여부는 사용자 결정 대기.
-
 ### STUDIO-BRANDING-AUTOSAVE · SERVER-MEMORY-01 통합 (2026-10-25)
 
 - 브랜딩 이미지 저장 `606a4df` → main `3c3c8ff`: 이미지 선택 시 검증된 원본을 `<프로젝트>/branding/`에 원자적으로 복사하고 프로젝트를 자동 저장한다(`project.torchproj`의 내장 스냅샷은 유지).

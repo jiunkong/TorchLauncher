@@ -27,6 +27,8 @@ import { openServerDeployment } from './product/deployment-trust';
 import { bindProductIpc } from './product/ipc';
 import { ProductService } from './product/service';
 import { createPlayerSkinService } from './skins';
+import { bindUpdateIpc } from './updates/ipc';
+import { createUpdateService, type UpdateService } from './updates/service';
 
 const applicationName = applicationNames.launcher;
 let mainLocale = resolveMainLocale(app.getLocale());
@@ -35,6 +37,7 @@ const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 
 let product: ProductService | undefined;
+let updates: UpdateService | undefined;
 let branding: BrandingService | undefined;
 let mainWindow: BrowserWindow | undefined;
 let shutdownFinished = false;
@@ -69,6 +72,7 @@ function createWindow(): void {
 
   mainWindow = window;
   window.on('page-title-updated', (event) => event.preventDefault());
+  const unbindUpdates = updates ? bindUpdateIpc(ipcMain, window, rendererUrl, updates) : () => {};
   const unbindBranding = branding
     ? bindBrandingIpc(ipcMain, window, rendererUrl, branding)
     : () => {};
@@ -120,6 +124,7 @@ function createWindow(): void {
   window.once('closed', () => {
     unbind();
     unbindBranding();
+    unbindUpdates();
     ipcMain.removeHandler(applicationInfoChannel);
     mainWindow = undefined;
   });
@@ -138,9 +143,11 @@ app.on('before-quit', (event) => {
   if (shutdownFinished) return;
   event.preventDefault();
   shutdown ??= (async () => {
+    const updatesClosed = updates?.close();
     const brandingClosed = branding?.close();
     await product?.close();
     await brandingClosed;
+    await updatesClosed;
     shutdownFinished = true;
     app.quit();
   })();
@@ -214,6 +221,10 @@ if (primaryInstance)
         if (mainWindow && !mainWindow.isDestroyed())
           mainWindow.webContents.send(productStateChannel, state);
       },
+    });
+    updates = createUpdateService({
+      currentVersion: app.getVersion(),
+      cacheDir: join(app.getPath('userData'), 'launcher-releases'),
     });
     createWindow();
     branding.start();

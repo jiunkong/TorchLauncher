@@ -72,3 +72,7 @@ GitHub가 제공하는 asset `digest`를 무결성 검사에 사용한다.
 [gh release create](https://cli.github.com/manual/gh_release_create),
 [gh release edit](https://cli.github.com/manual/gh_release_edit),
 [GitHub asset digest](https://docs.github.com/en/rest/releases/assets).
+
+공유 다운로드 모듈과 아직 UI에 연결되지 않은 런처 업데이트 백엔드의 범위는
+[런처 릴리스 다운로드](launcher-updates.md)를 참고한다. 현재 GitHub digest 검증은
+독립 게시자 서명 검증을 대신하지 않으며 실행 파일 교체·설치는 구현하지 않는다.
