@@ -7,6 +7,21 @@
 
 ## 현재 상태와 다음 작업
 
+### RELEASE-UI-01 · 런처 도움말의 업데이트 버튼 구현·검토 완료 (2026-10-25, 기능 브랜치)
+
+사용자 요청으로 `feat/launcher-release-download`에서 작업자 `release_download`의 `5796376`을 #0이 검토했다(baseline `9b22dd6`). main 병합/push 없음.
+- 사이드 메뉴에 도움말 페이지를 추가하고 현재 버전·`최신 버전 확인`/`업데이트` 두 버튼과 ko/en 상태/받은 바이트를 표시한다.
+  시작/도움말 진입은 로컬 상태만 읽고, 클릭 때만 네트워크를 요청한다. 새 버전 확인 후에만 다운로드 버튼을 활성화한다.
+- shared 상태·preload·신뢰된 main-frame IPC를 연결했다. 정확한 check/download 명령만 받고 경로·URL·저장소·버전 입력/원본 오류를 노출하지 않는다.
+  중복 요청 차단, 이벤트 구독 정리, 미지원 기기의 안전한 상태, 종료 때 취소+staging 정리 대기를 구현했다.
+  React StrictMode의 오래된 초기 응답이 최신 이벤트를 덮지 않도록 effect 수명을 분리했다.
+- 작업자 검증: 집중 Vitest 9 files/**95 passed**(공통/기존 Studio 회귀·backend/IPC/service·Help/hook/i18n/menu), workspace 타입 전체,
+  런처 main/preload/renderer build, 변경 TS/JS 20 files Biome 오류/경고0. 기존 CSS 경고8은 유지한다. 마지막 기기 안내 문구 수정은 정적 검사만 수행했다.
+  #0은 코드·문서·검증 인계와 `git diff --check 9b22dd6..5796376`을 검토했다.
+- Electron 모의 화면 smoke는 GUI 실행 승인이 부여되지 않아 **미실행**이다. 스크립트는 작성/정적 검사됐지만 760/1100 배치·화면 캡처·실제 버튼/이벤트 동작을 검증한 증거는 없다.
+  실제 GitHub 릴리스가 없어 실제 수급도 미검증이다. 다운로드 완료만 표시하며 독립 서명 검증·실행 파일 교체·재시작은 계속 후속이다.
+  인계: 로컬 `docs/handoffs/RELEASE-UI-01.md`, 모의 화면 검사 명령 `node apps/launcher/scripts/updates-smoke.mjs`(실행 시 GUI 권한 필요).
+
 ### RELEASE-DOWNLOAD-01 · 공통 런처 다운로드 구현·검토 완료 (2026-10-25, 기능 브랜치)
 
 사용자 요청으로 새 `feat/launcher-release-download` 브랜치에서 작업한다(baseline `5a249af`).
@@ -20,7 +35,7 @@
 - 작업자 검증: 집중 Vitest 3 files/**58 passed**(공통19/런처7/기존 Studio32), workspace 타입 전체, scoped Biome 오류/경고0, 두 앱 build 성공.
   #0은 공통 경계·adapter·backend·제품 문서의 diff 검토와 `git diff --check`를 완료했다. 깨끗한 기능 브랜치의 테스트/빌드는 중복 실행하지 않았다.
 - 한계/후속: 현재 검증 기준은 GitHub API size/digest다. 실행 파일 교체 전 독립 게시자 서명 검증이 필요하다.
-  실제 교체·재시작·시작/IPC/UI 연결, native Windows·실제 GitHub 다운로드는 미구현 또는 미검증이며 RELEASE-02 전체 완료가 아니다.
+  실제 교체·재시작, native Windows·실제 GitHub 다운로드는 미구현 또는 미검증이며 RELEASE-02 전체 완료가 아니다. IPC/도움말 UI 후속은 위 RELEASE-UI-01을 따른다.
   성공한 캐시 generation 자동 정리는 후속이다. 제품 설명 [런처 다운로드](launcher-updates.md), 로컬 인계 `docs/handoffs/RELEASE-DOWNLOAD-01.md`.
 
 ### STUDIO-BRANDING-AUTOSAVE · SERVER-MEMORY-01 통합 (2026-10-25)
