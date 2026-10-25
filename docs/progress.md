@@ -7,6 +7,17 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-PACK-NAMES-01 통합 (2026-10-25)
+
+사용자 보고: `Icon Xaero's 1.22.zip`, `NewGlowingOres-§6[Border]§r.zip` 추가가 건너뛰어짐. 원인은 Studio `validatePackName`이 글자·숫자·공백·`_.()+-[]`만 허용해
+`'`와 `§`를 거부한 것(배포 경로 규칙은 허용). Sonnet 작업자 `0d74511` → main `4136ffc`.
+- 이름 규칙은 core `validateDeploymentPath`/`DEPLOYMENT_LIMITS.pathComponentLength`를 재사용(별도 정규식 없음)하고 확장자, `/`·`..`, 앞 공백/점, 확장자 앞 공백, 120바이트 상한을 추가로 검사한다.
+  열기 때 자동 등록(`discoverPacks`)도 같은 규칙을 쓴다. 정책 생성의 `file/<이름>`은 특수 이름으로 core `parseSettingsPolicy` 통과를 테스트했다.
+- 건너뜀 사유 분리: bad-name, name-too-long, bad-type, too-large, duplicate, conflict, limit, failed. `PackFailure`(project.ts)가 사유를 직접 전달한다.
+- main 검증: `pnpm check` 119 files/**1578 passed**(9 skip), 공통 smoke, Studio 기능 smoke, branding smoke 성공.
+- **알려진 한계:** 셰이더 설정에서 선택한 팩 이름이 비ASCII(`§`, 한글 등)이면 `.properties`에 쓰는 shaderPack 값이 core `validConfigValue`(출력 가능 ASCII만, Java ISO-8859-1)에 걸려 정책 생성이 실패할 수 있다. 이번 변경 전의 한글 이름도 같았다. 리소스팩·모드는 영향 없음. 미검증이며 core 변경이 필요하므로 별도 결정 대기.
+- 120바이트 상한은 그대로라 한글 100자 이름은 name-too-long.
+
 ### STUDIO-AUTOSAVE-FILES-01 통합 (2026-10-25)
 
 사용자 보고: 모드를 추가한 뒤 저장 없이 Studio를 닫았다 열면 `files/mods/`에 파일은 있는데 목록이 비어 있음(추가 후 저장→재열기는 정상 재현 확인).
