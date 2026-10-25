@@ -16,6 +16,11 @@ import { systemProcessProbe } from '../../../../../packages/core/src/minecraft/i
 import { parseServerConfig } from '../../../../../packages/core/src/server-config/index';
 import { type ProductHost, ProductService, safeProductError } from './service';
 
+// vi.waitFor defaults to a 1 s budget; Windows runners (process probes, file locking) need more.
+// Polling stops as soon as the condition holds, so the larger bound costs nothing when it passes.
+const waitFor = (callback: () => unknown) =>
+  vi.waitFor(callback, { timeout: 20_000, interval: 25 });
+
 const roots: string[] = [];
 afterEach(async () => {
   await cleanTemporary();
@@ -496,7 +501,7 @@ it('keeps cosmetic skin work off the authentication path and invalidates stale r
   await Promise.resolve();
   expect(service.snapshot().account?.skin).toBeUndefined();
   completions[1]?.('current');
-  await vi.waitFor(() => expect(service.snapshot().account?.skin).toBe('current'));
+  await waitFor(() => expect(service.snapshot().account?.skin).toBe('current'));
   await service.command({ type: 'login' });
   await service.command({ type: 'logout' });
   completions[2]?.('late');

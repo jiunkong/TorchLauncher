@@ -11,6 +11,11 @@ import {
 import { launchDeployment } from '../../../../../packages/core/src/loaders/launch-gate';
 import { ProductService } from './service';
 
+// vi.waitFor defaults to a 1 s budget; Windows runners (process probes, file locking) need more.
+// Polling stops as soon as the condition holds, so the larger bound costs nothing when it passes.
+const waitFor = (callback: () => unknown) =>
+  vi.waitFor(callback, { timeout: 20_000, interval: 25 });
+
 vi.mock('../../../../../packages/core/src/loaders/launch-gate', () => ({
   launchDeployment: vi.fn(),
 }));
@@ -105,7 +110,7 @@ it('holds product ownership through game reaping and applies policy before handi
   });
   const launch = service.command({ type: 'launch' });
   await running;
-  await vi.waitFor(() => expect(service.snapshot().running).toBe(true));
+  await waitFor(() => expect(service.snapshot().running).toBe(true));
   expect(service.snapshot().operation).toBe('launch');
   expect((await service.command({ type: 'open-logs' })).ok).toBe(true);
   expect(openLogs).toHaveBeenCalledWith(join(root, 'logs'));

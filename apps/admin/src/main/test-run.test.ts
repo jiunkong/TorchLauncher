@@ -16,6 +16,11 @@ import { PROJECT_DATA_DIR } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 import { StudioTestRunner, TEST_LOG_LIMIT, type TestRunHost } from './test-run.js';
 
+// vi.waitFor defaults to a 1 s budget; Windows runners (process probes, file locking) need more.
+// Polling stops as soon as the condition holds, so the larger bound costs nothing when it passes.
+const waitFor = (callback: () => unknown) =>
+  vi.waitFor(callback, { timeout: 20_000, interval: 25 });
+
 const roots: string[] = [];
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -269,7 +274,7 @@ it('cancels installation and forbids process spawn or reset while preparation is
       ),
   );
   const pending = h.service.request({ action: 'testStart' });
-  await vi.waitFor(() => expect(h.install).toHaveBeenCalledOnce());
+  await waitFor(() => expect(h.install).toHaveBeenCalledOnce());
   expect(await h.service.request({ action: 'testReset', confirmed: true })).toEqual({
     ok: false,
     code: 'BUSY',
@@ -286,8 +291,8 @@ it('stops and awaits the managed child on close, and bounds sanitized live logs'
     text: `${i} ${account.accessToken} ${account.profile.name}`,
   }));
   const pending = h.service.request({ action: 'testStart' });
-  await vi.waitFor(() => expect(h.runner.state.phase).toBe('running'));
-  await vi.waitFor(() => expect(h.runner.state.logs).toHaveLength(TEST_LOG_LIMIT));
+  await waitFor(() => expect(h.runner.state.phase).toBe('running'));
+  await waitFor(() => expect(h.runner.state.logs).toHaveLength(TEST_LOG_LIMIT));
   expect(JSON.stringify(h.runner.state.logs)).not.toContain(account.accessToken);
   await h.service.close();
   expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
@@ -307,7 +312,7 @@ it('logs out during an interactive attempt, waits cancellation, and keeps render
       ),
   );
   const pending = h.service.request({ action: 'testLogin' });
-  await vi.waitFor(() => expect(h.auth.login).toHaveBeenCalledOnce());
+  await waitFor(() => expect(h.auth.login).toHaveBeenCalledOnce());
   expect(await h.service.request({ action: 'testLogout' })).toMatchObject({
     ok: true,
     state: { account: { signedIn: false } },
@@ -396,7 +401,7 @@ it.skipIf(process.platform === 'win32')('refuses reset through an instance symli
 it('finishes analysis after a requested normal stop and clears old results on project replacement', async () => {
   const h = await setup();
   const pending = h.service.request({ action: 'testStart' });
-  await vi.waitFor(() => expect(h.runner.state.phase).toBe('running'));
+  await waitFor(() => expect(h.runner.state.phase).toBe('running'));
   expect(await h.service.request({ action: 'testStop' })).toMatchObject({ ok: true });
   expect(await pending).toMatchObject({ ok: true });
   expect(h.runner.state).toMatchObject({ phase: 'done', exit: { reason: 'stopped' }, error: null });
@@ -431,7 +436,7 @@ it('redacts token fields even when the account name is itself a token-field name
   h.auth.refresh.mockResolvedValue(identity);
   h.logs.entries = [{ stream: 'stdout', text: 'access_token=synthetic-other-secret' }];
   const pending = h.service.request({ action: 'testStart' });
-  await vi.waitFor(() => expect(h.runner.state.phase).toBe('running'));
+  await waitFor(() => expect(h.runner.state.phase).toBe('running'));
   await h.service.request({ action: 'testStop' });
   await pending;
   expect(JSON.stringify(h.runner.state)).not.toContain('synthetic-other-secret');
@@ -657,7 +662,7 @@ it('publishes the device code in state only while the login waits', async () => 
   expect(h.service.snapshot().account.login).toBeNull();
   pendingLogin(h, 'abort');
   const pending = h.service.request({ action: 'testLogin' });
-  await vi.waitFor(() => expect(h.service.snapshot().account.login).toEqual({ code: loginCode }));
+  await waitFor(() => expect(h.service.snapshot().account.login).toEqual({ code: loginCode }));
   expect(await h.service.request({ action: 'cancel' })).toMatchObject({ ok: true });
   expect(await pending).toEqual({ ok: false, code: 'CANCELLED' });
   expect(h.service.snapshot().account.login).toBeNull();
@@ -674,7 +679,7 @@ it('clears the published code after success, failure and logout', async () => {
   expect(h.service.snapshot().account.login).toBeNull();
   pendingLogin(h, 'abort');
   const pending = h.service.request({ action: 'testLogin' });
-  await vi.waitFor(() => expect(h.service.snapshot().account.login).not.toBeNull());
+  await waitFor(() => expect(h.service.snapshot().account.login).not.toBeNull());
   await h.service.request({ action: 'testLogout' });
   await pending;
   expect(h.service.snapshot().account.login).toBeNull();
@@ -689,7 +694,7 @@ it('copies the pending code through main and rejects when none is waiting', asyn
   expect(h.dialogs.copy).not.toHaveBeenCalled();
   pendingLogin(h, 'abort');
   const pending = h.service.request({ action: 'testLogin' });
-  await vi.waitFor(() => expect(h.service.snapshot().account.login).not.toBeNull());
+  await waitFor(() => expect(h.service.snapshot().account.login).not.toBeNull());
   for (const extra of [{ code: loginCode }, { text: 'x' }])
     expect(await h.service.request({ action: 'testLoginCopyCode', ...extra })).toEqual({
       ok: false,
@@ -729,7 +734,7 @@ it('closes the project for real: UNSAVED rule, full reset, no file or instance c
   const h = await setup();
   // A finished test run leaves results behind.
   const pending = h.service.request({ action: 'testStart' });
-  await vi.waitFor(() => expect(h.runner.state.phase).toBe('running'));
+  await waitFor(() => expect(h.runner.state.phase).toBe('running'));
   await h.service.request({ action: 'testStop' });
   await pending;
   expect(h.runner.state.phase).toBe('done');

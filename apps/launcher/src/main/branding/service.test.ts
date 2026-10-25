@@ -9,6 +9,11 @@ import type { ServerConfig } from '../../../../../packages/core/src/server-confi
 import { readBrandingFile } from './files';
 import { type BrandingOptions, BrandingService, brandingFingerprint } from './service';
 
+// vi.waitFor defaults to a 1 s budget; Windows runners (process probes, file locking) need more.
+// Polling stops as soon as the condition holds, so the larger bound costs nothing when it passes.
+const waitFor = (callback: () => unknown) =>
+  vi.waitFor(callback, { timeout: 20_000, interval: 25 });
+
 const roots: string[] = [];
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -182,7 +187,7 @@ describe('hybrid branding service', () => {
     );
     const service = new BrandingService(f.options);
     service.start();
-    await vi.waitFor(() => expect(f.options.openReader).toHaveBeenCalled());
+    await waitFor(() => expect(f.options.openReader).toHaveBeenCalled());
     const stale = reader(f.config, { icon: null });
     const current = reader(f.config, { background: descriptor() });
     let finishStage: () => void = () => {};
@@ -194,7 +199,7 @@ describe('hybrid branding service', () => {
       return { role, outputPath: path, length: png.length, sha256: hash(png) };
     });
     service.observe(current);
-    await vi.waitFor(() => expect(current.stageBrandingAsset).toHaveBeenCalled());
+    await waitFor(() => expect(current.stageBrandingAsset).toHaveBeenCalled());
     finishOpen(stale);
     await service.close();
     const before = service.snapshot();
@@ -262,7 +267,7 @@ it('reserves startup generation before delayed initialization so observe superse
   const f = await fixture();
   const service = new BrandingService(f.options);
   service.start();
-  await vi.waitFor(() => expect(read).toHaveBeenCalled());
+  await waitFor(() => expect(read).toHaveBeenCalled());
   const remote = reader(f.config, { icon: null });
   service.observe(remote);
   release();

@@ -1,6 +1,6 @@
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { readServerConfig, serverConfigPath } from './bootstrap';
 
@@ -24,22 +24,22 @@ it('resolves trusted packaged portable locations and development overrides', () 
     executable: '/binary/launcher',
     environment: {},
   };
-  expect(serverConfigPath(base)).toBe('/binary/torchlauncher-server.json');
+  expect(serverConfigPath(base)).toBe(join('/binary', 'torchlauncher-server.json'));
   expect(
     serverConfigPath({
       ...base,
       environment: { PORTABLE_EXECUTABLE_DIR: '/portable', APPIMAGE: '/image/launcher' },
     }),
-  ).toBe('/portable/torchlauncher-server.json');
+  ).toBe(join('/portable', 'torchlauncher-server.json'));
   expect(serverConfigPath({ ...base, environment: { APPIMAGE: '/image/launcher' } })).toBe(
-    '/image/torchlauncher-server.json',
+    join('/image', 'torchlauncher-server.json'),
   );
   expect(serverConfigPath({ ...base, packaged: false })).toBe(
-    '/application/torchlauncher-server.json',
+    join('/application', 'torchlauncher-server.json'),
   );
   expect(
     serverConfigPath({ ...base, environment: { TORCH_SERVER_CONFIG: '/override.json' } }),
-  ).toBe('/override.json');
+  ).toBe(resolve('/override.json'));
 });
 it('reads the bounded real config and rejects oversized/malformed/link files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'launcher-config-'));
