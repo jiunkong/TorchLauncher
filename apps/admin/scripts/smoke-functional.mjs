@@ -702,10 +702,10 @@ try {
   await goto('모드');
   await page.getByTestId('pack-add').click();
   await page.getByTestId('mod-row').filter({ hasText: 'example-mod.jar' }).waitFor();
-  await page
-    .getByRole('radiogroup', { name: 'example-mod.jar 적용 방식' })
-    .getByRole('radio', { name: '항상', exact: true })
-    .click();
+  assert.equal(
+    await page.getByRole('radiogroup', { name: 'example-mod.jar 적용 방식' }).count(),
+    0,
+  );
   await page.getByTestId('settings-config').waitFor();
   assert.equal(await page.getByTestId('mod-row').count(), 1);
   await page.getByRole('button', { name: '폴더에서 불러오기' }).click();

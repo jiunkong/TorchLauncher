@@ -962,9 +962,14 @@ export class StudioService {
             for (const pack of added) {
               const index = list.findIndex((p) => p.name.toLowerCase() === pack.name.toLowerCase());
               const existing = list[index];
-              if (existing) list[index] = { ...pack, policy: existing.policy };
+              // Mods are always applied; the other kinds keep their policy or start as first-install.
+              if (existing)
+                list[index] = {
+                  ...pack,
+                  policy: command.kind === 'mod' ? 'required' : existing.policy,
+                };
               else if (list.length >= MAX_PACKS) throw new StudioFailure('TOO_LARGE');
-              else list.push({ ...pack, policy: 'initial' });
+              else list.push({ ...pack, policy: command.kind === 'mod' ? 'required' : 'initial' });
             }
           },
           true,
@@ -981,6 +986,9 @@ export class StudioService {
       case 'settingsPackMove':
       case 'settingsPackRemove': {
         validatePackName(command.name, command.kind);
+        // A mod is always applied, so its policy is not a choice.
+        if (command.action === 'settingsPackPolicy' && command.kind === 'mod')
+          throw new StudioFailure('INVALID');
         this.updatePack(command.kind, (list) => {
           const index = list.findIndex((p) => p.name === command.name);
           const pack = list[index];

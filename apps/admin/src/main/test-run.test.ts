@@ -96,14 +96,6 @@ async function setup() {
   expect(await service.request({ action: 'settingsPackAdd', kind: 'mod' })).toMatchObject({
     ok: true,
   });
-  expect(
-    await service.request({
-      action: 'settingsPackPolicy',
-      kind: 'mod',
-      name: 'example.jar',
-      policy: 'required',
-    }),
-  ).toMatchObject({ ok: true });
   const project = service.snapshot().project;
   if (!project) throw new Error('Missing test project');
   const root = join(host.userData, 'test-instances', project.serverId);

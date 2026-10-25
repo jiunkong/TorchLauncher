@@ -498,8 +498,8 @@ const table = {
   'mods.eyebrow': ['Game setup', '게임 구성'],
   'mods.title': ['Mods', '모드'],
   'mods.lead': [
-    'Add mod files to deliver with the game and choose when each one is applied.',
-    '게임과 함께 전달할 모드 파일을 추가하고 적용 시점을 정합니다.',
+    'Add mod files to deliver with the game. Every mod is applied on each update.',
+    '게임과 함께 전달할 모드 파일을 추가합니다. 모든 모드는 업데이트할 때마다 적용됩니다.',
   ],
   'mods.manage.title': ['Mod files', '모드 파일'],
   'mods.manage.sub': [
@@ -508,9 +508,6 @@ const table = {
   ],
   'mods.add': ['Add mod (.jar)', '모드 추가 (.jar)'],
   'mods.empty': ['No mod files added.', '추가한 모드 파일이 없습니다.'],
-  'mods.policy.exclude': ['Exclude', '제외'],
-  'mods.policy.initial': ['First install', '최초 설치'],
-  'mods.policy.always': ['Always', '항상'],
   'mods.removeNote': [
     'Removing a mod only removes it from the project list; the file stays in the project folder.',
     '모드를 제거해도 프로젝트 목록에서만 빠지고 프로젝트 폴더 파일은 지워지지 않습니다.',

@@ -103,7 +103,10 @@ export function parseProject(input: unknown): StudioProject {
   } catch {
     throw new StudioFailure('INVALID');
   }
-  return structuredClone(input) as StudioProject;
+  const project = structuredClone(input) as StudioProject;
+  // Mods are always applied: normalize whatever policy a saved project carries.
+  for (const mod of project.gameSettings?.mods ?? []) mod.policy = 'required';
+  return project;
 }
 const SHA = /^[0-9a-f]{64}$/;
 export function parseLastBuild(input: unknown): StudioLastBuild {

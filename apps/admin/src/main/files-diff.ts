@@ -53,10 +53,12 @@ export function buildPlan(project: StudioProject): BuildPlan {
       ['mod', settings.mods ?? []],
     ] as const)
       for (const pack of list) {
-        if (pack.policy === 'none') continue;
+        // Mods are always applied whatever a saved project says.
+        const choice = kind === 'mod' ? 'required' : pack.policy;
+        if (choice === 'none') continue;
         managed.push({
           path: `${PACK_DIRECTORY[kind]}/${pack.name}`,
-          policy: pack.policy === 'required' ? 'always' : 'initial-only',
+          policy: choice === 'required' ? 'always' : 'initial-only',
           kind: 'pack',
           length: pack.length,
           sha256: pack.sha256,
