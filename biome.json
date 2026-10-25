@@ -9,6 +9,8 @@
       "!!.aws",
       "!!.codex",
       "!!.agents",
+      "!!.claude",
+      "!!torchlauncher-web",
       "!!.testserver",
       "!!.testfabricserver",
       "!!docs/design"

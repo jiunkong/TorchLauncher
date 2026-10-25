@@ -7,6 +7,20 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-FILES-MANAGEMENT-01 통합 (2026-10-25)
+
+Codex 작업자 `3b36a5e` → main `50261af`, 후속 테스트·정합 수정 Sonnet `552bbb4` → `7546b4e`.
+파일 페이지는 모드/팩/셰이더/options.txt 등 관리 대상을 뺀 **수동 파일만** 다룬다. 프로젝트 파일 항목은 `targetPath`(게임 폴더 기준 경로, 필수)와
+원본 `sourcePath`를 분리하고 배포 index에는 targetPath를 쓴다. 정책은 `always`/`initial-only`(`excluded` 제거), 삭제는 항목과 `files/` 안의 파일을 함께 지우고 자동 저장.
+`lastBuild.files`에 `sourcePath` 필수. 호환 reader/마이그레이션 없음([프로젝트 형식](studio-project-format.md), [현재 형식](current-formats.md) 갱신).
+- 병합 직후 작업자가 단위 테스트를 실행하지 않아 9개가 실패했다(모두 구형 fixture/제거된 동작의 stale 테스트). 새 모델로 교체하고 12개 테스트를 추가했다.
+- 진짜 결함 2건을 최소 수정: ① `parseProject`가 managed **원본** 경로를 거부하지 않던 점 ② `files` 추가 때 외부 `options.txt`가 복사된 뒤 실패하던 점(이제 복사 없이 건너뜀).
+- main 검증: `pnpm biome check apps packages scripts` 오류 0, 타입, `pnpm test` 119 files/**1590 passed**(9 skip), 두 앱 빌드, 공통 smoke, Studio 기능 smoke(파일 섹션 재작성), branding smoke 성공.
+- 루트 `pnpm check`가 사용자의 별도 웹사이트 저장소 디렉터리 `torchlauncher-web/`(git 무시)를 Biome가 스캔해 a11y 오류 7건으로 실패했다(제품 코드 아님).
+  사용자 승인으로 `biome.json`에서 `torchlauncher-web`과 `.claude`(에이전트 worktree의 중첩 설정 충돌 방지)를 제외했다. 이후 루트 `pnpm check` 성공:
+  119 files/**1590 passed**(9 skip), Biome 오류 0(42 warnings/2 infos), 타입·두 앱 빌드.
+- 한계: 760px에서 파일 표가 카드보다 넓어 카드 안에서 가로 스크롤(정책/삭제 열이 화면 밖), 원본이 없는 파일은 대상 경로 변경 불가, 프로젝트 `files/`에 있으나 프로젝트에 미등록인 일반 파일은 피커로만 추가 가능, Windows 미검증.
+
 ### STUDIO-PACK-NAMES-01 통합 (2026-10-25)
 
 사용자 보고: `Icon Xaero's 1.22.zip`, `NewGlowingOres-§6[Border]§r.zip` 추가가 건너뛰어짐. 원인은 Studio `validatePackName`이 글자·숫자·공백·`_.()+-[]`만 허용해
