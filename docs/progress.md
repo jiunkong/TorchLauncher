@@ -7,6 +7,21 @@
 
 ## 현재 상태와 다음 작업
 
+### NATIVE-TITLEBAR-01 · STUDIO-FILES-UI-01 통합 (2026-10-25)
+
+- NATIVE-TITLEBAR-01 Codex `6be251e`/`0a50ccb` → main `dbf83e4`: 두 앱 창이 `titleBarStyle: 'hidden'` + 36px `titleBarOverlay`(`--bg-deep`)를 쓰고,
+  렌더러에 다크 드래그 제목 영역(아이콘+제목)을 그린다. 최소화/최대화/닫기는 OS 네이티브 컨트롤 유지. Studio 메뉴 막대는 다음 행. 제목 아래 구분선 제거.
+- STUDIO-FILES-UI-01 Codex `d3ed588`…`018f10f` → main `3f4c60b`: 파일 표를 960px 이하에서 카드형 행으로 바꿔 정책/삭제가 항상 보이게 하고,
+  "런처 경로"는 표 안 입력 대신 읽기 전용 폴더 표시+연필 아이콘으로 앱 내 모달에서 편집한다(원본 파일명은 자동 유지, 게임 폴더 루트 별칭 `.`/`./`/`/`·앞의 `./`·`/` 정규화,
+  `filesTarget` 계약과 main 검증은 불변). 시작 페이지 버튼 색 정리, 렌더러 드래그 시작 차단(텍스트 선택은 유지).
+- 병합 후 두 브랜치의 조합에서 기능 smoke 2개가 실패했다(제목 표시줄 작업자는 공통 smoke만 실행): 런처 설정 760px와 Studio `files@760`에서 문서 가로 오버플로.
+  원인(프로브로 확인): Playwright가 뷰포트만 760px로 줄여도 실제 창 폭이 남아 `env(titlebar-area-width)`가 987px로 해석돼 절대 위치 `.desktop-titlebar-content`가 뷰포트를 넘음.
+  Sonnet `e594f31` → main `5d17f0a`: `.desktop-titlebar { overflow: hidden }`, 내용 폭을 `min(env(titlebar-area-width), 100% - env(titlebar-area-x))`로 제한(두 앱). smoke 단언은 약화하지 않았다.
+  `docs/launcher-ui.md`, 두 `docs/design/*/README.md`의 "기본 OS 제목 표시줄" 서술을 커스텀 제목 표시줄로 갱신.
+- main 검증: 루트 `pnpm check` 120 files/**1594 passed**(9 skip), Biome 오류 0(45 warnings/2 infos), 타입·두 앱 빌드, 공통 smoke,
+  Studio·런처 기능 smoke, Studio·런처 branding smoke 모두 성공.
+- 미검증: Windows 네이티브 오버레이 렌더링, 실제 창 드래그·최대화·닫기와 Windows의 실제 `env(titlebar-area-*)` 값. Linux 캡처에는 오버레이 버튼이 보이지 않는다.
+
 ### STUDIO-FILES-MANAGEMENT-01 통합 (2026-10-25)
 
 Codex 작업자 `3b36a5e` → main `50261af`, 후속 테스트·정합 수정 Sonnet `552bbb4` → `7546b4e`.
