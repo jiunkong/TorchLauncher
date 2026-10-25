@@ -1069,6 +1069,76 @@ try {
   await page.getByTestId('test-reset-dialog').waitFor();
   await page.getByTestId('test-reset-dialog').getByRole('button', { name: '취소' }).click();
   await page.getByTestId('test-reset-dialog').waitFor({ state: 'detached' });
+  // Render a completed diagnostic snapshot without account/network/game side effects.
+  const resultState = await page.evaluate(
+    async () => (await window.torchlauncher.request({ action: 'state' })).state,
+  );
+  await app.evaluate(({ ipcMain }, state) => {
+    const handler = ipcMain._invokeHandlers.get('studio:request');
+    globalThis.__studioResultHandler = handler;
+    globalThis.__studioResultCommands = [];
+    const result = {
+      ...state,
+      busy: null,
+      account: { ...state.account, signedIn: true, available: true },
+      testRun: {
+        ...state.testRun,
+        phase: 'done',
+        exit: { reason: 'exited', code: 1, signal: null },
+        logs: [{ stream: 'stderr', text: 'synthetic recent log' }],
+        report: {
+          status: 'problems',
+          truncated: true,
+          items: [
+            {
+              severity: 'error',
+              category: 'mixin',
+              summary: { code: 'mixin-failed', parameters: {} },
+              evidence: [],
+            },
+          ],
+        },
+        configFiles: [{ path: 'config/hidden.toml' }],
+        extracted: { keybindCount: 1, otherOptionCount: 2, newConfigCount: 3 },
+      },
+    };
+    ipcMain.removeHandler('studio:request');
+    ipcMain.handle('studio:request', (_event, command) => {
+      globalThis.__studioResultCommands.push(command);
+      return { ok: true, state: result };
+    });
+  }, resultState);
+  // Navigation performs a state request through the existing bridge.
+  await goto('서버 정보');
+  await goto('테스트 실행');
+  await page.evaluate(() => window.torchlauncher.request({ action: 'state' }));
+  // The controller refreshes through its normal polling while this page is active.
+  await page.getByTestId('test-result').waitFor();
+  assert.match(await page.getByTestId('test-result').textContent(), /문제 1건 · 경고 0건/);
+  assert.match(await page.getByTestId('test-result').textContent(), /종료 코드 1/);
+  assert.match(await page.getByTestId('test-log').textContent(), /synthetic recent log/);
+  for (const selector of [
+    '.test-findings',
+    '.test-mods-card',
+    '.test-extracted',
+    '.test-config-summary',
+  ])
+    assert.equal(await page.locator(selector).count(), 0);
+  await page.getByTestId('test-open-logs').click();
+  await page.getByRole('button', { name: '다시 실행', exact: true }).click();
+  const commands = await app.evaluate(() => globalThis.__studioResultCommands);
+  assert.ok(commands.some((command) => command.action === 'testOpenLogs'));
+  assert.ok(commands.some((command) => command.action === 'testStart'));
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 760 });
+    assert.ok(await page.getByTestId('test-open-logs').isVisible());
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-test-result-${width}.png`) });
+  }
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('studio:request');
+    ipcMain.handle('studio:request', globalThis.__studioResultHandler);
+    delete globalThis.__studioResultHandler;
+  });
   await goto('단축키 · 옵션');
   await page.getByRole('button', { name: '파일 선택' }).click();
   await page.getByTestId('settings-keys').waitFor();

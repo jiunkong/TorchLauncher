@@ -125,6 +125,8 @@ export interface StudioDialogs {
   save(kind: 'pack' | 'keybackup' | 'zip'): Promise<string | null>;
   /** Shows a file in the OS file manager. Optional so tests can omit it. */
   reveal?(path: string): void;
+  /** Opens a trusted directory in the OS file manager. */
+  openFolder?(path: string): Promise<void>;
   /** Writes text to the system clipboard (the sandboxed renderer cannot). Optional so tests can omit it. */
   copy?(text: string): void;
 }
@@ -379,6 +381,7 @@ export class StudioService {
           'testStart',
           'testStop',
           'testReset',
+          'testOpenLogs',
         ].includes(value.action) ||
         Object.keys(value).sort().join(',') !==
           (value.action === 'testReset' ? 'action,confirmed' : 'action') ||
@@ -421,6 +424,7 @@ export class StudioService {
       'testLogin',
       'testStart',
       'testStop',
+      'testOpenLogs',
       'testLogout',
       'touch',
       'open',
@@ -883,6 +887,10 @@ export class StudioService {
         await this.tests.start(project, this.sourceRoot, signal);
         return;
       }
+      case 'testOpenLogs':
+        if (!this.tests || !this.dialogs.openFolder) throw new StudioFailure('IO');
+        await this.dialogs.openFolder(await this.tests.logsDirectory(this.project()));
+        return;
       case 'testReset':
         if (!this.tests || command.confirmed !== true) throw new StudioFailure('INVALID');
         await this.tests.reset(this.project());

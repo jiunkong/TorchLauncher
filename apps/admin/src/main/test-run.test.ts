@@ -94,6 +94,7 @@ async function setup() {
     open: vi.fn<StudioDialogs['open']>().mockResolvedValue(null),
     save: vi.fn<StudioDialogs['save']>().mockResolvedValue(null),
     copy: vi.fn<NonNullable<StudioDialogs['copy']>>(),
+    openFolder: vi.fn<NonNullable<StudioDialogs['openFolder']>>().mockResolvedValue(undefined),
   };
   const service = new StudioService(dialogs, undefined, undefined, undefined, runner);
   await createProjectAt(service, dialogs, projDir, {});
@@ -846,3 +847,40 @@ it('launches the test run with the operator default memory', async () => {
   expect(unset).not.toHaveProperty('maxMemoryMiB');
   expect(unset).not.toHaveProperty('initialMemoryMiB');
 });
+
+it('opens only the completed current test instance log directory and rejects extra paths', async () => {
+  const h = await setup();
+  expect(await h.service.request({ action: 'testOpenLogs' })).toMatchObject({
+    ok: false,
+    code: 'INVALID',
+  });
+  await mkdir(h.root, { recursive: true });
+  h.runner.state = { ...h.runner.state, phase: 'done', serverId: h.project.serverId };
+  expect(await h.service.request({ action: 'testOpenLogs', path: h.base })).toEqual({
+    ok: false,
+    code: 'INVALID',
+  });
+  expect(await h.service.request({ action: 'testOpenLogs' })).toMatchObject({ ok: true });
+  expect(h.dialogs.openFolder).toHaveBeenCalledExactlyOnceWith(join(h.root, 'logs'));
+  h.runner.state.serverId = '00000000-0000-0000-0000-000000000000';
+  expect(await h.service.request({ action: 'testOpenLogs' })).toMatchObject({
+    ok: false,
+    code: 'INVALID',
+  });
+  expect(h.dialogs.openFolder).toHaveBeenCalledTimes(1);
+  h.runner.state.serverId = h.project.serverId;
+  h.dialogs.openFolder.mockRejectedValueOnce(new Error('private system error'));
+  expect(await h.service.request({ action: 'testOpenLogs' })).toEqual({ ok: false, code: 'IO' });
+});
+
+it.skipIf(process.platform === 'win32')(
+  'rejects linked log directories without opening them',
+  async () => {
+    const h = await setup();
+    await mkdir(h.root, { recursive: true });
+    await symlink(h.source, join(h.root, 'logs'), 'dir');
+    h.runner.state = { ...h.runner.state, phase: 'done', serverId: h.project.serverId };
+    expect(await h.service.request({ action: 'testOpenLogs' })).toMatchObject({ ok: false });
+    expect(h.dialogs.openFolder).not.toHaveBeenCalled();
+  },
+);
