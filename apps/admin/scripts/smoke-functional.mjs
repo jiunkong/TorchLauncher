@@ -607,9 +607,21 @@ try {
   assert.deepEqual(await projectFiles(), [
     { path: 'custom.data', targetPath: 'custom.data', policy: 'always' },
   ]);
-  // Added files start as "always" and list their launcher path (the source path by default).
-  const targetInput = page.getByLabel('custom.data의 런처 경로');
-  assert.equal(await targetInput.inputValue(), 'custom.data');
+  // Added files start at the game folder; launcher folder editing keeps the source filename.
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  let targetDialog = page.getByTestId('files-target-dialog');
+  let targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  assert.equal(await targetInput.inputValue(), '');
+  assert.equal(await targetDialog.getByTestId('files-target-save').isDisabled(), true);
+  await targetInput.fill('  ');
+  assert.equal(await targetDialog.getByTestId('files-target-save').isDisabled(), true);
+  await targetInput.press('Enter');
+  assert.equal(await targetDialog.isVisible(), true);
+  await targetInput.press('Escape');
+  await targetDialog.waitFor({ state: 'detached' });
+  assert.deepEqual(await projectFiles(), [
+    { path: 'custom.data', targetPath: 'custom.data', policy: 'always' },
+  ]);
   await customRow
     .getByRole('radiogroup', { name: 'custom.data 적용 방식' })
     .getByRole('radio', { name: '최초만' })
@@ -624,22 +636,98 @@ try {
   await page.getByLabel('custom.data 선택').check();
   await page.getByTestId('files-bulk').getByRole('button', { name: '항상 적용' }).click();
   await customRow.locator('button.a[aria-checked=true]').waitFor();
-  // Launcher path: a valid change is stored; unsafe and managed paths are refused and not stored.
-  await targetInput.fill('data/custom.data');
-  await targetInput.blur();
+  // Launcher folder: valid changes retain the source filename; invalid folders show an in-modal error.
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('data');
+  await targetInput.press('Enter');
   await page.waitForFunction(
     async () =>
       (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
         .targetPath === 'data/custom.data',
   );
-  for (const bad of ['../escape.data', 'options.txt', 'mods/x.jar']) {
-    await targetInput.fill(bad);
-    await targetInput.blur();
-    await page.waitForTimeout(300);
-    assert.equal((await projectFiles())[0].targetPath, 'data/custom.data', `${bad} not stored`);
+  await targetDialog.waitFor({ state: 'detached' });
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('/');
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(
+    async () =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === 'custom.data',
+  );
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('./');
+  assert.equal(await targetDialog.getByTestId('files-target-save').isDisabled(), true);
+  await targetInput.press('Escape');
+  await targetDialog.waitFor({ state: 'detached' });
+  for (const [folder, target] of [
+    ['./app/', 'app/custom.data'],
+    ['/folder/', 'folder/custom.data'],
+    ['/', 'custom.data'],
+  ]) {
+    await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+    targetDialog = page.getByTestId('files-target-dialog');
+    targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+    await targetInput.fill(folder);
+    await targetDialog.getByTestId('files-target-save').click();
+    await targetDialog.waitFor({ state: 'detached' });
+    await page.waitForFunction(
+      async (expected) =>
+        (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+          .targetPath === expected,
+      target,
+    );
   }
-  await targetInput.fill('custom.data');
-  await targetInput.blur();
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill('data');
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(
+    async () =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === 'data/custom.data',
+  );
+  for (const bad of ['../escape', 'resourcepacks', 'shaderpacks/subdir']) {
+    if (!(await targetDialog.isVisible())) {
+      await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+      targetDialog = page.getByTestId('files-target-dialog');
+      targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+    }
+    await targetInput.fill(bad);
+    await targetDialog.getByTestId('files-target-save').click();
+    await targetDialog.getByRole('alert').waitFor();
+    assert.equal((await projectFiles())[0].targetPath, 'data/custom.data', `${bad} not stored`);
+    assert.equal(await targetInput.inputValue(), bad, `${bad} stays editable`);
+    await targetInput.press('Escape');
+    await targetDialog.waitFor({ state: 'detached' });
+  }
+  // Reset copies the source folder into the editor; cancel keeps the persisted target folder.
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetDialog.getByTestId('files-target-reset').click();
+  assert.equal(await targetInput.inputValue(), '');
+  await targetDialog.getByRole('button', { name: '취소' }).click();
+  await targetDialog.waitFor({ state: 'detached' });
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.getAttribute('data-testid')),
+    'files-target-edit',
+  );
+  assert.equal((await projectFiles())[0].targetPath, 'data/custom.data');
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetDialog.getByTestId('files-target-reset').click();
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
   await page.waitForFunction(
     async () =>
       (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
@@ -678,28 +766,97 @@ try {
   assert.deepEqual(await projectFiles(), [
     { path: 'custom.data', targetPath: 'custom.data', policy: 'always' },
   ]);
-  // The page holds its layout at the minimum and default widths.
+  const longTargetFolder = `nested/${'long-folder/'.repeat(8)}tail`;
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+  await targetInput.fill(longTargetFolder);
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(
+    async (target) =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === `${target}/custom.data`,
+    longTargetFolder,
+  );
+  // The responsive table keeps all row controls in view and hit-testable at both widths.
   await mkdir(join(cwd, '.cache/smoke'), { recursive: true });
   for (const width of [760, 1100]) {
     await page.setViewportSize({ width, height: 760 });
-    const fit = await page.evaluate(() => {
+    await customRow.scrollIntoViewIfNeeded();
+    const fit = await page.evaluate((fullFolder) => {
       const scroll = document.querySelector('.tablecard .scroll').getBoundingClientRect();
       const card = document.querySelector('.tablecard').getBoundingClientRect();
-      const input = document.querySelector('.file-target').getBoundingClientRect();
+      const row = [...document.querySelectorAll('.tbl tbody tr')].find((item) =>
+        item.textContent.includes('custom.data'),
+      );
+      const controls = [
+        row?.querySelector('[role="radio"]'),
+        row?.querySelector('[data-testid="files-remove"]'),
+        row?.querySelector('[data-testid="files-target-edit"]'),
+      ];
+      const controlRects = controls.map((item) => item?.getBoundingClientRect());
+      const targetText = row?.querySelector('.target-value');
+      const targetRect = targetText?.getBoundingClientRect();
+      const editRect = row
+        ?.querySelector('[data-testid="files-target-edit"]')
+        ?.getBoundingClientRect();
+      const targetStyle = targetText ? getComputedStyle(targetText) : null;
+      const hitTargets = controls.map((item, index) => {
+        const rect = controlRects[index];
+        if (!item || !rect || rect.width === 0 || rect.height === 0) return false;
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(x, y);
+        return (
+          x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight && !!hit && item.contains(hit)
+        );
+      });
       return {
         horizontal: document.documentElement.scrollWidth > innerWidth,
-        // A narrow table scrolls inside its own card instead of widening the page.
-        scrollInsideCard: scroll.left >= card.left - 1 && scroll.right <= card.right + 1,
-        inputWide: input.width >= 80,
+        cardHasNoHorizontalScroll:
+          scroll.right <= card.right + 1 &&
+          document.querySelector('.tablecard .scroll').scrollWidth <=
+            document.querySelector('.tablecard .scroll').clientWidth,
+        controlsInsideViewport: controlRects.every(
+          (rect) => rect && rect.left >= 0 && rect.right <= innerWidth,
+        ),
+        controlsHitTest: hitTargets.every(Boolean),
+        targetEllipsis:
+          targetStyle?.textOverflow === 'ellipsis' &&
+          targetStyle.whiteSpace === 'nowrap' &&
+          targetStyle.overflow === 'hidden',
+        targetTitleHasFullFolder: targetText?.getAttribute('title') === fullFolder,
+        targetAndEditStayOnOneLine:
+          !!targetRect &&
+          !!editRect &&
+          Math.abs(targetRect.top + targetRect.height / 2 - (editRect.top + editRect.height / 2)) <
+            1,
       };
-    });
+    }, longTargetFolder);
     assert.deepEqual(
       fit,
-      { horizontal: false, scrollInsideCard: true, inputWide: true },
+      {
+        horizontal: false,
+        cardHasNoHorizontalScroll: true,
+        controlsInsideViewport: true,
+        controlsHitTest: true,
+        targetEllipsis: true,
+        targetTitleHasFullFolder: true,
+        targetAndEditStayOnOneLine: true,
+      },
       `files@${width}`,
     );
     await page.screenshot({ path: join(cwd, `.cache/smoke/studio-files-${width}.png`) });
   }
+  await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+  targetDialog = page.getByTestId('files-target-dialog');
+  await targetDialog.getByTestId('files-target-reset').click();
+  await targetDialog.getByTestId('files-target-save').click();
+  await targetDialog.waitFor({ state: 'detached' });
+  assert.deepEqual(await projectFiles(), [
+    { path: 'custom.data', targetPath: 'custom.data', policy: 'always' },
+  ]);
 
   // Player settings imports options explicitly from either source.
   await goto('단축키 · 옵션');

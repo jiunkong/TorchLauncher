@@ -3,6 +3,7 @@ import { defineTranslations } from '@torchlauncher/core/i18n';
 /** Each key holds [English, Korean]; Korean is the reference text of the approved mockups. */
 const table = {
   'common.cancel': ['Cancel', '취소'],
+  'files.target.save': ['Save', '저장'],
   'common.close': ['Close', '닫기'],
   'common.apply': ['Apply', '적용'],
   'common.retry': ['Try again', '다시 시도'],
@@ -418,12 +419,16 @@ const table = {
   'files.selectFile': ['Select {path}', '{path} 선택'],
   'files.policyOf': ['Apply policy of {path}', '{path} 적용 방식'],
   'files.col.path': ['Path', '경로'],
-  'files.col.target': ['Launcher path', '런처 경로'],
+  'files.col.target': ['Launcher folder', '런처 폴더'],
   'files.col.actions': ['Actions', '작업'],
-  'files.targetPath': ['Launcher path for {path}', '{path}의 런처 경로'],
+  'files.targetPath': ['Launcher folder for {path}', '{path}의 런처 폴더'],
+  'files.targetEdit': ['Edit launcher folder for {path}', '{path}의 런처 폴더 편집'],
+  'files.targetRoot': ['Game folder', '게임 폴더'],
+  'files.target.title': ['Edit launcher folder', '런처 폴더 편집'],
+  'files.target.reset': ['Use source path', '원래대로'],
   'files.targetHint': [
-    'Launcher paths are relative to the game folder. Removing a file deletes it from the project folder.',
-    '런처 경로는 게임 폴더 기준 상대 경로입니다. 파일을 삭제하면 프로젝트 폴더에서도 제거됩니다.',
+    'Folder paths are relative to the game folder. A leading ./ or / is optional; leave blank for the game folder itself. The source filename is kept.',
+    '게임 폴더 기준 상대 폴더를 입력하세요. 앞의 ./ 또는 /는 생략할 수 있고, 빈칸은 게임 폴더 자체를 뜻합니다. 원본 파일명은 유지됩니다.',
   ],
   'files.remove': ['Delete {path} from the project', '프로젝트에서 {path} 삭제'],
   'files.removeButton': ['Delete', '삭제'],

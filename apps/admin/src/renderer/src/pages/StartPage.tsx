@@ -29,7 +29,7 @@ export function StartPage({ studio, onNew }: { studio: StudioController; onNew()
         <div className="acts">
           <button
             type="button"
-            className="big p"
+            className="big"
             disabled={busy}
             data-testid="start-new"
             onClick={onNew}
