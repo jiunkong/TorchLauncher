@@ -327,7 +327,7 @@ export interface StudioTestRun {
   error: string | null;
 }
 export type StudioTestCommand =
-  | { action: 'testLogin' | 'testLogout' | 'testStart' | 'testStop' }
+  | { action: 'testLogin' | 'testLogout' | 'testStart' | 'testStop' | 'testOpenLogs' }
   /** Copies the code of the pending login to the clipboard (INVALID when no login is waiting). */
   | { action: 'testLoginCopyCode' }
   | { action: 'testReset'; confirmed: true };

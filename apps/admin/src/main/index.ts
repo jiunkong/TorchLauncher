@@ -62,6 +62,9 @@ function createWindow(): void {
     {
       ...createStudioNativeDialogs(dialog, window, () => mainLocale),
       reveal: (path) => shell.showItemInFolder(path),
+      openFolder: async (path) => {
+        if (await shell.openPath(path)) throw new Error('Could not open log folder');
+      },
       copy: (text) => clipboard.writeText(text),
     },
     undefined,

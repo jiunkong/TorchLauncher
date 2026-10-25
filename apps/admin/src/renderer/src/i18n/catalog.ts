@@ -772,6 +772,7 @@ const table = {
     '테스트 인스턴스를 사용 중입니다. 다른 테스트를 닫고 다시 시도하세요.',
   ],
   'test.failed.retry': ['Try again', '다시 시도'],
+  'test.logs.open': ['Open log folder', '로그 폴더 열기'],
   'test.logs.title': ['Recent game log', '최근 게임 로그'],
   'test.logs.count': ['{count} lines', '{count}줄'],
   'test.logs.truncated': ['older lines omitted', '이전 줄 생략'],

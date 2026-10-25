@@ -199,6 +199,16 @@ export class StudioTestRunner {
       throw new StudioFailure('INVALID');
     return join(this.host.userData, 'test-instances', project.serverId);
   }
+  async logsDirectory(project: StudioProject): Promise<string> {
+    if (this.state.serverId !== project.serverId || this.state.phase !== 'done')
+      throw new StudioFailure('INVALID');
+    const root = this.root(project);
+    await noLinks(root);
+    const logs = join(root, 'logs');
+    await secureDirectory(logs);
+    await noLinks(logs);
+    return logs;
+  }
   private phase(phase: StudioTestRun['phase']) {
     this.state.phase = phase;
     this.state.progress = null;

@@ -89,7 +89,7 @@ describe('test run phases', () => {
     expect(html.match(/class="card/g)?.length).toBe(1);
   });
 
-  it('lists problems in the result and offers the player settings import', () => {
+  it('keeps only counts, exit code, logs, rerun, open logs and reset in results', () => {
     const { html } = page({
       signedIn: true,
       run: {
@@ -99,18 +99,33 @@ describe('test run phases', () => {
       },
     });
     expect(html).toContain('data-testid="test-result"');
-    expect(html).toContain('test-outcome-error');
-    expect(html).toContain('Mixin apply failed');
+    expect(html).toContain('문제 1건 · 경고 0건');
+    expect(html).toContain('종료 코드 1');
+    expect(html).toContain('로그 폴더 열기');
+    expect(html).toContain('다시 실행');
+    expect(html).toContain('data-testid="test-log"');
+    expect(html).not.toContain('Mixin apply failed');
+    for (const removed of ['test-findings', 'test-mods', 'test-extracted', 'test-config-summary'])
+      expect(html).not.toContain(removed);
     expect(html).toContain('data-testid="test-reset-open"');
   });
 
-  it('says a clean result is not a guarantee', () => {
+  it('shows zero counts for a clean report without extra explanations', () => {
     const { html } = page({
       signedIn: true,
       run: { phase: 'done', report: report('no-problems-found') },
     });
-    expect(html).toContain('test-outcome-ok');
-    expect(html).toContain('보장하지');
+    expect(html).toContain('문제 0건 · 경고 0건');
+    expect(html).not.toContain('보장하지');
+    expect(html).not.toContain('문제를 찾지 못했습니다');
+  });
+
+  it('shows unknown counts when there is no analysis report', () => {
+    const { html } = page({ signedIn: true, run: { phase: 'done', report: null } });
+    expect(html).toContain('문제 —건 · 경고 —건');
+    expect(html).toContain('종료 코드 —');
+    expect(html).toContain('data-testid="test-open-logs"');
+    expect(html).not.toContain('분석 결과가 없습니다');
   });
 
   it('shows a safe message when the test failed', () => {

@@ -21,7 +21,6 @@ const activePhases = new Set<StudioTestRun['phase']>([
 export function TestPage({
   studio,
   draft,
-  go,
 }: {
   studio: StudioController;
   draft: StudioProject;
@@ -34,7 +33,6 @@ export function TestPage({
   const logCount = run?.logs.length ?? 0;
   const account = studio.state?.account;
   const active = run ? activePhases.has(run.phase) : false;
-  const report = run?.report;
   const canStart =
     !studio.busy &&
     !!draft.serverId &&
@@ -160,14 +158,15 @@ export function TestPage({
           </section>
         )}
 
-        {run?.phase === 'done' && report && (
+        {run?.phase === 'done' && (
           <TestResult
             run={run}
-            go={go}
             t={t}
             logRef={log}
             canStart={canStart}
             onStart={() => send('testStart')}
+            onOpenLogs={() => void studio.command({ action: 'testOpenLogs' })}
+            busy={studio.busy}
           />
         )}
 
@@ -175,24 +174,6 @@ export function TestPage({
           <div className="test-reset-row">
             <ResetButton busy={studio.busy} onClick={() => setConfirm('reset')} />
           </div>
-        )}
-
-        {run?.phase === 'done' && !report && (
-          <section className="card test-outcome" data-testid="test-result-unavailable">
-            <h2>{t('test.result.unavailable')}</h2>
-            <p>{t('test.result.unavailableHelp')}</p>
-            <TestLog run={run} logRef={log} t={t} />
-            <div className="test-start-actions">
-              <button
-                type="button"
-                className="btn primary"
-                disabled={!canStart}
-                onClick={() => send('testStart')}
-              >
-                {t('test.result.again')}
-              </button>
-            </div>
-          </section>
         )}
       </div>
 
@@ -274,176 +255,48 @@ function TestLog({
 
 function TestResult({
   run,
-  go,
   t,
   logRef,
   canStart,
   onStart,
+  onOpenLogs,
+  busy,
 }: {
   run: StudioTestRun;
-  go(page: PageId): void;
   t: Translator;
   logRef: RefObject<HTMLDivElement | null>;
   canStart: boolean;
   onStart(): void;
+  onOpenLogs(): void;
+  busy: boolean;
 }) {
   const report = run.report;
-  if (!report) return null;
-  const errors = report.items.filter((item) => item.severity === 'error').length;
-  const warnings = report.items.filter((item) => item.severity === 'warning').length;
-  const mods = run.mods.flatMap((file) => file.mods.map((mod) => ({ ...mod, file: file.file })));
-  const affectedMods = new Map<string, 'error' | 'warning'>();
-  for (const item of report.items) {
-    if (item.severity === 'info') continue;
-    for (const id of item.modIds ?? []) {
-      if (item.severity === 'error' || affectedMods.get(id) !== 'error')
-        affectedMods.set(id, item.severity);
-    }
-  }
-  const title =
-    report.status === 'problems'
-      ? t('test.result.problems', { errors, warnings })
-      : report.status === 'incomplete'
-        ? t('test.result.incomplete')
-        : t('test.result.ok');
+  const errors = report?.items.filter((item) => item.severity === 'error').length ?? '—';
+  const warnings = report?.items.filter((item) => item.severity === 'warning').length ?? '—';
   return (
-    <>
-      <section
-        className={`card test-outcome ${report.status === 'problems' ? 'test-outcome-error' : report.status === 'no-problems-found' ? 'test-outcome-ok' : ''}`}
-        data-testid="test-result"
-      >
-        <div className="test-outcome-heading">
-          <div>
-            <span className="eyebrow">{t('test.result.eyebrow')}</span>
-            <h2>{title}</h2>
-            {report.status === 'no-problems-found' && <p>{t('test.result.okHelp')}</p>}
-            {report.status === 'incomplete' && <p>{t('test.result.incompleteHelp')}</p>}
-            {run.exit && (
-              <p className="fine">
-                {t(`test.exit.${run.exit.reason}`)}
-                {run.exit.code == null ? '' : ` · ${t('test.exit.code', { code: run.exit.code })}`}
-              </p>
-            )}
-          </div>
-          <div className="test-result-actions">
-            <button type="button" className="btn" disabled={!canStart} onClick={onStart}>
-              {t('test.result.again')}
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={!run.extracted}
-              onClick={() => go('playerSettings')}
-            >
-              {t('test.result.settings')}
-            </button>
-          </div>
+    <section className="card test-outcome" data-testid="test-result">
+      <div className="test-outcome-heading">
+        <div>
+          <h2>{t('test.result.problems', { errors, warnings })}</h2>
+          <p className="fine">{t('test.exit.code', { code: run.exit?.code ?? '—' })}</p>
         </div>
-        {report.truncated && <div className="note warn">{t('test.result.truncated')}</div>}
-        <div className="test-result-grid">
-          <div className="test-findings" data-testid="test-findings">
-            {report.items.length === 0 ? (
-              <div className="card test-no-findings">{t('test.result.noFindings')}</div>
-            ) : (
-              report.items.map((item) => (
-                <article
-                  className={`test-finding ${item.severity}`}
-                  key={`${item.summary.code}-${item.evidence.map((entry) => `${entry.source}-${entry.line}-${entry.text}`).join('|')}`}
-                >
-                  <div className="test-finding-heading">
-                    <span className={`test-severity ${item.severity}`}>
-                      {translate(t, `test.severity.${item.severity}`)}
-                    </span>
-                    <strong>
-                      {translate(
-                        t,
-                        summaryKeys[item.summary.code] ?? 'test.summary.unknown-error',
-                        item.summary.parameters,
-                      )}
-                    </strong>
-                  </div>
-                  <p>
-                    {translate(t, `test.category.${item.category}`)}
-                    {item.modIds?.length ? ` · ${item.modIds.join(', ')}` : ''}
-                    {item.files?.length ? ` · ${item.files.join(', ')}` : ''}
-                  </p>
-                  {item.evidence.length > 0 && (
-                    <div className="test-evidence">
-                      {item.evidence.map((evidence) => (
-                        <div key={`${evidence.source}-${evidence.line}-${evidence.text}`}>
-                          <span>{t('test.evidence.line', { line: evidence.line })}</span>
-                          <code>{evidence.text}</code>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              ))
-            )}
-          </div>
-          <aside className="card test-mods-card" data-testid="test-mods">
-            <h3>{t('test.mods.title', { count: mods.length })}</h3>
-            {mods.length === 0 ? (
-              <p className="sub">{t('test.mods.empty')}</p>
-            ) : (
-              <ul className="test-mod-list">
-                {mods.slice(0, 100).map((mod) => (
-                  <li key={`${mod.file}-${mod.id}-${mod.version}`}>
-                    <span
-                      className={`test-mod-dot ${affectedMods.get(mod.id) ?? 'ok'}`}
-                      aria-hidden="true"
-                    />
-                    <span className="test-mod-id">{mod.id}</span>
-                    <span className="test-mod-version">{mod.version}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {run.metadataErrors.length > 0 && (
-              <p className="fine">
-                {t('test.mods.metadataErrors', { count: run.metadataErrors.length })}
-              </p>
-            )}
-            {run.extracted && (
-              <div className="test-extracted" data-testid="test-extracted">
-                <h3>{t('test.extracted.title')}</h3>
-                <div className="test-extracted-row">
-                  <span>{t('test.extracted.keybinds')}</span>
-                  <strong>{run.extracted.keybindCount}</strong>
-                </div>
-                <div className="test-extracted-row">
-                  <span>{t('test.extracted.options')}</span>
-                  <strong>{run.extracted.otherOptionCount}</strong>
-                </div>
-                <div className="test-extracted-row">
-                  <span>{t('test.extracted.configs')}</span>
-                  <strong>{run.extracted.newConfigCount}</strong>
-                </div>
-                {run.extractionError && <p className="fine">{t('test.extracted.unavailable')}</p>}
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={!run.extracted}
-                  onClick={() => go('playerSettings')}
-                >
-                  {t('test.extracted.import')}
-                </button>
-              </div>
-            )}
-          </aside>
-        </div>
-        <TestLog run={run} logRef={logRef} t={t} />
-      </section>
-      {run.configFiles && run.configFiles.length > 0 && (
-        <section className="card test-config-summary">
-          <h2>{t('test.config.title', { count: run.configFiles.length })}</h2>
-          <p>{t('test.config.help')}</p>
-          <button type="button" className="btn ghost" onClick={() => go('mods')}>
-            {t('test.config.open')}
+        <div className="test-result-actions">
+          <button type="button" className="btn" disabled={!canStart} onClick={onStart}>
+            {t('test.result.again')}
           </button>
-        </section>
-      )}
-    </>
+          <button
+            type="button"
+            className="btn"
+            data-testid="test-open-logs"
+            disabled={busy}
+            onClick={onOpenLogs}
+          >
+            {t('test.logs.open')}
+          </button>
+        </div>
+      </div>
+      <TestLog run={run} logRef={logRef} t={t} />
+    </section>
   );
 }
 
@@ -461,21 +314,6 @@ function translateError(t: Translator, error: string | null) {
   };
   return translate(t, keys[error ?? ''] ?? 'test.error.unknown');
 }
-
-const summaryKeys: Record<string, Parameters<Translator>[0]> = {
-  'loader-resolution-failed': 'test.summary.loader-resolution-failed',
-  'dependency-mismatch': 'test.summary.dependency-mismatch',
-  'environment-mismatch': 'test.summary.environment-mismatch',
-  'duplicate-mod': 'test.summary.duplicate-mod',
-  'mixin-failed': 'test.summary.mixin-failed',
-  'class-loading-failed': 'test.summary.class-loading-failed',
-  'out-of-memory': 'test.summary.out-of-memory',
-  'java-version-mismatch': 'test.summary.java-version-mismatch',
-  'game-crashed': 'test.summary.game-crashed',
-  'unknown-error': 'test.summary.unknown-error',
-  'crash-report-present': 'test.summary.crash-report-present',
-  'abnormal-exit': 'test.summary.abnormal-exit',
-};
 
 function translate(t: Translator, key: string, values: Record<string, string | number> = {}) {
   return (t as unknown as (key: string, values: Record<string, string | number>) => string)(
