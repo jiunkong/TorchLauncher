@@ -7,6 +7,22 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-BRANDING-AUTOSAVE · SERVER-MEMORY-01 통합 (2026-10-25)
+
+- 브랜딩 이미지 저장 `606a4df` → main `3c3c8ff`: 이미지 선택 시 검증된 원본을 `<프로젝트>/branding/`에 원자적으로 복사하고 프로젝트를 자동 저장한다(`project.torchproj`의 내장 스냅샷은 유지).
+  다른 이름으로 저장도 `branding/`을 복사한다. 통합 중 Biome import 정렬 오류 1건을 `1010d00`으로 정리. 한계: 이 브랜치에는 새 테스트가 없고,
+  `brandingRemove`가 `branding/`의 기존 사본을 지우는지는 확인하지 않았다(문서는 "있는 역할만"이라고 서술).
+- SERVER-MEMORY-01 Sonnet `1572355` → main `c0f3666`(충돌: `docs/current-formats.md` 한 곳, 양쪽 행을 합쳐 해결): 서버 구성에 선택 `memory:{maxMiB, initialMiB?}`
+  (Xmx 512–65536 MiB 필수, Xms 선택·256 이상·Xmx 이하, Xms만 있으면 거부), Studio 게임 환경 카드에 Xmx/Xms GB 입력(새 프로젝트는 Xmx 2 GB·Xms 빈칸), 테스트 실행도 같은 값 사용.
+  런처 유효값은 플레이어 설정 → 서버 기본값 → 내장 기본값(Xmx 2048, Xms 없음), Xms가 Xmx를 넘으면 Xms를 버린다. 서버 기본값이 물리 RAM을 넘으면 `memory-limit-server`로 설정에서 낮추라고 안내.
+  설정 화면에 "서버 기본값/현재 적용값"과 "서버 기본값 사용"(`clear-game-memory`) 버튼. 서버 구성이 바뀌므로 런처 ZIP 재내보내기가 필요하고 torchpack 재빌드는 불필요.
+  한계: 새 Xmx/Xms 인자로 실제 Minecraft를 실행하지 않았고(mock 서비스 테스트), 서버 `memory`가 있을 때의 런처 설정 화면 캡처 없음, Windows 로컬 미실행.
+- main 검증(이 병합 단계): 루트 `pnpm check` 120 files/**1630 passed**(9 skip), 공통·Studio 기능·런처 기능·두 branding smoke 성공.
+- `feat/studio-test-result`(Codex 작업 브랜치)에 main을 병합해 최신화했다(`1e2d48d`, 충돌 없음). 해당 worktree에서 Biome·타입·`pnpm test` 120 files/1597 passed·빌드 성공.
+  이 브랜치의 작업자 커밋 `787ba8a`가 `docs/progress.md`를 수정했으므로 main 통합 때 규칙(진행표는 #0만 수정)에 따라 해당 변경을 검토한다. 아직 main에 통합하지 않았다.
+- 검증 범위 원칙(사용자 지적 2026-10-25): 병합마다 전체 검사+전 smoke를 반복하지 않는다. 작업자가 통과를 보고한 깨끗한 병합은 영향 범위만 확인하고,
+  충돌 해결·코드 수정·다중 병합·미실행 보고·공유 계약 변경 때만 전체 또는 해당 smoke를 돌린다. 넓은 검증은 push 후 CI(Windows+Linux)를 쓰되 push는 사용자 승인 후에만 한다.
+
 ### GitHub Actions JavaScript 런타임 Node 24 (2026-10-25)
 
 사용자 요청으로 CI/릴리스 workflow에서 Node 20을 선언하던 JavaScript 액션을 Node 24 런타임 액션으로 갱신했다.
