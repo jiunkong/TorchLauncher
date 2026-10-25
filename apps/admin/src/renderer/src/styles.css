@@ -2580,7 +2580,6 @@ button.big.dlgbtn {
   height: 36px;
   flex: none;
   background: var(--bg-deep);
-  border-bottom: 1px solid var(--line);
   color: var(--text-2);
   -webkit-app-region: drag;
   app-region: drag;

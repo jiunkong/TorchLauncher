@@ -105,7 +105,6 @@ button:disabled {
   position: relative;
   height: 36px;
   background: var(--bg-deep);
-  border-bottom: 1px solid var(--line);
   color: var(--text-2);
   -webkit-app-region: drag;
   app-region: drag;
