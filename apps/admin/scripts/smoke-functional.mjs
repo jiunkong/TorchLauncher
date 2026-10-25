@@ -589,31 +589,117 @@ try {
     'discarding reopens the saved project',
   );
 
-  // Files: project folder, add files, real sizes, bulk policy, rescan.
+  // Files: project folder, add files, real sizes, bulk policy, launcher paths, deletion, rescan.
   await goto('파일');
+  const projectFiles = async () =>
+    page.evaluate(
+      async () => (await window.torchlauncher.request({ action: 'state' })).state.project.files,
+    );
   await page.getByTestId('source-name').filter({ hasText: 'server-project' }).waitFor();
   await page.getByTestId('project-reveal').click();
   await page.getByRole('button', { name: '파일 추가', exact: true }).click();
   const customRow = page.getByRole('row').filter({ hasText: 'custom.data' });
   await customRow.waitFor();
   assert.match(await customRow.textContent(), /19 B/);
-  assert.equal(await page.getByRole('button', { name: '설정 화면에서 관리' }).count(), 1);
+  // Player settings (options.txt) are managed on their own page and never listed here.
+  assert.equal(await page.getByRole('row').filter({ hasText: 'options.txt' }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '설정 화면에서 관리' }).count(), 0);
+  assert.deepEqual(await projectFiles(), [
+    { path: 'custom.data', targetPath: 'custom.data', policy: 'always' },
+  ]);
+  // Added files start as "always" and list their launcher path (the source path by default).
+  const targetInput = page.getByLabel('custom.data의 런처 경로');
+  assert.equal(await targetInput.inputValue(), 'custom.data');
   await customRow
     .getByRole('radiogroup', { name: 'custom.data 적용 방식' })
     .getByRole('radio', { name: '최초만' })
     .click();
   await customRow.locator('button.i[aria-checked=true]').waitFor();
   await page.getByLabel('custom.data 선택').check();
-  await page.getByTestId('files-bulk').getByRole('button', { name: '제외', exact: true }).click();
-  await page.locator('tr.off').filter({ hasText: 'custom.data' }).waitFor();
+  await page.getByTestId('files-bulk').getByRole('button', { name: '항상 적용' }).click();
+  await customRow.locator('button.a[aria-checked=true]').waitFor();
+  await page.getByLabel('custom.data 선택').check();
+  await page.getByTestId('files-bulk').getByRole('button', { name: '최초 설치만' }).click();
+  await customRow.locator('button.i[aria-checked=true]').waitFor();
   await page.getByLabel('custom.data 선택').check();
   await page.getByTestId('files-bulk').getByRole('button', { name: '항상 적용' }).click();
-  await page.locator('tr:not(.off)').filter({ hasText: 'custom.data' }).waitFor();
+  await customRow.locator('button.a[aria-checked=true]').waitFor();
+  // Launcher path: a valid change is stored; unsafe and managed paths are refused and not stored.
+  await targetInput.fill('data/custom.data');
+  await targetInput.blur();
+  await page.waitForFunction(
+    async () =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === 'data/custom.data',
+  );
+  for (const bad of ['../escape.data', 'options.txt', 'mods/x.jar']) {
+    await targetInput.fill(bad);
+    await targetInput.blur();
+    await page.waitForTimeout(300);
+    assert.equal((await projectFiles())[0].targetPath, 'data/custom.data', `${bad} not stored`);
+  }
+  await targetInput.fill('custom.data');
+  await targetInput.blur();
+  await page.waitForFunction(
+    async () =>
+      (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+        .targetPath === 'custom.data',
+  );
+  // A source file that was never added is not listed.
   await writeFile(join(project, 'files', 'extra.txt'), 'added later');
   await page.getByTestId('files-rescan').click();
-  await page.getByRole('row').filter({ hasText: 'extra.txt' }).waitFor();
-  await page.getByLabel('extra.txt 선택').check();
-  await page.getByTestId('files-bulk').getByRole('button', { name: '제외', exact: true }).click();
+  await page.waitForFunction(async () => {
+    const state = (await window.torchlauncher.request({ action: 'state' })).state;
+    return state.files.entries.some((entry) => entry.path === 'extra.txt');
+  });
+  assert.equal(await page.getByRole('row').filter({ hasText: 'extra.txt' }).count(), 0);
+  // Delete asks first; cancelling keeps the file, confirming removes the entry and the file.
+  await customRow.getByTestId('files-remove').click();
+  await page.getByTestId('files-remove-dialog').waitFor();
+  await page.getByTestId('files-remove-dialog').getByRole('button', { name: '취소' }).click();
+  assert.equal(
+    await readFile(join(project, 'files', 'custom.data'), 'utf8'),
+    'UI selected payload',
+  );
+  await customRow.getByTestId('files-remove').click();
+  await page.getByTestId('files-remove-confirm').click();
+  await customRow.waitFor({ state: 'detached' });
+  await assert.rejects(readFile(join(project, 'files', 'custom.data')), { code: 'ENOENT' });
+  assert.deepEqual(await projectFiles(), []);
+  // Deleting autosaves; adding the file again lists it as "always" once more.
+  assert.equal(
+    await page.evaluate(
+      async () => (await window.torchlauncher.request({ action: 'state' })).state.dirty,
+    ),
+    false,
+  );
+  await page.getByRole('button', { name: '파일 추가', exact: true }).click();
+  await customRow.waitFor();
+  assert.deepEqual(await projectFiles(), [
+    { path: 'custom.data', targetPath: 'custom.data', policy: 'always' },
+  ]);
+  // The page holds its layout at the minimum and default widths.
+  await mkdir(join(cwd, '.cache/smoke'), { recursive: true });
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 760 });
+    const fit = await page.evaluate(() => {
+      const scroll = document.querySelector('.tablecard .scroll').getBoundingClientRect();
+      const card = document.querySelector('.tablecard').getBoundingClientRect();
+      const input = document.querySelector('.file-target').getBoundingClientRect();
+      return {
+        horizontal: document.documentElement.scrollWidth > innerWidth,
+        // A narrow table scrolls inside its own card instead of widening the page.
+        scrollInsideCard: scroll.left >= card.left - 1 && scroll.right <= card.right + 1,
+        inputWide: input.width >= 80,
+      };
+    });
+    assert.deepEqual(
+      fit,
+      { horizontal: false, scrollInsideCard: true, inputWide: true },
+      `files@${width}`,
+    );
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-files-${width}.png`) });
+  }
 
   // Player settings imports options explicitly from either source.
   await goto('단축키 · 옵션');
@@ -763,17 +849,11 @@ try {
   assert.equal(await page.getByTestId('settings-policy-error').count(), 0);
   // The generated policy and imported mod are managed files.
   await goto('파일');
-  await page
-    .getByRole('row')
-    .filter({ hasText: 'resourcepacks/server-pack.zip' })
-    .getByRole('button', { name: '설정 화면에서 관리' })
-    .waitFor();
-  await page
-    .getByRole('row')
-    .filter({ hasText: 'mods/example-mod.jar' })
-    .getByRole('button', { name: '설정 화면에서 관리' })
-    .click();
-  assert.equal(await page.getByRole('button', { name: '배포 파일 다시 만들기' }).count(), 0);
+  // They are not listed on the Files page; the mod stays on its own page.
+  assert.equal(await page.getByRole('row').filter({ hasText: 'server-pack.zip' }).count(), 0);
+  assert.equal(await page.getByRole('row').filter({ hasText: 'example-mod.jar' }).count(), 0);
+  assert.equal(await page.getByRole('row').filter({ hasText: 'settings-policy' }).count(), 0);
+  await goto('모드');
   await page.getByTestId('mod-row').waitFor();
   // Return to the file list through the side navigation.
   await page.getByRole('button', { name: '파일' }).click();

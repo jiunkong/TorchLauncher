@@ -465,12 +465,14 @@ async function harness() {
     'renderDistance:12\nmusicVolume:0.5\nkey_key.inventory:key.keyboard.e\nfov:70.0\n',
   );
   /** Reopens a current project with an explicit file list. */
-  const reopenWithFiles = async (files: { path: string; policy: 'always' | 'initial-only' }[]) => {
+  const reopenWithFiles = async (
+    files: { path: string; targetPath?: string; policy: 'always' | 'initial-only' }[],
+  ) => {
     const project = parseProject(s.snapshot().project);
-    project.files = files.map((file) => ({ ...file, targetPath: file.path }));
+    project.files = files.map((file) => ({ ...file, targetPath: file.targetPath ?? file.path }));
     await writeFile(join(root, PROJECT_FILE_NAME), encodeProjectFile(project, {}));
     d.open.mockResolvedValueOnce([root]);
-    await s.request({ action: 'open', discard: true });
+    return s.request({ action: 'open', discard: true });
   };
   const importFolder = async () => {
     d.open.mockResolvedValueOnce([game]);
@@ -595,29 +597,38 @@ describe('service: game settings preset', () => {
         ?.change,
     ).toBe('modified');
   });
-  it('keeps plain options.txt entries working for projects that never used game settings', async () => {
+  it('rejects options.txt as a plain file source or target: player settings are managed, with no legacy reader', async () => {
     const h = await harness();
     await writeFile(join(h.source, 'options.txt'), 'old');
-    // Current projects can list options.txt as a plain file.
-    await h.reopenWithFiles([{ path: 'options.txt', policy: 'initial-only' }]);
-    expect(h.s.snapshot().files?.entries[0]).toMatchObject({
-      path: 'options.txt',
-      policy: 'managed',
+    const before = h.s.snapshot().project;
+    expect(await h.reopenWithFiles([{ path: 'options.txt', policy: 'initial-only' }])).toEqual({
+      ok: false,
+      code: 'INVALID',
     });
-    expect([...(await h.readPack()).keys()]).toEqual(['options.txt|initial-only']);
+    expect(
+      await h.reopenWithFiles([
+        { path: 'options.txt', targetPath: 'plain-options.txt', policy: 'always' },
+      ]),
+    ).toEqual({ ok: false, code: 'INVALID' });
+    expect(h.s.snapshot().project).toEqual(before);
+    // The manual file picker skips the managed file instead of listing it.
+    h.d.open.mockResolvedValueOnce([join(h.source, 'options.txt')]);
+    expect((await h.s.request({ action: 'files' })).ok).toBe(true);
+    expect(h.s.snapshot().project?.files).toEqual([]);
+    expect(h.s.snapshot().files?.entries.find((e) => e.path === 'options.txt')).toMatchObject({
+      policy: 'managed',
+      targetPath: null,
+    });
   });
-  it('drops a plain options.txt entry from the build once game settings own it', async () => {
+  it('builds plain files beside game settings without building options.txt', async () => {
     const h = await harness();
     await writeFile(join(h.source, 'options.txt'), 'old');
     await writeFile(join(h.source, 'keep.txt'), 'k');
-    await h.reopenWithFiles([
-      { path: 'options.txt', policy: 'always' },
-      { path: 'keep.txt', policy: 'always' },
-    ]);
+    await h.reopenWithFiles([{ path: 'keep.txt', targetPath: 'extra/keep.txt', policy: 'always' }]);
     await h.importFolder();
     await h.s.request({ action: 'settingsOptions', changes: [{ key: 'fov', policy: 'initial' }] });
     expect([...(await h.readPack()).keys()].sort()).toEqual([
-      'keep.txt|always',
+      'extra/keep.txt|always',
       'torchlauncher/settings-policy.json|always',
     ]);
   });

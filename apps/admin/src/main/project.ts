@@ -113,6 +113,8 @@ export function parseProject(input: unknown): StudioProject {
         { expectedServerId: p.serverId as string },
       );
     validatePaths(files.map((file) => file.path));
+    // Managed files (player settings, mods, resource packs, shaders) cannot be a source either.
+    if (files.some((file) => isReservedPath(file.path))) throw new StudioFailure('INVALID');
     const targets = (p.files as Record<string, unknown>[]).map((file) => file.targetPath as string);
     validatePaths(targets);
     if (targets.some((path) => isReservedPath(path))) throw new StudioFailure('INVALID');

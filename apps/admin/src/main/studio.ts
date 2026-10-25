@@ -1342,6 +1342,8 @@ export class StudioService {
               files.set(rel, { path: rel, targetPath: rel, policy: 'always' });
           } else {
             const name = basename(path);
+            // Managed files are never listed (as for files already inside), so do not copy one.
+            if (isReservedPath(name)) continue;
             await copyIntoDataDir(root, path, name, signal);
             if (!files.has(name))
               files.set(name, { path: name, targetPath: name, policy: 'always' });

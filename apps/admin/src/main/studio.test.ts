@@ -350,11 +350,11 @@ describe('Studio project and trusted disk selections', () => {
     const source = join(projDir, PROJECT_DATA_DIR);
     await mkdir(join(source, 'custom'), { recursive: true });
     await writeFile(join(source, 'custom', 'arbitrary.data'), 'real payload');
-    await writeFile(join(source, 'options.txt'), 'initial settings');
+    await writeFile(join(source, 'seed.cfg'), 'initial settings');
 
     d.open.mockResolvedValueOnce([
       join(source, 'custom', 'arbitrary.data'),
-      join(source, 'options.txt'),
+      join(source, 'seed.cfg'),
     ]);
     expect((await s.request({ action: 'files' })).ok).toBe(true);
     const project = parseProject(s.snapshot().project);
@@ -371,7 +371,7 @@ describe('Studio project and trusted disk selections', () => {
     });
     expect(reader.index.files.map((f) => [f.path, f.policy])).toEqual([
       ['custom/arbitrary.data', 'always'],
-      ['options.txt', 'initial-only'],
+      ['seed.cfg', 'initial-only'],
     ]);
     await reader.stageFile('custom/arbitrary.data', join(root, 'staged'));
     expect(await readFile(join(root, 'staged'), 'utf8')).toBe('real payload');
