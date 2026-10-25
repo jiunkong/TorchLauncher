@@ -7,6 +7,18 @@
 
 ## 현재 상태와 다음 작업
 
+### GitHub 푸시와 첫 CI (2026-10-25)
+
+`main`을 `https://github.com/jiunkong/TorchLauncher`에 처음 push했다(사용자 승인, 빈 원격, `main`만; `release` 브랜치/태그 없음 → 릴리스 workflow 미실행).
+이력에는 Git에서 뺀 로컬 작업 문서 262개 버전과 홈 경로 일부가 남아 있음을 사용자에게 알렸고 사용자가 그대로 push하기로 결정했다.
+- 첫 실행(run 40187656137): ubuntu 통과, **macOS 실패**(`NO_PROJECT` 단언, 원인 미조사), **Windows 실패**(`pnpm check`의 테스트 9개).
+  `.github/workflows/ci.yml`은 초기 커밋에서 macOS를 포함한 채 만들어져 보류 결정(2026-10-22)이 반영되지 않았다 → 매트릭스에서 macOS 제거 `862ad81`.
+- Windows 실패 9개는 모두 테스트 이식성 문제로 확인해 수정: `bad name?.zip`(Windows 금지 문자)을 `bad%name.zip`으로, readdir 순서 정렬, 경로 기대값을 `path.join/resolve`로,
+  `vi.waitFor` 기본 1초가 느린 Windows 러너에서 부족해 `syncing`→`running` 대기가 실패하던 것을 25ms 폴링/20초 상한 helper로 교체(테스트 6개 파일 포함). 제품 코드 변경 없음. Sonnet `f08c3ee` → main `f9401ba`.
+- push 후 run 40188533765: **ubuntu와 windows 모두 통과**. Windows는 `pnpm check` Vitest 120 files/1585 passed·**17 skipped**(Linux는 9 skipped; 차이는 Windows 가드로 건너뛴 테스트)와
+  `Smoke test (Windows)`(런처·Studio 공통 렌더러/IPC/격리/760·1100px)까지 성공. 이는 CI 실행 증거이며 Windows 실게임·네이티브 컨트롤·패키지 실행 검증은 아니다.
+- 남은 Windows 의심 지점(작업자 보고, 미수정): `scripts/smoke.mjs`의 `SIGKILL`/8.3 임시 경로, `auth-smoke`/`game-smoke`의 시그널 처리. 기능 smoke(Studio/런처)는 CI에서 실행하지 않는다.
+
 ### NATIVE-TITLEBAR-01 · STUDIO-FILES-UI-01 통합 (2026-10-25)
 
 - NATIVE-TITLEBAR-01 Codex `6be251e`/`0a50ccb` → main `dbf83e4`: 두 앱 창이 `titleBarStyle: 'hidden'` + 36px `titleBarOverlay`(`--bg-deep`)를 쓰고,
