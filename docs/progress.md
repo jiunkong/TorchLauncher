@@ -7,6 +7,22 @@
 
 ## 현재 상태와 다음 작업
 
+### RELEASE-DOWNLOAD-01 · 공통 런처 다운로드 구현·검토 완료 (2026-10-25, 기능 브랜치)
+
+사용자 요청으로 새 `feat/launcher-release-download` 브랜치에서 작업한다(baseline `5a249af`).
+작업자 `release_download`(gpt-6.1-sol medium) `588f887`을 #0이 검토했다. main 병합·push 없이 기능 브랜치에 남긴다.
+- 최신 안정 릴리스 조회·검증·다운로드·캐시를 Electron 없는 `core/releases`로 분리하고 Studio resolver를 adapter로 교체했다.
+  Studio의 개발 로컬 파일·검증된 온라인 캐시·정확한 버전의 오프라인 캐시 사용 동의·오류/상태 계약은 유지한다.
+- 런처에 미연결 `main/updates` backend를 추가했다. 확인은 metadata만 조회하고 다운로드 시 최신 정보를 다시 확인해 현재 버전보다 높은 안정판만 받는다.
+  진행·취소·이전 작업 무효화·경로/URL 없는 상태 snapshot을 제공하며 오프라인 캐시를 업데이트 성공으로 취급하지 않는다.
+- stream까지 적용되는 120초 deadline, 크기·SHA-256·헤더 검사, immutable generation/원자적 포인터, 취소/실패 정리,
+  symlink·hardlink·FIFO 차단을 확인했다. 숫자 버전 비교와 잘못된 stable 태그/후행 공백 거부를 테스트했다.
+- 작업자 검증: 집중 Vitest 3 files/**58 passed**(공통19/런처7/기존 Studio32), workspace 타입 전체, scoped Biome 오류/경고0, 두 앱 build 성공.
+  #0은 공통 경계·adapter·backend·제품 문서의 diff 검토와 `git diff --check`를 완료했다. 깨끗한 기능 브랜치의 테스트/빌드는 중복 실행하지 않았다.
+- 한계/후속: 현재 검증 기준은 GitHub API size/digest다. 실행 파일 교체 전 독립 게시자 서명 검증이 필요하다.
+  실제 교체·재시작·시작/IPC/UI 연결, native Windows·실제 GitHub 다운로드는 미구현 또는 미검증이며 RELEASE-02 전체 완료가 아니다.
+  성공한 캐시 generation 자동 정리는 후속이다. 제품 설명 [런처 다운로드](launcher-updates.md), 로컬 인계 `docs/handoffs/RELEASE-DOWNLOAD-01.md`.
+
 ### STUDIO-BRANDING-AUTOSAVE · SERVER-MEMORY-01 통합 (2026-10-25)
 
 - 브랜딩 이미지 저장 `606a4df` → main `3c3c8ff`: 이미지 선택 시 검증된 원본을 `<프로젝트>/branding/`에 원자적으로 복사하고 프로젝트를 자동 저장한다(`project.torchproj`의 내장 스냅샷은 유지).
