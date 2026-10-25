@@ -7,6 +7,15 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-BUSY-LABEL-01 · STUDIO-MODS-ALWAYS-01 통합 (2026-10-25)
+
+- 모드/리소스팩/셰이더 추가 선택창이 열린 동안 상단 문구가 "게임 설정을 읽는 중"이던 문제: `bfdabb9` → main `88c97ec`.
+  action→라벨 대응표를 `hooks/operations.ts`로 분리했고 선택창 동안 `op.choosing`을 표시한다. 한계: 선택 후 복사 구간도 같은 문구
+  (선택창 닫힘 신호 IPC 없음), 한국어 화면 육안 확인 없음(대응 테스트·smoke만).
+- 모드 정책 선택 제거: `44a594d` → main `7cbd1a6`. 모드는 항상 `always`(저장 필드는 `required`)로 추가·로드·계획하고
+  `settingsPackPolicy`는 모드에 대해 INVALID. 예전 프로젝트의 initial/none 값은 저장 전까지 파일에 남지만 앱에서는 always로 취급.
+- main 검증(두 작업 통합 후): `pnpm check` 118 files/**1561 passed**(9 skip), 공통 smoke, Studio 기능 smoke, branding smoke 성공.
+
 ### STUDIO-POLISH-02 통합 (2026-10-25)
 
 Sonnet 작업자 `66f2af2` → main `536fe70`. 개요의 "소스 폴더" 문구와 카탈로그의 다른 소스 폴더 표현 정리, 게임 환경 도움말 정리
