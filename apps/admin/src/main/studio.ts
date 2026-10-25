@@ -112,6 +112,8 @@ export interface StudioDialogs {
 const RESCAN = new Set([
   'files',
   'filesPolicy',
+  'filesTarget',
+  'filesRemove',
   'rescan',
   'exportCheck',
   'build',
@@ -121,6 +123,8 @@ const RESCAN = new Set([
 const POLICY_CHOICES = ['none', 'initial', 'required'];
 const SPECIAL_FIELDS: Record<string, string[]> = {
   filesPolicy: ['paths', 'policy'],
+  filesTarget: ['path', 'targetPath'],
+  filesRemove: ['path'],
   settingsImport: ['source'],
   settingsImportOptions: ['source'],
   settingsTestConfigs: [],
@@ -183,8 +187,19 @@ function validSpecial(value: Record<string, unknown>): boolean {
         value.paths.length > 0 &&
         value.paths.length <= 1000 &&
         value.paths.every((p) => typeof p === 'string' && p.length > 0 && p.length <= 1024) &&
-        ['always', 'initial-only', 'excluded'].includes(value.policy as string)
+        ['always', 'initial-only'].includes(value.policy as string)
       );
+    case 'filesTarget':
+      return (
+        typeof value.path === 'string' &&
+        value.path.length > 0 &&
+        value.path.length <= 1024 &&
+        typeof value.targetPath === 'string' &&
+        value.targetPath.length > 0 &&
+        value.targetPath.length <= 1024
+      );
+    case 'filesRemove':
+      return typeof value.path === 'string' && value.path.length > 0 && value.path.length <= 1024;
     case 'settingsTestConfigs':
       return true;
     case 'settingsImportOptions':
@@ -858,18 +873,78 @@ export class StudioService {
         );
         for (const path of new Set(command.paths)) {
           if (isReservedPath(path) || policyPaths.has(path)) throw new StudioFailure('INVALID');
-          if (command.policy === 'excluded') {
-            if (!files.has(path) && !onDisk.has(path)) throw new StudioFailure('INVALID');
-            files.delete(path);
-          } else {
-            if (!onDisk.has(path)) throw new StudioFailure('INVALID');
-            files.set(path, { path, policy: command.policy });
-          }
+          if (!files.has(path) || !onDisk.has(path)) throw new StudioFailure('INVALID');
+          files.set(path, { ...files.get(path)!, policy: command.policy });
         }
         signal.throwIfAborted();
         this.lastScan = scan;
         this.state.project = parseProject({ ...project, files: [...files.values()] });
         this.state.dirty = true;
+        return;
+      }
+      case 'filesTarget': {
+        const project = this.project();
+        const root = this.sourceRoot;
+        if (!root) throw new StudioFailure('INVALID');
+        const scan = await scanSource(root, signal);
+        const policyPaths = new Set(
+          project.gameSettings ? policyConfigPaths(project.gameSettings) : [],
+        );
+        const files = project.files.map((file) => {
+          if (file.path !== command.path) return file;
+          if (
+            isReservedPath(file.path) ||
+            policyPaths.has(file.path) ||
+            policyPaths.has(command.targetPath)
+          )
+            throw new StudioFailure('INVALID');
+          if (!scan.files.some((entry) => entry.path === file.path))
+            throw new StudioFailure('INVALID');
+          return { ...file, targetPath: command.targetPath };
+        });
+        if (!project.files.some((file) => file.path === command.path))
+          throw new StudioFailure('INVALID');
+        signal.throwIfAborted();
+        this.state.project = parseProject({ ...project, files });
+        this.lastScan = scan;
+        this.state.dirty = true;
+        if (!(await this.autoSave(signal))) this.state.result = { key: 'autosaveFailed' };
+        return;
+      }
+      case 'filesRemove': {
+        const project = this.project();
+        const root = this.sourceRoot;
+        if (!root) throw new StudioFailure('INVALID');
+        const file = project.files.find((entry) => entry.path === command.path);
+        const policyPaths = new Set(
+          project.gameSettings ? policyConfigPaths(project.gameSettings) : [],
+        );
+        if (!file || isReservedPath(file.path) || policyPaths.has(file.path))
+          throw new StudioFailure('INVALID');
+        const target = join(root, ...file.path.split('/'));
+        signal.throwIfAborted();
+        try {
+          await noLinks(dirname(target));
+        } catch (error) {
+          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
+            throw error;
+        }
+        try {
+          await noLinks(target);
+          const info = await lstat(target);
+          if (!info.isFile() || info.nlink !== 1) throw new StudioFailure('INVALID');
+          await rm(target);
+        } catch (error) {
+          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'))
+            throw error;
+        }
+        this.state.project = parseProject({
+          ...project,
+          files: project.files.filter((entry) => entry.path !== file.path),
+        });
+        this.lastScan = null;
+        this.state.dirty = true;
+        if (!(await this.autoSave(signal))) this.state.result = { key: 'autosaveFailed' };
         return;
       }
       case 'settingsTestConfigs':
@@ -1263,11 +1338,13 @@ export class StudioService {
           const rel = relative(root, path).split(sep).join('/');
           const inside = !isAbsolute(rel) && rel !== '..' && !rel.startsWith('../');
           if (inside) {
-            if (!files.has(rel)) files.set(rel, { path: rel, policy: 'always' });
+            if (!isReservedPath(rel) && !files.has(rel))
+              files.set(rel, { path: rel, targetPath: rel, policy: 'always' });
           } else {
             const name = basename(path);
             await copyIntoDataDir(root, path, name, signal);
-            if (!files.has(name)) files.set(name, { path: name, policy: 'always' });
+            if (!files.has(name))
+              files.set(name, { path: name, targetPath: name, policy: 'always' });
           }
         }
         signal.throwIfAborted();
@@ -1326,7 +1403,7 @@ export class StudioService {
         for (const item of plan.items) {
           if (item.kind !== 'pack') continue;
           // A pack that changed on disk since it was added would ship bytes the preset never described.
-          const actual = await hashFile(join(this.sourceRoot, item.path), PACK_LIMIT, signal);
+          const actual = await hashFile(join(this.sourceRoot, item.sourcePath), PACK_LIMIT, signal);
           if (actual.sha256 !== item.sha256) throw new StudioFailure('MISMATCH');
         }
         if (plan.policyText) await writeGeneratedPolicy(this.sourceRoot, plan.policyText);
@@ -1348,7 +1425,8 @@ export class StudioService {
           deploymentId,
           game: project.game,
           files: plan.items.map((f) => ({
-            sourcePath: f.path,
+            sourcePath: f.sourcePath,
+            path: f.path,
             policy: f.policy,
             compression: 'none',
           })),
@@ -1370,6 +1448,7 @@ export class StudioService {
             brandingKey: brandingKey(project),
             files: written.index.files.map((f) => ({
               path: f.path,
+              sourcePath: plan.items.find((item) => item.path === f.path)?.sourcePath ?? f.path,
               sha256: f.sha256,
               length: f.originalLength,
               policy: f.policy,

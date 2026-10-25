@@ -6,7 +6,7 @@ import {
 import { parseServerIdentity } from '../../../../packages/core/src/server-config/index.js';
 import type { StudioLastBuild, StudioProject } from '../shared/studio.js';
 import { parseBranding } from './branding.js';
-import { parseGameSettings } from './game-settings.js';
+import { isReservedPath, parseGameSettings } from './game-settings.js';
 
 export class StudioFailure extends Error {
   constructor(readonly code: import('../shared/studio.js').StudioError) {
@@ -74,7 +74,12 @@ export function parseProject(input: unknown): StudioProject {
       if (!file || typeof file !== 'object' || Array.isArray(file))
         throw new StudioFailure('INVALID');
       const f = file as Record<string, unknown>;
-      if (Object.keys(f).length !== 2 || !Object.hasOwn(f, 'path') || !Object.hasOwn(f, 'policy'))
+      if (
+        Object.keys(f).sort().join(',') !== 'path,policy,targetPath' ||
+        typeof f.path !== 'string' ||
+        typeof f.targetPath !== 'string' ||
+        (f.policy !== 'always' && f.policy !== 'initial-only')
+      )
         throw new StudioFailure('INVALID');
       return {
         path: f.path,
@@ -86,26 +91,31 @@ export function parseProject(input: unknown): StudioProject {
         compression: 'none',
       };
     });
-    validateDeploymentIndex(
-      {
-        formatVersion: { major: 1, minor: 2 },
-        serverId: p.serverId,
-        deploymentId: p.serverId,
-        game: p.game,
-        sequence: 1,
-        branding: {},
-        files,
-      },
-      {
-        magic: 'TORCHDEP',
-        formatVersion: { major: 1, minor: 2 },
-        flags: 0,
-        indexLength: 1,
-        totalLength: 129,
-        indexSha256: EMPTY_FILE_SHA256,
-      },
-      { expectedServerId: p.serverId as string },
-    );
+    const validatePaths = (paths: string[]) =>
+      validateDeploymentIndex(
+        {
+          formatVersion: { major: 1, minor: 2 },
+          serverId: p.serverId,
+          deploymentId: p.serverId,
+          game: p.game,
+          sequence: 1,
+          branding: {},
+          files: paths.map((path) => ({ ...files[0], path })),
+        },
+        {
+          magic: 'TORCHDEP',
+          formatVersion: { major: 1, minor: 2 },
+          flags: 0,
+          indexLength: 1,
+          totalLength: 129,
+          indexSha256: EMPTY_FILE_SHA256,
+        },
+        { expectedServerId: p.serverId as string },
+      );
+    validatePaths(files.map((file) => file.path));
+    const targets = (p.files as Record<string, unknown>[]).map((file) => file.targetPath as string);
+    validatePaths(targets);
+    if (targets.some((path) => isReservedPath(path))) throw new StudioFailure('INVALID');
   } catch {
     throw new StudioFailure('INVALID');
   }
@@ -154,9 +164,11 @@ export function parseLastBuild(input: unknown): StudioLastBuild {
     if (
       !e ||
       typeof e !== 'object' ||
-      Object.keys(e).sort().join(',') !== 'length,path,policy,sha256' ||
+      Object.keys(e).sort().join(',') !== 'length,path,policy,sha256,sourcePath' ||
       typeof e.path !== 'string' ||
       !e.path ||
+      typeof e.sourcePath !== 'string' ||
+      !e.sourcePath ||
       e.path.length > 1024 ||
       (e.policy !== 'always' && e.policy !== 'initial-only') ||
       typeof e.sha256 !== 'string' ||

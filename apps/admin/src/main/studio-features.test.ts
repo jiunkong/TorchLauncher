@@ -86,7 +86,7 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
     await writeFile(join(source, path), content);
   }
   await s.request({ action: 'rescan' });
-  const include = async (paths: string[], policy: 'always' | 'initial-only' | 'excluded') =>
+  const include = async (paths: string[], policy: 'always' | 'initial-only') =>
     s.request({ action: 'filesPolicy', paths, policy });
   const edit = async (change: (p: ReturnType<typeof parseProject>) => void) => {
     const p = parseProject(s.snapshot().project);
@@ -122,8 +122,8 @@ describe('files diff against the last build', () => {
     expect((await h.include(['a.txt', 'sub/b.txt'], 'always')).ok).toBe(true);
     expect(h.s.snapshot().files?.counts).toMatchObject({ excluded: 0, total: 2 });
     expect(h.s.snapshot().project?.files).toEqual([
-      { path: 'a.txt', policy: 'always' },
-      { path: 'sub/b.txt', policy: 'always' },
+      { path: 'a.txt', targetPath: 'a.txt', policy: 'always' },
+      { path: 'sub/b.txt', targetPath: 'sub/b.txt', policy: 'always' },
     ]);
   });
   it('reports added, modified (same size), policy-modified, removed and excluded correctly', async () => {
@@ -137,14 +137,14 @@ describe('files diff against the last build', () => {
     await writeFile(join(h.source, 'b.txt'), 'bbbb');
     await h.include(['c.txt'], 'initial-only');
     await h.include(['d.txt'], 'initial-only');
-    await h.include(['b.txt'], 'excluded');
+    await h.s.request({ action: 'filesRemove', path: 'b.txt' });
     await h.s.request({ action: 'rescan' });
     const state = h.s.snapshot();
     expect(entry(state, 'a.txt')).toMatchObject({ policy: 'always', change: 'modified' });
     expect(entry(state, 'b.txt')).toMatchObject({ policy: 'excluded', change: 'removed' });
     expect(entry(state, 'c.txt')).toMatchObject({ policy: 'initial-only', change: 'added' });
     expect(entry(state, 'd.txt')).toMatchObject({ policy: 'initial-only', change: 'modified' });
-    expect(state.files?.counts).toMatchObject({ added: 1, modified: 2, removed: 1, excluded: 1 });
+    expect(state.files?.counts).toMatchObject({ added: 1, modified: 2, removed: 1 });
     expect(state.deploy).toMatchObject({
       status: 'changed',
       reasons: ['files'],
@@ -160,13 +160,13 @@ describe('files diff against the last build', () => {
     const state = h.s.snapshot();
     expect(entry(state, 'b.txt')).toMatchObject({ missing: true, size: null, change: 'modified' });
     expect(state.files?.counts.missing).toBe(1);
-    await h.include(['b.txt'], 'excluded');
+    await h.s.request({ action: 'filesRemove', path: 'b.txt' });
     expect(entry(h.s.snapshot(), 'b.txt')).toMatchObject({ change: 'removed', size: null });
     expect(h.s.snapshot().deploy?.status).toBe('changed');
   });
   it('rejects reserved, unknown, malformed and unsafe paths in the bulk policy command', async () => {
     const h = await harness({ 'a.txt': 'a', 'options.txt': 'x', 'resourcepacks/p.zip': 'z' });
-    const reply = async (paths: string[], policy: 'always' | 'excluded' = 'always') =>
+    const reply = async (paths: string[], policy: 'always' | 'initial-only' = 'always') =>
       h.s.request({ action: 'filesPolicy', paths, policy });
     expect(await reply(['options.txt'])).toEqual({ ok: false, code: 'INVALID' });
     expect(await reply(['resourcepacks/p.zip'])).toEqual({ ok: false, code: 'INVALID' });

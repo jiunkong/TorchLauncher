@@ -23,7 +23,10 @@ import type { ScanResult } from './scan.js';
 
 /** One file the next build will contain. */
 export interface PlanItem {
+  /** Deployment target path relative to the launcher's game directory. */
   path: string;
+  /** Source path relative to the Studio project files folder. */
+  sourcePath: string;
   policy: DeploymentFilePolicy;
   kind: 'disk' | 'pack' | 'generated';
   /** Known up front for packs and the generated policy; read from disk for `disk`. */
@@ -58,6 +61,7 @@ export function buildPlan(project: StudioProject): BuildPlan {
         if (choice === 'none') continue;
         managed.push({
           path: `${PACK_DIRECTORY[kind]}/${pack.name}`,
+          sourcePath: `${PACK_DIRECTORY[kind]}/${pack.name}`,
           policy: choice === 'required' ? 'always' : 'initial-only',
           kind: 'pack',
           length: pack.length,
@@ -74,6 +78,7 @@ export function buildPlan(project: StudioProject): BuildPlan {
       const bytes = Buffer.from(policy.text);
       managed.push({
         path: SETTINGS_POLICY_PATH,
+        sourcePath: SETTINGS_POLICY_PATH,
         policy: 'always',
         kind: 'generated',
         length: bytes.length,
@@ -85,9 +90,13 @@ export function buildPlan(project: StudioProject): BuildPlan {
   // Game settings own options.txt, the generated policy, packs and imported mods; plain entries
   // for the same paths are not built twice. Other plain files under resourcepacks/ keep working.
   const plain: PlanItem[] = project.files
-    .filter((f) => !taken.has(f.path) && !(settings && isPlanReserved(f.path)))
+    .filter(
+      (f) =>
+        !taken.has(f.path) && !taken.has(f.targetPath) && !(settings && isPlanReserved(f.path)),
+    )
     .map((f) => ({
-      path: f.path,
+      path: f.targetPath,
+      sourcePath: f.path,
       policy: f.policy,
       kind: 'disk' as const,
       length: null,
@@ -135,8 +144,8 @@ export async function computeFiles(
   now = Date.now(),
 ): Promise<DiffResult> {
   const plan = buildPlan(project);
-  const last = new Map((project.lastBuild?.files ?? []).map((f) => [f.path, f]));
-  const planned = new Map(plan.items.map((i) => [i.path, i]));
+  const last = new Map((project.lastBuild?.files ?? []).map((f) => [f.sourcePath, f]));
+  const planned = new Map(plan.items.map((i) => [i.sourcePath, i]));
   const entries: StudioFileEntry[] = [];
   const present = new Set<string>();
   let managedChanged = false;
@@ -150,7 +159,7 @@ export async function computeFiles(
     const before = last.get(path);
     if (!item) return before ? 'removed' : 'unchanged';
     if (!before) return 'added';
-    if (before.policy !== item.policy) return 'modified';
+    if (before.path !== item.path || before.policy !== item.policy) return 'modified';
     const length = item.length ?? size;
     if (length === null || before.length !== length) return 'modified';
     const sha = item.sha256 ?? (size === null ? null : await hash(path, size));
@@ -170,6 +179,7 @@ export async function computeFiles(
     note(change, managed);
     entries.push({
       path: file.path,
+      targetPath: item?.path ?? null,
       size: file.size,
       policy: managed ? 'managed' : item ? item.policy : 'excluded',
       change,
@@ -177,15 +187,16 @@ export async function computeFiles(
     });
   }
   for (const item of plan.items) {
-    if (present.has(item.path)) continue;
-    present.add(item.path);
+    if (present.has(item.sourcePath)) continue;
+    present.add(item.sourcePath);
     const generated = item.kind === 'generated';
     // Not on disk yet: the generated policy is written at build time, which is fine; other items are missing.
     const missing = !generated;
-    const change = await changeOf(item.path, item, generated ? item.length : null);
+    const change = await changeOf(item.sourcePath, item, generated ? item.length : null);
     note(change, item.kind !== 'disk');
     entries.push({
-      path: item.path,
+      path: item.sourcePath,
+      targetPath: item.path,
       size: generated ? item.length : null,
       policy: item.kind === 'disk' ? item.policy : 'managed',
       change,
@@ -193,11 +204,12 @@ export async function computeFiles(
     });
   }
   for (const before of last.values()) {
-    if (present.has(before.path)) continue;
-    const managed = isReservedPath(before.path);
+    if (present.has(before.sourcePath)) continue;
+    const managed = isReservedPath(before.sourcePath);
     note('removed', managed);
     entries.push({
-      path: before.path,
+      path: before.sourcePath,
+      targetPath: before.path,
       size: null,
       policy: managed ? 'managed' : 'excluded',
       change: 'removed',

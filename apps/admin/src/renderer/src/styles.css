@@ -929,6 +929,10 @@ button.chip.link:hover {
   overflow-wrap: anywhere;
   min-width: 160px;
 }
+.file-target {
+  width: 100%;
+  min-width: 160px;
+}
 .c-box {
   width: 36px;
 }
