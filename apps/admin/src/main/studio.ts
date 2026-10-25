@@ -29,7 +29,11 @@ import type {
   StudioUrlCheck,
   UrlCheckState,
 } from '../shared/studio.js';
-import { projectNameProblem, shaderConfigPaths } from '../shared/studio.js';
+import {
+  BRANDING_PREVIEW_LIMITS,
+  projectNameProblem,
+  shaderConfigPaths,
+} from '../shared/studio.js';
 import {
   type BrandingSnapshots,
   type ImageDecoder,
@@ -42,6 +46,7 @@ import {
   displayFileName,
   ioCause,
   prepareBrandingImage,
+  previewBrandingImage,
   type RasterDecoder,
 } from './branding-image.js';
 import { sameContent } from './canonical.js';
@@ -465,6 +470,15 @@ export class StudioService {
           (typeof value.cachedVersion !== 'string' || value.cachedVersion.length > 100))
       )
         return Promise.resolve({ ok: false, code: 'INVALID' });
+    } else if (value.action === 'brandingImage') {
+      if (
+        Object.keys(value).length !== 3 ||
+        (value.role !== 'icon' && value.role !== 'background') ||
+        typeof value.sha256 !== 'string' ||
+        !/^[0-9a-f]{64}$/.test(value.sha256)
+      )
+        return Promise.resolve({ ok: false, code: 'INVALID' });
+      return Promise.resolve(this.brandingImage(value.role, value.sha256));
     } else if (typeof value.action === 'string' && SPECIAL_FIELDS[value.action]) {
       if (!validSpecial(value)) return Promise.resolve({ ok: false, code: 'INVALID' });
     } else if (keyFields) {
@@ -558,6 +572,31 @@ export class StudioService {
         this.pending = null;
       });
     return this.pending;
+  }
+  /** Read-only and allowed while busy; answers from the in-memory snapshot, never from a path. */
+  private brandingImage(role: 'icon' | 'background', sha256: string): StudioReply {
+    const project = this.state.project;
+    if (!project) return { ok: false, code: 'NO_PROJECT' };
+    const asset = project.branding?.[role];
+    const bytes = this.snapshots[role];
+    if (!asset || !bytes || asset.sha256 !== sha256) return { ok: false, code: 'MISMATCH' };
+    try {
+      const thumb = previewBrandingImage(role, bytes, this.raster);
+      if (thumb.bytes.length > BRANDING_PREVIEW_LIMITS[role].maxBytes)
+        return { ok: false, code: 'TOO_LARGE' };
+      return {
+        ok: true,
+        state: this.snapshot(),
+        image: {
+          dataUrl: `data:${thumb.mediaType};base64,${thumb.bytes.toString('base64')}`,
+          width: thumb.width,
+          height: thumb.height,
+          sha256,
+        },
+      };
+    } catch {
+      return { ok: false, code: 'INVALID' };
+    }
   }
   private testActive = false;
   private testControl: Promise<StudioReply> | null = null;

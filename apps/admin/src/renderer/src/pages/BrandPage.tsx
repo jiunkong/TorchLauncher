@@ -3,6 +3,7 @@ import torchUrl from '../assets/torch.png';
 import { GamepadIcon, ModsIcon, PlayIcon, SettingsIcon } from '../components/Icons';
 import { PageHeader } from '../components/ui';
 import { formatBytes, loaderLabel } from '../format';
+import { useBrandingImage } from '../hooks/useBrandingImage';
 import { useStudioLocale } from '../i18n';
 import type { PageProps } from './types';
 
@@ -15,6 +16,15 @@ export function BrandPage({ studio, draft }: PageProps) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
   const inputId = useId();
+  const icon = useBrandingImage('icon', branding.icon?.sha256 ?? null);
+  const background = useBrandingImage('background', branding.background?.sha256 ?? null);
+  const images = { icon, background };
+  const failureText = (role: 'icon' | 'background', title: string) => {
+    const code = images[role].failure;
+    if (!code) return null;
+    const reason = code === 'MISMATCH' || code === 'TOO_LARGE' || code === 'INVALID' ? code : 'IO';
+    return t('brand.previewFailed', { item: title, reason: t(`brand.previewFailed.${reason}`) });
+  };
   const assetText = (asset: { length: number; mediaType: string } | null | undefined) =>
     asset
       ? `${asset.mediaType === 'image/png' ? 'PNG' : 'JPEG'} · ${formatBytes(asset.length)}`
@@ -24,37 +34,60 @@ export function BrandPage({ studio, draft }: PageProps) {
     title: string,
     asset: { length: number; mediaType: string } | null | undefined,
     thumb: string,
-  ) => (
-    <div className="row3" data-testid={`brand-${role}`}>
-      <span className="t" style={role === 'background' ? { background: thumb } : undefined}>
-        {role === 'icon' && <img src={torchUrl} alt="" width={30} height={30} />}
-      </span>
-      <span className="g">
-        <strong>{title}</strong>
-        <small>{assetText(asset)}</small>
-      </span>
-      {asset && (
+  ) => {
+    const custom = images[role].dataUrl;
+    const failure = failureText(role, title);
+    return (
+      <div className="row3" data-testid={`brand-${role}`}>
+        <span
+          className="t"
+          data-testid={`brand-${role}-thumb`}
+          data-custom={custom ? 'true' : 'false'}
+          style={role === 'background' ? { background: custom ? undefined : thumb } : undefined}
+        >
+          {role === 'icon' && (
+            <img
+              src={custom ?? torchUrl}
+              alt=""
+              width={30}
+              height={30}
+              className={custom ? 'custom' : undefined}
+            />
+          )}
+          {role === 'background' && custom && <img src={custom} alt="" className="fill" />}
+        </span>
+        <span className="g">
+          <strong>{title}</strong>
+          <small>{assetText(asset)}</small>
+          {failure && (
+            <small className="brand-fail" role="alert">
+              {failure}
+            </small>
+          )}
+        </span>
+        {asset && (
+          <button
+            className="btn sm ghost"
+            type="button"
+            disabled={busy}
+            aria-label={t('brand.removeLabel', { item: title })}
+            onClick={() => void command({ action: 'brandingRemove', role })}
+          >
+            {t('brand.remove')}
+          </button>
+        )}
         <button
-          className="btn sm ghost"
+          className="btn sm"
           type="button"
           disabled={busy}
-          aria-label={t('brand.removeLabel', { item: title })}
-          onClick={() => void command({ action: 'brandingRemove', role })}
+          aria-label={t('brand.changeLabel', { item: title })}
+          onClick={() => void command({ action: 'brandingSelect', role })}
         >
-          {t('brand.remove')}
+          {t('brand.change')}
         </button>
-      )}
-      <button
-        className="btn sm"
-        type="button"
-        disabled={busy}
-        aria-label={t('brand.changeLabel', { item: title })}
-        onClick={() => void command({ action: 'brandingSelect', role })}
-      >
-        {t('brand.change')}
-      </button>
-    </div>
-  );
+      </div>
+    );
+  };
   return (
     <>
       <PageHeader eyebrow={t('brand.eyebrow')} title={t('brand.title')} lead={t('brand.lead')} />
@@ -66,7 +99,14 @@ export function BrandPage({ studio, draft }: PageProps) {
           data-testid="brand-preview"
         >
           <div className="tb">
-            <img src={torchUrl} alt="" width={14} height={14} />
+            <img
+              src={icon.dataUrl ?? torchUrl}
+              alt=""
+              width={14}
+              height={14}
+              data-testid="brand-preview-icon"
+              data-custom={icon.dataUrl ? 'true' : 'false'}
+            />
             {shown}
           </div>
           <div className="body">
@@ -84,10 +124,27 @@ export function BrandPage({ studio, draft }: PageProps) {
                 <SettingsIcon />
               </i>
             </div>
-            <div className="st">
-              <span className="sun" />
-              <span className="h" />
-              <span className="h h2" />
+            <div
+              className="st"
+              data-testid="brand-preview-bg"
+              data-custom={background.dataUrl ? 'true' : 'false'}
+              style={
+                background.dataUrl
+                  ? {
+                      backgroundImage: `url("${background.dataUrl}")`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }
+                  : undefined
+              }
+            >
+              {!background.dataUrl && (
+                <>
+                  <span className="sun" />
+                  <span className="h" />
+                  <span className="h h2" />
+                </>
+              )}
               <span className="shd" />
               <div className="cp">
                 <small>{t('brand.previewStatus')}</small>

@@ -16,8 +16,8 @@ try {
     `
 import assert from 'node:assert/strict';
 import { app, nativeImage, safeStorage } from 'electron';
+import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { decodeNativeImage, rasterNativeImage } from ${JSON.stringify(resolve('apps/admin/src/main/native-branding.ts'))};
 import { validateImage } from ${JSON.stringify(resolve('apps/admin/src/main/branding.ts'))};
@@ -94,9 +94,29 @@ try {
   assert.equal((await pick('icon','empty.png',Buffer.alloc(0))).image.part,'empty');
   assert.deepEqual(service.snapshot().project,afterConversions);
   assert.deepEqual((await readdir(join(projDir,'branding'))).sort(),files);
+  // Previews are built from the STORED (converted) images: bounded, decodable, no paths, gone on removal.
+  const sha=(b)=>createHash('sha256').update(b).digest('hex');
+  const preview=async(role,bytes)=>{const reply=await service.request({action:'brandingImage',role,sha256:sha(bytes)});assert.equal(reply.ok,true);return reply.image;};
+  const storedIcon=await stored('icon.png');
+  const iconPreview=await preview('icon',storedIcon);
+  assert.ok(iconPreview.dataUrl.startsWith('data:image/png;base64,'));
+  assert.deepEqual(nativeImage.createFromDataURL(iconPreview.dataUrl).getSize(),{width:128,height:128});
+  assert.deepEqual([iconPreview.width,iconPreview.height],[128,128]);
+  const storedBackground=await stored('background.png');
+  const bgPreview=await preview('background',storedBackground);
+  assert.ok(bgPreview.dataUrl.startsWith('data:image/jpeg;base64,'));
+  assert.deepEqual([bgPreview.width,bgPreview.height],[960,Math.round(960*bgSize.height/bgSize.width)]);
+  assert.deepEqual(nativeImage.createFromDataURL(bgPreview.dataUrl).getSize(),{width:bgPreview.width,height:bgPreview.height});
+  assert.ok(bgPreview.dataUrl.length < 1.4*768*1024+64);
+  assert.equal(JSON.stringify([iconPreview,bgPreview]).includes(${JSON.stringify(root)}),false);
+  assert.deepEqual(await service.request({action:'brandingImage',role:'icon',sha256:'0'.repeat(64)}),{ok:false,code:'MISMATCH'});
+  assert.equal((await service.request({action:'save'})).ok,true);
+  selected=[projDir];assert.equal((await service.request({action:'open'})).ok,true);
+  assert.equal((await preview('icon',storedIcon)).width,128);
   assert.equal((await service.request({action:'brandingRemove',role:'background'})).ok,true);
   assert.deepEqual(await readdir(join(projDir,'branding')),['icon.png']);
-  console.log('Studio native branding smoke passed: PNG/JPEG decode, truncation, durable snapshot, oversize and byte-limit conversion, precise import failures, failed import preservation, scoped removal');
+  assert.deepEqual(await service.request({action:'brandingImage',role:'background',sha256:sha(storedBackground)}),{ok:false,code:'MISMATCH'});
+  console.log('Studio native branding smoke passed: PNG/JPEG decode, truncation, durable snapshot, oversize and byte-limit conversion, precise import failures, failed import preservation, scoped removal, bounded previews of converted images');
   app.exit(0);
 } catch(error) { console.error(error); app.exit(1); }
 });

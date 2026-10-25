@@ -1370,6 +1370,19 @@ div.big .body {
   flex: none;
   overflow: hidden;
 }
+.row3 .t img.custom {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.row3 .t img.fill {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.row3 small.brand-fail {
+  color: #e5412b;
+}
 .row3 .t.aa {
   font-size: 12px;
   color: var(--text-2);

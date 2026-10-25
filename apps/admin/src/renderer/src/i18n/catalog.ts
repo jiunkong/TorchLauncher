@@ -480,8 +480,28 @@ const table = {
   'brand.changeLabel': ['Change {item}', '{item} 변경'],
   'brand.removeLabel': ['Remove {item}', '{item} 제거'],
   'brand.limits': [
-    'The preview shows the default artwork; chosen images are applied to the launcher when you export. You can choose a PNG or JPEG file (up to 32 MiB and 64 megapixels). Images are resized automatically to fit: the icon to at most 512×512 px and 1 MiB (always saved as PNG), the background to at most 3840×2160 px and 8 MiB (PNG or JPEG). Images that already fit are used unchanged.',
-    '미리보기는 기본 이미지를 보여 줍니다. 고른 이미지는 내보낸 런처에 적용됩니다. PNG 또는 JPEG 파일(32 MiB, 6400만 화소 이하)을 고를 수 있으며, 크기에 맞게 자동으로 줄입니다. 아이콘은 최대 512×512 px, 1 MiB(항상 PNG), 배경은 최대 3840×2160 px, 8 MiB(PNG 또는 JPEG)입니다. 이미 제한 안에 있는 이미지는 그대로 사용합니다.',
+    'The preview shows the icon and background you chose (a reduced copy), and the default artwork for anything not set; the launcher itself may crop the background differently. You can choose a PNG or JPEG file (up to 32 MiB and 64 megapixels). Images are resized automatically to fit: the icon to at most 512×512 px and 1 MiB (always saved as PNG), the background to at most 3840×2160 px and 8 MiB (PNG or JPEG). Images that already fit are used unchanged.',
+    '미리보기에는 고른 아이콘과 배경(축소본)이 표시되며, 지정하지 않은 항목은 기본 이미지로 보입니다. 실제 런처에서는 배경이 다르게 잘릴 수 있습니다. PNG 또는 JPEG 파일(32 MiB, 6400만 화소 이하)을 고를 수 있으며, 크기에 맞게 자동으로 줄입니다. 아이콘은 최대 512×512 px, 1 MiB(항상 PNG), 배경은 최대 3840×2160 px, 8 MiB(PNG 또는 JPEG)입니다. 이미 제한 안에 있는 이미지는 그대로 사용합니다.',
+  ],
+  'brand.previewFailed': [
+    'Could not show the {item} preview: {reason}',
+    '{item} 미리보기를 표시할 수 없습니다: {reason}',
+  ],
+  'brand.previewFailed.MISMATCH': [
+    'the image in the project changed; select it again.',
+    '프로젝트의 이미지가 바뀌었습니다. 다시 선택하세요.',
+  ],
+  'brand.previewFailed.TOO_LARGE': [
+    'the reduced copy exceeded the preview size limit.',
+    '축소본이 미리보기 크기 제한을 넘었습니다.',
+  ],
+  'brand.previewFailed.INVALID': [
+    'the saved image could not be decoded.',
+    '저장된 이미지를 해석할 수 없습니다.',
+  ],
+  'brand.previewFailed.IO': [
+    'the preview request to the app failed.',
+    '앱에 미리보기를 요청하지 못했습니다.',
   ],
 
   'files.eyebrow': ['Files', '파일'],
