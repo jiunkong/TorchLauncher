@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import torchUrl from './assets/torch.png';
 import { BrandingVisual } from './components/BrandingVisual';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { DeleteDialog } from './components/DeleteDialog';
@@ -129,6 +130,12 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
 
   return (
     <>
+      <header className="desktop-titlebar" data-testid="desktop-titlebar">
+        <div className="desktop-titlebar-content">
+          <img src={branding.icon ?? torchUrl} alt="" width={18} height={18} draggable={false} />
+          <span title={branding.appName}>{branding.appName}</span>
+        </div>
+      </header>
       <main
         className="app"
         data-testid="app-shell"

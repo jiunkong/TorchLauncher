@@ -2575,6 +2575,35 @@ button.big.dlgbtn {
 }
 
 /* 상단 메뉴 막대 */
+.desktop-titlebar {
+  position: relative;
+  height: 36px;
+  flex: none;
+  background: var(--bg-deep);
+  color: var(--text-2);
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.desktop-titlebar-content {
+  position: absolute;
+  left: env(titlebar-area-x, 0px);
+  width: env(titlebar-area-width, 100%);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  overflow: hidden;
+  font-size: 12px;
+}
+.desktop-titlebar-content img {
+  flex: none;
+}
+.desktop-titlebar-content span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .frame {
   display: flex;
   flex-direction: column;
