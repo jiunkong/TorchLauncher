@@ -153,10 +153,17 @@ try {
   // Language setting: explicit choices switch visible text immediately, automatic follows the system.
   const pathButton = page.locator('.settings-data-path button[title]');
   const pathTitle = () => pathButton.getAttribute('title');
-  const choose = (name) => page.getByTestId('language-card').locator(`[data-choice="${name}"]`);
-  await choose('en').click();
+  const choose = (name) => page.getByTestId(`menu-item-language-${name}`);
+  const selectLanguage = async (name) => {
+    const view = page.getByTestId('menu-view');
+    if ((await view.getAttribute('aria-expanded')) !== 'true') await view.click();
+    await choose(name).click();
+  };
+  await selectLanguage('en');
   assert.equal(await pathTitle(), 'Copy path');
+  await page.getByTestId('menu-view').click();
   assert.equal(await choose('en').getAttribute('aria-checked'), 'true');
+  await page.getByTestId('menu-view').click();
   await mkdir(resolve('.cache/smoke'), { recursive: true });
   const openEnglishMenu = async () => {
     if ((await menu.getAttribute('data-open')) !== 'true') await toggle.click();
@@ -213,29 +220,18 @@ try {
   await openEnglishMenu();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('heading', { level: 2, name: 'Active resource pack order' }).waitFor();
-  await choose('ko').click();
+  await selectLanguage('ko');
   assert.equal(await pathTitle(), '경로 복사');
-  await choose('auto').click();
+  await selectLanguage('auto');
   const systemKorean = await page.evaluate(() =>
     (navigator.languages?.[0] ?? '').toLowerCase().startsWith('ko'),
   );
   assert.equal(await pathTitle(), systemKorean ? '경로 복사' : 'Copy path');
+  await page.getByTestId('menu-view').click();
   assert.equal(await choose('auto').getAttribute('aria-checked'), 'true');
-  await choose('ko').click();
-  await page.screenshot({ path: resolve('.cache/smoke/launcher-language-card.png') });
-  // The segmented control does not wrap or overflow its card at the narrowest window.
-  await page.setViewportSize({ width: 760, height: 600 });
-  const narrow = await page.evaluate(() => {
-    const seg = document.querySelector('[data-testid="language-card"] .seg');
-    const card = seg.closest('.card');
-    return {
-      fits: seg.getBoundingClientRect().right <= card.getBoundingClientRect().right,
-      oneLine: [...seg.querySelectorAll('button')].every(
-        (b) => b.getBoundingClientRect().height < 44,
-      ),
-    };
-  });
-  assert.deepEqual(narrow, { fits: true, oneLine: true });
+  await page.getByTestId('menu-view').click();
+  await selectLanguage('ko');
+  await page.screenshot({ path: resolve('.cache/smoke/launcher-language-menu.png') });
   await page.setViewportSize({ width: 1100, height: 760 });
 
   assert.equal(await page.getByText(dataRoot, { exact: true }).count(), 1);

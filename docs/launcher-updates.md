@@ -28,10 +28,12 @@ against a malicious process concurrently replacing user-owned directory ancestor
 
 Studio retains its development-local package behavior and existing status/error contract.
 `apps/launcher/src/main/updates` provides check, download, cancellation and state snapshots.
-The launcher Help page shows the current app version and explicit Check for updates / Update
-actions in Korean and English. Startup and Help navigation only read local state; they do not
+The launcher in-app Help menu shows the current app version and explicit Check for updates / Update
+actions in Korean and English. Startup and menu opening only read local state; they do not
 query GitHub. Update is enabled after a newer stable version is found. Duplicate operations
-are disabled, and status reports available/no-release/offline/errors and received bytes.
+are disabled, and status reports available/no-release/offline/errors and received bytes in the
+menu while open. Completed explicit actions also appear in the existing toast. `downloaded` means
+the file was downloaded and verified; it does not mean installation or restart.
 Trusted main-frame IPC accepts only exact check/download commands, never repository, version,
 URL or path overrides. Event subscriptions follow window lifecycle; shutdown cancels and
 awaits active download cleanup. Unsupported platforms report safe state without blocking

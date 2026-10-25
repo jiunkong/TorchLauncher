@@ -5,11 +5,13 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { DeleteDialog } from './components/DeleteDialog';
 import { LoginCodeDialog } from './components/LoginCodeDialog';
 import { Menu, type PageId } from './components/Menu';
+import { LauncherMenuBar } from './components/MenuBar';
 import { RecoveryDialog } from './components/RecoveryDialog';
 import { RemoveUnregisteredDialog } from './components/RemoveUnregisteredDialog';
 import { Splash } from './components/Splash';
 import { StopDialog } from './components/StopDialog';
 import { Toast, useToast } from './components/Toast';
+import { updateStatus } from './components/updateStatus';
 import { homePrimaryCommand } from './flow';
 import { runningElapsed } from './home';
 import { useApplicationInfo } from './hooks/useApplicationInfo';
@@ -18,7 +20,8 @@ import { useElapsed } from './hooks/useElapsed';
 import { useProduct } from './hooks/useProduct';
 import { useStage } from './hooks/useStage';
 import { useT } from './hooks/useTranslator';
-import { HelpPage } from './pages/Help';
+import { useUpdates } from './hooks/useUpdates';
+import { useLauncherLocale } from './i18n';
 import { Home } from './pages/Home';
 import { LogsPage } from './pages/Logs';
 import { ModsAddButton, ModsPage } from './pages/Mods';
@@ -29,6 +32,8 @@ import { appReady } from './splash';
 export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const t = useT();
   const { toast, notify } = useToast();
+  const locale = useLauncherLocale();
+  const updates = useUpdates();
   const branding = useBranding();
   const { info, error } = useApplicationInfo();
   const { state, error: productError, pending, command } = useProduct();
@@ -54,6 +59,25 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
   const elapsed = state ? runningElapsed(state, observed, tick) : 0;
   const stage = useStage(state);
   const statusAttempted = useRef(false);
+  const updateRequested = useRef(false);
+  const runUpdate = useCallback(
+    async (request: { action: 'check' | 'download' }) => {
+      updateRequested.current = true;
+      await updates.command(request);
+    },
+    [updates.command],
+  );
+  useEffect(() => {
+    const next = updates.state;
+    if (!updateRequested.current || updates.pending || !next) return;
+    if (next.phase === 'current' || next.phase === 'available' || next.phase === 'downloaded') {
+      notify('success', updateStatus(t, next));
+      updateRequested.current = false;
+    } else if (next.phase === 'error' || next.phase === 'cancelled') {
+      notify('error', updateStatus(t, next));
+      updateRequested.current = false;
+    }
+  }, [updates.state, updates.pending, notify, t]);
 
   const navigate = useCallback((next: PageId) => setPage(next), []);
 
@@ -145,107 +169,119 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
           stopOpen ||
           deleteOpen ||
           recoveryOpen ||
+          logoutOpen ||
           removeFile !== null ||
           !!state?.loginCode
         }
       >
-        <Menu
-          open={menuOpen}
-          onToggle={() => setMenuOpen((open) => !open)}
-          page={page}
-          onNavigate={navigate}
-          serverName={state?.server?.name ?? null}
-          appName={branding.appName}
-          brandingIcon={branding.icon}
-          accountName={state?.account?.name ?? null}
-          {...(state?.account?.skin ? { accountSkin: state.account.skin } : {})}
-          logoutDisabled={busy}
-          onLogout={logout}
+        <LauncherMenuBar
+          version={info?.version ?? null}
+          locale={locale}
+          updates={updates}
+          onUpdateAction={runUpdate}
+          t={t}
         />
-        <div className="content">
-          {page === 'home' &&
-            (state ? (
-              <Home
-                state={state}
-                brandingBackground={branding.background}
-                productError={productError}
-                pending={pending}
-                elapsedMs={elapsed}
-                stage={stage}
-                applicationVersion={info?.version ?? null}
-                applicationInfoFailed={error}
-                onPrimary={() => {
-                  const primary = homePrimaryCommand(state);
-                  if (primary) void command(primary);
-                }}
-                onCancel={() => void command({ type: 'cancel' })}
-                onStop={() => setStopOpen(true)}
-                onViewLogs={() => navigate('troubleshooting')}
-                onReviewRecovery={() => {
-                  recoveryPlay.current = true;
-                  setRecoveryOpen(true);
-                }}
-              />
-            ) : (
-              <section className="stage-home" aria-label={t('home.region')}>
-                <BrandingVisual kind="background" value={branding.background} />
-                <div className="shade" />
-                <div className="copy">
-                  <p role={productError ? 'alert' : 'status'}>
-                    {productError ? t('shell.productFailed') : t('shell.connecting')}
-                  </p>
-                </div>
-              </section>
-            ))}
-          {/* Other pages stay mounted so unsaved edits and loaded lists survive navigation. */}
-          <PageFrame
-            {...frame}
-            testId="page-mods"
-            hidden={page !== 'mods'}
-            title={t('menu.mods')}
-            subtitle={t('mods.subtitle')}
-            footer={footer}
-            actions={
-              <ModsAddButton disabled={!ready} onClick={() => void command({ type: 'add-mod' })} />
-            }
-          >
-            {state && (
-              <ModsPage
-                onRemoveUnregistered={setRemoveFile}
-                active={page === 'mods'}
-                state={state}
-                pending={pending}
-                command={command}
-              />
-            )}
-          </PageFrame>
-          <PageFrame
-            {...frame}
-            testId="page-settings"
-            hidden={page !== 'settings'}
-            title={t('menu.settings')}
-            subtitle={t('settings.subtitle')}
-            footer={footer}
-            showOutcome
-          >
-            {state && (
-              <SettingsPage
-                active={page === 'settings'}
-                state={state}
-                pending={pending}
-                command={command}
-                onDelete={openDelete}
-                notify={notify}
-              />
-            )}
-          </PageFrame>
-          <HelpPage hidden={page !== 'help'} version={info?.version ?? null} />
-          <LogsPage
-            frame={frame}
-            hidden={page !== 'troubleshooting'}
-            state={state}
-            command={command}
+        <div className="app-body">
+          <Menu
+            open={menuOpen}
+            onToggle={() => setMenuOpen((open) => !open)}
+            page={page}
+            onNavigate={navigate}
+            serverName={state?.server?.name ?? null}
+            appName={branding.appName}
+            brandingIcon={branding.icon}
+            accountName={state?.account?.name ?? null}
+            {...(state?.account?.skin ? { accountSkin: state.account.skin } : {})}
+            logoutDisabled={busy}
+            onLogout={logout}
           />
+          <div className="content">
+            {page === 'home' &&
+              (state ? (
+                <Home
+                  state={state}
+                  brandingBackground={branding.background}
+                  productError={productError}
+                  pending={pending}
+                  elapsedMs={elapsed}
+                  stage={stage}
+                  applicationVersion={info?.version ?? null}
+                  applicationInfoFailed={error}
+                  onPrimary={() => {
+                    const primary = homePrimaryCommand(state);
+                    if (primary) void command(primary);
+                  }}
+                  onCancel={() => void command({ type: 'cancel' })}
+                  onStop={() => setStopOpen(true)}
+                  onViewLogs={() => navigate('troubleshooting')}
+                  onReviewRecovery={() => {
+                    recoveryPlay.current = true;
+                    setRecoveryOpen(true);
+                  }}
+                />
+              ) : (
+                <section className="stage-home" aria-label={t('home.region')}>
+                  <BrandingVisual kind="background" value={branding.background} />
+                  <div className="shade" />
+                  <div className="copy">
+                    <p role={productError ? 'alert' : 'status'}>
+                      {productError ? t('shell.productFailed') : t('shell.connecting')}
+                    </p>
+                  </div>
+                </section>
+              ))}
+            {/* Other pages stay mounted so unsaved edits and loaded lists survive navigation. */}
+            <PageFrame
+              {...frame}
+              testId="page-mods"
+              hidden={page !== 'mods'}
+              title={t('menu.mods')}
+              subtitle={t('mods.subtitle')}
+              footer={footer}
+              actions={
+                <ModsAddButton
+                  disabled={!ready}
+                  onClick={() => void command({ type: 'add-mod' })}
+                />
+              }
+            >
+              {state && (
+                <ModsPage
+                  onRemoveUnregistered={setRemoveFile}
+                  active={page === 'mods'}
+                  state={state}
+                  pending={pending}
+                  command={command}
+                />
+              )}
+            </PageFrame>
+            <PageFrame
+              {...frame}
+              testId="page-settings"
+              hidden={page !== 'settings'}
+              title={t('menu.settings')}
+              subtitle={t('settings.subtitle')}
+              footer={footer}
+              showOutcome
+            >
+              {state && (
+                <SettingsPage
+                  active={page === 'settings'}
+                  state={state}
+                  pending={pending}
+                  command={command}
+                  onDelete={openDelete}
+                  notify={notify}
+                />
+              )}
+            </PageFrame>
+            <LogsPage
+              frame={frame}
+              hidden={page !== 'troubleshooting'}
+              state={state}
+              command={command}
+            />
+          </div>
         </div>
       </main>
       <Toast toast={toast} />

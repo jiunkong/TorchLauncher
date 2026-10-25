@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProductCommand, ProductState } from '../../../shared/product';
 import { ChevronDownIcon, ChevronUpIcon, CopyIcon, TrashIcon } from '../components/Icons';
-import { LanguageControl } from '../components/LanguageControl';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatBytes } from '../format';
 import { useT } from '../hooks/useTranslator';
-import { useLauncherLocale } from '../i18n';
 import type { LoadState } from './Mods';
 import {
   defaultMaxMemoryMiB,
@@ -34,7 +32,6 @@ export function SettingsPage({
   notify?(kind: 'success' | 'error', text: string): void;
 }) {
   const t = useT();
-  const { preference, setLocale, useAutomaticLocale: followSystem } = useLauncherLocale();
   const busy = state.operation !== null || pending;
   const ready = state.configuration === 'ready' && !busy;
   const [packsLoad, setPacksLoad] = useState<LoadState>('unqueried');
@@ -142,13 +139,6 @@ export function SettingsPage({
               }
             />
           </div>
-        </section>
-        <section className="card" aria-labelledby="settings-language" data-testid="language-card">
-          <h2 id="settings-language">언어 / Language</h2>
-          <LanguageControl
-            preference={preference}
-            onSelect={(choice) => (choice === 'auto' ? followSystem() : setLocale(choice))}
-          />
         </section>
         <section className="card" aria-labelledby="settings-memory">
           <h2 id="settings-memory">{t('settings.gameMemory')}</h2>

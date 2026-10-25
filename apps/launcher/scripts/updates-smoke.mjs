@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { _electron as electron } from 'playwright';
 
-const temp = await mkdtemp(resolve(tmpdir(), 'launcher-help-'));
+const temp = await mkdtemp(resolve(tmpdir(), 'launcher-menu-'));
 const screenshots = resolve('.cache/smoke');
 await mkdir(screenshots, { recursive: true });
 const env = { ...process.env, TORCH_SERVER_CONFIG: resolve(temp, 'absent-config.json') };
@@ -30,7 +30,7 @@ try {
     };
     globalThis.updateMock = mock;
     globalThis.fetch = async () => {
-      throw new Error('Network disabled by Help smoke');
+      throw new Error('Network disabled by launcher menu smoke');
     };
     const send = (state) => {
       mock.state = state;
@@ -71,16 +71,23 @@ try {
   );
   await page.reload();
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
-  await page.getByRole('button', { name: 'Help', exact: true }).click();
-  const status = page.getByTestId('update-status');
-  const check = page.getByTestId('update-check');
-  const update = page.getByTestId('update-download');
+  const openHelp = async () => {
+    const button = page.getByTestId('menu-help');
+    if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
+  };
+  const toast = (text) => page.getByTestId('toast').filter({ hasText: text });
+  const check = page.getByTestId('menu-item-check-updates');
+  const update = page.getByTestId('menu-item-download-update');
+  await openHelp();
   // An event arriving before delayed initial local snapshots must win.
   await app.evaluate(() => {
     globalThis.updateMock.send({ phase: 'current' });
     for (const complete of globalThis.updateMock.snapshots.splice(0)) complete({ phase: 'idle' });
   });
-  await status.getByText('You are using the latest version.', { exact: true }).waitFor();
+  await page
+    .getByTestId('update-menu-status')
+    .getByText('You are using the latest version.', { exact: true })
+    .waitFor();
   assert.equal(await update.isDisabled(), true);
   assert.deepEqual(
     await app.evaluate(() => globalThis.updateMock.actions),
@@ -88,7 +95,7 @@ try {
     'mount/navigation must not check releases',
   );
   await check.click();
-  await status.getByText('You are using the latest version.', { exact: true }).waitFor();
+  await toast('You are using the latest version.').waitFor();
   const scenarios = [
     [
       { phase: 'error', code: 'LAUNCHER_NO_RELEASE' },
@@ -115,18 +122,28 @@ try {
     await app.evaluate((_electron, value) => {
       globalThis.updateMock.next = value;
     }, next);
+    await openHelp();
     await check.click();
-    await status.getByText(text, { exact: true }).waitFor();
+    await toast(text).waitFor();
+    await openHelp();
     assert.equal(await update.isEnabled(), next.phase === 'available');
   }
   await update.click();
-  await status.getByText('Downloading update… 0 B', { exact: true }).waitFor();
+  await openHelp();
+  await page
+    .getByTestId('update-menu-status')
+    .getByText('Downloading update… 0 B', { exact: true })
+    .waitFor();
   assert.equal(await check.isDisabled(), true);
   assert.equal(await update.isDisabled(), true);
   await app.evaluate(() => globalThis.updateMock.send({ phase: 'downloading', received: 512 }));
-  await status.getByText('Downloading update… 512 B', { exact: true }).waitFor();
+  await page
+    .getByTestId('update-menu-status')
+    .getByText('Downloading update… 512 B', { exact: true })
+    .waitFor();
   await app.evaluate(() => globalThis.updateMock.complete());
-  await status.getByText('Version 1.10.0 download complete.', { exact: true }).waitFor();
+  await toast('Version 1.10.0 download complete.').waitFor();
+  await openHelp();
   assert.equal(await update.isDisabled(), true);
   for (const width of [760, 1100]) {
     await app.evaluate(
@@ -138,7 +155,7 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       true,
     );
-    await page.screenshot({ path: resolve(screenshots, `launcher-help-en-${width}.png`) });
+    await page.screenshot({ path: resolve(screenshots, `launcher-menu-en-${width}.png`) });
   }
   // Check the actual Korean controls and messages after a locale change/reload.
   await page.evaluate(() =>
@@ -149,23 +166,26 @@ try {
   );
   await page.reload();
   await page.getByTestId('splash').waitFor({ state: 'detached', timeout: 20_000 });
-  await page.getByRole('button', { name: '도움말', exact: true }).click();
+  await openHelp();
   await app.evaluate(() => {
     globalThis.updateMock.send({ phase: 'idle' });
     for (const complete of globalThis.updateMock.snapshots.splice(0)) complete({ phase: 'idle' });
     globalThis.updateMock.next = { phase: 'error', code: 'LAUNCHER_NO_RELEASE' };
   });
-  await page.getByTestId('update-check').getByText('최신 버전 확인', { exact: true }).waitFor();
-  await page.getByTestId('update-check').click();
-  await status.getByText('아직 공개된 런처 버전이 없습니다.', { exact: true }).waitFor();
+  await page
+    .getByTestId('menu-item-check-updates')
+    .getByText('최신 버전 확인', { exact: true })
+    .waitFor();
+  await page.getByTestId('menu-item-check-updates').click();
+  await toast('아직 공개된 런처 버전이 없습니다.').waitFor();
   assert.equal(
-    await page.getByRole('button', { name: '업데이트', exact: true }).isDisabled(),
+    await openHelp().then(() => page.getByTestId('menu-item-download-update').isDisabled()),
     true,
   );
-  await page.screenshot({ path: resolve(screenshots, 'launcher-help-ko-1100.png') });
+  await page.screenshot({ path: resolve(screenshots, 'launcher-menu-ko-1100.png') });
   assert.deepEqual(errors, []);
   console.log(
-    'Launcher Help mock smoke passed: explicit actions, state/events, no release, offline, validation/service errors, available/download progress/completion, ko/en and 760/1100 layouts.',
+    'Launcher menu update mock smoke passed: explicit actions, state/events, no release, offline, validation/service errors, available/download progress/completion, ko/en and 760/1100 layouts.',
   );
 } finally {
   if (app) await app.close();

@@ -133,8 +133,101 @@ button:disabled {
 }
 .app {
   display: flex;
+  flex-direction: column;
   height: calc(100% - 36px);
   min-height: 0;
+}
+.app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.menubar {
+  position: relative;
+  z-index: 15;
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  flex: none;
+  padding: 0 6px;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--line);
+}
+.mb-menu {
+  position: relative;
+  display: flex;
+}
+.mb-top {
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.mb-top:hover,
+.mb-top.open {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.mb-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 260px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.mb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: default;
+}
+.mb-item:hover,
+.mb-item:focus-visible {
+  background: var(--panel-3);
+  outline: none;
+}
+.mb-item.disabled {
+  opacity: 0.45;
+}
+.mb-check {
+  width: 14px;
+  color: var(--red-text);
+  flex: none;
+}
+.mb-label {
+  flex: 1;
+}
+.mb-key {
+  color: var(--text-3);
+  font-size: 12px;
+  margin-left: 24px;
+}
+.mb-sep {
+  height: 1px;
+  margin: 5px 4px;
+  border: 0;
+  background: var(--line);
+}
+.mb-cap {
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .content {
   flex: 1;
@@ -1680,21 +1773,4 @@ svg {
   background: var(--red-600);
   color: #fff;
   font-weight: 700;
-}
-
-.update-card {
-  max-width: 680px;
-}
-.update-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
-}
-.update-status {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-2);
-  margin: 16px 0 0;
-  overflow-wrap: anywhere;
 }

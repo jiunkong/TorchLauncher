@@ -2,9 +2,11 @@ import { defineTranslations } from '@torchlauncher/core/i18n';
 
 // Korean is the reference language; both catalogs use the same keys and placeholders.
 const ko = {
-  'menu.help': '도움말',
-  'help.subtitle': '런처 버전을 확인하고 업데이트를 다운로드합니다.',
-  'help.launcher': '런처 업데이트',
+  'menubar.label': '앱 메뉴',
+  'menubar.view': '보기',
+  'menubar.help': '도움말',
+  'menubar.language': '언어',
+  'menubar.system': '시스템 기본값',
   'help.version': '현재 버전 {version}',
   'help.versionUnknown': '확인할 수 없음',
   'help.check': '최신 버전 확인',
@@ -296,9 +298,11 @@ const ko = {
 
 export const launcherTranslations = defineTranslations(
   {
-    'menu.help': 'Help',
-    'help.subtitle': 'Check your launcher version and download updates.',
-    'help.launcher': 'Launcher updates',
+    'menubar.label': 'Application menu',
+    'menubar.view': 'View',
+    'menubar.help': 'Help',
+    'menubar.language': 'Language',
+    'menubar.system': 'System default',
     'help.version': 'Current version {version}',
     'help.versionUnknown': 'Unavailable',
     'help.check': 'Check for updates',
