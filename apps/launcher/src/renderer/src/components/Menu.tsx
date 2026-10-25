@@ -3,6 +3,7 @@ import { useT } from '../hooks/useTranslator';
 import { BrandingVisual } from './BrandingVisual';
 import {
   CollapseIcon,
+  HelpIcon,
   LogoutIcon,
   LogsIcon,
   MenuIcon,
@@ -12,16 +13,17 @@ import {
 } from './Icons';
 import { PlayerAvatar } from './PlayerAvatar';
 
-export type PageId = 'home' | 'mods' | 'settings' | 'troubleshooting';
+export type PageId = 'home' | 'mods' | 'settings' | 'troubleshooting' | 'help';
 const items: {
   id: PageId;
-  key: 'menu.play' | 'menu.mods' | 'menu.settings' | 'menu.logs';
+  key: 'menu.play' | 'menu.mods' | 'menu.settings' | 'menu.logs' | 'menu.help';
   icon: ReactNode;
 }[] = [
   { id: 'home', key: 'menu.play', icon: <PlayIcon /> },
   { id: 'mods', key: 'menu.mods', icon: <ModsIcon /> },
   { id: 'settings', key: 'menu.settings', icon: <SettingsIcon /> },
   { id: 'troubleshooting', key: 'menu.logs', icon: <LogsIcon /> },
+  { id: 'help', key: 'menu.help', icon: <HelpIcon /> },
 ];
 
 export interface MenuProps {

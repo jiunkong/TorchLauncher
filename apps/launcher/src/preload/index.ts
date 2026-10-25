@@ -8,8 +8,16 @@ import {
   productChannel,
   productStateChannel,
 } from '../shared/product';
+import { type UpdateState, updateCommandChannel, updateStateChannel } from '../shared/updates';
 
 const api: LauncherApi = {
+  getUpdateState: () => ipcRenderer.invoke(updateStateChannel),
+  update: (command) => ipcRenderer.invoke(updateCommandChannel, command),
+  onUpdate: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: UpdateState) => listener(state);
+    ipcRenderer.on(updateStateChannel, handler);
+    return () => ipcRenderer.removeListener(updateStateChannel, handler);
+  },
   getApplicationInfo: () => ipcRenderer.invoke(applicationInfoChannel),
   getBranding: () => ipcRenderer.invoke(brandingChannel),
   onBranding: (listener) => {

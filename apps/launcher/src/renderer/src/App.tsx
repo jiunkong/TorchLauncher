@@ -18,6 +18,7 @@ import { useElapsed } from './hooks/useElapsed';
 import { useProduct } from './hooks/useProduct';
 import { useStage } from './hooks/useStage';
 import { useT } from './hooks/useTranslator';
+import { HelpPage } from './pages/Help';
 import { Home } from './pages/Home';
 import { LogsPage } from './pages/Logs';
 import { ModsAddButton, ModsPage } from './pages/Mods';
@@ -238,6 +239,7 @@ export function App({ splashMinimumMs }: { splashMinimumMs?: number } = {}) {
               />
             )}
           </PageFrame>
+          <HelpPage hidden={page !== 'help'} version={info?.version ?? null} />
           <LogsPage
             frame={frame}
             hidden={page !== 'troubleshooting'}

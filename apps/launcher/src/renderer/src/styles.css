@@ -1681,3 +1681,20 @@ svg {
   color: #fff;
   font-weight: 700;
 }
+
+.update-card {
+  max-width: 680px;
+}
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.update-status {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+  margin: 16px 0 0;
+  overflow-wrap: anywhere;
+}

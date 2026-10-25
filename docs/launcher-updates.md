@@ -27,8 +27,15 @@ Caches must live in application-owned directories; these checks do not provide a
 against a malicious process concurrently replacing user-owned directory ancestors.
 
 Studio retains its development-local package behavior and existing status/error contract.
-`apps/launcher/src/main/updates` provides check, download, cancellation and state snapshots
-without startup, renderer, preload or IPC wiring. A new operation cancels its predecessor;
+`apps/launcher/src/main/updates` provides check, download, cancellation and state snapshots.
+The launcher Help page shows the current app version and explicit Check for updates / Update
+actions in Korean and English. Startup and Help navigation only read local state; they do not
+query GitHub. Update is enabled after a newer stable version is found. Duplicate operations
+are disabled, and status reports available/no-release/offline/errors and received bytes.
+Trusted main-frame IPC accepts only exact check/download commands, never repository, version,
+URL or path overrides. Event subscriptions follow window lifecycle; shutdown cancels and
+awaits active download cleanup. Unsupported platforms report safe state without blocking
+launcher startup. A new operation cancels its predecessor;
 stale completions cannot overwrite newer state. The returned artifact path stays in the
 host process; snapshots contain no local paths or transport URLs. `downloaded` means
 verified cached bytes. No downloaded executable is run, installed or used to replace files.

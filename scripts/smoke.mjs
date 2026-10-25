@@ -88,8 +88,12 @@ const appCases = [
       ['내 모드', '내 모드'],
       ['설정', '설정'],
       ['로그', '로그'],
+      ['도움말', '도움말'],
     ],
     expectedBridge: [
+      'getUpdateState',
+      'update',
+      'onUpdate',
       'getApplicationInfo',
       'getBranding',
       'onBranding',

@@ -4,19 +4,16 @@ import {
   launcherTarget,
   parseStableVersion,
   type ReleaseArtifact,
-  type ReleaseErrorCode,
   ReleaseFailure,
   type ReleaseOptions,
 } from '../../../../../packages/core/src/releases/index.js';
 
-export type UpdateState =
-  | { phase: 'idle' | 'checking' | 'current' | 'cancelled' }
-  | { phase: 'available'; version: string; size: number }
-  | { phase: 'downloading'; received: number }
-  | { phase: 'downloaded'; version: string; size: number }
-  | { phase: 'error'; code: ReleaseErrorCode };
+import type { UpdateState } from '../../shared/updates';
+
+export type { UpdateState } from '../../shared/updates';
 export interface UpdateOptions extends ReleaseOptions {
   currentVersion: string;
+  publish?(state: UpdateState): void;
   platform?: NodeJS.Platform;
   arch?: string;
 }
@@ -28,6 +25,10 @@ export function createLauncherUpdater(options: UpdateOptions) {
   const client = createLauncherReleaseClient(options);
   let state: UpdateState = { phase: 'idle' };
   let active: AbortController | undefined;
+  function setState(next: UpdateState) {
+    state = next;
+    options.publish?.({ ...state });
+  }
   function begin() {
     active?.abort();
     const controller = new AbortController();
@@ -36,13 +37,15 @@ export function createLauncherUpdater(options: UpdateOptions) {
   }
   function publish(controller: AbortController, next: UpdateState) {
     controller.signal.throwIfAborted();
-    if (active === controller) state = next;
+    if (active === controller) setState(next);
   }
   function failed(controller: AbortController, error: unknown): never {
     if (active === controller) {
-      state = controller.signal.aborted
-        ? { phase: 'cancelled' }
-        : { phase: 'error', code: error instanceof ReleaseFailure ? error.code : 'IO' };
+      setState(
+        controller.signal.aborted
+          ? { phase: 'cancelled' }
+          : { phase: 'error', code: error instanceof ReleaseFailure ? error.code : 'IO' },
+      );
     }
     throw error;
   }
@@ -55,7 +58,7 @@ export function createLauncherUpdater(options: UpdateOptions) {
       if (!active) return;
       active.abort();
       active = undefined;
-      state = { phase: 'cancelled' };
+      setState({ phase: 'cancelled' });
     },
     async check(): Promise<UpdateState> {
       const controller = begin();
