@@ -12,6 +12,7 @@ import { hashFile, isListableName, SCAN_LIMITS } from './scan.js';
 
 export const PROJECT_FILE_NAME = 'project.torchproj';
 export const PROJECT_DATA_DIR = 'files';
+export const PROJECT_BRANDING_DIR = 'branding';
 
 /**
  * Creates the empty project folder `<parent>/<name>` and returns its path. The parent must exist
@@ -185,6 +186,19 @@ export async function copyProjectFolder(
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
 
+    const fromBranding = join(absFrom, PROJECT_BRANDING_DIR);
+    const toBranding = join(absTo, PROJECT_BRANDING_DIR);
+    try {
+      const brandingStat = await lstat(fromBranding);
+      if (!brandingStat.isDirectory() || brandingStat.isSymbolicLink())
+        throw new StudioFailure('INVALID');
+      await mkdir(toBranding, { recursive: true, mode: 0o700 });
+      await noLinks(toBranding);
+      await copyTree(fromBranding, toBranding, 0);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+
     // project.torchproj is written LAST
     await saveProject(join(to, PROJECT_FILE_NAME), projBytes);
   } catch (error) {
@@ -198,6 +212,49 @@ export async function copyProjectFolder(
       // Ignore secondary cleanup error
     }
     throw error;
+  }
+}
+
+/** Stores a selected branding image in the project folder using the same atomic write as project saves. */
+export async function saveProjectBrandingAsset(
+  projectDir: string,
+  role: 'icon' | 'background',
+  mediaType: 'image/png' | 'image/jpeg',
+  bytes: Uint8Array,
+): Promise<void> {
+  await noLinks(projectDir);
+  const directory = join(projectDir, PROJECT_BRANDING_DIR);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await noLinks(directory);
+  const extension = mediaType === 'image/png' ? 'png' : 'jpg';
+  await saveProject(join(directory, `${role}.${extension}`), bytes);
+}
+
+/** Removes stale image variants for a role after the current project save succeeds. */
+export async function removeStaleProjectBrandingAsset(
+  projectDir: string,
+  role: 'icon' | 'background',
+  keepMediaType: 'image/png' | 'image/jpeg',
+): Promise<void> {
+  const directory = join(projectDir, PROJECT_BRANDING_DIR);
+  try {
+    await noLinks(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  const keep = `${role}.${keepMediaType === 'image/png' ? 'png' : 'jpg'}`;
+  for (const name of [`${role}.png`, `${role}.jpg`]) {
+    if (name === keep) continue;
+    const path = join(directory, name);
+    try {
+      const stat = await lstat(path);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1)
+        throw new StudioFailure('INVALID');
+      await rm(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 }
 
