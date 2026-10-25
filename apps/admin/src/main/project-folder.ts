@@ -234,7 +234,7 @@ export async function saveProjectBrandingAsset(
 export async function removeStaleProjectBrandingAsset(
   projectDir: string,
   role: 'icon' | 'background',
-  keepMediaType: 'image/png' | 'image/jpeg',
+  keepMediaType: 'image/png' | 'image/jpeg' | null,
 ): Promise<void> {
   const directory = join(projectDir, PROJECT_BRANDING_DIR);
   try {
@@ -243,7 +243,7 @@ export async function removeStaleProjectBrandingAsset(
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
     throw error;
   }
-  const keep = `${role}.${keepMediaType === 'image/png' ? 'png' : 'jpg'}`;
+  const keep = keepMediaType && `${role}.${keepMediaType === 'image/png' ? 'png' : 'jpg'}`;
   for (const name of [`${role}.png`, `${role}.jpg`]) {
     if (name === keep) continue;
     const path = join(directory, name);

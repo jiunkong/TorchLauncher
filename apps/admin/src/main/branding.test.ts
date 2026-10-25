@@ -204,7 +204,8 @@ describe('Studio durable branding', () => {
     d.open.mockResolvedValueOnce([path]);
     expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
       ok: false,
-      code: 'INVALID',
+      code: 'IMAGE_FAILED',
+      image: { reason: 'unsupported', role: 'icon', name: 'image.png' },
     });
     expect(s.snapshot().project).toEqual(before);
     await s.request({ action: 'brandingName', appName: 'Title' });
@@ -243,7 +244,8 @@ describe('Studio durable branding', () => {
     d.open.mockResolvedValueOnce([hard]);
     expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
       ok: false,
-      code: 'INVALID',
+      code: 'IMAGE_FAILED',
+      image: { reason: 'unreadable', role: 'icon', name: 'hard.png', cause: 'notFile' },
     });
     if (process.platform !== 'win32') {
       const dir = join(root, 'dir');
@@ -254,7 +256,8 @@ describe('Studio durable branding', () => {
       d.open.mockResolvedValueOnce([join(linked, 'image.png')]);
       expect(await s.request({ action: 'brandingSelect', role: 'icon' })).toEqual({
         ok: false,
-        code: 'INVALID',
+        code: 'IMAGE_FAILED',
+        image: { reason: 'unreadable', role: 'icon', name: 'image.png', cause: 'notFile' },
       });
     }
     const bad = join(root, 'project.torchproj');

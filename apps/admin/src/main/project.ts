@@ -22,6 +22,12 @@ export class PackFailure extends StudioFailure {
     super('INVALID');
   }
 }
+/** A branding image import failure carrying the structured, path-free cause shown to the user. */
+export class ImageFailure extends StudioFailure {
+  constructor(readonly image: import('../shared/studio.js').StudioImageFailure) {
+    super('IMAGE_FAILED');
+  }
+}
 /** A precise settings-source failure within the existing INVALID request category. */
 export class TestSettingsFailure extends StudioFailure {
   constructor(readonly detailCode: import('../shared/studio.js').StudioTestSettingsError) {

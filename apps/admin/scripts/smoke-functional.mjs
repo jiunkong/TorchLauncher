@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inflateSync } from 'node:zlib';
+import { crc32, deflateSync, inflateSync } from 'node:zlib';
 
 /** Reads the META section of a TorchLauncher Studio file (checks magic, trailer hash and section hashes). */
 function readStudioFile(bytes) {
@@ -41,6 +41,31 @@ function readStudioFile(bytes) {
   return meta;
 }
 
+/** A solid-colour RGB PNG built with zlib only (no image library, no stored binary fixture). */
+function solidPng(width, height) {
+  const chunk = (type, data) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length, 0);
+    head.write(type, 4, 'latin1');
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])));
+    return Buffer.concat([head, data, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 0x7f)]);
+  const raw = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
 import { _electron } from 'playwright';
 
 const cwd = fileURLToPath(new URL('../../..', import.meta.url));
@@ -51,6 +76,10 @@ await mkdir(source);
 await mkdir(join(game, 'config'), { recursive: true });
 await mkdir(join(game, 'shaderpacks'), { recursive: true });
 await writeFile(join(source, 'custom.data'), 'UI selected payload');
+const bigIcon = join(source, 'big-icon.png');
+await writeFile(bigIcon, solidPng(2000, 2000));
+const badIcon = join(source, 'bad-icon.png');
+await writeFile(badIcon, 'this is not an image');
 await writeFile(join(source, 'options.txt'), 'renderDistance:12\n');
 await writeFile(
   join(game, 'options.txt'),
@@ -133,6 +162,7 @@ try {
         '리소스팩(.zip) 선택': [join(paths.packs, 'server-pack.zip')],
         '셰이더팩(.zip) 선택': [join(paths.packs, 'Test.zip')],
         '모드(.jar) 선택': [join(paths.packs, 'example-mod.jar')],
+        '앱 아이콘 선택 (PNG 또는 JPEG, 자동으로 크기 조정)': [paths.bigIcon],
       };
       function join(...parts) {
         return parts.join('/');
@@ -144,6 +174,8 @@ try {
           ...(globalThis.__studioSmokeOpenTitles ?? []),
           options.title,
         ];
+        if (!canceled && globalThis.__studioSmokeIcon && options.title.startsWith('앱 아이콘'))
+          return { canceled: false, filePaths: [globalThis.__studioSmokeIcon] };
         return { canceled, filePaths: canceled ? [] : (answers[options.title] ?? [paths.file]) };
       };
       dialog.showSaveDialog = async (_window, options) => {
@@ -215,6 +247,8 @@ try {
       packs,
       launcher,
       file: join(source, 'custom.data'),
+      bigIcon,
+      badIcon,
       options: join(source, 'options.txt'),
       project,
       projectParent,
@@ -601,6 +635,49 @@ try {
     undefined,
     'branding name is unsaved until the project is saved',
   );
+
+  // Branding image: an oversized icon is converted, a broken file shows its concrete cause.
+  const iconRow = page.getByTestId('brand-icon');
+  await iconRow.getByText('기본값').waitFor();
+  await page.getByRole('button', { name: '앱 아이콘 변경', exact: true }).click();
+  await iconRow.getByText(/^PNG · /).waitFor();
+  await page.getByTestId('brand-preview').waitFor();
+  const converted = await page.evaluate(() => window.torchlauncher.request({ action: 'state' }));
+  assert.ok(converted.state.project.branding.icon.length <= 1024 ** 2);
+  const storedIcon = await readFile(join(project, 'branding', 'icon.png'));
+  assert.equal(storedIcon.readUInt32BE(16), 512);
+  assert.equal(storedIcon.readUInt32BE(20), 512);
+  assert.equal(
+    createHash('sha256').update(storedIcon).digest('hex'),
+    converted.state.project.branding.icon.sha256,
+  );
+  await app.evaluate((_electron, icon) => {
+    globalThis.__studioSmokeIcon = icon;
+  }, badIcon);
+  await page.getByRole('button', { name: '앱 아이콘 변경', exact: true }).click();
+  const imageMessage = page.getByTestId('studio-message');
+  await imageMessage.getByText(/bad-icon\.png/).waitFor();
+  const imageText = await imageMessage.innerText();
+  assert.ok(imageText.includes('지원하는 이미지가 아닙니다'), imageText);
+  assert.ok(!imageText.includes('입력값'), imageText);
+  assert.ok(!imageText.includes(source), 'no absolute path in the message');
+  assert.equal(await app.evaluate(() => globalThis.__studioSmokeNativeBoxes ?? 0), 0);
+  await app.evaluate(() => {
+    globalThis.__studioSmokeIcon = undefined;
+  });
+  for (const width of [760, 1100]) {
+    await page.setViewportSize({ width, height: 760 });
+    const layout = await page.evaluate(() => ({
+      documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      pageOverflow: (() => {
+        const el = document.querySelector('[data-testid="page"]');
+        return el ? el.scrollWidth > el.clientWidth : false;
+      })(),
+    }));
+    assert.deepEqual(layout, { documentOverflow: false, pageOverflow: false });
+    await page.screenshot({ path: join(cwd, `.cache/smoke/studio-branding-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 1100, height: 760 });
 
   // UNSAVED contract: replacing a dirty project needs the in-app confirmation flag.
   await page
