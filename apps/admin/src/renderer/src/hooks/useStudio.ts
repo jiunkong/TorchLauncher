@@ -8,6 +8,12 @@ import type {
 } from '../../../shared/studio.js';
 import { useStudioLocale } from '../i18n';
 import { detailMessageKey } from './errors';
+import {
+  type OperationAction,
+  type OperationLabelKey,
+  operationKeys,
+  operationLabelKey,
+} from './operations';
 import { studioResultMessage } from './result';
 
 export type StudioAction = Exclude<
@@ -34,7 +40,10 @@ export function useStudio() {
   const [lastRun, setLastRun] = useState<StudioRun | null>(null);
   const actionLock = useRef(false);
   const sequence = useRef(0);
-  const [operation, setOperation] = useState<keyof typeof operationKeys | null>(null);
+  const [operation, setOperation] = useState<{
+    action: OperationAction;
+    label: OperationLabelKey;
+  } | null>(null);
   const errorMessage = (code: StudioError) => t(`error.${code}`);
   // The locale only affects the failure text; the polling must not restart with it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
@@ -87,7 +96,8 @@ export function useStudio() {
     if (actionLock.current) return false;
     actionLock.current = true;
     setPending(true);
-    if (request.action in operationKeys) setOperation(request.action as keyof typeof operationKeys);
+    const label = operationLabelKey(request);
+    if (label) setOperation({ action: request.action as OperationAction, label });
     setMessage('');
     let ok = false;
     let code: StudioError | null = null;
@@ -190,8 +200,8 @@ export function useStudio() {
     }
   };
   const serviceBusy = state?.busy ?? null;
-  const effectiveOperation = operation ?? serviceBusy;
-  const operationLabel = t(operationKeys[effectiveOperation ?? 'work']);
+  const effectiveOperation = operation?.action ?? serviceBusy;
+  const operationLabel = t(operation?.label ?? operationKeys[serviceBusy ?? 'work']);
   return {
     state,
     draft,
@@ -216,27 +226,3 @@ export function useStudio() {
   };
 }
 export type StudioController = ReturnType<typeof useStudio>;
-
-const operationKeys = {
-  new: 'op.new',
-  open: 'op.open',
-  save: 'op.save',
-  saveAs: 'op.save',
-  source: 'op.source',
-  files: 'op.files',
-  build: 'op.build',
-  check: 'op.check',
-  export: 'op.export',
-  cancel: 'op.new',
-  saving: 'op.save',
-  opening: 'op.open',
-  choosing: 'op.choosing',
-  building: 'op.build',
-  checking: 'op.check',
-  exporting: 'op.export',
-  work: 'op.work',
-  rescan: 'op.rescan',
-  exportCheck: 'op.check',
-  settingsImport: 'op.settings',
-  settingsPackAdd: 'op.settings',
-} as const;
