@@ -51,7 +51,7 @@
 
 ## 다운로드 및 빌드
 
-- **실행 파일 다운로드**: 공식 배포판은 저장소의 [GitHub Releases](https://github.com/jiunkong/TorchLauncher/releases)에서 Windows x64 포터블 실행 파일과 Linux x64 AppImage로 제공됩니다.
+- **실행 파일 다운로드**: 공식 배포판은 저장소의 [GitHub Releases](https://github.com/jiunkong/TorchLauncher/releases)에서 Windows x64 포터블 실행 파일과 Linux x64 AppImage로 제공될 예정입니다(첫 릴리스 게시 전).
 - **소스 코드에서 실행**:
 
 ```sh
