@@ -1099,6 +1099,10 @@ const table = {
     'The public deployment file matches the project server ID, Minecraft version and loader.',
     '공개 배포 파일의 서버 ID · Minecraft · 로더가 프로젝트와 일치합니다.',
   ],
+  'result.autosaveFailed': [
+    'The files are in the project, but saving it automatically failed. Save the project manually.',
+    '파일은 프로젝트에 들어갔지만 자동 저장에 실패했습니다. 프로젝트를 직접 저장하세요.',
+  ],
   'result.packsAdded': ['Added {count}.', '{count}개를 추가했습니다.'],
   'result.packsSkipped': ['Skipped {count}:', '{count}개는 건너뛰었습니다:'],
   'result.packsMore': ['and {count} more', '외 {count}개'],

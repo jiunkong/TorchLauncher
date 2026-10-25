@@ -721,3 +721,43 @@ export async function writeGeneratedPolicy(sourceRoot: string, text: string): Pr
     await rm(temporary, { force: true });
   }
 }
+
+/**
+ * Lists valid pack files that sit in the project's pack directory but are not in `known` (lower
+ * case names). Uses the same checks as `addPack` plus a hard-link refusal; anything invalid is
+ * skipped silently. Returns at most `room` packs, sorted by name, each with policy `none`.
+ */
+export async function discoverPacks(
+  sourceRoot: string,
+  kind: PackKind,
+  known: ReadonlySet<string>,
+  room: number,
+  signal: AbortSignal,
+): Promise<StudioPack[]> {
+  if (room <= 0) return [];
+  const directory = join(sourceRoot, PACK_DIRECTORY[kind]);
+  let names: string[];
+  try {
+    await noLinks(directory);
+    names = await readdir(directory);
+  } catch {
+    return [];
+  }
+  const found: StudioPack[] = [];
+  for (const name of names.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+    signal.throwIfAborted();
+    if (found.length >= room) break;
+    if (known.has(name.toLowerCase())) continue;
+    try {
+      validatePackName(name, kind);
+      const path = join(directory, name);
+      const info = await lstat(path);
+      if (!info.isFile() || info.nlink !== 1 || info.size > PACK_LIMIT) continue;
+      found.push(await addPack(sourceRoot, kind, path, signal));
+    } catch (error) {
+      signal.throwIfAborted();
+      if (error instanceof Error && error.name === 'AbortError') throw error;
+    }
+  }
+  return found;
+}
