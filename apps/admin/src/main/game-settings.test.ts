@@ -16,6 +16,7 @@ import { openDeploymentReader } from '../../../../packages/core/src/deployment/r
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import { parseSettingsPolicy } from '../../../../packages/core/src/instance/settings/index.js';
 import type { StudioGameSettings } from '../shared/studio.js';
+import { buildPlan } from './files-diff.js';
 import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import {
@@ -28,7 +29,7 @@ import {
   readPreset,
   validatePackName,
 } from './game-settings.js';
-import { parseProject } from './project.js';
+import { newProject, parseProject } from './project.js';
 import { decodeProjectFile, encodeProjectFile } from './project-file.js';
 import { PROJECT_DATA_DIR, PROJECT_FILE_NAME } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
@@ -199,7 +200,7 @@ describe('pack names and files', () => {
     });
     expect(await readFile(join(source, 'resourcepacks', 'pack.zip'))).toEqual(bytes);
   });
-  it('copies jar mods to mods and applies their selected deployment policy', async () => {
+  it('copies jar mods to mods and always applies them, refusing policy changes', async () => {
     const h = await harness();
     const picked = join(h.root, 'fabric-api.jar');
     const jar = zipBytes('mod');
@@ -210,25 +211,41 @@ describe('pack names and files', () => {
     });
     expect(await readFile(join(h.source, 'mods', 'fabric-api.jar'))).toEqual(jar);
     expect(h.s.snapshot().project?.gameSettings?.mods).toMatchObject([
-      { name: 'fabric-api.jar', policy: 'initial' },
+      { name: 'fabric-api.jar', policy: 'required' },
     ]);
-    expect([...(await h.readPack()).keys()]).toContain('mods/fabric-api.jar|initial-only');
-    await h.s.request({
-      action: 'settingsPackPolicy',
-      kind: 'mod',
-      name: 'fabric-api.jar',
-      policy: 'required',
-    });
     expect([...(await h.readPack()).keys()]).toContain('mods/fabric-api.jar|always');
-    await h.s.request({
-      action: 'settingsPackPolicy',
-      kind: 'mod',
-      name: 'fabric-api.jar',
-      policy: 'none',
-    });
-    expect([...(await h.readPack()).keys()]).not.toContain('mods/fabric-api.jar|always');
-    await h.reopenWithFiles([{ path: 'mods/fabric-api.jar', policy: 'always' }]);
-    expect([...(await h.readPack()).keys()]).not.toContain('mods/fabric-api.jar|always');
+    for (const policy of ['none', 'initial'] as const)
+      expect(
+        await h.s.request({
+          action: 'settingsPackPolicy',
+          kind: 'mod',
+          name: 'fabric-api.jar',
+          policy,
+        }),
+      ).toMatchObject({ ok: false, code: 'INVALID' });
+    expect(h.s.snapshot().project?.gameSettings?.mods).toMatchObject([{ policy: 'required' }]);
+    expect([...(await h.readPack()).keys()]).toContain('mods/fabric-api.jar|always');
+  });
+  it('normalizes a stored mod policy to always when loading and planning', () => {
+    const stored = {
+      ...newProject(),
+      gameSettings: {
+        options: [],
+        resourcePacks: [],
+        shaderPacks: [],
+        mods: [
+          { name: 'a.jar', sha256: 'a'.repeat(64), length: 4, policy: 'initial' },
+          { name: 'b.jar', sha256: 'b'.repeat(64), length: 4, policy: 'none' },
+        ],
+      },
+    };
+    const parsed = parseProject(stored);
+    expect(parsed.gameSettings?.mods?.map((m) => m.policy)).toEqual(['required', 'required']);
+    const plan = buildPlan(stored as never);
+    expect(plan.items.filter((i) => i.path.startsWith('mods/')).map((i) => i.policy)).toEqual([
+      'always',
+      'always',
+    ]);
   });
   it('rejects non-zip, oversized, badly named and linked packs and leaves no files', async () => {
     const source = await temp();
