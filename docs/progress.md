@@ -7,6 +7,18 @@
 
 ## 현재 상태와 다음 작업
 
+### STUDIO-AUTOSAVE-FILES-01 통합 (2026-10-25)
+
+사용자 보고: 모드를 추가한 뒤 저장 없이 Studio를 닫았다 열면 `files/mods/`에 파일은 있는데 목록이 비어 있음(추가 후 저장→재열기는 정상 재현 확인).
+Sonnet 작업자 `1387f25` → main `4d84713`.
+- 자동 저장: 모드/리소스팩/셰이더 추가·제거와 파일 페이지 추가가 성공하면 `save`와 같은 `writeProject()`로 프로젝트 전체를 즉시 저장하고 dirty를 해제한다.
+  저장 실패 시 목록 변경은 유지·dirty 유지하고 `packsAdded.saveFailed`/`autosaveFailed`로 알린다. 취소된 명령은 저장하지 않는다.
+- 열기·다시 읽기 시 `files/mods|resourcepacks|shaderpacks/`의 유효한 미등록 파일을 목록 끝에 이름순으로 등록(모드 always, 팩 initial,
+  `addPack` 검증+하드링크 거부, 무효 파일은 조용히 건너뜀, 누락 항목은 유지, 그것만으로 dirty 안 됨). 명세는 `docs/studio-project-format.md`.
+- 사용자 결정: 제거는 `files/` 안의 실제 파일도 삭제(자동 등록 때문에 필요). 원본은 처음 고른 위치에 남는다.
+- main 검증: `pnpm check` 119 files/**1574 passed**(9 skip), 공통 smoke, Studio 기능 smoke, branding smoke 성공.
+한계: 파일 페이지에는 별도 제거 명령이 없어 추가만 자동 저장, 대용량 폴더에서 열기·다시 읽기 때 신규 파일 해시로 느릴 수 있음, `new`/`saveAs` 직후 등록은 하지 않음.
+
 ### STUDIO-BUSY-LABEL-01 · STUDIO-MODS-ALWAYS-01 통합 (2026-10-25)
 
 - 모드/리소스팩/셰이더 추가 선택창이 열린 동안 상단 문구가 "게임 설정을 읽는 중"이던 문제: `bfdabb9` → main `88c97ec`.
