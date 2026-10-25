@@ -13,7 +13,10 @@ export function fileDirectory(filePath: string) {
 }
 
 export function normalizeFileDirectory(directory: string) {
-  const normalized = directory.trim().replace(/\/+$/, '');
+  const normalized = directory
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/^(?:(?:\.\/)|\/)+/, '');
   return normalized === '.' ? '' : normalized;
 }
 

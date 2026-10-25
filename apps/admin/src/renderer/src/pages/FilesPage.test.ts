@@ -73,9 +73,13 @@ describe('launcher folder path helpers', () => {
     expect(normalizeFileDirectory(' data/ ')).toBe('data');
     expect(normalizeFileDirectory('./')).toBe('');
     expect(normalizeFileDirectory('/')).toBe('');
+    expect(normalizeFileDirectory('./app/')).toBe('app');
+    expect(normalizeFileDirectory('/folder/')).toBe('folder');
     expect(targetPathForDirectory('custom.data', 'data/')).toBe('data/custom.data');
     expect(targetPathForDirectory('source/custom.data', '')).toBe('custom.data');
     expect(targetPathForDirectory('custom.data', './')).toBe('custom.data');
     expect(targetPathForDirectory('custom.data', '/')).toBe('custom.data');
+    expect(targetPathForDirectory('custom.data', './app/')).toBe('app/custom.data');
+    expect(targetPathForDirectory('custom.data', '/folder/')).toBe('folder/custom.data');
   });
 });

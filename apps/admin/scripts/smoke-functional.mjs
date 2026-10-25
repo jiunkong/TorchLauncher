@@ -666,6 +666,24 @@ try {
   assert.equal(await targetDialog.getByTestId('files-target-save').isDisabled(), true);
   await targetInput.press('Escape');
   await targetDialog.waitFor({ state: 'detached' });
+  for (const [folder, target] of [
+    ['./app/', 'app/custom.data'],
+    ['/folder/', 'folder/custom.data'],
+    ['/', 'custom.data'],
+  ]) {
+    await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
+    targetDialog = page.getByTestId('files-target-dialog');
+    targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
+    await targetInput.fill(folder);
+    await targetDialog.getByTestId('files-target-save').click();
+    await targetDialog.waitFor({ state: 'detached' });
+    await page.waitForFunction(
+      async (expected) =>
+        (await window.torchlauncher.request({ action: 'state' })).state.project.files[0]
+          .targetPath === expected,
+      target,
+    );
+  }
   await customRow.getByRole('button', { name: 'custom.data의 런처 폴더 편집' }).click();
   targetDialog = page.getByTestId('files-target-dialog');
   targetInput = targetDialog.getByLabel('custom.data의 런처 폴더');
