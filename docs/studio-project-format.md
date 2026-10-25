@@ -59,4 +59,11 @@
 - **자동 저장**: 파일을 프로젝트 폴더에 넣는 명령(`settingsPackAdd`, `settingsPackRemove`(목록 항목과 `files/` 안의 파일을 함께 제거), Files 페이지 `files` 추가)이 성공하면 `save`와 같은 원자적 경로로 즉시 저장하고 `dirty: false`가 된다(다른 미저장 편집도 함께 저장). 자동 저장이 실패하면 변경은 메모리에 남고 `dirty`는 `true`로 유지되며 결과(`saveFailed` / `autosaveFailed`)로 알린다.
 - **다른 이름으로 저장 (`saveAs`)**: `new`와 같은 이름 입력·상위 폴더 선택으로 새 폴더를 만들고 `files/`와 `project.torchproj`를 전체 복사한 뒤 새 폴더로 전환한다. 원본과 같거나 포함 관계인 대상은 `INVALID`로 거부한다.
 - **파일 추가**: 프로젝트 폴더 밖의 파일은 항상 `files/`로 안전하게 복사된다. 대상 경로에 이미 내용이 다른 파일이 존재할 경우 덮어쓰지 않고 `INVALID`로 거부된다.
+- **파일 항목 (`project.files`, 2026-10-25)**: 각 항목은 정확히 `path`, `targetPath`, `policy` 세 필드를 가진다.
+  - `path`: `files/` 기준 원본 경로(페이로드를 읽는 곳). `targetPath`: 게임 폴더 기준 배포 경로로, 배포 인덱스의 `path`에 기록된다. 둘 다 배포 경로 규칙(코어 `validateDeploymentPath`: 상대·`/` 구분·`..`/빈 요소/제어 문자/`.torchlauncher` 금지 등)을 따르고 `targetPath`끼리는 대소문자를 무시하고 중복될 수 없다. 새로 추가한 파일은 `targetPath = path`, `policy = always`로 시작한다.
+  - `policy`는 `always` 또는 `initial-only`만 허용한다. 예전의 `excluded`는 제거됐다. 프로젝트에 없는 `files/` 안의 파일은 배포에 들어가지 않고 Files 페이지에도 나열되지 않는다(진단용 `state.files`에는 `excluded`로 남는다).
+  - 관리 파일(`options.txt`·플레이어 설정 정책 `torchlauncher/settings-policy.json`·`mods/*.jar`·`resourcepacks/`·`shaderpacks/`)은 설정·모드·팩 화면이 관리하므로 `path`와 `targetPath` 어느 쪽에도 둘 수 없고(프로젝트 파싱이 `INVALID`), 파일 추가 선택에서는 건너뛴다. 팩 목록에서 자동 등록된 파일은 `managed`로 표시되어 Files 페이지에 나타나지 않는다.
+  - 명령: `filesPolicy`(이미 등록된 파일의 정책 변경), `filesTarget`(`targetPath` 변경, 원본이 링크가 아닌 실제 파일이어야 함, 위 규칙 위반은 `INVALID`), `filesRemove`(항목과 `files/`의 원본 파일을 함께 삭제, 링크는 따르지 않고 거부, 이미 없는 파일은 항목만 제거). `files`/`filesTarget`/`filesRemove`는 성공 시 자동 저장한다.
+  - `lastBuild.files[]`는 `sourcePath`, `path`(= 배포 `targetPath`), `sha256`, `length`, `policy`를 모두 가진다. 변경 비교는 `sourcePath`로 매칭하며 `path`나 `policy`가 달라도 `modified`다. 삭제된 항목은 `removed`로 보인다.
+  - 호환: 개발 단계 정책에 따라 `targetPath`가 없는 항목, `excluded` 정책, `sourcePath`가 없는 `lastBuild.files`를 읽는 호환 reader나 마이그레이션은 없다. 이런 프로젝트는 `INVALID`로 거부된다.
 - **프로젝트 폴더 표시**: 파일 메뉴 `파일 > 프로젝트 폴더 표시` 및 파일 페이지의 버튼을 통해 OS 기본 파일 관리자로 프로젝트 폴더를 연다.

@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { openDeploymentReader } from '../../../../packages/core/src/deployment/reader/index.js';
 import { RangeNotSupportedError } from '../../../../packages/core/src/download/http/range-client.js';
 import type { DownloadSource } from '../../../../packages/core/src/download/source/index.js';
 import type { StudioFileEntry, StudioState } from '../shared/studio.js';
@@ -18,7 +19,8 @@ import { createProjectAt } from './fixtures/projects.js';
 import { StudioService } from './fixtures/signing.js';
 import { readZip } from './fixtures/zip.js';
 import { parseProject } from './project.js';
-import { PROJECT_DATA_DIR } from './project-folder.js';
+import { decodeProjectFile } from './project-file.js';
+import { PROJECT_DATA_DIR, PROJECT_FILE_NAME } from './project-folder.js';
 import type { StudioDialogs } from './studio.js';
 import { writeZip } from './zip.js';
 
@@ -86,8 +88,21 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
     await writeFile(join(source, path), content);
   }
   await s.request({ action: 'rescan' });
-  const include = async (paths: string[], policy: 'always' | 'initial-only') =>
-    s.request({ action: 'filesPolicy', paths, policy });
+  /** Adds source files through the file picker, as a user would. New files start as `always`. */
+  const add = async (paths: string[]) => {
+    d.open.mockResolvedValueOnce(paths.map((path) => join(source, path)));
+    return s.request({ action: 'files' });
+  };
+  /** Adds the files that are not in the project yet, then sets their policy. */
+  const include = async (paths: string[], policy: 'always' | 'initial-only') => {
+    const known = new Set((s.snapshot().project?.files ?? []).map((f) => f.path));
+    const fresh = paths.filter((path) => !known.has(path));
+    if (fresh.length > 0) {
+      const added = await add(fresh);
+      if (!added.ok) return added;
+    }
+    return s.request({ action: 'filesPolicy', paths, policy });
+  };
   const edit = async (change: (p: ReturnType<typeof parseProject>) => void) => {
     const p = parseProject(s.snapshot().project);
     change(p);
@@ -104,7 +119,7 @@ async function harness(files: Record<string, string> = { 'a.txt': 'aaaa', 'b.txt
   await edit((p) => {
     p.sourceUrl = 'https://example.org/pack';
   });
-  return { root, projDir, source, d, s, remote, include, edit, build };
+  return { root, projDir, source, d, s, remote, add, include, edit, build };
 }
 const entry = (state: StudioState, path: string): StudioFileEntry => {
   const found = state.files?.entries.find((e) => e.path === path);
@@ -113,20 +128,29 @@ const entry = (state: StudioState, path: string): StudioFileEntry => {
 };
 
 describe('files diff against the last build', () => {
-  it('lists source files as excluded until included, with no change marks before a first build', async () => {
+  it('lists unmanaged source files as unassigned until added, with no change marks before a first build', async () => {
     const h = await harness({ 'a.txt': 'aaaa', 'sub/b.txt': 'bb' });
     const state = h.s.snapshot();
     expect(state.files?.counts).toMatchObject({ total: 2, excluded: 2, added: 0 });
-    expect(entry(state, 'a.txt')).toMatchObject({ policy: 'excluded', change: null, size: 4 });
+    expect(entry(state, 'a.txt')).toMatchObject({
+      policy: 'excluded',
+      targetPath: null,
+      change: null,
+      size: 4,
+    });
     expect(state.deploy).toMatchObject({ status: 'none', lastBuild: null });
-    expect((await h.include(['a.txt', 'sub/b.txt'], 'always')).ok).toBe(true);
+    expect((await h.add(['a.txt', 'sub/b.txt'])).ok).toBe(true);
     expect(h.s.snapshot().files?.counts).toMatchObject({ excluded: 0, total: 2 });
+    expect(entry(h.s.snapshot(), 'sub/b.txt')).toMatchObject({
+      policy: 'always',
+      targetPath: 'sub/b.txt',
+    });
     expect(h.s.snapshot().project?.files).toEqual([
       { path: 'a.txt', targetPath: 'a.txt', policy: 'always' },
       { path: 'sub/b.txt', targetPath: 'sub/b.txt', policy: 'always' },
     ]);
   });
-  it('reports added, modified (same size), policy-modified, removed and excluded correctly', async () => {
+  it('reports added, modified (same size), policy-modified and removed correctly', async () => {
     const h = await harness({ 'a.txt': 'aaaa', 'b.txt': 'bbbb', 'c.txt': 'cccc', 'd.txt': 'dddd' });
     await h.include(['a.txt', 'b.txt', 'd.txt'], 'always');
     await h.build();
@@ -141,7 +165,13 @@ describe('files diff against the last build', () => {
     await h.s.request({ action: 'rescan' });
     const state = h.s.snapshot();
     expect(entry(state, 'a.txt')).toMatchObject({ policy: 'always', change: 'modified' });
-    expect(entry(state, 'b.txt')).toMatchObject({ policy: 'excluded', change: 'removed' });
+    // Delete removed b.txt from the project and from files/; the diff keeps it as a removal.
+    expect(entry(state, 'b.txt')).toMatchObject({
+      policy: 'excluded',
+      change: 'removed',
+      size: null,
+    });
+    expect(state.project?.files.map((f) => f.path)).not.toContain('b.txt');
     expect(entry(state, 'c.txt')).toMatchObject({ policy: 'initial-only', change: 'added' });
     expect(entry(state, 'd.txt')).toMatchObject({ policy: 'initial-only', change: 'modified' });
     expect(state.files?.counts).toMatchObject({ added: 1, modified: 2, removed: 1 });
@@ -221,6 +251,258 @@ describe('files diff against the last build', () => {
       ok: false,
       code: 'INVALID',
     });
+  });
+});
+
+describe('file targets, policies and deletion', () => {
+  const rejected = { ok: false, code: 'INVALID' };
+  const savedFiles = async (h: Awaited<ReturnType<typeof harness>>) =>
+    decodeProjectFile(await readFile(join(h.projDir, PROJECT_FILE_NAME)), () => {
+      throw new Error('no images expected');
+    }).project.files;
+  const target = (h: Awaited<ReturnType<typeof harness>>, path: string, targetPath: string) =>
+    h.s.request({ action: 'filesTarget', path, targetPath });
+  const readIndex = async (h: Awaited<ReturnType<typeof harness>>) =>
+    openDeploymentReader(memorySource(await readFile(await h.build())), {
+      expectedServerId: parseProject(h.s.snapshot().project).serverId,
+    });
+
+  it('retargets a source file; the index carries targetPath while the payload comes from the source path', async () => {
+    const h = await harness({ 'a.txt': 'from source', 'b.txt': 'bbbb' });
+    await h.include(['a.txt', 'b.txt'], 'always');
+    expect((await target(h, 'a.txt', 'config/nested/renamed.cfg')).ok).toBe(true);
+    expect(h.s.snapshot().project?.files).toEqual([
+      { path: 'a.txt', targetPath: 'config/nested/renamed.cfg', policy: 'always' },
+      { path: 'b.txt', targetPath: 'b.txt', policy: 'always' },
+    ]);
+    expect(entry(h.s.snapshot(), 'a.txt')).toMatchObject({
+      targetPath: 'config/nested/renamed.cfg',
+    });
+    const reader = await readIndex(h);
+    expect(reader.index.files.map((f) => f.path).sort()).toEqual([
+      'b.txt',
+      'config/nested/renamed.cfg',
+    ]);
+    await reader.stageFile('config/nested/renamed.cfg', join(h.root, 'staged'));
+    expect(await readFile(join(h.root, 'staged'), 'utf8')).toBe('from source');
+    // The record keeps both paths, and the diff follows the source path.
+    expect(h.s.snapshot().project?.lastBuild?.files.map((f) => [f.sourcePath, f.path])).toEqual([
+      ['a.txt', 'config/nested/renamed.cfg'],
+      ['b.txt', 'b.txt'],
+    ]);
+    expect(h.s.snapshot().deploy).toMatchObject({ status: 'upToDate', reasons: [] });
+    await h.s.request({ action: 'rescan' });
+    expect(entry(h.s.snapshot(), 'a.txt')).toMatchObject({ change: 'unchanged' });
+    // Changing only the target is a change; changing it back is not.
+    expect((await target(h, 'a.txt', 'other.cfg')).ok).toBe(true);
+    expect(entry(h.s.snapshot(), 'a.txt')).toMatchObject({ change: 'modified' });
+    expect(h.s.snapshot().deploy).toMatchObject({ status: 'changed', reasons: ['files'] });
+    expect((await target(h, 'a.txt', 'config/nested/renamed.cfg')).ok).toBe(true);
+    expect(h.s.snapshot().deploy?.status).toBe('upToDate');
+  });
+  it('saves a target change automatically', async () => {
+    const h = await harness({ 'a.txt': 'a' });
+    await h.include(['a.txt'], 'always');
+    await h.s.request({ action: 'save' });
+    expect(await target(h, 'a.txt', 'x/a.txt')).toMatchObject({
+      ok: true,
+      state: { dirty: false },
+    });
+    expect(await savedFiles(h)).toEqual([
+      { path: 'a.txt', targetPath: 'x/a.txt', policy: 'always' },
+    ]);
+  });
+  it('rejects unsafe, duplicate, managed and unknown targets and leaves the project untouched', async () => {
+    const h = await harness({ 'a.txt': 'a', 'b.txt': 'b', 'options.txt': 'o', 'sub/c.txt': 'c' });
+    await h.include(['a.txt', 'b.txt', 'sub/c.txt'], 'always');
+    const before = h.s.snapshot().project?.files;
+    const bad = [
+      '../escape.txt',
+      '/etc/passwd',
+      'C:/x.txt',
+      'x\\y.txt',
+      'a//b.txt',
+      './a.txt',
+      'dir/../a.txt',
+      'dir/',
+      '.torchlauncher/state',
+      'a\u0000b',
+      // managed destinations
+      'options.txt',
+      'OPTIONS.TXT',
+      'mods/x.jar',
+      'resourcepacks/x.zip',
+      'shaderpacks/x.zip',
+      'torchlauncher/settings-policy.json',
+      // another file's target, also with different case
+      'b.txt',
+      'B.TXT',
+      'sub/c.txt',
+    ];
+    for (const targetPath of bad)
+      expect(await target(h, 'a.txt', targetPath), targetPath).toEqual(rejected);
+    expect(await target(h, 'nope.txt', 'z.txt')).toEqual(rejected);
+    // a managed or unlisted source cannot be retargeted
+    expect(await target(h, 'options.txt', 'z.txt')).toEqual(rejected);
+    expect(await h.s.request({ action: 'filesTarget', path: 'a.txt' })).toEqual(rejected);
+    expect(await h.s.request({ action: 'filesTarget', path: 'a.txt', targetPath: 1 })).toEqual(
+      rejected,
+    );
+    expect(await h.s.request({ action: 'filesTarget', path: '', targetPath: 'z' })).toEqual(
+      rejected,
+    );
+    expect(h.s.snapshot().project?.files).toEqual(before);
+    // A target equal to the file's own target is a no-op and stays valid.
+    expect((await target(h, 'a.txt', 'a.txt')).ok).toBe(true);
+  });
+  it('does not retarget through a link or for a file that left the source folder', async () => {
+    const h = await harness({ 'a.txt': 'a', 'b.txt': 'b' });
+    await h.include(['a.txt', 'b.txt'], 'always');
+    await rm(join(h.source, 'b.txt'));
+    expect(await target(h, 'b.txt', 'moved.txt')).toEqual(rejected);
+    await writeFile(join(h.root, 'outside.txt'), 'secret');
+    await symlink(join(h.root, 'outside.txt'), join(h.source, 'link.txt'));
+    expect(
+      await h.s.request({ action: 'filesPolicy', paths: ['link.txt'], policy: 'always' }),
+    ).toEqual(rejected);
+    expect(await target(h, 'link.txt', 'x.txt')).toEqual(rejected);
+  });
+  it('rejects project files with a managed or duplicate source or target on load, with no legacy reader', async () => {
+    const h = await harness({ 'a.txt': 'a' });
+    const project = parseProject(h.s.snapshot().project);
+    const withFiles = (files: unknown) => ({ ...project, files });
+    const f = (path: string, targetPath: string) => ({ path, targetPath, policy: 'always' });
+    expect(() => parseProject(withFiles([f('a.txt', 'a.txt')]))).not.toThrow();
+    expect(() => parseProject(withFiles([f('a.txt', 'options.txt')]))).toThrow();
+    expect(() => parseProject(withFiles([f('options.txt', 'x.txt')]))).toThrow();
+    expect(() => parseProject(withFiles([f('mods/a.jar', 'a.jar')]))).toThrow();
+    expect(() => parseProject(withFiles([f('a.txt', 'x.txt'), f('b.txt', 'X.txt')]))).toThrow();
+    expect(() => parseProject(withFiles([f('a.txt', 'x.txt'), f('a.txt', 'y.txt')]))).toThrow();
+    // earlier shapes: no targetPath, or the removed excluded policy
+    expect(() => parseProject(withFiles([{ path: 'a.txt', policy: 'always' }]))).toThrow();
+    expect(() =>
+      parseProject(withFiles([{ path: 'a.txt', targetPath: 'a.txt', policy: 'excluded' }])),
+    ).toThrow();
+  });
+  it('sets always and initial-only per file and carries them into the deployment', async () => {
+    const h = await harness({ 'a.txt': 'a', 'b.txt': 'b' });
+    expect((await h.add(['a.txt', 'b.txt'])).ok).toBe(true);
+    expect(h.s.snapshot().project?.files.map((f) => f.policy)).toEqual(['always', 'always']);
+    expect((await h.include(['b.txt'], 'initial-only')).ok).toBe(true);
+    expect(
+      await h.s.request({ action: 'filesPolicy', paths: ['a.txt'], policy: 'excluded' }),
+    ).toEqual(rejected);
+    const reader = await readIndex(h);
+    expect(reader.index.files.map((f) => [f.path, f.policy])).toEqual([
+      ['a.txt', 'always'],
+      ['b.txt', 'initial-only'],
+    ]);
+    // Switching the policy alone is a change against the last build.
+    await h.include(['b.txt'], 'always');
+    expect(entry(h.s.snapshot(), 'b.txt')).toMatchObject({ policy: 'always', change: 'modified' });
+  });
+  it('does not set a policy for a file that is not in the project yet', async () => {
+    const h = await harness({ 'a.txt': 'a' });
+    expect(
+      await h.s.request({ action: 'filesPolicy', paths: ['a.txt'], policy: 'always' }),
+    ).toEqual(rejected);
+  });
+  it('deletes the entry and the file from files/ and saves automatically', async () => {
+    const h = await harness({ 'a.txt': 'a', 'sub/b.txt': 'b' });
+    await h.include(['a.txt', 'sub/b.txt'], 'always');
+    await h.build();
+    await h.s.request({ action: 'save' });
+    const reply = await h.s.request({ action: 'filesRemove', path: 'sub/b.txt' });
+    expect(reply).toMatchObject({ ok: true, state: { dirty: false } });
+    expect(await readdir(join(h.source, 'sub'))).toEqual([]);
+    expect(await readFile(join(h.source, 'a.txt'), 'utf8')).toBe('a');
+    expect(h.s.snapshot().project?.files.map((f) => f.path)).toEqual(['a.txt']);
+    expect((await savedFiles(h)).map((f) => f.path)).toEqual(['a.txt']);
+    expect(entry(h.s.snapshot(), 'sub/b.txt')).toMatchObject({ change: 'removed', size: null });
+    expect(h.s.snapshot().deploy).toMatchObject({ status: 'changed', reasons: ['files'] });
+    // The file is gone, so a rescan never brings the entry back.
+    await h.s.request({ action: 'rescan' });
+    expect(h.s.snapshot().project?.files.map((f) => f.path)).toEqual(['a.txt']);
+    // Deleting a file that is already gone from disk still drops the entry.
+    await rm(join(h.source, 'a.txt'));
+    expect((await h.s.request({ action: 'filesRemove', path: 'a.txt' })).ok).toBe(true);
+    expect(h.s.snapshot().project?.files).toEqual([]);
+  });
+  it('rejects deleting managed, unknown, unlisted and linked files and keeps them', async () => {
+    const h = await harness({
+      'a.txt': 'a',
+      'unlisted.txt': 'u',
+      'options.txt': 'o',
+      'resourcepacks/p.zip': 'z',
+    });
+    await h.include(['a.txt'], 'always');
+    for (const path of ['options.txt', 'resourcepacks/p.zip', 'unlisted.txt', 'nope.txt', '../x'])
+      expect(await h.s.request({ action: 'filesRemove', path }), path).toEqual(rejected);
+    expect(await h.s.request({ action: 'filesRemove', path: 1 })).toEqual(rejected);
+    expect(await readFile(join(h.source, 'options.txt'), 'utf8')).toBe('o');
+    expect(await readFile(join(h.source, 'unlisted.txt'), 'utf8')).toBe('u');
+    expect(await readFile(join(h.source, 'resourcepacks/p.zip'), 'utf8')).toBe('z');
+    // a source replaced by a link is never followed or removed
+    await writeFile(join(h.root, 'outside.txt'), 'secret');
+    await rm(join(h.source, 'a.txt'));
+    await symlink(join(h.root, 'outside.txt'), join(h.source, 'a.txt'));
+    expect(await h.s.request({ action: 'filesRemove', path: 'a.txt' })).toEqual(rejected);
+    expect(await readFile(join(h.root, 'outside.txt'), 'utf8')).toBe('secret');
+    expect(h.s.snapshot().project?.files.map((f) => f.path)).toEqual(['a.txt']);
+  });
+  it('keeps the removal and flags a failed automatic save', async () => {
+    const h = await harness({ 'a.txt': 'a' });
+    await h.include(['a.txt'], 'always');
+    await rm(join(h.projDir, PROJECT_FILE_NAME));
+    await mkdir(join(h.projDir, PROJECT_FILE_NAME));
+    expect(await h.s.request({ action: 'filesRemove', path: 'a.txt' })).toMatchObject({
+      ok: true,
+      state: { dirty: true, result: { key: 'autosaveFailed' } },
+    });
+    expect(h.s.snapshot().project?.files).toEqual([]);
+  });
+  it('lists reconciled pack files as managed so the Files page does not show them, and keeps plain files out of managed paths', async () => {
+    const h = await harness({ 'a.txt': 'a' });
+    await h.include(['a.txt'], 'always');
+    const zip = Buffer.concat([Buffer.from('504b0304', 'hex'), Buffer.from('p')]);
+    await mkdir(join(h.source, 'resourcepacks'), { recursive: true });
+    await mkdir(join(h.source, 'mods'), { recursive: true });
+    await writeFile(join(h.source, 'resourcepacks', 'rp.zip'), zip);
+    await writeFile(join(h.source, 'mods', 'm.jar'), zip);
+    await h.s.request({ action: 'rescan' });
+    const settings = h.s.snapshot().project?.gameSettings;
+    expect(settings?.resourcePacks.map((p) => p.name)).toEqual(['rp.zip']);
+    expect(settings?.mods?.map((p) => [p.name, p.policy])).toEqual([['m.jar', 'required']]);
+    expect(h.s.snapshot().project?.files.map((f) => f.path)).toEqual(['a.txt']);
+    const state = h.s.snapshot();
+    expect(entry(state, 'resourcepacks/rp.zip')).toMatchObject({ policy: 'managed' });
+    expect(entry(state, 'mods/m.jar')).toMatchObject({ policy: 'managed' });
+    // Add-by-picker skips managed locations, and a target in them is refused.
+    h.d.open.mockResolvedValueOnce([
+      join(h.source, 'resourcepacks', 'rp.zip'),
+      join(h.source, 'mods', 'm.jar'),
+    ]);
+    expect((await h.s.request({ action: 'files' })).ok).toBe(true);
+    expect(h.s.snapshot().project?.files.map((f) => f.path)).toEqual(['a.txt']);
+    expect(await target(h, 'a.txt', 'resourcepacks/rp.zip')).toEqual(rejected);
+    expect(await target(h, 'a.txt', 'mods/m.jar')).toEqual(rejected);
+    const reader = await readIndex(h);
+    expect(reader.index.files.map((f) => f.path).sort()).toEqual([
+      'a.txt',
+      'mods/m.jar',
+      'resourcepacks/rp.zip',
+      'torchlauncher/settings-policy.json',
+    ]);
+  });
+  it('skips an external file whose name is a managed path without copying it', async () => {
+    const h = await harness({});
+    const outside = join(h.root, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'options.txt'), 'o');
+    h.d.open.mockResolvedValueOnce([join(outside, 'options.txt')]);
+    expect((await h.s.request({ action: 'files' })).ok).toBe(true);
+    expect(await readdir(h.source)).toEqual([]);
+    expect(h.s.snapshot().project?.files).toEqual([]);
   });
 });
 

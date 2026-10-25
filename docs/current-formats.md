@@ -9,6 +9,7 @@
 | `.torchpack` | 1.2, 64B 헤더 + 64B Ed25519 서명 + 인덱스 + 페이로드. sequence/branding 필수 | 1.0/1.1 및 다른 버전은 헤더 검사에서 거부. 무서명 생성 없음 |
 | `torchlauncher-server.json` | `version:1`, `signing:{algorithm:'ed25519',publicKey}` 필수 | signing 없는 구성 거부 |
 | `.torchproj` (프로젝트 폴더) | 프로젝트 폴더(`<dir>/project.torchproj` + `<dir>/files/`), 바이너리 컨테이너 schema1 | 단일 파일 직접 열기 및 예전 JSON 프로젝트·다른 schema 거부, 변환 reader 없음 |
+| 프로젝트 파일 항목 | `files[]`는 `{path, targetPath, policy}`(`policy`는 `always`/`initial-only`), `lastBuild.files[]`는 `{sourcePath, path, sha256, length, policy}`. 관리 경로는 원본·대상 모두 금지 | `targetPath` 없음·`excluded` 정책·`sourcePath` 없는 lastBuild는 `INVALID`로 거부, 변환 reader 없음 |
 | `.torchkey` | 현재 암호화 백업 version1, scrypt + AES-256-GCM | 옛 확장자 필터/마이그레이션 없음. 내용은 현재 단일 schema로 검사 |
 | settings-policy | 현재 version1의 선택 `configFiles`와 혼합 정책 | 이전 version2·옛 상태 구조는 거부 |
 | 잠금 `owner.json` | version2, owner·process identity·host·child 포함 | version1은 구조 해석하지 않음. invalid/불확실 잠금으로 보호하며 자동 삭제·자동 회수하지 않음 |
