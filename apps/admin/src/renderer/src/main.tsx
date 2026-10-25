@@ -7,6 +7,7 @@ import './splash.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing application root');
+root.addEventListener('dragstart', (event) => event.preventDefault(), true);
 
 createRoot(root).render(
   <StrictMode>
